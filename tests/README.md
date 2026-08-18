@@ -12,6 +12,7 @@ heißt bestanden.
 .venv/Scripts/python.exe tests/test_proxy.py
 .venv/Scripts/python.exe tests/test_kategorien.py
 .venv/Scripts/python.exe tests/test_durchfahrt.py
+.venv/Scripts/python.exe tests/test_einstellungen.py
 node tests/test_durchfahrt_js.js
 ```
 
@@ -40,7 +41,12 @@ node tests/test_durchfahrt_js.js
 - `test_durchfahrt_js.js` – die Filterlogik selbst, unter **node**, gegen
   dieselbe Datei, die der Browser lädt.
 
-Die sechs legen sich eigene Wegwerf-Datenbanken unter dem Temp-Verzeichnis an.
+- `test_einstellungen.py` – die im Backoffice gepflegte Benachrichtigungs-
+  adresse: speichern, prüfen, abschalten, und dass bei einem neuen Antrag genau
+  eine Meldung entsteht. Dazu der Umbau von `mail_out` auf einer alten
+  Datenbank (Daten, Index und neuer Typ).
+
+Die legen sich eigene Wegwerf-Datenbanken unter dem Temp-Verzeichnis an.
 
 ## Mit Server
 

@@ -63,7 +63,64 @@ NACHTRAEGLICHE_SPALTEN = (
 )
 
 
-def _migrieren(con: sqlite3.Connection) -> list:
+# Spalten von mail_out in der Reihenfolge, in der beim Umbau kopiert wird.
+_MAIL_OUT_SPALTEN = (
+    "id", "antrag_id", "typ", "empfaenger", "betreff", "body",
+    "versuche", "gesendet_am", "letzter_fehler", "naechster_versuch", "created_at",
+)
+
+
+def _mail_out_umbauen(con: sqlite3.Connection) -> bool:
+    """Zieht den CHECK auf mail_out.typ nach.
+
+    SQLite kann Constraints nicht aendern, deshalb die uebliche Prozedur: neue
+    Tabelle daneben, Daten hinueber, alte weg, umbenennen. Laeuft nur, wenn die
+    gespeicherte Definition den Typ 'orga' noch nicht kennt.
+    """
+    zeile = con.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'mail_out'"
+    ).fetchone()
+    if zeile is None or "'orga'" in zeile["sql"]:
+        return False
+
+    # Fremdschluessel fuer den Umbau abschalten - so steht es in der
+    # SQLite-Anleitung. Sonst scheitert das Kopieren an Zeilen, deren Antrag es
+    # nicht mehr gibt; die alte Tabelle kannte diese Bedingung noch nicht.
+    # PRAGMA wirkt nur ausserhalb einer Transaktion, deshalb hier und nicht im
+    # Skript.
+    con.execute("PRAGMA foreign_keys = OFF")
+    spalten = ", ".join(_MAIL_OUT_SPALTEN)
+    try:
+        con.executescript(
+            f"""
+        BEGIN;
+        CREATE TABLE mail_out_neu (
+          id          INTEGER PRIMARY KEY,
+          antrag_id   INTEGER REFERENCES antrag(id) ON DELETE CASCADE,
+          typ         TEXT NOT NULL
+                      CHECK (typ IN ('eingang', 'genehmigt', 'abgelehnt', 'orga')),
+          empfaenger  TEXT NOT NULL,
+          betreff     TEXT NOT NULL,
+          body        TEXT NOT NULL,
+          versuche    INTEGER NOT NULL DEFAULT 0,
+          gesendet_am TEXT,
+          letzter_fehler TEXT,
+          naechster_versuch TEXT,
+          created_at  TEXT NOT NULL
+        );
+        INSERT INTO mail_out_neu ({spalten}) SELECT {spalten} FROM mail_out;
+        DROP TABLE mail_out;
+        ALTER TABLE mail_out_neu RENAME TO mail_out;
+        CREATE INDEX IF NOT EXISTS idx_mail_out_offen ON mail_out (gesendet_am, versuche);
+        COMMIT;
+        """
+        )
+    finally:
+        con.execute("PRAGMA foreign_keys = ON")
+    return True
+
+
+def _spalten_nachtragen(con: sqlite3.Connection) -> list:
     ergaenzt = []
     for tabelle, spalte, typ in NACHTRAEGLICHE_SPALTEN:
         vorhanden = {z["name"] for z in con.execute(f"PRAGMA table_info({tabelle})")}
@@ -85,7 +142,12 @@ def init() -> list:
         con.execute("PRAGMA journal_mode = WAL")
         with con:
             con.executescript(SCHEMA.read_text(encoding="utf-8"))
-            return _migrieren(con)
+            ergaenzt = _spalten_nachtragen(con)
+        # Der Tabellenumbau braucht abgeschaltete Fremdschluessel und damit
+        # eine eigene Transaktion – deshalb ausserhalb des with-Blocks.
+        if _mail_out_umbauen(con):
+            ergaenzt.append("mail_out.typ (Umbau: Typ 'orga' ergaenzt)")
+        return ergaenzt
     finally:
         con.close()
 
@@ -567,3 +629,25 @@ def durchfahrt_token_erzeugen() -> str:
 
 def durchfahrt_token_zuruecknehmen() -> bool:
     return einstellung_loeschen(TOKEN_SCHLUESSEL)
+
+
+# --- Benachrichtigung der Orga bei neuen Antraegen --------------------------
+
+BENACHRICHTIGUNG_SCHLUESSEL = "benachrichtigung_mail"
+
+
+def benachrichtigung_mail() -> str:
+    """Adresse, die bei jedem neuen Antrag eine Nachricht bekommt.
+
+    Leer heisst: niemand wird benachrichtigt. Steht bewusst in der Datenbank
+    und nicht in der Env, damit sie sich ohne Neustart aendern laesst.
+    """
+    return einstellung_lesen(BENACHRICHTIGUNG_SCHLUESSEL) or ""
+
+
+def benachrichtigung_mail_setzen(adresse: str) -> None:
+    adresse = (adresse or "").strip()
+    if adresse:
+        einstellung_setzen(BENACHRICHTIGUNG_SCHLUESSEL, adresse)
+    else:
+        einstellung_loeschen(BENACHRICHTIGUNG_SCHLUESSEL)

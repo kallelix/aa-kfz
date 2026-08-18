@@ -41,12 +41,16 @@ chmod 750 /var/lib/abfahrt /var/backups/abfahrt
 ### Code und virtuelle Umgebung
 
 ```bash
-# Projekt nach /opt/abfahrt bringen (git clone, rsync, scp – wie es passt)
+apt install -y git
+git clone https://github.com/kallelix/aa-kfz.git /opt/abfahrt
 cd /opt/abfahrt
 python3 -m venv .venv
 .venv/bin/pip install --no-cache-dir -r requirements.txt
 chown -R abfahrt:abfahrt /opt/abfahrt
 ```
+
+`.venv/` und `data/` stehen in `.gitignore`, ein späteres `git pull` fasst sie
+also nicht an. Die Datenbank liegt ohnehin unter `/var/lib/abfahrt`.
 
 ### Konfiguration
 
@@ -197,16 +201,73 @@ Im Browser:
 ## 5. Aktualisieren
 
 ```bash
+# 1. Sichern, bevor irgendetwas angefasst wird
+/opt/abfahrt/deploy/backup.sh
+
+# 2. Stand holen
 cd /opt/abfahrt
-git pull                      # oder neu hochladen
-.venv/bin/pip install -r requirements.txt
+git pull
+
+# 3. Abhängigkeiten nachziehen (schadet nie, dauert ohne Änderung Sekunden)
+.venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# 4. Rechte wieder geraderücken – git pull legt neue Dateien als root an
+chown -R abfahrt:abfahrt /opt/abfahrt
+
+# 5. Neu starten und nachsehen
 systemctl restart kennzeichen
-journalctl -u kennzeichen -n 30
+systemctl status kennzeichen --no-pager
+journalctl -u kennzeichen -n 30 --no-pager
 ```
 
-Fehlende Datenbankspalten trägt die App beim Start selbst nach und schreibt das
-ins Protokoll. Eine Sicherung vor dem Update ist trotzdem die günstigere
-Reihenfolge.
+Im Protokoll gehören nach dem Start keine Warnungen zu `FORWARDED_ALLOW_IPS`,
+`APP_SECRET_KEY` oder `ADMIN_PASSWORD_HASH` zu sehen. Steht dort eine Zeile
+`Datenbank ergaenzt: …`, hat die App ein Schema-Update selbst erledigt – das ist
+normal und gewollt.
+
+Danach einmal im Browser: Formular lädt, Backoffice lädt, ein Antrag lässt sich
+öffnen.
+
+### Schema-Änderungen
+
+Die App zieht fehlende Spalten und geänderte Tabellen beim Start selbst nach und
+schreibt es ins Protokoll. Ein Datenbankumbau (etwa als `mail_out.typ` um den
+Typ `orga` erweitert wurde) läuft in einer Transaktion: entweder ganz oder gar
+nicht. Trotzdem gilt Schritt 1 – eine Sicherung kostet zwei Sekunden.
+
+### Wenn das Update schiefgeht
+
+```bash
+# Auf den vorherigen Stand zurück
+cd /opt/abfahrt
+git log --oneline -5          # Commit von vorher heraussuchen
+git checkout <commit>
+.venv/bin/pip install --no-cache-dir -r requirements.txt
+systemctl restart kennzeichen
+```
+
+Zurück auf die aktuelle Spitze geht es mit `git checkout main`.
+
+Ist die **Datenbank** das Problem, hilft der Code-Rollback allein nicht – dann
+die Sicherung aus Schritt 1 zurückspielen:
+
+```bash
+systemctl stop kennzeichen
+cp /var/backups/abfahrt/antraege-JJJJ-MM-TT.db /var/lib/abfahrt/antraege.db
+rm -f /var/lib/abfahrt/antraege.db-wal /var/lib/abfahrt/antraege.db-shm
+chown abfahrt:abfahrt /var/lib/abfahrt/antraege.db
+systemctl start kennzeichen
+```
+
+Die beiden `-wal`- und `-shm`-Dateien müssen weg: sie gehören zur alten
+Datenbank und passen nicht zur zurückgespielten.
+
+### Lokale Änderungen am Server
+
+Wenn jemand direkt auf dem Server etwas editiert hat, bricht `git pull` ab. Was
+lokal abweicht, zeigt `git status`. Entweder verwerfen (`git checkout -- <datei>`)
+oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt in
+`/etc/abfahrt/kennzeichen.env` und damit außerhalb des Repos.
 
 ---
 

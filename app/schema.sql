@@ -31,7 +31,8 @@ CREATE INDEX IF NOT EXISTS idx_antrag_created_at ON antrag (created_at);
 CREATE TABLE IF NOT EXISTS mail_out (
   id          INTEGER PRIMARY KEY,
   antrag_id   INTEGER REFERENCES antrag(id) ON DELETE CASCADE,
-  typ         TEXT NOT NULL CHECK (typ IN ('eingang', 'genehmigt', 'abgelehnt')),
+  typ         TEXT NOT NULL
+              CHECK (typ IN ('eingang', 'genehmigt', 'abgelehnt', 'orga')),
   empfaenger  TEXT NOT NULL,
   betreff     TEXT NOT NULL,
   body        TEXT NOT NULL,

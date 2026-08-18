@@ -138,6 +138,7 @@ tests/            Skripte ohne Testbibliothek, siehe tests/README.md
 .venv/Scripts/python.exe tests/test_proxy.py      # Verhalten hinter dem Reverse Proxy
 .venv/Scripts/python.exe tests/test_kategorien.py # alle Kategorien vom Formular bis zum CSV
 .venv/Scripts/python.exe tests/test_durchfahrt.py # Durchfahrtsliste, Serverseite
+.venv/Scripts/python.exe tests/test_einstellungen.py # Benachrichtigung, Schema-Umbau
 node tests/test_durchfahrt_js.js                  # Filterlogik der Durchfahrtsliste
 ```
 
@@ -372,6 +373,21 @@ sofort die Antwortseite aus; [app/worker.py](app/worker.py) holt sie alle
 Die Genehmigungsmail nennt Ort und Zeit der Kartenübergabe nur, wenn `ABHOLUNG`
 gesetzt ist (offene Frage 4). Sonst steht dort, dass die Info nachkommt – lieber
 vage als falsch.
+
+### Meldung an die Orga bei neuen Anträgen
+
+Unter `/admin/einstellungen` lässt sich eine Adresse hinterlegen, die bei jedem
+eingegangenen Antrag eine kurze Nachricht bekommt – mit den Daten und einem
+Verweis in die Detailansicht. Leer lassen schaltet es ab.
+
+Die Adresse steht in der Tabelle `einstellung`, nicht in der Env: sie lässt sich
+damit ohne Neustart ändern. Die Nachricht läuft über dieselbe Queue wie alles
+andere, wird also nicht im Request verschickt.
+
+Der Plan warnt an dieser Stelle vor Lärm und schlägt eine tägliche
+Sammelmeldung vor. Bei ein paar Dutzend Anträgen über mehrere Wochen ist eine
+Nachricht je Antrag brauchbar; wenn es zu viel wird, ist das Feld in zehn
+Sekunden geleert.
 
 ### Anträge ohne Mailadresse
 

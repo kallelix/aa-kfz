@@ -178,6 +178,14 @@ async def formular_absenden(request: Request):
     if vorlage is not None:
         db.mail_einreihen(nummer, vorlage)
 
+    # Meldung an die Orga, sofern eine Adresse gepflegt ist.
+    orga = db.benachrichtigung_mail()
+    if orga and angelegt is not None:
+        db.mail_einreihen(
+            nummer,
+            mail.vorlage_orga(angelegt, orga, str(request.base_url).rstrip("/")),
+        )
+
     return RedirectResponse(DANKE_PFAD + "?nr=" + str(nummer), status_code=303)
 
 
@@ -312,6 +320,8 @@ MELDUNGEN = {
     "mail_erneut": "Mail steht wieder in der Schlange.",
     "link_neu": "Neuer Link erzeugt. Der bisherige funktioniert nicht mehr.",
     "link_weg": "Link zurückgezogen. Es gibt keinen offenen Zugang mehr.",
+    "meldung_an": "Gespeichert. Neue Anträge werden ab sofort gemeldet.",
+    "meldung_aus": "Gespeichert. Es wird niemand mehr über neue Anträge benachrichtigt.",
 }
 
 
@@ -647,6 +657,57 @@ async def admin_export(
         content=inhalt,
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{dateiname}"'},
+    )
+
+
+# --- Einstellungen ----------------------------------------------------------
+
+
+@app.get("/admin/einstellungen")
+async def admin_einstellungen(
+    request: Request,
+    hinweis: str = "",
+    fehler: str = "",
+    sitzung=Depends(auth.sitzung_erforderlich),
+):
+    return templates.TemplateResponse(
+        "admin_einstellungen.html",
+        _admin_kontext(
+            request,
+            sitzung,
+            benachrichtigung=db.benachrichtigung_mail(),
+            hinweis=_meldung(hinweis),
+            fehler=MELDUNGEN.get(fehler, "") if fehler else "",
+        ),
+    )
+
+
+@app.post("/admin/einstellungen")
+async def admin_einstellungen_speichern(
+    request: Request, sitzung=Depends(auth.sitzung_erforderlich)
+):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return _csrf_fehler(request, sitzung)
+
+    adresse = str(daten.get("benachrichtigung") or "").strip().lower()[:254]
+    if adresse and not validation.EMAIL_RE.match(adresse):
+        return templates.TemplateResponse(
+            "admin_einstellungen.html",
+            _admin_kontext(
+                request,
+                sitzung,
+                benachrichtigung=adresse,
+                hinweis="",
+                fehler="Das sieht nicht nach einer E-Mail-Adresse aus.",
+            ),
+            status_code=422,
+        )
+
+    db.benachrichtigung_mail_setzen(adresse)
+    return RedirectResponse(
+        "/admin/einstellungen?hinweis=" + ("meldung_an" if adresse else "meldung_aus"),
+        status_code=303,
     )
 
 

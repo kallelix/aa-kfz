@@ -112,6 +112,35 @@ def vorlage_abgelehnt(antrag, begruendung: str) -> tuple:
     return ("abgelehnt", antrag["email"], betreff, body)
 
 
+def vorlage_orga(antrag, empfaenger: str, basis_url: str = "") -> tuple:
+    """Kurze Meldung an die Orga, dass ein Antrag eingegangen ist.
+
+    Geht an die im Backoffice gepflegte Adresse, nicht an den Antragsteller –
+    deshalb steht hier auch der Kontakt des Antragstellers mit drin.
+    """
+    betreff = f"Neuer Antrag {antrag['id']}: {antrag['vorname']} {antrag['nachname']}"
+    zeilen = [
+        f"Es ist ein neuer Antrag für {config.VERANSTALTUNG} eingegangen.",
+        "",
+        _daten(antrag),
+    ]
+    if antrag["email"]:
+        zeilen.append(f"  E-Mail:        {antrag['email']}")
+    if antrag["bemerkung"]:
+        zeilen.append("")
+        zeilen.append("Bemerkung:")
+        zeilen.append(antrag["bemerkung"])
+    if basis_url:
+        zeilen.append("")
+        zeilen.append(f"Im Backoffice: {basis_url}/admin/antrag/{antrag['id']}")
+    zeilen.append("")
+    zeilen.append(
+        "Diese Nachricht geht an die Adresse, die im Backoffice unter"
+        " Einstellungen hinterlegt ist."
+    )
+    return ("orga", empfaenger, betreff, "\n".join(zeilen))
+
+
 def fuer(antrag, typ: str, begruendung: str = "") -> tuple | None:
     """Vorlage nach Typ – oder None, wenn keine Mailadresse hinterlegt ist."""
     if not (antrag["email"] or "").strip():

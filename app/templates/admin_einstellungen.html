@@ -1,0 +1,48 @@
+{% extends "admin_base.html" %}
+{% block titel %}Einstellungen{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Einstellungen{% endblock %}
+
+{% block inhalt %}
+  {% if hinweis %}
+    <p class="hinweis hinweis-ok" role="status">{{ hinweis }}</p>
+  {% endif %}
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">{{ fehler }}</p>
+  {% endif %}
+
+  <h2>Benachrichtigung bei neuen Anträgen</h2>
+
+  <form method="post" action="/admin/einstellungen">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="feld{% if fehler %} feld-fehler{% endif %}">
+      <label for="benachrichtigung">E-Mail-Adresse</label>
+      <input type="email" id="benachrichtigung" name="benachrichtigung"
+             autocomplete="off" placeholder="orga@example.de"
+             value="{{ benachrichtigung }}">
+      <p class="hilfe">
+        Bekommt bei jedem eingegangenen Antrag eine kurze Nachricht mit den
+        Daten und einem Verweis in die Detailansicht.
+        <strong>Leer lassen schaltet die Benachrichtigung ab.</strong>
+      </p>
+    </div>
+
+    <div class="knopfreihe">
+      <button type="submit">Speichern</button>
+    </div>
+  </form>
+
+  <p class="hilfe">
+    Die Adresse steht in der Datenbank, nicht in der Konfiguration – sie lässt
+    sich also ohne Neustart ändern.
+  </p>
+
+  {% if not mail_aktiv %}
+    <p class="hinweis hinweis-warnung">
+      Es ist kein SMTP konfiguriert (<code>SMTP_HOST</code> und
+      <code>MAIL_FROM</code>). Die Nachrichten werden erzeugt und gesammelt,
+      gehen aber erst raus, wenn der Versand eingerichtet ist.
+    </p>
+  {% endif %}
+{% endblock %}
