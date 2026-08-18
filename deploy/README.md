@@ -30,24 +30,33 @@ wenn sie nicht auf localhost lauscht und der Wert trotzdem `127.0.0.1` ist.
 
 ```bash
 apt update
-apt install -y python3 python3-venv sqlite3
+apt install -y python3 python3-venv sqlite3 git
 
-adduser --system --group --home /opt/abfahrt --shell /usr/sbin/nologin abfahrt
-mkdir -p /opt/abfahrt /var/lib/abfahrt /etc/abfahrt /var/backups/abfahrt
+adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin abfahrt
+
+mkdir -p /var/lib/abfahrt /etc/abfahrt /var/backups/abfahrt
 chown abfahrt:abfahrt /var/lib/abfahrt /var/backups/abfahrt
 chmod 750 /var/lib/abfahrt /var/backups/abfahrt
 ```
 
+**Dem Dienstbenutzer gehören nur diese beiden Verzeichnisse.** `/opt/abfahrt`
+bleibt bei root: der Dienst liest seinen Code nur, und die systemd-Unit setzt
+`ProtectSystem=strict`, macht `/opt` für ihn also ohnehin schreibgeschützt. Root
+als Eigentümer ist zusätzlich sicherer, weil der Dienstbenutzer sein eigenes
+Programm dann nicht verändern kann – und `git pull` als root funktioniert nur
+so (siehe Abschnitt 6).
+
 ### Code und virtuelle Umgebung
 
 ```bash
-apt install -y git
 git clone https://github.com/kallelix/aa-kfz.git /opt/abfahrt
 cd /opt/abfahrt
 python3 -m venv .venv
 .venv/bin/pip install --no-cache-dir -r requirements.txt
-chown -R abfahrt:abfahrt /opt/abfahrt
 ```
+
+Alles bleibt root:root mit den Standardrechten – `abfahrt` darf lesen und
+ausführen, das genügt. **Kein `chown` auf `/opt/abfahrt`.**
 
 `.venv/` und `data/` stehen in `.gitignore`, ein späteres `git pull` fasst sie
 also nicht an. Die Datenbank liegt ohnehin unter `/var/lib/abfahrt`.
@@ -143,8 +152,11 @@ systemctl reload nginx
 
 ## 3. Sicherung
 
+Das Skript liegt bereits im Klon und ist ausführbar. Es läuft als `abfahrt`,
+liest die Datenbank und schreibt nach `/var/backups/abfahrt` – beides gehört
+diesem Benutzer.
+
 ```bash
-install -o abfahrt -g abfahrt -m 750 deploy/backup.sh /opt/abfahrt/deploy/backup.sh
 crontab -u abfahrt -e
 ```
 
@@ -211,10 +223,7 @@ git pull
 # 3. Abhängigkeiten nachziehen (schadet nie, dauert ohne Änderung Sekunden)
 .venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# 4. Rechte wieder geraderücken – git pull legt neue Dateien als root an
-chown -R abfahrt:abfahrt /opt/abfahrt
-
-# 5. Neu starten und nachsehen
+# 4. Neu starten und nachsehen
 systemctl restart kennzeichen
 systemctl status kennzeichen --no-pager
 journalctl -u kennzeichen -n 30 --no-pager
@@ -275,6 +284,7 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 
 | Symptom | Ursache, die es meistens ist |
 | --- | --- |
+| `git pull` sagt „detected dubious ownership" | `/opt/abfahrt` gehört nicht root. Frühere Fassungen dieser Anleitung haben es fälschlich auf `abfahrt` gesetzt. Richtigstellen mit `chown -R root:root /opt/abfahrt` – der Dienst braucht dort keine Schreibrechte. `git config --global --add safe.directory` behebt zwar die Meldung, lässt aber den Dienstbenutzer weiter seinen eigenen Code beschreiben. |
 | Anmeldung wirft einen zurück auf die Anmeldeseite | Cookie mit `Secure`, aber die Verbindung kam als HTTP an. `X-Forwarded-Proto` fehlt im Proxy. |
 | Alle Anträge haben dieselbe IP | `FORWARDED_ALLOW_IPS` zeigt nicht auf den nginx. |
 | Ein Fehlversuch sperrt alle aus | dasselbe. |
