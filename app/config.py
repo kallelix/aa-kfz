@@ -182,7 +182,7 @@ CSV_TRENNER = os.environ.get("CSV_TRENNER", ";")[:1] or ";"
 
 # --- Druckansicht der Karten (Schritt 11) -----------------------------------
 
-# Basis fuer den QR-Code, z. B. https://kennzeichen.exorpro.de – gescannt fuehrt
+# Basis fuer den QR-Code, z. B. https://kennzeichen.example.de – gescannt fuehrt
 # er dann in die Detailansicht des Antrags. Die verlangt eine Anmeldung, taugt
 # also fuer die Orga und gibt Fremden nichts preis. Leer = der QR-Code traegt
 # nur die Antragsnummer als Text.

@@ -2,7 +2,7 @@
 
 Braucht einen laufenden Server mit `TEST_DB` und frischem Seed – siehe
 tests/README.md. Der Server sollte mit
-`KARTEN_URL_BASIS=https://kennzeichen.exorpro.de` laufen.
+`KARTEN_URL_BASIS=https://kennzeichen.example.de` laufen.
 """
 
 import http.cookiejar
@@ -97,7 +97,7 @@ pruefe("<img" not in seite or "/static/" in seite, "keine externen Bilder")
 try:
     import segno  # noqa: F401
     from urllib.parse import urlparse
-    basis = os.environ.get("TEST_KARTEN_BASIS", "https://kennzeichen.exorpro.de")
+    basis = os.environ.get("TEST_KARTEN_BASIS", "https://kennzeichen.example.de")
     erwartet = segno.make(basis + "/admin/antrag/1", error="m").svg_inline(
         scale=3, dark="#000000", border=0
     )

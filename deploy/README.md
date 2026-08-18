@@ -2,7 +2,7 @@
 
 Aufbau: die App läuft in einem **LXC-Container** (Debian/Ubuntu), ein
 **nginx auf einem anderen Host** mit öffentlicher IP terminiert HTTPS und leitet
-weiter. Adresse: `kennzeichen.exorpro.de`.
+weiter. Adresse: `kennzeichen.example.de`.
 
 ```text
 Internet ──HTTPS──▶ nginx (10.0.0.10)  ──HTTP──▶ LXC (10.0.0.42:8080)
@@ -111,8 +111,8 @@ Internet nicht antwortet – das gehört auf die Prüfliste unten.
 ```bash
 install -m 644 deploy/abfahrt-proxy.conf /etc/nginx/snippets/abfahrt-proxy.conf
 install -m 644 deploy/nginx-kennzeichen.conf \
-    /etc/nginx/sites-available/kennzeichen.exorpro.de
-ln -s ../sites-available/kennzeichen.exorpro.de /etc/nginx/sites-enabled/
+    /etc/nginx/sites-available/kennzeichen.example.de
+ln -s ../sites-available/kennzeichen.example.de /etc/nginx/sites-enabled/
 
 # IP des Containers in der Datei anpassen, dann:
 nginx -t
@@ -120,15 +120,15 @@ nginx -t
 
 ### DNS und Zertifikat
 
-1. A-Record (und ggf. AAAA) für `kennzeichen.exorpro.de` auf die öffentliche IP
+1. A-Record (und ggf. AAAA) für `kennzeichen.example.de` auf die öffentliche IP
    des nginx
 2. Zertifikat holen:
 
 ```bash
-certbot --nginx -d kennzeichen.exorpro.de
+certbot --nginx -d kennzeichen.example.de
 ```
 
-Falls schon ein Wildcard-Zertifikat für `*.exorpro.de` vorliegt, stattdessen
+Falls schon ein Wildcard-Zertifikat für `*.example.de` vorliegt, stattdessen
 dessen Pfade in der Config eintragen und certbot überspringen.
 
 ```bash
@@ -166,16 +166,16 @@ Vom eigenen Rechner aus, nicht vom Server:
 
 ```bash
 # erreichbar und verschlüsselt
-curl -sS -o /dev/null -w '%{http_code}\n' https://kennzeichen.exorpro.de/
+curl -sS -o /dev/null -w '%{http_code}\n' https://kennzeichen.example.de/
 
 # HTTP leitet weiter
-curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://kennzeichen.exorpro.de/
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://kennzeichen.example.de/
 
 # Der Container ist NICHT direkt erreichbar (muss scheitern)
 curl -sS --max-time 5 http://<oeffentliche-ip-des-containers>:8080/ || echo "gut so"
 
 # Backoffice verlangt Anmeldung
-curl -sS -o /dev/null -w '%{http_code}\n' https://kennzeichen.exorpro.de/admin
+curl -sS -o /dev/null -w '%{http_code}\n' https://kennzeichen.example.de/admin
 ```
 
 Im Browser:

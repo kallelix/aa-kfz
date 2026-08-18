@@ -110,7 +110,7 @@ Export landet. Läuft der Server mit `CSV_TRENNER=,`, muss der Test
 
 ## Karten drucken (Schritt 11)
 
-Der Server braucht dafür `KARTEN_URL_BASIS=https://kennzeichen.exorpro.de` und
+Der Server braucht dafür `KARTEN_URL_BASIS=https://kennzeichen.example.de` und
 **kein** `LOGO_DATEI` – der Test prüft auch den Hinweis, wenn kein Logo hinterlegt
 ist.
 

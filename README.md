@@ -17,7 +17,7 @@ Zertifikate macht der Reverse Proxy davor.
 | 4 | Backoffice: Liste, Filter, Detailansicht, Löschen | fertig |
 | 5 | Redaktionelle Freigabe: genehmigen/ablehnen, Werte korrigieren | fertig |
 | 6 | Mail-Queue + Versand-Worker + Vorlagen | fertig |
-| 7 | SPF/DKIM/DMARC für exorpro.de | SPF und DMARC stehen, DKIM offen – siehe unten |
+| 7 | SPF/DKIM/DMARC für example.de | SPF und DMARC stehen, DKIM offen – siehe unten |
 | 8 | CSV-Export | fertig |
 | 9 | Honeypot, Rate Limit, Datenschutzhinweis | fertig (Formular-Limit liegt im nginx, siehe `deploy/`) |
 | 10 | Deployment: systemd, Proxy-Config, Backup-Cron | fertig, siehe [deploy/](deploy/) |
@@ -285,7 +285,7 @@ keine Rechte zum Genehmigen oder Löschen –, lässt sich unter
 `/admin/durchfahrt` ein Link erzeugen:
 
 ```text
-https://kennzeichen.exorpro.de/durchfahrt/<43 Zeichen Zufall>
+https://kennzeichen.example.de/durchfahrt/<43 Zeichen Zufall>
 ```
 
 Der Token liegt in der Tabelle `einstellung` und wird im Backoffice erzeugt,
@@ -338,7 +338,7 @@ URL geht trotzdem jeder Status: `/admin/karten?status=ausgegeben`.
 
 ### QR-Code und Logo
 
-- `KARTEN_URL_BASIS=https://kennzeichen.exorpro.de` – dann führt der QR-Code in
+- `KARTEN_URL_BASIS=https://kennzeichen.example.de` – dann führt der QR-Code in
   die Detailansicht des Antrags. Die verlangt eine Anmeldung, taugt also für die
   Orga an der Einfahrt und gibt Fremden nichts preis. Ohne den Wert enthält der
   Code nur Antragsnummer und Veranstaltung als Text.
@@ -384,7 +384,7 @@ ohnehin auf der Liste und bekommt den Aufkleber dort – ein Anruf wäre Arbeit 
 Ertrag. Eine Absage dagegen muss ankommen, sonst fährt jemand umsonst hin. Der
 Statusfilter dafür steht in `db.TELEFONISCH_STATUS`.
 
-### Zustellbarkeit (Schritt 7, exorpro.de)
+### Zustellbarkeit (Schritt 7, example.de)
 
 Stand heute im DNS:
 
@@ -400,11 +400,11 @@ relayen.** Dann greift der vorhandene SPF-Eintrag, IONOS signiert mit DKIM, und
 Reverse-DNS und IP-Reputation sind nicht dein Problem. Genau dazu rät der Plan im
 Abschnitt Zustellbarkeit.
 
-1. Postfach `kennzeichen@exorpro.de` bei IONOS anlegen
+1. Postfach `kennzeichen@example.de` bei IONOS anlegen
 2. `SMTP_HOST=smtp.ionos.de`, `SMTP_PORT=587`, `SMTP_TLS=starttls`,
    `SMTP_USER`/`SMTP_PASS` des Postfachs setzen
 3. `MAIL_FROM` muss **dieselbe Adresse** tragen, sonst weist IONOS ab
-4. DKIM im IONOS-Kundenmenü für exorpro.de aktivieren, falls noch nicht geschehen
+4. DKIM im IONOS-Kundenmenü für example.de aktivieren, falls noch nicht geschehen
 5. Testmails an Gmail, GMX und Outlook schicken und die Kopfzeilen prüfen:
    `spf=pass`, `dkim=pass`, `dmarc=pass`
 
@@ -414,7 +414,7 @@ und das betrifft die ganze Domain, nicht nur diese App.
 ## Deployment
 
 Alles in [deploy/](deploy/): systemd-Unit, nginx-Konfiguration für
-`kennzeichen.exorpro.de`, Backup-Skript und eine Prüfliste vor dem Livegang.
+`kennzeichen.example.de`, Backup-Skript und eine Prüfliste vor dem Livegang.
 
 Aufbau: App in einem LXC-Container, nginx auf einem anderen Host mit
 öffentlicher IP terminiert HTTPS.
