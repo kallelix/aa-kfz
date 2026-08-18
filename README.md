@@ -455,3 +455,12 @@ Code hängen:
 - **Löschung X Wochen nach der Veranstaltung** (Abschnitt 8 des Plans,
   Datenschutz). Bewusst zurückgestellt – bisher gibt es dafür nur den
   Hinweistext im Formular, keinen Knopf und keinen Cron-Job.
+
+## Lizenz
+
+[MIT](LICENSE) – benutzen, ändern und weitergeben ist erlaubt, auch
+kommerziell; mitgeliefert werden muss nur der Copyright-Hinweis. Ohne
+Gewährleistung.
+
+Nicht mit umfasst sind die Inhalte der Veranstaltung selbst: Logo, Texte und
+Daten gehören denen, die sie beigesteuert haben.
