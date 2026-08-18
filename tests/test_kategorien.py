@@ -53,6 +53,18 @@ pruefe(config.KATEGORIEN == ERWARTET, "Vorgabe sind die fuenf Kategorien: " + st
 pruefe(config.KATEGORIE_LABELS["local"] == "Local/Durchfahrt",
        "ein Schraegstrich in der Beschriftung ueberlebt das Parsen")
 
+# Der Beschreibungstext darf enthalten, was in KATEGORIEN nicht ginge.
+import os as _os  # noqa: E402
+
+_os.environ["KATEGORIE_TEXT_CAMPING"] = "Mit Komma, Doppelpunkt: und allem."
+pruefe(config._kategorie_text("camping") == "Mit Komma, Doppelpunkt: und allem.",
+       "Env-Text ueberschreibt und vertraegt Satzzeichen")
+del _os.environ["KATEGORIE_TEXT_CAMPING"]
+pruefe(config._kategorie_text("camping").startswith("Du bist Helfer"),
+       "ohne Env greift der eingebaute Text")
+pruefe(config._kategorie_text("gibtesnicht") == "",
+       "unbekannte Kategorie hat keinen Text")
+
 sonderfaelle = config._parse_kategorien("  a : Alpha , b:Beta:mit Doppelpunkt ,, c , ")
 pruefe(sonderfaelle == [("a", "Alpha"), ("b", "Beta:mit Doppelpunkt"), ("c", "c")],
        "Leerzeichen, leere Eintraege und fehlende Beschriftung: " + str(sonderfaelle))
@@ -135,6 +147,16 @@ try:
                "Formular bietet " + beschriftung + " an")
     pruefe(formular.count('name="kategorie"') == len(ERWARTET),
            "genau fuenf Auswahlfelder: " + str(formular.count('name="kategorie"')))
+
+    print("Beschreibungen")
+    for schluessel, _ in ERWARTET:
+        text = config.KATEGORIE_TEXTE.get(schluessel, "")
+        pruefe(bool(text), "fuer " + schluessel + " ist ein Text hinterlegt")
+        if text:
+            pruefe(text in formular, "der Text zu " + schluessel + " steht im Formular")
+            pruefe('id="kat-' + schluessel + '"' in formular
+                   and 'aria-describedby="kat-' + schluessel + '"' in formular,
+                   "der Text ist mit dem Auswahlfeld " + schluessel + " verknuepft")
 
     print("Absenden")
     for nummer, (schluessel, _) in enumerate(ERWARTET, start=1):

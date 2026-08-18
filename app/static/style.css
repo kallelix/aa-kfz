@@ -70,8 +70,27 @@ legend { font-weight: 600; padding: 0 .35rem; }
 
 label { display: block; font-weight: 600; margin-bottom: .3rem; }
 
-.auswahl { font-weight: 400; display: flex; gap: .5rem; align-items: center; margin-bottom: .35rem; }
-.auswahl input { width: auto; }
+/* Mit Erklaerungstext werden die Zeilen mehrzeilig, deshalb oben ausrichten
+   statt mittig. Das ganze Label ist klickbar - auf dem Telefon zaehlt das. */
+.auswahl {
+  font-weight: 400;
+  display: flex;
+  gap: .6rem;
+  align-items: flex-start;
+  margin-bottom: .75rem;
+  cursor: pointer;
+}
+
+.auswahl input { width: auto; margin-top: .25rem; flex: none; }
+.auswahl-text { display: flex; flex-direction: column; }
+.auswahl-titel { font-weight: 600; }
+
+.auswahl-hilfe {
+  font-size: .875rem;
+  line-height: 1.35;
+  color: var(--gedaempft);
+  margin-top: .1rem;
+}
 
 .pflicht { color: var(--fehler); }
 .optional { font-weight: 400; color: var(--gedaempft); font-size: .85rem; }

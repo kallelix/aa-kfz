@@ -58,10 +58,17 @@
     <fieldset class="feld{% if fehler.get('kategorie') %} feld-fehler{% endif %}">
       <legend>Kategorie <span class="pflicht" aria-hidden="true">*</span></legend>
       {% for schluessel, beschriftung in kategorien %}
+        {% set erklaerung = kategorie_texte.get(schluessel) %}
         <label class="auswahl">
           <input type="radio" name="kategorie" value="{{ schluessel }}" required
+                 {% if erklaerung %}aria-describedby="kat-{{ schluessel }}"{% endif %}
                  {% if werte.get('kategorie') == schluessel %}checked{% endif %}>
-          {{ beschriftung }}
+          <span class="auswahl-text">
+            <span class="auswahl-titel">{{ beschriftung }}</span>
+            {% if erklaerung %}
+              <span class="auswahl-hilfe" id="kat-{{ schluessel }}">{{ erklaerung }}</span>
+            {% endif %}
+          </span>
         </label>
       {% endfor %}
       {{ fehlermeldung('kategorie') }}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -77,6 +78,28 @@ KATEGORIEN = _parse_kategorien(
 )
 KATEGORIE_KEYS = [k for k, _ in KATEGORIEN]
 KATEGORIE_LABELS = dict(KATEGORIEN)
+
+# Ein Satz je Kategorie, der im Formular unter der Auswahl steht. Damit muss
+# niemand raten, welche Kategorie die eigene ist.
+#
+# Bewusst eine Variable je Kategorie statt eines weiteren Feldes in KATEGORIEN:
+# dort trennen Komma und Doppelpunkt, und beides kommt in einem deutschen Satz
+# vor. KATEGORIE_TEXT_CAMPING=... ueberschreibt den Text fuer "camping".
+_STANDARD_TEXTE = {
+    "camping": "Du bist Helfer und möchtest auf dem Campingplatz übernachten.",
+    "expo": "Du bist Aussteller und hast einen EXPO-Platz gebucht.",
+    "local": "Du musst als Anlieger die Straßensperre passieren.",
+    "parken": "Du musst auf dem Parkplatz der Veranstaltung parken.",
+    "vip": "Du musst auf dem Veranstaltungsgelände parken.",
+}
+
+
+def _kategorie_text(schluessel: str) -> str:
+    name = "KATEGORIE_TEXT_" + re.sub(r"[^A-Za-z0-9]", "_", schluessel).upper()
+    return os.environ.get(name, _STANDARD_TEXTE.get(schluessel, "")).strip()
+
+
+KATEGORIE_TEXTE = {schluessel: _kategorie_text(schluessel) for schluessel in KATEGORIE_KEYS}
 KENNZEICHEN_ERFASSEN = _flag("KENNZEICHEN_ERFASSEN")
 
 # --- Ansprechpartner ---

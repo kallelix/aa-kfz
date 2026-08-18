@@ -122,6 +122,7 @@ def _kontext(request: Request, **extra) -> dict:
         "veranstaltung": config.VERANSTALTUNG,
         "kategorien": config.KATEGORIEN,
         "kategorie_labels": config.KATEGORIE_LABELS,
+        "kategorie_texte": config.KATEGORIE_TEXTE,
         "kennzeichen_erfassen": config.KENNZEICHEN_ERFASSEN,
         "kontakt_name": config.KONTAKT_NAME,
         "kontakt_mail": config.KONTAKT_MAIL,
