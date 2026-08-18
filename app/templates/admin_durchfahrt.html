@@ -1,0 +1,65 @@
+{% extends "admin_base.html" %}
+{% block titel %}Durchfahrtsliste{% endblock %}
+{% block ueberschrift %}Durchfahrtsliste{% endblock %}
+
+{% block inhalt %}
+  {% if hinweis %}
+    <p class="hinweis hinweis-ok" role="status">{{ hinweis }}</p>
+  {% endif %}
+
+  {% include "_durchfahrt_tabelle.html" %}
+
+  <h2>Link für die Straßensperre</h2>
+
+  {% if offen_url %}
+    <p class="hilfe">
+      Dieser Link zeigt genau diese Liste – <strong>ohne Anmeldung</strong>.
+      Weitergeben an die Leute an der Sperre, sonst nirgends posten.
+    </p>
+
+    <p class="teilen-url"><a href="{{ offen_url }}">{{ offen_url }}</a></p>
+
+    <div class="knopfreihe">
+      <form method="post" action="/admin/durchfahrt/link"
+            onsubmit="return confirm('Neuen Link erzeugen? Der bisherige funktioniert danach nicht mehr.');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="aktion" value="erzeugen">
+        <button type="submit" class="knopf-schlicht">Neuen Link erzeugen</button>
+      </form>
+      <form method="post" action="/admin/durchfahrt/link"
+            onsubmit="return confirm('Link zurückziehen? Die Sperre kann die Liste dann nicht mehr öffnen.');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="aktion" value="zuruecknehmen">
+        <button type="submit" class="knopf-gefahr">Link zurückziehen</button>
+      </form>
+    </div>
+
+    <p class="hilfe">
+      Wer den Link hat, sieht Namen und Kennzeichen aller Berechtigten. Wenn er
+      in die falschen Hände gerät: neuen Link erzeugen, der alte ist dann sofort
+      tot. Nach der Veranstaltung zurückziehen.
+    </p>
+  {% else %}
+    <p class="hilfe">
+      Damit die Leute an der Sperre kein Backoffice-Passwort brauchen, lässt
+      sich ein Link mit langem Zufallsschlüssel erzeugen. Er zeigt nur diese
+      Liste – kein Genehmigen, kein Löschen, keine Kontaktdaten.
+    </p>
+    <div class="knopfreihe">
+      <form method="post" action="/admin/durchfahrt/link">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="aktion" value="erzeugen">
+        <button type="submit">Link erzeugen</button>
+      </form>
+    </div>
+    <p class="hilfe">Solange keiner erzeugt ist, gibt es keinen offenen Zugang.</p>
+  {% endif %}
+
+  <p class="hilfe sperre-fuss">
+    Aufgeführt sind genehmigte und bereits ausgegebene Berechtigungen. Anträge,
+    die noch offen oder abgelehnt sind, stehen bewusst nicht drauf.
+    Die Seite einmal laden, solange Empfang da ist – danach funktioniert die
+    Suche auch ohne Netz. Für den Fall, dass gar nichts geht: der CSV-Export
+    unter „Anträge" lässt sich vorher aufs Telefon laden.
+  </p>
+{% endblock %}

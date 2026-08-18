@@ -1,0 +1,9 @@
+{% extends "admin_base.html" %}
+{% block titel %}Nicht gefunden{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Da ist nichts{% endblock %}
+
+{% block inhalt %}
+  <p class="hinweis hinweis-fehler">{{ meldung or 'Diesen Antrag gibt es nicht (mehr).' }}</p>
+  <p><a href="/admin">← zurück zur Liste</a></p>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block ueberschrift %}Durchfahrtsberechtigung beantragen{% endblock %}
+
+{% macro fehlermeldung(feld) %}
+  {% if fehler.get(feld) %}<p class="fehler" id="fehler-{{ feld }}">{{ fehler[feld] }}</p>{% endif %}
+{% endmacro %}
+
+{% block inhalt %}
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">
+      Bitte die markierten Felder prüfen – der Antrag wurde noch nicht abgeschickt.
+    </p>
+  {% endif %}
+
+  <form method="post" action="{{ form_pfad }}" novalidate>
+
+    <div class="feld{% if fehler.get('vorname') %} feld-fehler{% endif %}">
+      <label for="vorname">Vorname <span class="pflicht" aria-hidden="true">*</span></label>
+      <input type="text" id="vorname" name="vorname" required autocomplete="given-name"
+             value="{{ werte.get('vorname', '') }}"
+             {% if fehler.get('vorname') %}aria-describedby="fehler-vorname" aria-invalid="true"{% endif %}>
+      {{ fehlermeldung('vorname') }}
+    </div>
+
+    <div class="feld{% if fehler.get('nachname') %} feld-fehler{% endif %}">
+      <label for="nachname">Name <span class="pflicht" aria-hidden="true">*</span></label>
+      <input type="text" id="nachname" name="nachname" required autocomplete="family-name"
+             value="{{ werte.get('nachname', '') }}"
+             {% if fehler.get('nachname') %}aria-describedby="fehler-nachname" aria-invalid="true"{% endif %}>
+      {{ fehlermeldung('nachname') }}
+    </div>
+
+    <div class="feld{% if fehler.get('funktion') %} feld-fehler{% endif %}">
+      <label for="funktion">Funktion <span class="pflicht" aria-hidden="true">*</span></label>
+      <input type="text" id="funktion" name="funktion" required
+             placeholder="z. B. Streckenposten, Aufbau, Sanität, Presse"
+             value="{{ werte.get('funktion', '') }}"
+             {% if fehler.get('funktion') %}aria-describedby="fehler-funktion" aria-invalid="true"{% endif %}>
+      {{ fehlermeldung('funktion') }}
+    </div>
+
+    {% if kennzeichen_erfassen %}
+      <div class="feld{% if fehler.get('kennzeichen') %} feld-fehler{% endif %}">
+        <label for="kennzeichen">Kfz-Kennzeichen <span class="pflicht" aria-hidden="true">*</span></label>
+        <input type="text" id="kennzeichen" name="kennzeichen" required
+               placeholder="z. B. KA-XY 123" autocapitalize="characters"
+               value="{{ werte.get('kennzeichen', '') }}"
+               {% if fehler.get('kennzeichen') %}aria-describedby="fehler-kennzeichen" aria-invalid="true"{% endif %}>
+        <p class="hilfe">
+          Das amtliche Kennzeichen des Fahrzeugs, das durchfahren soll. An der
+          Straßensperre wird der Aufkleber anhand dieser Angabe ausgegeben –
+          ohne sie geht es nicht.
+        </p>
+        {{ fehlermeldung('kennzeichen') }}
+      </div>
+    {% endif %}
+
+    <fieldset class="feld{% if fehler.get('kategorie') %} feld-fehler{% endif %}">
+      <legend>Kategorie <span class="pflicht" aria-hidden="true">*</span></legend>
+      {% for schluessel, beschriftung in kategorien %}
+        <label class="auswahl">
+          <input type="radio" name="kategorie" value="{{ schluessel }}" required
+                 {% if werte.get('kategorie') == schluessel %}checked{% endif %}>
+          {{ beschriftung }}
+        </label>
+      {% endfor %}
+      {{ fehlermeldung('kategorie') }}
+    </fieldset>
+
+    <p class="gruppenhinweis">
+      E-Mail und Telefon sind beide freiwillig – <strong>eines von beiden brauchen wir aber</strong>.
+      Mit Mailadresse bekommst du die Entscheidung per Mail. Ohne melden wir uns
+      nur, wenn es <em>nicht</em> klappt – und dafür brauchen wir eine Nummer.
+    </p>
+
+    <div class="feld{% if fehler.get('email') %} feld-fehler{% endif %}">
+      <label for="email">E-Mail</label>
+      <input type="email" id="email" name="email" autocomplete="email"
+             value="{{ werte.get('email', '') }}"
+             {% if fehler.get('email') %}aria-describedby="fehler-email" aria-invalid="true"{% endif %}>
+      {{ fehlermeldung('email') }}
+    </div>
+
+    <div class="feld{% if fehler.get('telefon') %} feld-fehler{% endif %}">
+      <label for="telefon">Telefon</label>
+      <input type="tel" id="telefon" name="telefon" autocomplete="tel"
+             value="{{ werte.get('telefon', '') }}"
+             {% if fehler.get('telefon') %}aria-describedby="fehler-telefon" aria-invalid="true"{% endif %}>
+      {{ fehlermeldung('telefon') }}
+    </div>
+
+    <div class="feld{% if fehler.get('bemerkung') %} feld-fehler{% endif %}">
+      <label for="bemerkung">Bemerkung <span class="optional">(optional)</span></label>
+      <textarea id="bemerkung" name="bemerkung" rows="3"
+                {% if fehler.get('bemerkung') %}aria-describedby="fehler-bemerkung" aria-invalid="true"{% endif %}>{{ werte.get('bemerkung', '') }}</textarea>
+      {{ fehlermeldung('bemerkung') }}
+    </div>
+
+    {# Honeypot: für Menschen unsichtbar, Bots füllen es gern aus. #}
+    <div class="honigtopf" aria-hidden="true">
+      <label for="{{ honeypot }}">Webseite (bitte freilassen)</label>
+      <input type="text" id="{{ honeypot }}" name="{{ honeypot }}" tabindex="-1" autocomplete="off">
+    </div>
+
+    <button type="submit">Antrag absenden</button>
+  </form>
+
+  <section class="datenschutz">
+    <h2>Datenschutz</h2>
+    <p>
+      Die Angaben werden von {{ kontakt_name }} ausschließlich zur Prüfung und Ausgabe der
+      Durchfahrtsberechtigungen für {{ veranstaltung }} verwendet. Sie werden nicht an Dritte
+      weitergegeben. {{ aufbewahrung_hinweis }}
+      {% if kontakt_mail %}Auskunft und Löschung: <a href="mailto:{{ kontakt_mail }}">{{ kontakt_mail }}</a>.{% endif %}
+    </p>
+  </section>
+{% endblock %}

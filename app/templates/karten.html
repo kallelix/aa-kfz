@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Karten drucken – {{ veranstaltung }}</title>
+  <link rel="stylesheet" href="/static/karten.css">
+</head>
+<body>
+
+  {# Erscheint nur am Bildschirm, nicht im Ausdruck. #}
+  <div class="steuerung">
+    <p>
+      <a href="/admin">← zurück zur Liste</a>
+    </p>
+    <p>
+      <strong>{{ antraege|length }}</strong> Karte{{ 'n' if antraege|length != 1 }}
+      {% if filter_status %}(Status „{{ filter_status }}“){% else %}(alle Status){% endif %}
+      {%- if filter_kategorie %}, {{ kategorie_labels.get(filter_kategorie, filter_kategorie) }}{% endif %}.
+      Vier Stück je A4-Bogen.
+    </p>
+    <p class="steuerung-hinweis">
+      Im Druckdialog <strong>Ränder auf „keine"</strong> und
+      <strong>Hintergrundgrafiken einschalten</strong>, sonst fehlen die
+      Schnittlinien und die Kategorieleiste. An den grauen Linien schneiden.
+      {% if not logo %}
+        <br>Es ist kein Logo hinterlegt – auf den Karten steht nur der
+        Veranstaltungsname. Siehe <code>LOGO_DATEI</code>.
+      {% endif %}
+    </p>
+  </div>
+
+  {% if antraege %}
+    {% for a in antraege %}
+      {% if loop.index0 % 4 == 0 %}<div class="bogen">{% endif %}
+
+      <div class="karte">
+        <div class="karte-kopf">
+          {% if logo %}
+            <img class="karte-logo" src="/static/{{ logo }}" alt="">
+          {% endif %}
+          <p class="karte-veranstaltung">{{ veranstaltung }}</p>
+        </div>
+
+        <div class="karte-mitte">
+          <p class="karte-name">{{ a.vorname }}<br>{{ a.nachname }}</p>
+          <p class="karte-funktion">{{ a.funktion }}</p>
+        </div>
+
+        <div class="karte-fuss">
+          <div class="karte-qr">{{ qr[a.id]|safe }}</div>
+          <div class="karte-angaben">
+            <p class="karte-nummer">Nr. {{ a.id }}</p>
+            {% if a.kennzeichen %}
+              <p class="karte-kennzeichen">{{ a.kennzeichen }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <p class="karte-kategorie">{{ kategorie_labels.get(a.kategorie, a.kategorie) }}</p>
+      </div>
+
+      {% if loop.index % 4 == 0 or loop.last %}</div>{% endif %}
+    {% endfor %}
+  {% else %}
+    <div class="steuerung">
+      <p>Keine Anträge, auf die der Filter passt – nichts zu drucken.</p>
+    </div>
+  {% endif %}
+
+</body>
+</html>

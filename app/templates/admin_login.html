@@ -1,0 +1,31 @@
+{% extends "admin_base.html" %}
+{% block titel %}Anmelden{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Anmelden{% endblock %}
+
+{% block inhalt %}
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">{{ fehler }}</p>
+  {% endif %}
+
+  <form method="post" action="/admin/login">
+    <input type="hidden" name="weiter" value="{{ weiter }}">
+
+    <div class="feld">
+      <label for="passwort">Passwort</label>
+      <input type="password" id="passwort" name="passwort" required autofocus
+             autocomplete="current-password">
+    </div>
+
+    {% if kuerzel_abfragen %}
+      <div class="feld">
+        <label for="kuerzel">Dein Kürzel <span class="optional">(optional)</span></label>
+        <input type="text" id="kuerzel" name="kuerzel" maxlength="20"
+               placeholder="z. B. KK" value="{{ kuerzel }}">
+        <p class="hilfe">Wird bei Entscheidungen als „bearbeitet von“ eingetragen.</p>
+      </div>
+    {% endif %}
+
+    <button type="submit">Anmelden</button>
+  </form>
+{% endblock %}

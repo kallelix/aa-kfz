@@ -1,0 +1,240 @@
+{% extends "admin_base.html" %}
+{% block titel %}Antrag {{ antrag.id }}{% endblock %}
+{% block ueberschrift %}Antrag {{ antrag.id }}{% endblock %}
+
+{% macro fehlermeldung(feld) %}
+  {% if fehler.get(feld) %}<p class="fehler" id="fehler-{{ feld }}">{{ fehler[feld] }}</p>{% endif %}
+{% endmacro %}
+
+{% block inhalt %}
+  <p class="zurueck-zeile"><a href="/admin">← zurück zur Liste</a></p>
+
+  {% if hinweis %}
+    <p class="hinweis hinweis-ok" role="status">{{ hinweis }}</p>
+  {% endif %}
+
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">
+      Bitte die markierten Felder prüfen – nichts wurde gespeichert.
+    </p>
+  {% endif %}
+
+  <p class="status-zeile">
+    <span class="marke marke-{{ antrag.status }}">{{ antrag.status }}</span>
+    {% if not antrag.email %}<span class="marke marke-telefon">nur Telefon</span>{% endif %}
+  </p>
+
+  {% if kontingent and kontingent.voll and antrag.status in ('neu', 'abgelehnt') %}
+    <p class="hinweis hinweis-warnung">
+      Kontingent für „{{ kategorie_labels.get(antrag.kategorie, antrag.kategorie) }}“
+      ist ausgeschöpft: {{ kontingent.belegt }} von {{ kontingent.grenze }} vergeben.
+      Genehmigen geht trotzdem – das ist eine Warnung, keine Sperre.
+    </p>
+  {% endif %}
+
+  <h2>Antragsdaten</h2>
+  <p class="hilfe">
+    Korrekturen sind erwünscht: Schreibfehler im Namen, „Sani“ zu „Sanität“
+    vereinheitlichen, Kategorie umbiegen.
+  </p>
+
+  <form method="post" action="/admin/antrag/{{ antrag.id }}/speichern">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="paar">
+      <div class="feld{% if fehler.get('vorname') %} feld-fehler{% endif %}">
+        <label for="vorname">Vorname</label>
+        <input type="text" id="vorname" name="vorname" value="{{ werte.get('vorname', '') }}">
+        {{ fehlermeldung('vorname') }}
+      </div>
+      <div class="feld{% if fehler.get('nachname') %} feld-fehler{% endif %}">
+        <label for="nachname">Name</label>
+        <input type="text" id="nachname" name="nachname" value="{{ werte.get('nachname', '') }}">
+        {{ fehlermeldung('nachname') }}
+      </div>
+    </div>
+
+    <div class="paar">
+      <div class="feld{% if fehler.get('funktion') %} feld-fehler{% endif %}">
+        <label for="funktion">Funktion</label>
+        <input type="text" id="funktion" name="funktion" value="{{ werte.get('funktion', '') }}">
+        {{ fehlermeldung('funktion') }}
+      </div>
+      {% if kennzeichen_erfassen %}
+        <div class="feld{% if fehler.get('kennzeichen') %} feld-fehler{% endif %}">
+          <label for="kennzeichen">
+            Kfz-Kennzeichen <span class="pflicht" aria-hidden="true">*</span>
+          </label>
+          <input type="text" id="kennzeichen" name="kennzeichen"
+                 autocapitalize="characters"
+                 value="{{ werte.get('kennzeichen', '') }}">
+          {{ fehlermeldung('kennzeichen') }}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="feld{% if fehler.get('kategorie') %} feld-fehler{% endif %}">
+      <label for="kategorie">Kategorie</label>
+      <select id="kategorie" name="kategorie">
+        {% for schluessel, beschriftung in kategorien %}
+          <option value="{{ schluessel }}" {% if werte.get('kategorie') == schluessel %}selected{% endif %}>{{ beschriftung }}</option>
+        {% endfor %}
+      </select>
+      {{ fehlermeldung('kategorie') }}
+    </div>
+
+    <div class="paar">
+      <div class="feld{% if fehler.get('email') %} feld-fehler{% endif %}">
+        <label for="email">E-Mail</label>
+        <input type="email" id="email" name="email" value="{{ werte.get('email', '') }}">
+        {{ fehlermeldung('email') }}
+      </div>
+      <div class="feld{% if fehler.get('telefon') %} feld-fehler{% endif %}">
+        <label for="telefon">Telefon</label>
+        <input type="tel" id="telefon" name="telefon" value="{{ werte.get('telefon', '') }}">
+        {{ fehlermeldung('telefon') }}
+      </div>
+    </div>
+
+    <div class="feld{% if fehler.get('bemerkung') %} feld-fehler{% endif %}">
+      <label for="bemerkung">Bemerkung</label>
+      <textarea id="bemerkung" name="bemerkung" rows="3">{{ werte.get('bemerkung', '') }}</textarea>
+      {{ fehlermeldung('bemerkung') }}
+    </div>
+
+    <div class="knopfreihe">
+      <button type="submit" name="aktion" value="speichern" class="knopf-schlicht">
+        Änderungen speichern
+      </button>
+      {% if antrag.status in ('neu', 'abgelehnt') %}
+        <button type="submit" name="aktion" value="genehmigen">
+          {% if antrag.status == 'abgelehnt' %}Doch genehmigen{% else %}Speichern und genehmigen{% endif %}
+        </button>
+      {% endif %}
+    </div>
+  </form>
+
+  <h2>Entscheidung</h2>
+
+  {% if antrag.status in ('neu', 'genehmigt') %}
+    <form method="post" action="/admin/antrag/{{ antrag.id }}/ablehnen" class="ablehnen">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="feld{% if fehler.get('begruendung') %} feld-fehler{% endif %}">
+        <label for="begruendung">Begründung für die Ablehnung</label>
+        <textarea id="begruendung" name="begruendung" rows="3"
+                  placeholder="Geht so an den Antragsteller."></textarea>
+        {{ fehlermeldung('begruendung') }}
+      </div>
+      <button type="submit" class="knopf-gefahr">Ablehnen</button>
+    </form>
+  {% endif %}
+
+  <div class="knopfreihe">
+    {% if antrag.status == 'genehmigt' %}
+      <form method="post" action="/admin/antrag/{{ antrag.id }}/status">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="ziel" value="ausgegeben">
+        <button type="submit">Karte ausgegeben</button>
+      </form>
+    {% endif %}
+
+    {% if antrag.status != 'neu' %}
+      <form method="post" action="/admin/antrag/{{ antrag.id }}/status">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="ziel" value="neu">
+        <button type="submit" class="knopf-schlicht">Zurück auf „neu“</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <h2>Verlauf</h2>
+  <dl class="daten">
+    <dt>Eingegangen</dt><dd>{{ antrag.created_at|zeit }}</dd>
+    {% if antrag.entscheidung_am %}
+      <dt>Entschieden</dt>
+      <dd>{{ antrag.entscheidung_am|zeit }}{% if antrag.entscheidung_durch %} durch {{ antrag.entscheidung_durch }}{% endif %}</dd>
+    {% endif %}
+    {% if antrag.begruendung %}
+      <dt>Begründung</dt><dd class="mehrzeilig">{{ antrag.begruendung }}</dd>
+    {% endif %}
+    {% if antrag.tel_informiert_am %}
+      <dt>Telefonisch informiert</dt><dd>{{ antrag.tel_informiert_am|zeit }}</dd>
+    {% endif %}
+    {% if antrag.remote_ip %}
+      <dt>IP bei Eingang</dt><dd class="gedaempft">{{ antrag.remote_ip }}</dd>
+    {% endif %}
+  </dl>
+
+  {% if not antrag.email and antrag.status == 'abgelehnt' %}
+    <form method="post" action="/admin/antrag/{{ antrag.id }}/telefoniert" class="knopfreihe">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="zurueck" value="/admin/antrag/{{ antrag.id }}">
+      {% if antrag.tel_informiert_am %}
+        <input type="hidden" name="erledigt" value="0">
+        <button type="submit" class="knopf-schlicht">Anruf doch noch offen</button>
+      {% else %}
+        <input type="hidden" name="erledigt" value="1">
+        <button type="submit">Telefonisch informiert</button>
+        <span class="hilfe">Absage ohne Mailadresse – jemand muss anrufen.</span>
+      {% endif %}
+    </form>
+  {% endif %}
+
+  <h2>Mails</h2>
+  {% if mails %}
+    <div class="tabelle-huelle">
+      <table>
+        <thead>
+          <tr><th>Anlass</th><th>An</th><th>Zustand</th><th>Versuche</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for m in mails %}
+            {% set aufgegeben = not m.gesendet_am and m.versuche >= mail_max_versuche %}
+            <tr>
+              <td>{{ m.typ }}</td>
+              <td>{{ m.empfaenger }}</td>
+              <td>
+                {% if m.gesendet_am %}
+                  <span class="marke marke-genehmigt">gesendet</span> {{ m.gesendet_am|zeit }}
+                {% elif aufgegeben %}
+                  <span class="marke marke-abgelehnt">fehlgeschlagen</span>
+                  <span class="hilfe">{{ m.letzter_fehler }}</span>
+                {% else %}
+                  <span class="marke marke-neu">wartet</span>
+                  {% if m.letzter_fehler %}<span class="hilfe">{{ m.letzter_fehler }}</span>{% endif %}
+                {% endif %}
+              </td>
+              <td>{{ m.versuche }}</td>
+              <td>
+                {% if aufgegeben %}
+                  <form method="post" action="/admin/mail/{{ m.id }}/erneut">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <input type="hidden" name="antrag_id" value="{{ antrag.id }}">
+                    <button type="submit" class="knopf-schlicht">erneut versuchen</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if not mail_aktiv %}
+      <p class="hinweis hinweis-warnung">
+        Kein SMTP konfiguriert – die Mails bleiben in der Schlange, bis
+        <code>SMTP_HOST</code> und <code>MAIL_FROM</code> gesetzt sind.
+      </p>
+    {% endif %}
+  {% elif antrag.email %}
+    <p class="hilfe">Noch keine Mail erzeugt.</p>
+  {% else %}
+    <p class="hilfe">Keine Mailadresse hinterlegt – die Rückmeldung läuft telefonisch.</p>
+  {% endif %}
+
+  <form method="post" action="/admin/antrag/{{ antrag.id }}/loeschen" class="loeschen"
+        onsubmit="return confirm('Antrag {{ antrag.id }} wirklich endgültig löschen?');">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="knopf-gefahr">Antrag löschen</button>
+    <span class="hilfe">Löscht den Datensatz endgültig, ohne Papierkorb.</span>
+  </form>
+{% endblock %}

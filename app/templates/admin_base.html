@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block titel %}Backoffice{% endblock %} – {{ veranstaltung }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="huelle {% block breite %}huelle-breit{% endblock %}">
+    <header class="admin-kopf">
+      <div>
+        <p class="veranstaltung">{{ veranstaltung }} · Backoffice</p>
+        <h1>{% block ueberschrift %}Anträge{% endblock %}</h1>
+      </div>
+      {% if sitzung %}
+        <form method="post" action="/admin/logout" class="abmelden">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if sitzung.kuerzel %}<span class="kuerzel">{{ sitzung.kuerzel }}</span>{% endif %}
+          <button type="submit" class="knopf-schlicht">Abmelden</button>
+        </form>
+      {% endif %}
+    </header>
+
+    {% if sitzung %}
+      <nav class="admin-nav">
+        <a href="/admin">Anträge</a>
+        <a href="/admin/durchfahrt">Durchfahrtsliste</a>
+        <a href="/admin/telefon">
+          Telefonisch informieren
+          {% if telefon_offen %}<span class="marke marke-telefon">{{ telefon_offen }}</span>{% endif %}
+        </a>
+      </nav>
+    {% endif %}
+
+    <main>
+      {% block inhalt %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

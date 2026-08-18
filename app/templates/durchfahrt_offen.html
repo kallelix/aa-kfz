@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  {# Der Token steht im Pfad. Ohne das hier truege ihn jeder Klick nach draussen. #}
+  <meta name="referrer" content="no-referrer">
+  <title>Durchfahrtsliste – {{ veranstaltung }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="huelle huelle-breit">
+    <header>
+      <p class="veranstaltung">{{ veranstaltung }}</p>
+      <h1>Durchfahrtsliste</h1>
+    </header>
+
+    <main>
+      {% include "_durchfahrt_tabelle.html" %}
+    </main>
+
+    <footer>
+      <p>
+        Aufgeführt sind alle Fahrzeuge mit gültiger Durchfahrtsberechtigung.
+        Wer nicht auf der Liste steht, hat keine.
+      </p>
+      <p>
+        Fragen? {{ kontakt_name }}{% if kontakt_mail %} ·
+        <a href="mailto:{{ kontakt_mail }}">{{ kontakt_mail }}</a>{% endif %}{% if kontakt_telefon %} ·
+        {{ kontakt_telefon }}{% endif %}
+      </p>
+    </footer>
+  </div>
+</body>
+</html>

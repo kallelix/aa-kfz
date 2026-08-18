@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titel %}Antrag eingegangen{% endblock %}
+{% block ueberschrift %}Antrag eingegangen{% endblock %}
+
+{% block inhalt %}
+  <p class="hinweis hinweis-ok">
+    Danke! Dein Antrag ist bei uns angekommen{% if nummer %} und hat die Nummer
+    <strong>{{ nummer }}</strong>{% endif %}.
+  </p>
+
+  <p>
+    Wir prüfen ihn und melden uns mit der Entscheidung. Hast du eine
+    E-Mail-Adresse angegeben, kommt die Rückmeldung per Mail. Ohne Mailadresse
+    hörst du nur von uns, wenn es <em>nicht</em> klappt – dann rufen wir an.
+  </p>
+
+  <p>
+    Deinen Aufkleber bekommst du an der Straßensperre. Dort liegt die Liste mit
+    den Kennzeichen.
+  </p>
+
+  <p><a class="zurueck" href="{{ form_pfad }}">Weiteren Antrag stellen</a></p>
+{% endblock %}

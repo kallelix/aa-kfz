@@ -1,0 +1,64 @@
+{# Suchfeld und Tabelle der Durchfahrtsliste.
+
+   Wird von der internen Ansicht (admin_durchfahrt.html) und von der offenen
+   Ansicht unter /durchfahrt/<token> eingebunden – so kann die eine nicht
+   von der anderen abdriften. #}
+
+<div class="sperre-suche">
+  <label for="suche">Name oder Kennzeichen</label>
+  <div class="sperre-suche-zeile">
+    <input type="search" id="suche" autofocus autocomplete="off"
+           autocapitalize="characters" spellcheck="false"
+           placeholder="z. B. Berger oder KAAB101">
+    <a class="knopf-schlicht weg" id="zuruecksetzen" href="#">zurücksetzen</a>
+  </div>
+  <p class="hilfe">
+    Wird beim Tippen gefiltert, ohne Netz. Beim Kennzeichen sind Bindestriche
+    und Leerzeichen egal – <code>kaab101</code> findet <code>KA-AB 101</code>.
+  </p>
+  <noscript>
+    <p class="hinweis hinweis-warnung">
+      JavaScript ist aus, deshalb gibt es kein Suchfeld. Die vollständige Liste
+      steht unten – mit Strg+F bzw. der Suchfunktion des Browsers kommst du auch
+      ans Ziel.
+    </p>
+  </noscript>
+</div>
+
+{% if zeilen %}
+  <p class="trefferzahl" id="trefferzahl">
+    {{ zeilen|length }} Fahrzeug{{ 'e' if zeilen|length != 1 }} berechtigt
+  </p>
+
+  <div class="tabelle-huelle">
+    <table class="sperre-tabelle" id="durchfahrt">
+      <thead>
+        <tr>
+          <th>Vorname</th>
+          <th>Name</th>
+          <th>Kennzeichen</th>
+          <th>Kategorie</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for z in zeilen %}
+          <tr data-name="{{ z.suchname }}" data-kfz="{{ z.suchkfz }}">
+            <td>{{ z.vorname }}</td>
+            <td>{{ z.nachname }}</td>
+            <td class="sperre-kennzeichen">{{ z.kennzeichen or '—' }}</td>
+            <td>{{ z.kategorie }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="hinweis hinweis-fehler weg" id="nichts-gefunden" role="status">
+    Nichts gefunden. <strong>Keine Durchfahrt.</strong> Wer hier nicht steht,
+    hat keine Berechtigung – im Zweifel bei der Orga nachfragen.
+  </p>
+{% else %}
+  <p class="hinweis">Noch ist niemand genehmigt.</p>
+{% endif %}
+
+<script src="/static/durchfahrt.js" defer></script>

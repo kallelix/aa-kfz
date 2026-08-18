@@ -1,0 +1,50 @@
+[Unit]
+Description=Kennzeichen-Antrag "Die absolute Abfahrt"
+Documentation=file:/opt/abfahrt/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=abfahrt
+Group=abfahrt
+WorkingDirectory=/opt/abfahrt
+
+# Alle Einstellungen inklusive Geheimnisse. Datei root:root 0600 – systemd liest
+# sie, bevor es die Rechte auf abfahrt fallen laesst.
+EnvironmentFile=/etc/abfahrt/kennzeichen.env
+
+# Bind-Adresse, vertraute Proxys und --proxy-headers kommen aus der Umgebung,
+# siehe app/__main__.py. Deshalb steht hier keine Kommandozeile voller Flags,
+# die man beim naechsten Mal falsch abschreibt.
+ExecStart=/opt/abfahrt/.venv/bin/python -m app
+
+Restart=always
+RestartSec=5
+
+# --- Absicherung ---
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+# AF_UNIX muss mit: unter Ubuntu loest glibc ueber systemd-resolved auf,
+# und das laeuft ueber einen Unix-Socket. Ohne die Familie findet der
+# Mailversand smtp.ionos.de nicht.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+
+# Einziger Pfad, in den geschrieben werden darf: die Datenbank.
+ReadWritePaths=/var/lib/abfahrt
+
+[Install]
+WantedBy=multi-user.target
