@@ -277,9 +277,15 @@ Toleranz gilt inzwischen auch für die Suche in der Antragsliste.
 
 ### Sortieren
 
-Ein Tipp auf eine Spaltenüberschrift sortiert danach, ein zweiter dreht die
-Richtung um. Läuft ebenfalls im Browser, also ohne Netz. Die Überschriften sind
+Vorgabe ist **Kennzeichen aufsteigend** – danach wird an der Sperre gesucht.
+Ein Tipp auf eine Spaltenüberschrift sortiert danach um, ein zweiter dreht die
+Richtung. Läuft ebenfalls im Browser, also ohne Netz. Die Überschriften sind
 echte Knöpfe und melden ihren Zustand über `aria-sort`.
+
+Die Serverabfrage sortiert bereits nach Kennzeichen (normalisiert, Leere ans
+Ende) – ohne JavaScript stimmt die Reihenfolge also auch. Das Skript sortiert
+beim Laden trotzdem einmal nach, damit die Anzeige auf die Stelle genau dem
+entspricht, was ein Klick auf dieselbe Spalte ergibt.
 
 Verglichen wird mit `localeCompare` und Gebietsschema `de`: Umlaute landen bei
 ihrem Grundbuchstaben (Öztürk zwischen O und P, nicht hinter Z), und Zahlen in

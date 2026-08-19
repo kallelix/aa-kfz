@@ -182,9 +182,11 @@
       marken(spalte, absteigend);
     }
 
-    // Der Server liefert nach Nachname sortiert, deshalb steht die Marke dort
-    // schon in der Vorlage. Ohne Klick wird hier nichts umsortiert.
-    var aktuelleSpalte = 1;
+    // Vorgabe: Kennzeichen aufsteigend. Der Server liefert schon so, hier wird
+    // trotzdem einmal sortiert – dann stimmt die Reihenfolge auf die Stelle
+    // genau mit dem ueberein, was ein Klick auf dieselbe Spalte ergibt, und der
+    // Pfeil steht von Anfang an richtig.
+    var aktuelleSpalte = 2;
     var aktuellAbsteigend = false;
 
     knoepfe.forEach(function (knopf) {
@@ -196,6 +198,7 @@
       });
     });
 
+    sortieren(aktuelleSpalte, aktuellAbsteigend);
     filtern();
   });
 })();

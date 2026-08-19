@@ -573,7 +573,12 @@ def antraege_durchfahrt() -> list:
     try:
         return con.execute(
             "SELECT * FROM antrag WHERE status IN (%s)"
-            " ORDER BY nachname COLLATE NOCASE, vorname COLLATE NOCASE"
+            # Nach Kennzeichen, denn danach wird an der Sperre gesucht.
+            # Normalisiert, damit KA-AB 1 und KAAB1 beieinander stehen, und
+            # Zeilen ohne Kennzeichen ans Ende statt nach vorn.
+            " ORDER BY (COALESCE(TRIM(kennzeichen), '') = ''),"
+            "          kfz_norm(COALESCE(kennzeichen, '')),"
+            "          nachname COLLATE NOCASE, vorname COLLATE NOCASE"
             % ", ".join("?" for _ in DURCHFAHRT_STATUS),
             DURCHFAHRT_STATUS,
         ).fetchall()

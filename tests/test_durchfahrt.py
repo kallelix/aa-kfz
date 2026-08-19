@@ -195,10 +195,13 @@ try:
     pruefe(seite.count('aria-sort=') == 4, "jede Spalte meldet ihren Sortierzustand")
     pruefe(seite.count('aria-sort="ascending"') == 1,
            "genau eine Spalte ist vorsortiert – die, nach der der Server liefert")
+    kennzeichen_reihenfolge = re.findall(r'class="sperre-kennzeichen">([^<]*)<', seite)
+    pruefe(kennzeichen_reihenfolge == sorted(kennzeichen_reihenfolge),
+           "der Server liefert nach Kennzeichen sortiert: " + str(kennzeichen_reihenfolge))
     vorsortiert = re.search(
         r'aria-sort="ascending">\s*<button[^>]*>\s*([A-Za-zÄÖÜäöüß]+)', seite)
-    pruefe(vorsortiert is not None and vorsortiert.group(1) == "Name",
-           "und zwar Name: " + (vorsortiert.group(1) if vorsortiert else "keine"))
+    pruefe(vorsortiert is not None and vorsortiert.group(1) == "Kennzeichen",
+           "und zwar Kennzeichen: " + (vorsortiert.group(1) if vorsortiert else "keine"))
     pruefe("sortpfeil" in seite, "Platz fuer die Richtungsmarke ist da")
     pruefe("Aufbau" not in seite, "die Funktion taucht auch im Inhalt nicht auf")
     pruefe("zaehler-kachel" not in seite, "keine Zusammenfassung oben")
