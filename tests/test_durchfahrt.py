@@ -177,10 +177,29 @@ try:
     pruefe(seite.count("<tr data-name=") == 2, "genau zwei Zeilen in der Tabelle")
 
     print("Nur die vier gewuenschten Spalten")
-    for kopf in ("Vorname", "Name", "Kennzeichen", "Kategorie"):
-        pruefe("<th>" + kopf + "</th>" in seite, "Spalte " + kopf + " ist da")
+    spaltenkoepfe = re.findall(r'data-spalte="(\d)">\s*([A-Za-zÄÖÜäöüß]+)', seite)
+    pruefe([name for _, name in spaltenkoepfe] == ["Vorname", "Name", "Kennzeichen", "Kategorie"],
+           "vier Spalten in dieser Reihenfolge: " + str(spaltenkoepfe))
     for weg in ("Funktion", "Status", "Eingang", "Kontakt"):
-        pruefe("<th>" + weg + "</th>" not in seite, "Spalte " + weg + " fehlt zu Recht")
+        pruefe(">" + weg + " <" not in seite and "<th>" + weg + "</th>" not in seite,
+               "Spalte " + weg + " fehlt zu Recht")
+
+    print("Sortieren per Tippen auf die Ueberschrift")
+    pruefe(seite.count('class="sortknopf"') == 4, "jede Ueberschrift ist ein Knopf")
+    pruefe(seite.count('type="button"') >= 4,
+           "type=button – ein Klick darf nichts abschicken")
+    pruefe([n for _, n in spaltenkoepfe] and
+           [z for z in ("0", "1", "2", "3") if 'data-spalte="' + z + '"' in seite] ==
+           ["0", "1", "2", "3"],
+           "die Spaltennummern 0 bis 3 sind vergeben")
+    pruefe(seite.count('aria-sort=') == 4, "jede Spalte meldet ihren Sortierzustand")
+    pruefe(seite.count('aria-sort="ascending"') == 1,
+           "genau eine Spalte ist vorsortiert – die, nach der der Server liefert")
+    vorsortiert = re.search(
+        r'aria-sort="ascending">\s*<button[^>]*>\s*([A-Za-zÄÖÜäöüß]+)', seite)
+    pruefe(vorsortiert is not None and vorsortiert.group(1) == "Name",
+           "und zwar Name: " + (vorsortiert.group(1) if vorsortiert else "keine"))
+    pruefe("sortpfeil" in seite, "Platz fuer die Richtungsmarke ist da")
     pruefe("Aufbau" not in seite, "die Funktion taucht auch im Inhalt nicht auf")
     pruefe("zaehler-kachel" not in seite, "keine Zusammenfassung oben")
     pruefe("030 111" not in seite, "keine Telefonnummern")

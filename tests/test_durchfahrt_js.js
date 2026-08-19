@@ -9,7 +9,7 @@
 "use strict";
 
 const path = require("path");
-const { kfzNormalisieren, passt } = require(
+const { kfzNormalisieren, passt, vergleiche } = require(
   path.join(__dirname, "..", "app", "static", "durchfahrt.js")
 );
 
@@ -96,6 +96,51 @@ pruefe(!passt(BERGER, "/ ."), "Trennzeichen gemischt ebenso wenig");
 pruefe(!passt(OHNE_KFZ, "kaab101"), "Zeile ohne Kennzeichen wird nicht zufaellig getroffen");
 pruefe(passt(OHNE_KFZ, "ohnewagen"), "ueber den Namen aber schon");
 pruefe(passt(OHNE_KFZ, ""), "und bei leerer Suche steht sie da");
+
+console.log("Sortierung");
+
+function sortiert(werte, absteigend) {
+  return werte.slice().sort(function (a, b) {
+    return vergleiche(a, b, absteigend);
+  });
+}
+
+pruefe(
+  JSON.stringify(sortiert(["Vogt", "Berger", "Öztürk", "Ackermann"], false)) ===
+    JSON.stringify(["Ackermann", "Berger", "Öztürk", "Vogt"]),
+  "Umlaute sortieren beim Grundbuchstaben, nicht hinter Z: " +
+    sortiert(["Vogt", "Berger", "Öztürk", "Ackermann"], false).join(", ")
+);
+
+pruefe(
+  JSON.stringify(sortiert(["Berger", "Ackermann"], true)) ===
+    JSON.stringify(["Berger", "Ackermann"]),
+  "absteigend dreht um"
+);
+
+pruefe(
+  JSON.stringify(sortiert(["KA-AB 10", "KA-AB 2", "KA-AB 1"], false)) ===
+    JSON.stringify(["KA-AB 1", "KA-AB 2", "KA-AB 10"]),
+  "Zahlen im Kennzeichen werden als Zahlen verglichen: " +
+    sortiert(["KA-AB 10", "KA-AB 2", "KA-AB 1"], false).join(", ")
+);
+
+pruefe(vergleiche("berger", "Berger") === 0, "Gross- und Kleinschreibung ist egal");
+pruefe(vergleiche("Ackermann", "Berger") < 0, "A vor B");
+pruefe(vergleiche("Berger", "Ackermann") > 0, "B nach A");
+
+pruefe(
+  JSON.stringify(sortiert(["KA-AB 1", "—", "HH-DO 4"], false)) ===
+    JSON.stringify(["HH-DO 4", "KA-AB 1", "—"]),
+  "leere Felder landen am Ende: " + sortiert(["KA-AB 1", "—", "HH-DO 4"], false).join(", ")
+);
+pruefe(
+  sortiert(["KA-AB 1", "—", "HH-DO 4"], true)[2] === "—",
+  "auch absteigend stehen sie hinten, nicht ploetzlich vorn"
+);
+pruefe(vergleiche("", "—") === 0, "leer und Gedankenstrich gelten als gleich leer");
+pruefe(vergleiche(null, "Berger") > 0, "null zaehlt als leer");
+pruefe(vergleiche("  Berger  ", "Berger") === 0, "Leerzeichen aussen stoeren nicht");
 
 console.log();
 if (fehler.length) {

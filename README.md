@@ -275,6 +275,18 @@ findet die Suche nichts, und zwar lautlos.
 `kaab101`, `ka ab 101`, `KA-AB-101` und `ab101` finden alle `KA-AB 101`. Dieselbe
 Toleranz gilt inzwischen auch für die Suche in der Antragsliste.
 
+### Sortieren
+
+Ein Tipp auf eine Spaltenüberschrift sortiert danach, ein zweiter dreht die
+Richtung um. Läuft ebenfalls im Browser, also ohne Netz. Die Überschriften sind
+echte Knöpfe und melden ihren Zustand über `aria-sort`.
+
+Verglichen wird mit `localeCompare` und Gebietsschema `de`: Umlaute landen bei
+ihrem Grundbuchstaben (Öztürk zwischen O und P, nicht hinter Z), und Zahlen in
+Kennzeichen werden als Zahlen verglichen – `KA-AB 2` steht vor `KA-AB 10`.
+Leere Felder bleiben in beiden Richtungen unten; die Richtung steckt deshalb im
+Vergleich und wird nicht außen negiert.
+
 Ohne JavaScript gibt es kein Suchfeld, aber die vollständige Liste – ein
 `<noscript>`-Hinweis verweist auf Strg+F. Für den Fall, dass gar nichts geht,
 lässt sich vorher der CSV-Export aufs Telefon laden.

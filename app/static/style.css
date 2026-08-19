@@ -499,8 +499,38 @@ td form { margin: 0; }
 .sperre-suche .hilfe { margin-top: .4rem; }
 
 .sperre-tabelle { font-size: 1rem; }
-.sperre-tabelle th { font-size: .75rem; }
+.sperre-tabelle th { font-size: .75rem; padding: 0; }
 .sperre-tabelle td { padding: .7rem .6rem; }
+
+/* Die Ueberschrift ist ein Knopf, damit sie auch per Tastatur und Screenreader
+   bedienbar ist. Sie fuellt die ganze Zelle - auf dem Telefon zaehlt jede
+   Millimeter Trefferflaeche. */
+.sortknopf {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  width: 100%;
+  padding: .6rem;
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--gedaempft);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sortknopf:hover { background: var(--flaeche); color: var(--text); }
+
+th[aria-sort="ascending"] .sortknopf,
+th[aria-sort="descending"] .sortknopf { color: var(--text); }
+
+.sortpfeil { font-size: .7em; line-height: 1; }
 
 .sperre-kennzeichen {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;

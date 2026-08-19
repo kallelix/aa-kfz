@@ -15,6 +15,7 @@
   <p class="hilfe">
     Wird beim Tippen gefiltert, ohne Netz. Beim Kennzeichen sind Bindestriche
     und Leerzeichen egal – <code>kaab101</code> findet <code>KA-AB 101</code>.
+    Tippen auf eine Spaltenüberschrift sortiert danach, nochmal tippen dreht um.
   </p>
   <noscript>
     <p class="hinweis hinweis-warnung">
@@ -34,10 +35,26 @@
     <table class="sperre-tabelle" id="durchfahrt">
       <thead>
         <tr>
-          <th>Vorname</th>
-          <th>Name</th>
-          <th>Kennzeichen</th>
-          <th>Kategorie</th>
+          <th scope="col" aria-sort="none">
+            <button type="button" class="sortknopf" data-spalte="0">
+              Vorname <span class="sortpfeil" aria-hidden="true"></span>
+            </button>
+          </th>
+          <th scope="col" aria-sort="ascending">
+            <button type="button" class="sortknopf" data-spalte="1">
+              Name <span class="sortpfeil" aria-hidden="true"></span>
+            </button>
+          </th>
+          <th scope="col" aria-sort="none">
+            <button type="button" class="sortknopf" data-spalte="2">
+              Kennzeichen <span class="sortpfeil" aria-hidden="true"></span>
+            </button>
+          </th>
+          <th scope="col" aria-sort="none">
+            <button type="button" class="sortknopf" data-spalte="3">
+              Kategorie <span class="sortpfeil" aria-hidden="true"></span>
+            </button>
+          </th>
         </tr>
       </thead>
       <tbody>
