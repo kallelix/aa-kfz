@@ -1,0 +1,94 @@
+{# Das Programm-Band eines Tages. Wird vom Backoffice und von der
+   Monitoransicht benutzt, deshalb ein Makro und keine eigene Seite.
+
+   `ziel` entscheidet, was ein Klick auf eine Schicht tut:
+     "admin"   -> Verweis auf die Schichtseite
+     "monitor" -> Schaltflaeche, die das Overlay oeffnet (siehe monitor.js)
+     ""        -> gar nichts, nur ansehen
+
+   Alle Positionen sind Prozentwerte und kommen fertig aus band.py. Im Browser
+   rechnet nichts nach: die Monitoransicht holt sich das Band beim Auffrischen
+   ohnehin neu, samt verschobener Jetzt-Linie. #}
+
+{% macro zeichnen(band, ziel='') %}
+<div class="band">
+  <div class="band-gitter">
+
+    {# Stundenraster. Liegt hinter den Balken, deshalb zuerst. #}
+    {% for s in band.stunden %}
+      <span class="band-strich{% if s.tageswechsel %} band-tageswechsel{% endif %}"
+            style="left: {{ s.prozent }}%"></span>
+      <span class="band-stunde{% if s.tageswechsel %} band-stunde-wechsel{% endif %}"
+            style="left: {{ s.prozent }}%">{{ s.text }}</span>
+    {% endfor %}
+
+    {% if band.jetzt_prozent is not none %}
+      <span class="band-jetzt" style="left: {{ band.jetzt_prozent }}%"
+            role="img" aria-label="jetzt"></span>
+    {% endif %}
+
+    {% for spur in band.programm_spuren %}
+      <div class="band-spur">
+        {% for b in spur %}
+          <span class="band-balken band-programm band-serie-{{ b.serie }}{% if b.offen %} band-offen{% endif %}"
+                style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                title="{{ b.titel }} · {{ b.von_uhr }}{% if b.bis_uhr %}–{{ b.bis_uhr }}{% else %} (offenes Ende){% endif %}">{{ b.beschriftung }}</span>
+        {% endfor %}
+      </div>
+    {% endfor %}
+
+    {% if band.programm_spuren and band.schicht_spuren %}
+      <div class="band-trenner"></div>
+    {% endif %}
+
+    {% for spur in band.schicht_spuren %}
+      <div class="band-spur">
+        {% for b in spur %}
+          {% set beschriftung = b.beschriftung %}
+          {% set marke = b.titel ~ ' · ' ~ b.von_uhr ~ '–' ~ b.bis_uhr
+                         ~ ' · ' ~ b.besetzt ~ ' von ' ~ b.bedarf
+                         ~ (' · ' ~ b.fehlt ~ ' fehlen' if b.fehlt else ' · voll') %}
+          {% if ziel == 'admin' %}
+            <a class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
+               style="left: {{ b.links }}%; width: {{ b.breite }}%"
+               href="/admin/schicht/{{ b.id }}" title="{{ marke }}">{{ beschriftung }}</a>
+          {% elif ziel == 'monitor' %}
+            <button type="button"
+                    class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
+                    style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                    data-schicht="{{ b.id }}" title="{{ marke }}">{{ beschriftung }}</button>
+          {% else %}
+            <span class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
+                  style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                  title="{{ marke }}">{{ beschriftung }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <p class="band-fuss">
+    {% for serie in band.serien %}
+      <span class="band-schluessel">
+        <span class="band-tupfer band-serie-{{ serie }}"></span>{{ serie }}
+      </span>
+    {% endfor %}
+    {% if band.schicht_spuren %}
+      <span class="band-schluessel">
+        <span class="band-tupfer band-schicht"></span>Schicht
+      </span>
+      <span class="band-schluessel">
+        <span class="band-tupfer band-schicht band-luecke"></span>Schicht mit Lücke
+      </span>
+    {% endif %}
+    {% if band.ohne_zeit %}
+      <span class="band-ohne-zeit">
+        ohne feste Zeit:
+        {% for e in band.ohne_zeit %}
+          {{ e.titel }} ({{ e.zeit_roh }}){% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </span>
+    {% endif %}
+  </p>
+</div>
+{% endmacro %}

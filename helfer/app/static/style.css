@@ -752,3 +752,158 @@ tr.entfallen td:last-child { text-decoration: none; }
   .vereinslogo { width: 2.6rem; height: 2.6rem; }
   .kopf-marke, .kopfzeile { gap: .6rem; }
 }
+
+/* Farben des Programm-Bands im hellen Backoffice. */
+:root {
+  --band-linie: var(--rand);
+  --band-flaeche: #fff;
+  --band-text: var(--gedaempft);
+  --band-jetzt: #ef4444;
+  --band-programm: #0d9488;
+  --band-voll: #4e690f;
+  --band-fehlt: #b3261e;
+}
+
+/* --- Programm-Band -------------------------------------------------------- */
+
+/* Ein Tag als Zeitachse: oben die Programmpunkte der Rennserien, darunter die
+   Schichten. Alle Positionen kommen als Prozentwerte aus band.py - hier wird
+   nichts gerechnet und im Browser laeuft dafuer kein Skript.
+
+   Die Farben stehen als Variablen weiter oben in der jeweiligen Datei, damit
+   dieselben Regeln im hellen Backoffice und auf dem dunklen Monitor gelten. */
+
+.band {
+  border: 1px solid var(--band-linie);
+  border-radius: 10px;
+  background: var(--band-flaeche);
+  padding: .6rem .8rem .5rem;
+  /* Bei vielen Stunden wird es eng: lieber schieben als stauchen. */
+  overflow-x: auto;
+}
+
+/* Traegt das Raster und die Spuren. position:relative, weil alles darin per
+   left-Prozent sitzt. Der Abstand oben macht Platz fuer die Stundenzahlen und
+   die Beschriftung der Jetzt-Linie. */
+.band-gitter {
+  position: relative;
+  min-width: 34rem;
+  padding-top: 1.6rem;
+}
+
+.band-strich {
+  position: absolute;
+  top: 1.5rem;
+  bottom: 0;
+  width: 1px;
+  background: var(--band-linie);
+  transform: translateX(-.5px);
+}
+
+/* Mitternacht bekommt einen eigenen Strich: sonst laese sich die "08" einer
+   Nachtschicht wie der Morgen desselben Tages. */
+.band-tageswechsel {
+  width: 2px;
+  background: var(--band-text);
+  opacity: .55;
+}
+
+.band-stunde {
+  position: absolute;
+  top: .35rem;
+  font-size: .7rem;
+  color: var(--band-text);
+  transform: translateX(-50%);
+  font-variant-numeric: tabular-nums;
+}
+.band-stunde-wechsel { font-weight: 700; }
+
+.band-jetzt {
+  position: absolute;
+  top: 1.5rem;
+  bottom: 0;
+  width: 2px;
+  background: var(--band-jetzt);
+  transform: translateX(-1px);
+  z-index: 3;
+}
+.band-jetzt::after {
+  content: "jetzt";
+  position: absolute;
+  top: -1.45rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .62rem;
+  font-weight: 700;
+  color: var(--band-jetzt);
+  background: var(--band-flaeche);
+  padding: 0 .2rem;
+  border-radius: 3px;
+}
+
+.band-spur {
+  position: relative;
+  height: 1.35rem;
+  margin-top: .2rem;
+}
+
+.band-trenner {
+  height: 1px;
+  margin: .4rem 0 .3rem;
+  background: var(--band-linie);
+}
+
+.band-balken {
+  position: absolute;
+  top: 0;
+  height: 1.35rem;
+  line-height: 1.35rem;
+  border-radius: 4px;
+  padding: 0 .35rem;
+  font-size: .72rem;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  border: 0;
+  z-index: 2;
+}
+
+a.band-balken:hover, button.band-balken:hover { filter: brightness(1.15); }
+.band-balken:focus-visible { outline: 2px solid var(--band-jetzt); outline-offset: 1px; }
+button.band-balken { font-family: inherit; cursor: pointer; }
+a.band-balken { cursor: pointer; }
+
+/* Offenes Ende: auslaufen lassen, statt ein Ende zu behaupten, das auf der
+   Website der Rennserie gar nicht steht. */
+.band-offen {
+  -webkit-mask-image: linear-gradient(90deg, #000 55%, transparent);
+  mask-image: linear-gradient(90deg, #000 55%, transparent);
+}
+
+.band-programm { background: var(--band-programm); }
+.band-serie-dhc { background: #95bf0b; color: #13160f; }
+.band-serie-kids { background: #4e690f; }
+
+.band-schicht { background: var(--band-voll); }
+.band-luecke { background: var(--band-fehlt); }
+
+.band-fuss {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem .9rem;
+  align-items: center;
+  margin: .5rem 0 0;
+  font-size: .72rem;
+  color: var(--band-text);
+}
+.band-schluessel { display: flex; align-items: center; gap: .3rem; }
+.band-tupfer {
+  display: inline-block;
+  width: .9rem;
+  height: .5rem;
+  border-radius: 2px;
+}
+.band-ohne-zeit { font-style: italic; }

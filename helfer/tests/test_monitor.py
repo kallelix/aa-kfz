@@ -233,8 +233,11 @@ try:
            "drei Kacheln insgesamt: " + str(seite.count('class="kachel"')))
 
     print("Langfassung liegt schon bei")
-    pruefe(seite.count('class="detail" hidden') == 3,
+    pruefe(seite.count('class="detail" data-detail=') == 3,
            "jede Kachel bringt ihre Langfassung versteckt mit")
+    pruefe(seite.count('data-detail="' + str(lueckig) + '"') == 1,
+           "die Langfassung traegt die Nummer ihrer Schicht - darueber findet "
+           "sie auch ein Balken im Band, der selbst keine bei sich hat")
     pruefe("overlay-inhalt" in seite, "und das Overlay ist da, sie aufzunehmen")
     pruefe(seite.index('id="overlay"') > seite.index('</main>'),
            "das Overlay liegt ausserhalb des aufgefrischten Bereichs")
@@ -317,8 +320,17 @@ try:
     pruefe("Ordner Zeltplatz" not in tagseite, "auch nicht die laufende von heute")
     pruefe('data-schicht="' + str(sonntag) + '"' in tagseite,
            "die Schicht ist antippbar wie ueberall")
-    pruefe(tagseite.count('class="detail" hidden') == 1,
+    pruefe(tagseite.count('class="detail" data-detail=') == 1,
            "mit ihrer Langfassung")
+
+    print("Band im Tagesblick")
+    pruefe("band-gitter" in tagseite, "der Tagesblick zeigt das Band")
+    pruefe('data-schicht="' + str(sonntag) + '"' in tagseite.split("band-gitter")[1].split("</section>")[0],
+           "die Schicht steckt als Balken darin")
+    pruefe(tagseite.count('data-schicht="' + str(sonntag) + '"') == 2,
+           "zweimal antippbar: als Balken im Band und als Kachel in der Liste")
+    pruefe("band-jetzt" not in tagseite,
+           "an einem kuenftigen Tag steht keine Jetzt-Linie im Band")
     pruefe("Sonntagsprogramm" in tagseite, "das Programm des Tages steht dabei")
     pruefe("Pflichttraining" not in tagseite, "das von heute nicht")
 

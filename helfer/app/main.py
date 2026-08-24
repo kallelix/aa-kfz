@@ -23,7 +23,7 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import auth, config, csv_import, db, worker, zeitplan
+from . import auth, band, config, csv_import, db, worker, zeitplan
 
 BASIS = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASIS / "templates"))
@@ -411,6 +411,7 @@ def _monitor_kontext(request: Request, token: str, tag: str = "") -> dict:
         request, token=token, stand=stand,
         # Nur der Tagesblick, wenn ein Tag angefragt ist – sonst None.
         tagesblick=db.tagesstand(tag, jetzt) if tag else None,
+        band=_band(tag, jetzt) if tag else None,
         tagesleiste=db.monitor_tage(),
         heute=jetzt.strftime("%Y-%m-%d"),
         intervall=config.MONITOR_INTERVALL,
@@ -418,6 +419,17 @@ def _monitor_kontext(request: Request, token: str, tag: str = "") -> dict:
         overlay_sekunden=config.MONITOR_OVERLAY_SEKUNDEN,
         tagesblick_sekunden=config.MONITOR_TAGESBLICK_SEKUNDEN,
         tage=config.TAGE)
+
+
+def _band(tag: str, jetzt) -> dict | None:
+    """Das Programm-Band eines Tages, fertig gerechnet."""
+    stand = db.tagesstand(tag, jetzt)
+    return band.bauen(
+        tag, stand["programm"], stand["schichten"],
+        # Die Jetzt-Linie gehoert nur auf den laufenden Tag. An einem anderen
+        # stuende sie an einer Stelle, die dort nichts bedeutet.
+        jetzt=jetzt if stand["ist_heute"] else None,
+        farben={s["schluessel"]: s["farbe"] for s in config.serien()})
 
 
 def _tag_pruefen(roh: str) -> str:
@@ -529,6 +541,26 @@ async def zeitplan_abrufen(
     berichte = await asyncio.to_thread(
         zeitplan.alle_abrufen, sitzung.kuerzel or "von Hand")
     return _zeitplan_seite(request, sitzung, berichte=berichte)
+
+
+# --- Programm-Band ---------------------------------------------------------
+
+@app.get("/admin/band")
+async def band_ansicht(request: Request, tag: str = "",
+                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    jetzt = db.jetzt_lokal()
+    tage = db.monitor_tage()
+    gewaehlt = _tag_pruefen(tag)
+    if not gewaehlt and tage:
+        # Ohne Angabe der heutige Tag, sonst der erste, an dem etwas ansteht.
+        heute = jetzt.strftime("%Y-%m-%d")
+        gewaehlt = heute if any(t["datum"] == heute for t in tage) else tage[0]["datum"]
+
+    stand = db.tagesstand(gewaehlt, jetzt) if gewaehlt else None
+    return templates.TemplateResponse(
+        "admin_band.html",
+        _admin(request, sitzung, hinweis="", tage=tage, gewaehlt=gewaehlt,
+               stand=stand, band=_band(gewaehlt, jetzt) if gewaehlt else None))
 
 
 # --- Import ----------------------------------------------------------------

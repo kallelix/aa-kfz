@@ -109,12 +109,12 @@
 
   /* --- Overlay: eine Schicht groß ---------------------------------------- */
 
+  /* Die Langfassung wird ueber ihre eigene Kennung gesucht, nicht ueber die
+   * Kachel daneben: im Tagesblick koennen zwei Dinge dieselbe Schicht
+   * oeffnen, die Kachel in der Liste und der Balken im Band. Nur eines von
+   * beiden traegt die Langfassung bei sich. */
   function detailSuchen(nummer) {
-    var kachel = inhalt.querySelector('.kachel[data-schicht="' + nummer + '"]');
-    if (!kachel || !kachel.parentNode) {
-      return null;
-    }
-    return kachel.parentNode.querySelector(".detail");
+    return inhalt.querySelector('[data-detail="' + nummer + '"]');
   }
 
   function overlayOeffnen(nummer) {
@@ -203,11 +203,11 @@
   /* --- Bedienung ---------------------------------------------------------- */
 
   inhalt.addEventListener("click", function (ereignis) {
-    var kachel = ereignis.target.closest
-      ? ereignis.target.closest(".kachel")
+    var ausloeser = ereignis.target.closest
+      ? ereignis.target.closest("[data-schicht]")
       : null;
-    if (kachel) {
-      overlayOeffnen(kachel.getAttribute("data-schicht"));
+    if (ausloeser) {
+      overlayOeffnen(ausloeser.getAttribute("data-schicht"));
     }
   });
 

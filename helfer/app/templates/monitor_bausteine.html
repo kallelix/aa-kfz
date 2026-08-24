@@ -9,7 +9,7 @@
   {# Die Langfassung einer Schicht. Liegt versteckt in jeder Kachel, damit das
      Overlay sie ohne zweiten Abruf herausholen kann - und damit sie auch dann
      noch da ist, wenn die Verbindung gerade weg ist. #}
-  <div class="detail" hidden>
+  <div class="detail" data-detail="{{ s.id }}" hidden>
     <h3 class="detail-titel">{{ s.liste }}</h3>
     <p class="detail-zeit">
       {{ s.datum | tag }} · {{ s.beginn[11:] }}–{{ s.ende[11:] }}

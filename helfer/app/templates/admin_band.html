@@ -1,0 +1,59 @@
+{% extends "admin_base.html" %}
+{% import "band.html" as bandmakro %}
+{% block titel %}Band{% endblock %}
+{% block ueberschrift %}Programm-Band{% endblock %}
+
+{% block inhalt %}
+  {% if not tage %}
+    <p class="leer">Noch nichts erfasst.
+      <a href="/admin/import">Zum Import</a></p>
+  {% else %}
+    <form method="get" action="/admin/band" class="filter">
+      <div>
+        <label for="f-tag">Tag</label>
+        <select id="f-tag" name="tag">
+          {% for t in tage %}
+            <option value="{{ t.datum }}" {% if t.datum == gewaehlt %}selected{% endif %}>
+              {{ t.lang }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-knoepfe">
+        <button type="submit" class="knopf">Anzeigen</button>
+      </div>
+    </form>
+
+    {% if not band %}
+      <p class="leer">An diesem Tag steht nichts an, das sich auf einer
+        Zeitachse zeigen ließe.</p>
+    {% else %}
+      {{ bandmakro.zeichnen(band, 'admin') }}
+
+      <p class="hilfe">
+        Oben die Programmpunkte der Rennserien, darunter die Schichten – rot,
+        wo Leute fehlen. Ein Balken führt auf die Schicht. Schichten, die sich
+        zeitlich nicht überschneiden, teilen sich eine Zeile; das Band wäre
+        sonst {{ stand.schichten | length }} Zeilen hoch.
+      </p>
+
+      <section class="zaehler">
+        <div class="zaehler-kachel">
+          <p class="zaehler-titel">Plätze</p>
+          <p class="zaehler-zahl">{{ stand.bedarf }}</p>
+          <p class="zaehler-detail">auf {{ stand.schichten | length }} Schichten</p>
+        </div>
+        <div class="zaehler-kachel">
+          <p class="zaehler-titel">Besetzt</p>
+          <p class="zaehler-zahl">{{ stand.besetzt }}</p>
+          <p class="zaehler-detail">
+            {%- if stand.bedarf %}{{ (100 * stand.besetzt / stand.bedarf) | round | int }} % des Bedarfs{% endif %}</p>
+        </div>
+        <div class="zaehler-kachel {% if stand.offen %}zaehler-voll{% endif %}">
+          <p class="zaehler-titel">Offen</p>
+          <p class="zaehler-zahl">{{ stand.offen }}</p>
+          <p class="zaehler-detail">auf {{ stand.luecken }} Schichten</p>
+        </div>
+      </section>
+    {% endif %}
+  {% endif %}
+{% endblock %}

@@ -7,6 +7,7 @@
    data-tagesblick sagt dem Skript, welcher Tag gerade offen ist. #}
 
 {% import "monitor_bausteine.html" as bausteine %}
+{% import "band.html" as bandmakro %}
 
 <div class="raster raster-tag"
      data-jetzt="{{ stand.jetzt.isoformat(timespec='seconds') }}"
@@ -24,6 +25,13 @@
       {%- endif %}
     </span>
   </p>
+
+  {% if band %}
+    <section class="tafel tafel-tagband">
+      <h2>Ablauf</h2>
+      {{ bandmakro.zeichnen(band, 'monitor') }}
+    </section>
+  {% endif %}
 
   <section class="tafel tafel-tagschichten">
     <h2>Schichten
