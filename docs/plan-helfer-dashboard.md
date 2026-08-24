@@ -121,29 +121,89 @@ Mailadressen der Helfer. Der Bildschirm hängt öffentlich.
 
 ---
 
-## 5. Datenmodell
+## 5. Die beiden CSVs
 
-**Vorläufig – die beiden CSVs fehlen noch.** Schichtzeiten und Helferliste
-bestimmen die Felder; erst danach steht das Modell.
+`docs/Offene Posten.csv` und `docs/Vergebene Posten.csv`, beide UTF-8 mit BOM,
+Komma als Trenner. **Beide sind vom Git ausgeschlossen** – die zweite enthält
+Namen, Mailadressen, Verpflegungswünsche und T-Shirt-Größen, und das Repo ist
+öffentlich.
 
-Absehbar sind drei Tabellen zusätzlich zu den Einträgen aus dem Timetable:
+| Datei | Spalten | Zeilen |
+| --- | --- | --- |
+| Offene Posten | Liste, Datum, Zeit, Aufgabe | 176 |
+| Vergebene Posten | Name, Zusatz1, Zusatz2, Liste, Datum, Zeit, Aufgabe, Email, Phone | 237 |
+
+`Zusatz1` ist die Verpflegung (Fleisch/Vegetarisch), `Zusatz2` die
+T-Shirt-Größe.
+
+### Eine Zeile ist ein Platz, keine Schicht
+
+Das ist der entscheidende Punkt fürs Modell: „Streckenposten, 28.08.2026,
+10:00 – 18:00" steht **zehnmal** in den offenen Posten – das sind zehn
+unbesetzte Plätze derselben Schicht.
+
+Eine Schicht ist also `(Liste, Datum, Zeit)`, und ihr Bedarf ist die Summe aus
+besetzten und offenen Zeilen:
+
+| | |
+| --- | --- |
+| Schichten insgesamt | **51** |
+| Plätze insgesamt | **413** |
+| davon besetzt | 237 |
+| davon offen | 176 (57 %) |
+
+Sechs Listen: Aufbau und Abbau (61 offen), Ordner Zeltplatz (53),
+Straßensperre (41), Streckenposten (10), Shuttle (8), Absoluter Wiesenslalom
+(3). Zeitraum 25.08. – 01.09.2026 – also Aufbau und Abbau mit drin, nicht nur
+die Veranstaltungstage.
+
+### Was in den Daten nicht stimmt
+
+Der Import muss damit umgehen, sonst wandert der Ärger mit:
+
+- **`Aufgabe` ist in beiden Dateien durchgehend leer**, ebenso **`Phone`**
+  (237 von 237). Zwei tote Spalten – die Schichtbezeichnung steckt in `Liste`.
+- **104 Namen, aber nur 90 Mailadressen.** Eine Adresse trägt **acht**
+  verschiedene Namen: jemand hat mehrere Leute unter seiner Adresse
+  angemeldet. Die Mailadresse taugt damit **nicht** als Identität – der Import
+  muss über `(Name, Email)` gehen, und das Backoffice braucht eine Möglichkeit,
+  Dubletten zusammenzuführen.
+- **T-Shirt-Größen sind Freitext und entsprechend wild**: neben `S`–`XXXL` auch
+  `xs`, `4xl`, `Xl`, `L.`, `Damen L`, `Shirt Gr.M`, `Größe L` und
+  `Straßensperrung Aufbau Größe M`. Sechs Personen haben widersprüchliche
+  Angaben auf verschiedenen Zeilen. Der Import normalisiert, was er erkennt,
+  und lässt den Rest als Freitext stehen – erfunden wird nichts.
+- **Eine T-Shirt-Größe steht im Verpflegungsfeld** (`Zusatz1 = "L"`).
+  Vertauschte Spalte beim Ausfüllen.
+- **Vieles ist leer**: 19 von 90 ohne T-Shirt-Größe, 39 von 90 ohne
+  Verpflegungsangabe. Das Dashboard muss mit Lücken leben können.
+
+## 6. Datenmodell
 
 ```sql
 -- Aus dem Timetable uebernommen (ohne planner_id / planner_snapshot)
-eintrag(id, kind, date, phase, start, end, title, note, ort, cat,
-        resp, contact, status, updated_at, quelle, quelle_stand)
+eintrag(id, kind, datum, phase, start, ende, titel, notiz, ort, kategorie,
+        verantwortlich, kontakt, status, updated_at, quelle, quelle_stand)
 
-schicht(id, datum, start, ende, titel, ort, bedarf, hinweis)
-helfer(id, vorname, nachname, telefon, email, bemerkung, ...)
-einteilung(id, schicht_id, helfer_id, zugesagt_am, bemerkung)
+-- Eine Schicht, nicht ein Platz. bedarf = wie viele gebraucht werden.
+schicht(id, liste, datum, start, ende, bedarf, ort, hinweis, updated_at)
+
+helfer(id, name, email, verpflegung, shirt_groesse, shirt_roh, bemerkung)
+
+einteilung(id, schicht_id, helfer_id, quelle, angelegt_am,
+           UNIQUE(schicht_id, helfer_id))
 ```
 
-`quelle` unterscheidet, was vom Abruf stammt und was die Orga selbst angelegt
-hat – nur Ersteres darf ein Abruf überhaupt anfassen.
+`quelle` unterscheidet, was aus Import oder Abruf stammt und was die Orga
+selbst angelegt hat – nur Ersteres darf ein erneuter Lauf überhaupt anfassen.
+
+`shirt_roh` behält die Originaleingabe neben der normalisierten Größe. Wenn
+jemand `Damen L` geschrieben hat, ist das eine Information, die beim Bestellen
+zählt.
 
 ---
 
-## 6. Was aus dem Timetable erhalten bleibt
+## 7. Was aus dem Timetable erhalten bleibt
 
 - **`updated_at`-Konfliktschutz**: jeder Schreibvorgang setzt ihn neu, der
   Client schickt seinen Stand mit, bei Abweichung `409` statt stillem
@@ -155,7 +215,7 @@ hat – nur Ersteres darf ein Abruf überhaupt anfassen.
 
 ---
 
-## 7. Umsetzungsschritte
+## 8. Umsetzungsschritte
 
 | # | Schritt | Aufwand |
 |---|---|---|
@@ -172,7 +232,7 @@ hat – nur Ersteres darf ein Abruf überhaupt anfassen.
 
 ---
 
-## 8. Geklärt
+## 9. Geklärt
 
 - Python/FastAPI als dritte App im selben Repo
 - Übernimmt **alles** vom Timetable, auch den Aufgabenplan
@@ -180,18 +240,22 @@ hat – nur Ersteres darf ein Abruf überhaupt anfassen.
 - Monitor über **Token-Link ohne Anmeldung**
 - Planner-Import entfällt
 
-## 9. Offene Fragen
+## 10. Offene Fragen
 
-1. **Die beiden CSVs** – ohne sie steht das Datenmodell nicht. Welche Spalten
-   haben Schichten und Helfer, und welches Werkzeug hat sie erzeugt?
-2. **Veranstaltungstage**: 28.–30.08.2026 wie in `seed.js`? Der Abruf braucht
+1. **Dubletten**: Soll der Import die acht Namen unter einer Adresse als acht
+   Helfer anlegen (vermutlich richtig – es sind acht Personen), und das
+   Backoffice bekommt ein „zusammenführen"? Oder anders herum?
+2. **T-Shirt-Größen**: normalisieren auf XS–4XL und Abweichungen wie
+   „Damen L" als Zusatz behalten – oder alles als Freitext lassen und nur beim
+   Bestellen sortieren?
+3. **Veranstaltungstage**: 28.–30.08.2026 wie in `seed.js`? Der Abruf braucht
    sie, um Wochentage auf Daten abzubilden.
-3. **Bestandsdaten aus dem Timetable**: Gibt es dort schon gepflegte Aufgaben,
+4. **Bestandsdaten aus dem Timetable**: Gibt es dort schon gepflegte Aufgaben,
    die übernommen werden müssen, oder ist die Datenbank noch leer?
-4. **PWA und Offline**: Der Timetable ist eine installierbare App mit Service
+5. **PWA und Offline**: Der Timetable ist eine installierbare App mit Service
    Worker. Braucht das Dashboard das auch – etwa für Helfer, die es auf dem
    Handy dabeihaben – oder genügt die Monitor-Ansicht plus Backoffice?
-5. **Sehen Helfer ihre eigene Einteilung?** Ein zweiter Token-Link mit einer
+6. **Sehen Helfer ihre eigene Einteilung?** Ein zweiter Token-Link mit einer
    „Wer hat wann Dienst"-Ansicht wäre naheliegend, ist aber nicht gefordert.
-6. **Benachrichtigung**: Sollen Helfer per Mail erfahren, wann sie eingeteilt
+7. **Benachrichtigung**: Sollen Helfer per Mail erfahren, wann sie eingeteilt
    sind? Der Mailversand steht in beiden Schwester-Apps bereits.
