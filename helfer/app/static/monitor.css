@@ -819,3 +819,11 @@ body.tagesblick .tafel-tagprogramm {
 .band-strich-rechts { transform: translateX(-100%); }
 .band-jetzt-links { transform: none; }
 .band-jetzt-rechts { transform: translateX(-100%); }
+
+/* Vor der Veranstaltung hat die Programmtafel nichts zu zeigen. Statt leer zu
+   bleiben, nennt sie den naechsten Tag, an dem etwas laeuft. */
+.programm-ausblick {
+  margin: .3rem 0 0;
+  font-size: 1.15em;
+  color: var(--limette);
+}

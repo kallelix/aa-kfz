@@ -89,7 +89,17 @@
 
     {% if not (stand.programm_laufend or stand.programm_kommend
                or stand.programm_ohne_zeit) %}
-      <p class="leer">Kein Programm hinterlegt.</p>
+      {% if stand.programm_heute %}
+        <p class="leer">Das Programm für heute ist durch.</p>
+      {% else %}
+        <p class="leer">Heute kein Programm.</p>
+      {% endif %}
+      {% if stand.programm_naechster_tag %}
+        <p class="programm-ausblick">
+          Weiter geht es
+          <strong>{{ stand.programm_naechster_tag.lang }}</strong>
+        </p>
+      {% endif %}
     {% endif %}
   </section>
 

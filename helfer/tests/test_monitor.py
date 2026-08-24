@@ -106,6 +106,12 @@ with con:
         " zeit_roh, angelegt_am) VALUES ('dhc', 'Sonntagsprogramm',"
         " '2026-08-30', '2026-08-30 11:30', NULL, 'Sonntag', 'ab 11.30 Uhr', ?)",
         (db.jetzt(),))
+    # Weit voraus – darf in der Jetzt-Ansicht nie auftauchen.
+    con.execute(
+        "INSERT INTO programm (serie, titel, datum, beginn, ende, tag_roh,"
+        " zeit_roh, angelegt_am) VALUES ('dhc', 'Uebernaechster Tag',"
+        " '2026-08-31', '2026-08-31 09:00', NULL, 'Montag', 'ab 9 Uhr', ?)",
+        (db.jetzt(),))
 con.close()
 
 
@@ -215,6 +221,14 @@ try:
     pruefe("Siegerehrung" in seite, "und der Punkt ohne Uhrzeit")
     pruefe("anschließend" in seite, "mit seinem Wortlaut")
 
+    print("Das Programm bleibt beim heutigen Tag")
+    programmteil = seite.split("tafel-programm")[1].split("tafel-naechst")[0]
+    pruefe("Sonntagsprogramm" not in programmteil,
+           "der Folgetag steht nicht in der Jetzt-Ansicht")
+    pruefe("Uebernaechster Tag" not in programmteil,
+           "der uebernaechste erst recht nicht")
+    pruefe("Pflichttraining" in programmteil, "das von heute schon")
+
     print("Als Naechstes")
     kommend = seite.split("tafel-naechst")[1]
     pruefe("Shuttle" in kommend, "was im Fenster beginnt, steht drauf")
@@ -291,9 +305,13 @@ try:
     pruefe(seite.index('id="tagesleiste"') < seite.index("<main"),
            "und liegt im Rahmen, nicht im aufgefrischten Bereich")
     pruefe('data-tag="" id="knopf-jetzt"' in seite, "mit einem Jetzt-Knopf")
-    pruefe(seite.count('class="tagknopf') == 3,
-           "je ein Knopf fuer Jetzt und die zwei Tage mit Inhalt: "
+    # Jetzt + 29.08. (Schichten), 30.08. (Schicht und Programm),
+    # 31.08. (nur Programm). Die Leiste fasst beide Quellen zusammen.
+    pruefe(seite.count('class="tagknopf') == 4,
+           "je ein Knopf fuer Jetzt und die drei Tage mit Inhalt: "
            + str(seite.count('class="tagknopf')))
+    pruefe('data-tag="2026-08-31"' in seite,
+           "ein Tag mit Programm, aber ohne Schicht, steht auch drin")
     pruefe('data-tag="2026-08-29"' in seite and 'data-tag="2026-08-30"' in seite,
            "beide Tage stehen drin")
     pruefe("ist-heute" in seite, "der heutige Tag ist markiert")

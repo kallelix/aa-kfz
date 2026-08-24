@@ -668,11 +668,19 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
         demnaechst = _schichten_mit_namen(con, "s.beginn > ? AND s.beginn <= ?",
                                           (jetzt, bis))
 
+        # NUR der heutige Tag. Vorher stand hier zusätzlich "beginn >= jetzt",
+        # und damit zog die Jetzt-Ansicht am 25.08. das Programm vom 28.08.
+        # herein – drei Tage voraus, direkt neben den Schichten von jetzt.
+        # Die Schichten daneben halten sich ans Vorschaufenster; das Programm
+        # war als einziges unbegrenzt.
         programm = [dict(z) for z in con.execute(
-            "SELECT * FROM programm WHERE entfallen_am IS NULL"
-            " AND (datum = ? OR beginn >= ?)"
-            " ORDER BY datum, beginn IS NULL, beginn LIMIT 40",
-            (heute, jetzt))]
+            "SELECT * FROM programm WHERE entfallen_am IS NULL AND datum = ?"
+            " ORDER BY beginn IS NULL, beginn", (heute,))]
+
+        # Damit die Tafel vor der Veranstaltung nicht bloß leer dasteht.
+        naechster = con.execute(
+            "SELECT datum FROM programm WHERE entfallen_am IS NULL"
+            " AND datum > ? ORDER BY datum LIMIT 1", (heute,)).fetchone()
 
         laufendes_programm = [
             p for p in programm
@@ -692,6 +700,18 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
         ohne_zeit = [p for p in programm
                      if not p["beginn"] and p["datum"] == heute]
 
+        naechster_tag = None
+        if naechster:
+            try:
+                zeit = datetime.fromisoformat(naechster["datum"])
+                naechster_tag = {
+                    "datum": naechster["datum"],
+                    "lang": (config.WOCHENTAGE[zeit.weekday()] + ", " +
+                             zeit.strftime("%d.%m.")),
+                }
+            except ValueError:
+                naechster_tag = None
+
         gesamt = zaehler()
         return {
             "jetzt": zeitpunkt,
@@ -704,6 +724,12 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
                                        key=lambda p: p["beginn"] or ""),
             "programm_kommend": kommendes_programm,
             "programm_ohne_zeit": ohne_zeit,
+            "programm_naechster_tag": naechster_tag,
+            # Wie viele Punkte der heutige Tag insgesamt hat. Damit lässt sich
+            # "heute ist noch nichts" von "heute ist alles durch" und von
+            # "für heute gibt es gar keins" unterscheiden – drei Zustände, die
+            # auf dem Bildschirm nicht gleich aussehen sollten.
+            "programm_heute": len(programm),
             "offen_jetzt": sum(z["fehlt"] for z in laufend),
             "offen_gesamt": gesamt["offen"],
         }
