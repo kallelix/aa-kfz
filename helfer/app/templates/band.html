@@ -16,7 +16,7 @@
 
     {# Stundenraster. Liegt hinter den Balken, deshalb zuerst. #}
     {% for s in band.stunden %}
-      <span class="band-strich{% if s.tageswechsel %} band-tageswechsel{% endif %}"
+      <span class="band-strich{% if s.tageswechsel %} band-tageswechsel{% endif %}{% if s.rand %} band-strich-{{ s.rand }}{% endif %}"
             style="left: {{ s.prozent }}%"></span>
       <span class="band-stunde{% if s.tageswechsel %} band-stunde-wechsel{% endif %}{% if s.rand %} band-stunde-{{ s.rand }}{% endif %}"
             style="left: {{ s.prozent }}%">{{ s.text }}</span>
@@ -32,7 +32,7 @@
       <div class="band-spur">
         {% for b in spur %}
           <span class="band-balken band-programm band-serie-{{ b.serie }}{% if b.offen %} band-offen{% endif %}"
-                style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
                 title="{{ b.titel }} · {{ b.von_uhr }}{% if b.bis_uhr %}–{{ b.bis_uhr }}{% else %} (offenes Ende){% endif %}">{{ b.beschriftung }}</span>
         {% endfor %}
       </div>
@@ -51,16 +51,16 @@
                          ~ (' · ' ~ b.fehlt ~ ' fehlen' if b.fehlt else ' · voll') %}
           {% if ziel == 'admin' %}
             <a class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
-               style="left: {{ b.links }}%; width: {{ b.breite }}%"
+               style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
                href="/admin/schicht/{{ b.id }}" title="{{ marke }}">{{ beschriftung }}</a>
           {% elif ziel == 'monitor' %}
             <button type="button"
                     class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
-                    style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                    style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
                     data-schicht="{{ b.id }}" title="{{ marke }}">{{ beschriftung }}</button>
           {% else %}
             <span class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
-                  style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                  style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
                   title="{{ marke }}">{{ beschriftung }}</span>
           {% endif %}
         {% endfor %}
@@ -74,11 +74,11 @@
             {% set marke = b.titel ~ ' · ' ~ b.von_uhr ~ '–' ~ b.bis_uhr %}
             {% if ziel == 'admin' %}
               <a class="band-balken band-aufgabe band-status-{{ b.status }}"
-                 style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                 style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
                  href="/admin/aufgabe/{{ b.id }}" title="{{ marke }}">{{ b.beschriftung }}</a>
             {% else %}
               <span class="band-balken band-aufgabe band-status-{{ b.status }}"
-                    style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                    style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
                     title="{{ marke }}">{{ b.beschriftung }}</span>
             {% endif %}
           {% endfor %}

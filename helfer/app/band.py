@@ -176,6 +176,12 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
         return {**eintrag,
                 "links": links,
                 "breite": round(breite, 3),
+                # Balken, die bis an die Achse reichen, werden in der Vorlage
+                # rechts verankert statt über ihre Breite bemessen. Sonst
+                # entscheidet die Rundung von Prozent auf Pixel darüber, ob
+                # ein Bruchteil hinausragt - und schon zeigt der Browser einen
+                # waagerechten Rollbalken fuer nichts.
+                "rechts_buendig": links + breite >= 99.995,
                 "beschriftung": beschriftung,
                 "farbe": farben.get(eintrag.get("serie", ""), ""),
                 "von_uhr": _uhr(eintrag["von"]),

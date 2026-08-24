@@ -959,3 +959,13 @@ a.band-balken { cursor: pointer; }
 .band-stunde-rechts { transform: translateX(-100%); }
 .band-jetzt-links::after { left: 0; transform: none; }
 .band-jetzt-rechts::after { left: auto; right: 0; transform: none; }
+
+/* Die Striche selbst muessen ebenfalls nach innen, nicht nur ihre Zahlen.
+   Ein Strich ist 1 px breit, sitzt bei 100 Prozent und wird nur um einen
+   halben Pixel zurueckgezogen - er ragt also garantiert einen halben Pixel
+   ueber die Achse hinaus. Das genuegt dem Browser fuer einen waagerechten
+   Rollbalken. Dieselbe Rechnung gilt fuer die 2 px breite Jetzt-Linie. */
+.band-strich-links { transform: none; }
+.band-strich-rechts { transform: translateX(-100%); }
+.band-jetzt-links { transform: none; }
+.band-jetzt-rechts { transform: translateX(-100%); }

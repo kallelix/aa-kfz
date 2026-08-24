@@ -505,11 +505,14 @@ html, body {
 .tafel-tagschichten { grid-area: schichten; overflow-y: auto; }
 .tafel-tagprogramm { grid-area: programm; overflow-y: auto; }
 
-/* Im Tagesblick sitzt das Band schon in einer Tafel - keine zweite Umrandung. */
+/* Im Tagesblick sitzt das Band schon in einer Tafel - keine zweite Umrandung.
+   Ein schmaler Rand bleibt aber: er faengt die Bruchteile eines Pixels ab, mit
+   denen prozentgenaue Positionen aufgehen, und verhindert so einen
+   Rollbalken fuer nichts. */
 .tafel-tagband .band {
   border: 0;
   background: none;
-  padding: 0;
+  padding: 0 2px;
 }
 
 /* Unmissverstaendlich: hier steht nicht, was jetzt los ist. */
@@ -806,3 +809,13 @@ body.tagesblick .tafel-tagschichten,
 body.tagesblick .tafel-tagprogramm {
   overflow: visible;
 }
+
+/* Die Striche selbst muessen ebenfalls nach innen, nicht nur ihre Zahlen.
+   Ein Strich ist 1 px breit, sitzt bei 100 Prozent und wird nur um einen
+   halben Pixel zurueckgezogen - er ragt also garantiert einen halben Pixel
+   ueber die Achse hinaus. Das genuegt dem Browser fuer einen waagerechten
+   Rollbalken. Dieselbe Rechnung gilt fuer die 2 px breite Jetzt-Linie. */
+.band-strich-links { transform: none; }
+.band-strich-rechts { transform: translateX(-100%); }
+.band-jetzt-links { transform: none; }
+.band-jetzt-rechts { transform: translateX(-100%); }

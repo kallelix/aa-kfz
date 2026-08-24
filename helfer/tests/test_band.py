@@ -205,6 +205,22 @@ b = band.bauen(TAG, [], [], aufgaben=[
 pruefe(b is not None and len(b["aufgaben_spuren"]) == 1,
        "eine Aufgabe allein ergibt schon ein Band")
 
+print("Am rechten Rand verankert statt bemessen")
+b = band.bauen(TAG, [programmpunkt("Rennlauf", "11:30", None)], [])
+rennlauf = b["programm_spuren"][0][0]
+pruefe(rennlauf["rechts_buendig"],
+       "der offene Balken reicht bis zur Achse und wird rechts verankert")
+
+# Ohne offenen Balken endet die Achse am letzten Ende - die Schicht dort ist
+# dann buendig, die davor nicht.
+b = band.bauen(TAG, [], [schicht(1, "Frueh", "08:00", "10:00", 1, 1),
+                         schicht(2, "Spaet", "10:00", "12:00", 1, 1)])
+alle = {x["titel"]: x for spur in b["schicht_spuren"] for x in spur}
+pruefe(alle["Spaet"]["rechts_buendig"],
+       "die letzte Schicht endet buendig und wird ebenso verankert")
+pruefe(not alle["Frueh"]["rechts_buendig"],
+       "was mittendrin endet, wird weiter ueber die Breite bemessen")
+
 print("Balken bleiben innerhalb der Achse")
 b = band.bauen(TAG, [programmpunkt("A", "08:00", "09:00"),
                      programmpunkt("B", "17:00", "18:30")],
