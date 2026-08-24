@@ -27,6 +27,10 @@
       <nav class="admin-nav">
         <a href="/admin">Anmeldungen</a>
         <a href="/admin/abholung">Abholliste</a>
+        <a href="/admin/bilder">
+          Bilder ausstehend
+          {% if bilder_offen %}<span class="marke marke-telefon">{{ bilder_offen }}</span>{% endif %}
+        </a>
       </nav>
     {% endif %}
 

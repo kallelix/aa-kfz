@@ -620,3 +620,7 @@ form:has(#gegen-gebuehr:checked) .nur-bilderspende { display: none; }
 .knopf-winzig:hover { color: var(--text); background: none; }
 
 .sperre-tabelle td form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+
+/* Mehrere Knoepfe nebeneinander in einer Tabellenzelle. */
+.aktionen { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+.aktionen form { margin: 0; }

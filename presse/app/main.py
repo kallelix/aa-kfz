@@ -18,7 +18,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import auth, config, db, validation, worker
+from . import auth, config, db, mail, validation, worker
 
 BASIS = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASIS / "templates"))
@@ -167,7 +167,12 @@ async def formular_absenden(request: Request):
         )
 
     nummer = db.anmeldung_anlegen(werte, _remote_ip(request))
-    # TODO (Schritt 6): Bestätigungsmail in mail_out einreihen.
+
+    # Bestätigung nur einreihen, nicht verschicken – siehe app/mail.py.
+    angelegt = db.anmeldung_laden(nummer)
+    vorlage = mail.fuer(angelegt, "eingang") if angelegt else None
+    if vorlage is not None:
+        db.mail_einreihen(nummer, vorlage)
 
     ziel = f"{DANKE_PFAD}?nr={nummer}"
     if werte["gegenleistung"]:
@@ -276,11 +281,23 @@ MELDUNGEN = {
     "badge_zurueck": "Badge-Häkchen zurückgenommen.",
     "gebuehr": "Gebühr als bezahlt vermerkt.",
     "gebuehr_zurueck": "Gebühren-Häkchen zurückgenommen.",
+    "bilder": "Bilder als erhalten vermerkt.",
+    "bilder_zurueck": "Bilder-Häkchen zurückgenommen.",
+    "erinnert": "Erinnerung steht in der Schlange.",
     "nichts": "Nichts geändert – der Zustand passte nicht zu dieser Aktion.",
 }
 
 
-def _meldung(schluessel: str) -> str:
+def _meldung(schluessel: str, anzahl: str = "") -> str:
+    if schluessel == "sammel":
+        if not anzahl.isdigit():
+            return ""
+        wieviele = int(anzahl)
+        if wieviele == 0:
+            return "Keine Erinnerung verschickt – es stand nichts mehr offen."
+        if wieviele == 1:
+            return "Eine Erinnerung steht in der Schlange."
+        return f"{wieviele} Erinnerungen stehen in der Schlange."
     return MELDUNGEN.get(schluessel, "")
 
 
@@ -290,6 +307,7 @@ def _admin_kontext(request: Request, sitzung, **extra) -> dict:
         sitzung=sitzung,
         csrf=auth.csrf_token(sitzung.token),
         status_werte=db.STATUS_WERTE,
+        bilder_offen=db.bilder_offen_zaehlen(),
         **extra,
     )
 
@@ -493,3 +511,88 @@ async def admin_gebuehr(
     hinweis = ("gebuehr" if bezahlt else "gebuehr_zurueck") if erledigt else "nichts"
 
     return RedirectResponse(_zurueck(daten) + "hinweis=" + hinweis, status_code=303)
+
+
+# --- Bilderspende nachhalten ------------------------------------------------
+
+
+@app.get("/admin/bilder")
+async def admin_bilder(
+    request: Request, hinweis: str = "", anzahl: str = "",
+    sitzung=Depends(auth.sitzung_erforderlich)
+):
+    """Wer Bilder schuldet und noch nicht geliefert hat.
+
+    Sortiert so, dass die noch nie Erinnerten oben stehen – danach arbeitet man
+    die Liste ab.
+    """
+    return templates.TemplateResponse(
+        "admin_bilder.html",
+        _admin_kontext(
+            request,
+            sitzung,
+            anmeldungen=db.anmeldungen_bilder_offen(),
+            hinweis=_meldung(hinweis, anzahl),
+        ),
+    )
+
+
+@app.post("/admin/anmeldung/{anmeldung_id}/bilder")
+async def admin_bilder_haken(
+    request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
+):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return _csrf_fehler(request, sitzung)
+
+    if db.anmeldung_laden(anmeldung_id) is None:
+        return _nicht_gefunden(request, sitzung)
+
+    erhalten = str(daten.get("erhalten") or "1") == "1"
+    erledigt = db.bilder_setzen(anmeldung_id, erhalten)
+    hinweis = ("bilder" if erhalten else "bilder_zurueck") if erledigt else "nichts"
+
+    return RedirectResponse(
+        _zurueck(daten, "/admin/bilder") + "hinweis=" + hinweis, status_code=303
+    )
+
+
+@app.post("/admin/anmeldung/{anmeldung_id}/erinnerung")
+async def admin_erinnerung(
+    request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
+):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return _csrf_fehler(request, sitzung)
+
+    anmeldung = db.anmeldung_laden(anmeldung_id)
+    if anmeldung is None:
+        return _nicht_gefunden(request, sitzung)
+
+    erledigt = db.erinnerung_einreihen(
+        anmeldung_id, mail.fuer(anmeldung, "erinnerung")
+    )
+    return RedirectResponse(
+        _zurueck(daten, "/admin/bilder")
+        + "hinweis=" + ("erinnert" if erledigt else "nichts"),
+        status_code=303,
+    )
+
+
+@app.post("/admin/erinnerungen")
+async def admin_erinnerungen(
+    request: Request, sitzung=Depends(auth.sitzung_erforderlich)
+):
+    """Alle offenen auf einmal erinnern."""
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return _csrf_fehler(request, sitzung)
+
+    verschickt = 0
+    for anmeldung in db.anmeldungen_bilder_offen():
+        if db.erinnerung_einreihen(anmeldung["id"], mail.fuer(anmeldung, "erinnerung")):
+            verschickt += 1
+
+    return RedirectResponse(
+        "/admin/bilder?hinweis=sammel&anzahl=" + str(verschickt), status_code=303
+    )

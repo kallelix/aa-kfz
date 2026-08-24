@@ -442,3 +442,56 @@ def bilder_setzen(anmeldung_id: int, erhalten: bool) -> bool:
             " WHERE id = ? AND gegenleistung = 'bilderspende'",
             (jetzt() if erhalten else None, anmeldung_id),
         ).rowcount > 0
+
+
+# --- Bilderspende nachhalten (Schritt 7) ------------------------------------
+
+
+def anmeldungen_bilder_offen() -> list:
+    """Wer Bilderspende gewaehlt, ein Badge bekommen und noch nicht geliefert hat.
+
+    Der Badge-Status gehoert in die Bedingung: wer gar nicht aufgetaucht ist,
+    schuldet auch keine Bilder.
+    """
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT * FROM anmeldung"
+            " WHERE gegenleistung = 'bilderspende'"
+            "   AND status = 'ausgegeben'"
+            "   AND bilder_erhalten_am IS NULL"
+            " ORDER BY erinnerung_am IS NOT NULL, erinnerung_am, nachname COLLATE NOCASE"
+        ).fetchall()
+    finally:
+        con.close()
+
+
+def bilder_offen_zaehlen() -> int:
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT COUNT(*) FROM anmeldung"
+            " WHERE gegenleistung = 'bilderspende' AND status = 'ausgegeben'"
+            "   AND bilder_erhalten_am IS NULL"
+        ).fetchone()[0]
+    finally:
+        con.close()
+
+
+def erinnerung_einreihen(anmeldung_id: int, mail: tuple) -> bool:
+    """Erinnerungsmail einreihen und den Zeitpunkt vermerken – in einem Vorgang.
+
+    Die Bedingungen stecken im UPDATE: wer schon geliefert hat oder gar keine
+    Bilderspende gewaehlt hat, bekommt keine Erinnerung, auch nicht bei einem
+    zweiten Klick.
+    """
+    with transaktion() as con:
+        geaendert = con.execute(
+            "UPDATE anmeldung SET erinnerung_am = ?"
+            " WHERE id = ? AND gegenleistung = 'bilderspende'"
+            "   AND bilder_erhalten_am IS NULL",
+            (jetzt(), anmeldung_id),
+        ).rowcount > 0
+        if geaendert and mail is not None:
+            _mail_einreihen(con, anmeldung_id, mail)
+        return geaendert

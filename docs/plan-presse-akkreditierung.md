@@ -287,16 +287,16 @@ wird.
 
 | # | Schritt | Aufwand |
 |---|---|---|
-| 1 | Gerüst `presse/`, Config, Schema | 1 h |
-| 2 | Formular mit bedingten Feldern und den zwei Häkchen | 2,5 h |
-| 3 | Anmeldung und Backoffice-Liste (aus der Kennzeichen-App übernommen) | 1 h |
-| 4 | Detailansicht, Korrigieren, Löschen | 1 h |
-| 5 | Abholliste mit Badge- und Gebühren-Häkchen | 1,5 h |
-| 6 | Mail-Queue, Bestätigungsmail in drei Varianten | 1,5 h |
-| 7 | Ansicht „Bilder ausstehend" samt Erinnerungsmail | 1,5 h |
-| 8 | CSV-Export | 0,5 h |
-| 9 | Deployment: zweite Unit, zweiter nginx-Block, zweites Backup | 1 h |
-| 10 | Später: Kern ziehen, `kfz/` umziehen | 3 h |
+| 1 | Gerüst `presse/`, Config, Schema | fertig |
+| 2 | Formular mit bedingten Feldern und den zwei Häkchen | fertig |
+| 3 | Anmeldung und Backoffice-Liste | fertig |
+| 4 | Detailansicht, Korrigieren, Löschen | fertig |
+| 5 | Abholliste mit Badge- und Gebühren-Häkchen | fertig |
+| 6 | Mail-Queue, Bestätigungsmail in drei Varianten | fertig |
+| 7 | Ansicht „Bilder ausstehend" samt Erinnerungsmail | fertig |
+| 8 | CSV-Export | offen |
+| 9 | Deployment: zweite Unit, zweiter nginx-Block, zweites Backup | offen |
+| 10 | Später: Kern ziehen, `kfz/` umziehen | offen |
 
 ---
 
