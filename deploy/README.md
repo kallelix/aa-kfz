@@ -1,13 +1,17 @@
 # Deployment
 
-Zwei Anwendungen aus einem Repository, je ein **LXC-Container**
+Drei Anwendungen aus einem Repository, je ein **LXC-Container**
 (Debian/Ubuntu), davor ein **nginx auf einem anderen Host** mit öffentlicher IP,
 der HTTPS terminiert.
 
 - Abschnitte 1 bis 6: **Kennzeichen-App** unter `kennzeichen.example.de`
 - Abschnitt 7: **Presse-Akkreditierung** unter `presse.example.de`
+- Abschnitt 8: **Helfer-Dashboard** unter `helfer.example.de`
 
-Der Aufbau ist für beide gleich; Abschnitt 7 nennt nur die Unterschiede.
+Der Aufbau ist für alle drei gleich; die Abschnitte 7 und 8 nennen nur die
+Unterschiede. Das Helfer-Dashboard hat davon die meisten – es ist die einzige
+der drei, die **von sich aus nach draußen telefoniert** und einen Teil ihrer
+Oberfläche **ohne Anmeldung** ausliefert.
 
 ```text
 Internet ──HTTPS──▶ nginx (10.0.0.10)  ──HTTP──▶ LXC (10.0.0.42:8080)
@@ -175,6 +179,14 @@ eingearbeiteten Änderungen aus der `-wal`-Datei nicht. Anschliessend prüft es
 die Kopie mit `PRAGMA integrity_check` – eine kaputte Sicherung fällt sonst erst
 auf, wenn man sie braucht. Sicherungen älter als 30 Tage werden gelöscht.
 
+**Der Dateiname folgt der Datenbank**: `antraege.db` wird zu
+`antraege-2026-08-25.db`, `presse.db` zu `presse-2026-08-25.db`, `helfer.db` zu
+`helfer-2026-08-25.db`. Bis zum Hinzukommen der dritten Anwendung hieß jede
+Sicherung `antraege-`, auch die der Presse-App – drei gleich benannte Dateien
+auseinanderzuhalten wäre genau dann schwierig geworden, wenn es eilt. Wer
+schon einen Presse-Container betreibt, findet dort noch Dateien mit dem alten
+Namen; das Skript räumt sie mit auf, sobald sie alt genug sind.
+
 Einmal von Hand laufen lassen und nachsehen, dass eine Datei entsteht.
 
 Und: einmal eine Rücksicherung geprobt haben, bevor es darauf ankommt.
@@ -234,8 +246,14 @@ systemctl status kennzeichen --no-pager
 journalctl -u kennzeichen -n 30 --no-pager
 ```
 
+Dieselben vier Schritte gelten in jedem der drei Container, nur mit dem
+jeweiligen Dienstnamen: `kennzeichen`, `presse` oder `helfer`. Jeder Container
+hat seinen eigenen Klon von `/opt/abfahrt` und wird einzeln aktualisiert – ein
+`git pull` im einen ändert am anderen nichts.
+
 Im Protokoll gehören nach dem Start keine Warnungen zu `FORWARDED_ALLOW_IPS`,
-`APP_SECRET_KEY` oder `ADMIN_PASSWORD_HASH` zu sehen. Steht dort eine Zeile
+`APP_SECRET_KEY` oder `ADMIN_PASSWORD_HASH` zu sehen. Im Helfer-Container
+zusätzlich keine zu `JETZT_FEST`. Steht dort eine Zeile
 `Datenbank ergaenzt: …`, hat die App ein Schema-Update selbst erledigt – das ist
 normal und gewollt.
 
@@ -296,6 +314,10 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 | 502 vom nginx | Dienst läuft nicht oder Firewall blockt. `systemctl status kennzeichen`, dann vom nginx-Host `curl http://10.0.0.42:8080/`. |
 | Mails bleiben liegen | `SMTP_HOST`/`MAIL_FROM` fehlen, oder Zugangsdaten stimmen nicht. Der Fehler steht in der Detailansicht des Antrags und im Journal. |
 | 429 beim Absenden | Rate Limit im nginx. Bei geteilten NAT-Adressen `rate=` in der Config hochsetzen. |
+| Monitor zeigt dauerhaft die orange „Keine Verbindung"-Leiste, obwohl die Seite lädt | `connect-src 'self'` fehlt in der Content-Security-Policy. Die Seite selbst kommt durch, ihre Nachladeanfragen nicht. In der Browserkonsole steht die geblockte Anfrage. Siehe `nginx-helfer.conf`. |
+| Zeitplan-Abruf schlägt immer fehl | Der Container kommt nicht nach draußen (Egress auf 443 und DNS), oder `ca-certificates` fehlt. Der genaue Text steht im Backoffice unter *Zeitplan* bei den bisherigen Abrufen. |
+| Monitor zeigt eine Uhrzeit, die nicht stimmt | Entweder steht `JETZT_FEST` noch gesetzt (Warnung im Journal), oder die Containeruhr geht falsch – `timedatectl`. Die Uhr auf dem Bildschirm kommt vom Server, nicht vom Bildschirmrechner. |
+| Monitor zeigt nichts, obwohl Schichten erfasst sind | `TAGE` oder die Daten in den CSV-Dateien liegen in einem anderen Jahr als die Containeruhr. Im Backoffice unter *Schichten* steht, für welche Tage etwas erfasst ist. |
 
 ---
 
@@ -418,3 +440,248 @@ Wie in Abschnitt 4, zusätzlich:
 - [ ] Abholliste: Suche filtert beim Tippen, Badge- und Gebühren-Häkchen wirken
 - [ ] `BILDER_ABGABE` gesetzt – sonst nennt die Erinnerungsmail keinen Weg
 - [ ] `BADGES_GESAMT` auf die Zahl der vorproduzierten Badges gesetzt
+
+---
+
+## 8. Dritte Anwendung: Helfer-Dashboard
+
+Eigener LXC-Container, eigene Adresse, eigene Datenbank – wieder **dasselbe
+Repository**, Dienst aus dem Unterverzeichnis `helfer/`.
+
+```text
+Internet ──HTTPS──▶ nginx (10.0.0.10) ──┬─▶ LXC kfz    (10.0.0.42:8080)
+                                        ├─▶ LXC presse (10.0.0.43:8081)
+                                        └─▶ LXC helfer (10.0.0.44:8082)
+                                                  │
+                                                  └──HTTPS──▶ ixsdownhillcup.com
+                                                              kidscup.bike
+```
+
+**Drei Unterschiede zu den Schwester-Apps.** Sie stehen hier vorn, weil jeder
+von ihnen erst im Betrieb auffällt, wenn man ihn beim Aufsetzen übersieht:
+
+1. **Ausgehende Verbindungen.** Der Dienst holt einmal täglich den Zeitplan
+   von den Websites der Rennserien. Der Container braucht dafür Egress auf
+   Port 443 und `ca-certificates`. Fehlt eines von beidem, bleibt der letzte
+   erfolgreiche Stand stehen und das Backoffice zeigt den Fehler – der Dienst
+   läuft weiter, aber der Zeitplan veraltet still.
+2. **Ein Teil ist öffentlich.** Die Monitoransicht läuft ohne Anmeldung,
+   geschützt nur durch einen langen Token im Pfad. Der optionale
+   Basic-Auth-Riegel vor `/admin` darf **nicht** auf `/monitor/` ausgedehnt
+   werden – der Bildschirm im Zelt kann kein Passwort eingeben.
+3. **Die Content-Security-Policy braucht `connect-src 'self'`.** Die
+   Monitoransicht holt sich ihren Inhalt per `fetch` selbst. Ohne die
+   Direktive fällt das auf `default-src 'none'` zurück und wird geblockt: der
+   Monitor bliebe stumm auf dem ersten Stand stehen. `nginx-helfer.conf` hat
+   sie als einzige der drei.
+
+Kein Mailversand – es gibt keine SMTP-Werte zu setzen.
+
+### Im Helfer-Container
+
+```bash
+apt update
+apt install -y python3 python3-venv sqlite3 git ca-certificates
+
+# Die Uhr des Containers erscheint auf dem Monitor. Sie sollte stimmen.
+timedatectl set-timezone Europe/Berlin
+timedatectl set-ntp true
+
+adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin helfer
+
+mkdir -p /var/lib/helfer /etc/abfahrt /var/backups/helfer
+chown helfer:helfer /var/lib/helfer /var/backups/helfer
+chmod 750 /var/lib/helfer /var/backups/helfer
+
+git clone https://github.com/kallelix/aa-kfz.git /opt/abfahrt
+cd /opt/abfahrt
+python3 -m venv .venv
+.venv/bin/pip install --no-cache-dir -r requirements.txt
+```
+
+`/opt/abfahrt` bleibt **root:root** – die Begründung aus Abschnitt 1 gilt
+unverändert.
+
+`ca-certificates` ist neu gegenüber den anderen beiden Containern: ohne die
+Wurzelzertifikate scheitert der Zeitplan-Abruf an der TLS-Prüfung. Der Fehler
+liest sich dann wie ein Netzproblem, ist aber keines.
+
+Die `requirements.txt` deckt alle drei Anwendungen ab. Neu darin ist `tzdata` –
+damit verhält sich die Zeitzone überall gleich, unabhängig davon, was das
+Betriebssystem mitbringt.
+
+### Konfiguration
+
+```bash
+install -o root -g root -m 600 deploy/helfer.env.example /etc/abfahrt/helfer.env
+
+cd /opt/abfahrt/helfer
+/opt/abfahrt/.venv/bin/python -m app.passwort
+/opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
+
+editor /etc/abfahrt/helfer.env
+```
+
+Mindestens setzen: `BIND`, `FORWARDED_ALLOW_IPS`, `ADMIN_PASSWORD_HASH`,
+`APP_SECRET_KEY`, `BASIS_URL`, `TAGE`.
+
+**`JETZT_FEST` muss leer sein.** Die Variable stellt die Uhr auf einen festen
+Zeitpunkt, damit sich die Monitoransicht außerhalb der Veranstaltung anschauen
+lässt. Bleibt sie im Betrieb gesetzt, zeigt der Monitor eine erfundene Uhrzeit
+– und niemandem fällt es auf, weil ja eine Uhr zu sehen ist. Der Dienst
+schreibt beim Start eine Warnung ins Journal:
+
+```bash
+journalctl -u helfer | grep JETZT_FEST
+```
+
+**`TAGE` sind die drei Renntage.** Der Zeitplan-Abruf bildet damit die
+Wochentage aus den Tabellen der Rennserien auf Daten ab. Steht dort das falsche
+Jahr, landet das gesamte Programm auf falschen Tagen und der Monitor zeigt
+dauerhaft nichts an.
+
+### Dienst
+
+```bash
+install -m 644 deploy/helfer.service /etc/systemd/system/helfer.service
+systemctl daemon-reload
+systemctl enable --now helfer
+systemctl status helfer
+journalctl -u helfer -f
+```
+
+### Firewall
+
+Wie in Abschnitt 1, mit dem dritten Port – **und mit Egress**, den die anderen
+beiden Container nicht brauchen:
+
+```bash
+ufw default deny incoming
+ufw default allow outgoing          # fuer den Zeitplan-Abruf
+ufw allow from 10.0.0.10 to any port 8082 proto tcp
+ufw allow from 10.0.0.0/24 to any port 22 proto tcp
+ufw enable
+```
+
+Wer den ausgehenden Verkehr enger fassen will, braucht DNS und HTTPS:
+
+```bash
+ufw default deny outgoing
+ufw allow out 53
+ufw allow out 443/tcp
+```
+
+Auf feste Ziel-IPs sollte man es nicht einengen – beide Serien-Websites liegen
+hinter Adressen, die sich ohne Ankündigung ändern.
+
+### Auf dem nginx-Host
+
+```bash
+install -m 644 deploy/helfer-proxy.conf /etc/nginx/snippets/helfer-proxy.conf
+install -m 644 deploy/nginx-helfer.conf /etc/nginx/sites-available/helfer.example.de
+ln -s ../sites-available/helfer.example.de /etc/nginx/sites-enabled/
+
+# Adresse und Container-IP in der Datei anpassen, dann:
+nginx -t
+certbot --nginx -d helfer.example.de
+systemctl reload nginx
+```
+
+Die Rate-Limit-Zone und der `map`-Block heißen wieder **anders** als in den
+beiden anderen Dateien. `client_max_body_size` steht hier auf 2 MB, weil über
+das Backoffice zwei CSV-Dateien hochgeladen werden.
+
+### Erste Inbetriebnahme
+
+Anders als die Schwester-Apps startet diese nicht leer und wartet auf Anträge –
+sie braucht erst ihren Datenbestand:
+
+1. **Beide CSV-Dateien** aus dem bisherigen Registrierungstool exportieren:
+   *Offene Posten* und *Vergebene Posten*.
+2. Im Backoffice unter **Import** beide zusammen hochladen. Einzeln geht
+   nicht: eine Zeile ist ein Platz, nicht eine Schicht – eine voll besetzte
+   Schicht steht nur in *Vergebene*, eine leere nur in *Offene*. Erst beide
+   zusammen ergeben den richtigen Bedarf.
+3. Den Bericht durchsehen. Übersprungene Zeilen sind **nicht** in der
+   Datenbank gelandet, die Hinweise darunter schon – dort stehen
+   Mehrfachbelegungen und uneindeutige Angaben, die jemand anschauen sollte.
+4. Unter **Zeitplan** einmal *Jetzt abrufen* drücken. Ab dann läuft der Abruf
+   täglich von selbst.
+5. Unter **Monitor** den Link erzeugen und auf den Bildschirmrechner
+   übertragen.
+
+Der Import lässt sich beliebig wiederholen: er rechnet den Bedarf neu aus und
+ersetzt nur seine eigenen Einteilungen. Was im Dashboard von Hand eingetragen
+wurde, bleibt stehen.
+
+### Der Monitor-Link
+
+Er steht in der Datenbank, nicht in der Konfiguration – ein Neustart ändert ihn
+also nicht, ein neuer `APP_SECRET_KEY` auch nicht. Wer ihn hat, sieht die
+Einteilung samt Namen. Also auf den Bildschirmrechner geben, nicht in einen
+offenen Verteiler.
+
+Verliert er sich oder war er an der falschen Stelle, im Backoffice unter
+**Monitor** einen neuen erzeugen – der alte gilt sofort nicht mehr.
+
+Auf dem Bildschirmrechner: Browser im Vollbild (F11), Bildschirmschoner und
+Energiesparen aus. Die Seite hält sich selbst aktuell und braucht kein F5.
+
+### Sicherung
+
+Wie in Abschnitt 7, mit den Pfaden dieses Containers:
+
+```bash
+crontab -u helfer -e
+```
+
+```cron
+15 3 * * * DB_PATH=/var/lib/helfer/helfer.db BACKUP_DIR=/var/backups/helfer /opt/abfahrt/deploy/backup.sh >> /var/log/helfer-backup.log 2>&1
+```
+
+Diese Datenbank ist die einzige der drei, die sich **nicht** aus den Anträgen
+der Leute wiederherstellen lässt: Schichten und Helfer kommen zwar aus den
+CSV-Dateien, jede Einteilung von Hand aber nur von hier. Vor der Veranstaltung
+lohnt sich ein zweiter Zeitpunkt am Abend.
+
+### Prüfliste
+
+Wie in Abschnitt 4, zusätzlich:
+
+- [ ] `JETZT_FEST` ist leer, im Journal steht keine Warnung dazu
+- [ ] `TAGE` nennt die richtigen drei Renntage im richtigen Jahr
+- [ ] Uhr des Containers geht richtig (`timedatectl`) – sie steht auf dem
+      Monitor
+- [ ] Import beider CSV-Dateien gelaufen, Bericht durchgesehen
+- [ ] Zeitplan-Abruf einmal von Hand ausgelöst, beide Serien melden Erfolg
+- [ ] Der Abruf hat die **allgemeine** DHC-Tabelle erwischt, nicht die von
+      Willingen – im Bericht steht, unter welcher Überschrift er gelesen hat
+- [ ] Monitor-Link erzeugt, auf dem Bildschirmrechner geöffnet
+- [ ] Am Monitor: Schicht antippen öffnet die Namensliste, ein Tag in der
+      Leiste öffnet den Tagesblick, beide kehren von selbst zurück
+- [ ] Netzstecker am Bildschirmrechner kurz gezogen: der letzte Stand bleibt
+      stehen und die orange Leiste erscheint. Das ist zugleich die Probe
+      darauf, dass `connect-src 'self'` sitzt – fehlt die Direktive, erscheint
+      die Leiste sofort und dauerhaft
+- [ ] `/monitor/<token>` ist **ohne** Anmeldung erreichbar, `/admin` nicht
+- [ ] Ein falscher Token gibt 404
+
+---
+
+## 9. Timetable ablösen
+
+Das Helfer-Dashboard ersetzt das bisherige `timetable`-Projekt vollständig.
+**Aus dessen Datenbank muss nichts übernommen werden** – der Aufgabenplan wird
+neu gepflegt, das Programm kommt aus dem Zeitplan-Abruf, Schichten und Helfer
+aus den beiden CSV-Dateien.
+
+Erst abschalten, wenn die Prüfliste aus Abschnitt 8 abgehakt ist:
+
+- [ ] Dienst des alten Projekts stoppen und aus dem Autostart nehmen
+- [ ] Dessen nginx-Block entfernen oder auf die neue Adresse umleiten
+- [ ] Eine letzte Sicherung der alten Datenbank wegheften und aufbewahren, bis
+      die Veranstaltung vorbei ist
+- [ ] Allen, die den alten Link gespeichert haben, die neue Adresse geben
+
+Die konkreten Pfade und Dienstnamen stehen hier bewusst nicht: das alte Projekt
+läuft nicht in diesem Aufbau, und geraten wäre schlimmer als nachgeschaut.

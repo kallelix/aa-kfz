@@ -1,7 +1,6 @@
 #!/bin/sh
-# Naechtliche Sicherung der Antragsdatenbank.
-#
-#   install -o abfahrt -g abfahrt -m 750 backup.sh /opt/abfahrt/deploy/backup.sh
+# Naechtliche Sicherung der Datenbank. Wird von allen drei Anwendungen
+# benutzt; welche gesichert wird, steht in DB_PATH.
 #
 # Wichtig: sqlite3 ".backup" statt cp. Die Datenbank laeuft im WAL-Modus, ein
 # blosses Kopieren der .db-Datei erwischt die noch nicht eingearbeiteten
@@ -19,7 +18,13 @@ if [ ! -f "$DB" ]; then
 fi
 
 mkdir -p "$ZIEL"
-DATEI="$ZIEL/antraege-$(date +%F).db"
+
+# Der Dateiname folgt der Datenbank: antraege.db -> antraege-2026-08-25.db,
+# helfer.db -> helfer-2026-08-25.db. Vorher hiess JEDE Sicherung "antraege-",
+# auch die der Presse-App - drei gleich benannte Dateien, die man im Ernstfall
+# auseinanderhalten muss, sind eine schlechte Idee.
+NAME="$(basename "$DB" .db)"
+DATEI="$ZIEL/$NAME-$(date +%F).db"
 
 sqlite3 "$DB" ".backup '$DATEI'"
 chmod 600 "$DATEI"
@@ -31,6 +36,11 @@ sqlite3 "$DATEI" "PRAGMA integrity_check;" | grep -q '^ok$' || {
     exit 1
 }
 
-find "$ZIEL" -name 'antraege-*.db' -mtime "+$TAGE" -delete
+find "$ZIEL" -name "$NAME-*.db" -mtime "+$TAGE" -delete
+
+# Sicherungen aus der Zeit vor der Umbenennung mit aufraeumen. Ohne diese
+# Zeile lagen sie fuer immer im Verzeichnis, weil das Muster oben sie nicht
+# mehr trifft.
+[ "$NAME" = "antraege" ] || find "$ZIEL" -name 'antraege-*.db' -mtime "+$TAGE" -delete
 
 echo "Sicherung nach $DATEI"

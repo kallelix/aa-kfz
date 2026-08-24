@@ -1,0 +1,54 @@
+[Unit]
+Description=Helfer-Dashboard "Die absolute Abfahrt"
+Documentation=file:/opt/abfahrt/docs/plan-helfer-dashboard.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=helfer
+Group=helfer
+
+# Dasselbe Repository wie die beiden anderen Apps, nur ein anderes
+# Unterverzeichnis. Im eigenen Container liegt der Klon trotzdem unter
+# /opt/abfahrt, damit die Pfade ueberall gleich aussehen.
+WorkingDirectory=/opt/abfahrt/helfer
+
+EnvironmentFile=/etc/abfahrt/helfer.env
+
+# Bind-Adresse, vertraute Proxys und --proxy-headers kommen aus der Umgebung,
+# siehe helfer/app/__main__.py.
+ExecStart=/opt/abfahrt/.venv/bin/python -m app
+
+Restart=always
+RestartSec=5
+
+# --- Absicherung ---
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+# AF_INET/AF_INET6 braucht dieser Dienst nicht nur zum Lauschen, sondern auch
+# fuer AUSGEHENDE Verbindungen: einmal taeglich holt er den Zeitplan von den
+# Websites der Rennserien. AF_UNIX muss mit, weil glibc unter Ubuntu ueber
+# systemd-resolved aufloest und das ueber einen Unix-Socket laeuft - ohne die
+# Familie scheitert schon die Namensaufloesung.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+
+# Einziger Pfad, in den geschrieben werden darf: die Datenbank.
+ReadWritePaths=/var/lib/helfer
+
+[Install]
+WantedBy=multi-user.target
