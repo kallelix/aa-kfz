@@ -1,0 +1,107 @@
+{% extends "admin_base.html" %}
+{% block titel %}Import{% endblock %}
+{% block ueberschrift %}Import aus dem Registrierungstool{% endblock %}
+
+{% block inhalt %}
+  <section class="kasten">
+    <h2>Warum beide Dateien zusammen</h2>
+    <p>In beiden Dateien ist eine Zeile ein <strong>Platz</strong>, nicht eine
+      Schicht. Der Bedarf einer Schicht ist die Summe aus offenen und
+      vergebenen Zeilen.</p>
+    <p>Eine voll besetzte Schicht steht deshalb nur in
+      <em>Vergebene Posten</em>, eine ganz leere nur in
+      <em>Offene Posten</em>. Erst beide zusammen ergeben den richtigen Bedarf.</p>
+    <p class="hilfe">Der Import lässt sich beliebig wiederholen: er rechnet den
+      Bedarf jedes Mal neu aus und ersetzt alle Einteilungen, die aus einem
+      früheren Import stammen. Was hier von Hand eingetragen wurde, bleibt
+      unangetastet – ebenso Schichten, die in den Dateien nicht mehr
+      vorkommen.</p>
+  </section>
+
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">{{ fehler }}</p>
+  {% endif %}
+
+  {% if bericht %}
+    <section class="kasten kasten-ok">
+      <h2>Import fertig</h2>
+      <ul class="strichliste">
+        <li><span>Zeilen gelesen</span>
+          <span>{{ bericht.zeilen_offen }} offen + {{ bericht.zeilen_vergeben }} vergeben</span></li>
+        <li><span>Schichten</span>
+          <span>{{ bericht.schichten }} ({{ bericht.schichten_neu }} neu)</span></li>
+        <li><span>Bedarf</span><span>{{ bericht.bedarf }} Plätze</span></li>
+        <li><span>Helfer</span>
+          <span>{{ bericht.personen }} ({{ bericht.personen_neu }} neu)</span></li>
+        <li><span>Einteilungen</span>
+          <span>{{ bericht.einteilungen }} ({{ bericht.ersetzt }} ersetzt)</span></li>
+      </ul>
+      <p class="knopfreihe">
+        <a class="knopf" href="/admin">Zur Übersicht</a>
+        <a class="knopf-schlicht" href="/admin/schichten">Schichten ansehen</a>
+      </p>
+    </section>
+
+    {% if bericht.probleme %}
+      <section>
+        <h2>Übersprungene Zeilen ({{ bericht.probleme | length }})</h2>
+        <p class="hinweis hinweis-warnung">Diese Zeilen waren nicht lesbar und
+          sind <strong>nicht</strong> in der Datenbank gelandet.</p>
+        <ul class="hinweisliste">
+          {% for p in bericht.probleme %}<li>{{ p }}</li>{% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if bericht.hinweise %}
+      <section>
+        <h2>Bitte anschauen ({{ bericht.hinweise | length }})</h2>
+        <p class="hilfe">Alles davon wurde übernommen. Es sind die Stellen, an
+          denen die Daten uneindeutig sind.</p>
+        <ul class="hinweisliste">
+          {% for h in bericht.hinweise %}<li>{{ h }}</li>{% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  {% endif %}
+
+  <section>
+    <h2>Dateien hochladen</h2>
+    <form method="post" action="/admin/import" enctype="multipart/form-data"
+          class="hochladen">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="offen">Offene Posten (CSV)</label>
+      <input type="file" id="offen" name="offen" accept=".csv,text/csv" required>
+
+      <label for="vergeben">Vergebene Posten (CSV)</label>
+      <input type="file" id="vergeben" name="vergeben" accept=".csv,text/csv" required>
+
+      <button type="submit" class="knopf">Importieren</button>
+    </form>
+  </section>
+
+  {% if laeufe %}
+    <section>
+      <h2>Bisherige Läufe</h2>
+      <div class="tabelle-huelle">
+        <table>
+          <thead>
+            <tr><th scope="col">Wann</th><th scope="col">Wer</th>
+              <th scope="col">Datei</th>
+              <th scope="col" class="rechts">Zeilen</th></tr>
+          </thead>
+          <tbody>
+            {% for l in laeufe %}
+              <tr>
+                <td class="nowrap">{{ l.gelaufen_am }}</td>
+                <td>{{ l.kuerzel or '–' }}</td>
+                <td class="gedaempft">{{ l.datei }}</td>
+                <td class="rechts">{{ l.zeilen }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

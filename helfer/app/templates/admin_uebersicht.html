@@ -1,0 +1,160 @@
+{% extends "admin_base.html" %}
+{% block titel %}Übersicht{% endblock %}
+{% block ueberschrift %}Übersicht{% endblock %}
+
+{% block inhalt %}
+  {% if not zaehler.schichten %}
+    <div class="kasten">
+      <h2>Noch keine Daten</h2>
+      <p>Es sind weder Schichten noch Helfer erfasst. Beides kommt aus den
+        beiden CSV-Dateien des bisherigen Registrierungstools.</p>
+      <p><a class="knopf" href="/admin/import">Zum Import</a></p>
+    </div>
+  {% else %}
+
+  <section class="zaehler">
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Plätze</p>
+      <p class="zaehler-zahl">{{ zaehler.bedarf }}</p>
+      <p class="zaehler-detail">auf {{ zaehler.schichten }} Schichten</p>
+    </div>
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Besetzt</p>
+      <p class="zaehler-zahl">{{ zaehler.besetzt }}</p>
+      <p class="zaehler-detail">
+        {%- if zaehler.bedarf %}{{ (100 * zaehler.besetzt / zaehler.bedarf) | round | int }} % des Bedarfs{% endif %}</p>
+    </div>
+    <div class="zaehler-kachel {% if zaehler.offen %}zaehler-voll{% endif %}">
+      <p class="zaehler-titel">Offen</p>
+      <p class="zaehler-zahl">{{ zaehler.offen }}</p>
+      <p class="zaehler-detail">auf {{ zaehler.luecken }} Schichten</p>
+    </div>
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Helfer</p>
+      <p class="zaehler-zahl">{{ zaehler.helfer }}</p>
+      <p class="zaehler-detail">erfasst</p>
+    </div>
+  </section>
+
+  {% if zaehler.bedarf %}
+    {% set anteil = (100 * zaehler.besetzt / zaehler.bedarf) | round(1) %}
+    <p class="balken" role="img"
+       aria-label="{{ zaehler.besetzt }} von {{ zaehler.bedarf }} Plätzen besetzt">
+      <span class="balken-voll" style="width: {{ anteil }}%"></span>
+    </p>
+    <p class="hilfe">{{ zaehler.besetzt }} von {{ zaehler.bedarf }} Plätzen
+      besetzt, {{ zaehler.offen }} offen.</p>
+  {% endif %}
+
+  <section>
+    <h2>Größte Lücken</h2>
+    {% if not luecken %}
+      <p class="leer">Alle Schichten sind voll besetzt.</p>
+    {% else %}
+      <div class="tabelle-huelle">
+        <table>
+          <thead>
+            <tr><th scope="col">Tag</th><th scope="col">Zeit</th>
+              <th scope="col">Liste</th>
+              <th scope="col" class="rechts">fehlt</th>
+              <th scope="col" class="rechts">besetzt</th></tr>
+          </thead>
+          <tbody>
+            {% for s in luecken %}
+              <tr>
+                <td class="nowrap">{{ s.datum | tag }}</td>
+                <td class="zeit">{{ s | spanne }}</td>
+                <td><a href="/admin/schicht/{{ s.id }}">{{ s.liste }}</a></td>
+                <td class="rechts"><span class="marke marke-luecke">{{ s.fehlt }}</span></td>
+                <td class="rechts">{{ s.besetzt }} / {{ s.bedarf }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if luecken_gesamt > luecken | length %}
+        <p class="hilfe"><a href="/admin/schichten?luecken=1">Alle
+          {{ luecken_gesamt }} Schichten mit Lücken ansehen</a></p>
+      {% endif %}
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Verpflegung und T-Shirts</h2>
+    <div class="spalten">
+      <div>
+        <h3>Verpflegung</h3>
+        <ul class="strichliste">
+          <li><span>Fleisch</span><span>{{ zaehler.fleisch }}</span></li>
+          <li><span>vegetarisch</span><span>{{ zaehler.veggie }}</span></li>
+          <li class="offen"><span>nicht angegeben</span><span>{{ zaehler.verpflegung_offen }}</span></li>
+        </ul>
+      </div>
+      <div>
+        <h3>T-Shirts</h3>
+        <ul class="strichliste">
+          {% for groesse in ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'] %}
+            {% if zaehler.tshirts.get(groesse) %}
+              <li><span>{{ groesse }}</span><span>{{ zaehler.tshirts[groesse] }}</span></li>
+            {% endif %}
+          {% endfor %}
+          <li class="offen"><span>nicht angegeben</span><span>{{ zaehler.tshirt_offen }}</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  {% if konflikte or doppelt %}
+    <section>
+      <h2>Bitte prüfen</h2>
+
+      {% if konflikte %}
+        <h3>Zur selben Zeit auf zwei Schichten ({{ konflikte | length }})</h3>
+        <div class="tabelle-huelle">
+          <table>
+            <tbody>
+              {% for k in konflikte %}
+                <tr>
+                  <td><a href="/admin/helfer/{{ k.helfer_id }}">{{ k.name }}</a></td>
+                  <td><a href="/admin/schicht/{{ k.schicht_a }}">{{ k.liste_a }}</a>
+                    <span class="gedaempft nowrap">{{ k.beginn_a | zeitpunkt }}</span></td>
+                  <td><a href="/admin/schicht/{{ k.schicht_b }}">{{ k.liste_b }}</a>
+                    <span class="gedaempft nowrap">{{ k.beginn_b | zeitpunkt }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
+      {% if doppelt %}
+        <h3>Mehrfach auf derselben Schicht ({{ doppelt | length }})</h3>
+        <p class="hilfe">Aus den Bestandsdaten übernommen. Entweder ein
+          Sammeleintrag für mehrere Leute oder eine Doppelanmeldung.</p>
+        <div class="tabelle-huelle">
+          <table>
+            <tbody>
+              {% for d in doppelt %}
+                <tr>
+                  <td><a href="/admin/helfer/{{ d.helfer_id }}">{{ d.name }}</a></td>
+                  <td class="gedaempft">{{ d.email }}</td>
+                  <td><a href="/admin/schicht/{{ d.schicht_id }}">{{ d.liste }}</a>
+                    <span class="gedaempft nowrap">{{ d.beginn | zeitpunkt }}</span></td>
+                  <td class="rechts nowrap">{{ d.anzahl }} Plätze</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {% if importe %}
+    <p class="hilfe">Letzter Import: {{ importe[0].gelaufen_am }}
+      {%- if importe[0].kuerzel %} durch {{ importe[0].kuerzel }}{% endif %}
+      ({{ importe[0].datei }}) · <a href="/admin/import">Import</a></p>
+  {% endif %}
+
+  {% endif %}
+{% endblock %}

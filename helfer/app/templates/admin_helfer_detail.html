@@ -1,0 +1,81 @@
+{% extends "admin_base.html" %}
+{% block titel %}{{ person.name }}{% endblock %}
+{% block ueberschrift %}{{ person.name }}{% endblock %}
+
+{% block inhalt %}
+  <section class="kasten">
+    <dl class="daten">
+      <dt>E-Mail</dt>
+      <dd>
+        {%- if person.email %}<a href="mailto:{{ person.email }}">{{ person.email }}</a>
+        {%- else %}<span class="gedaempft">nicht angegeben</span>{% endif %}
+      </dd>
+
+      <dt>Telefon</dt>
+      <dd>
+        {%- if person.telefon %}{{ person.telefon }}
+        {%- else %}<span class="gedaempft">nicht angegeben</span>{% endif %}
+      </dd>
+
+      <dt>T-Shirt</dt>
+      <dd>
+        {%- if person.tshirt %}{{ person.tshirt }}
+        {%- else %}<span class="gedaempft">nicht angegeben</span>{% endif %}
+        {%- if person.tshirt_roh and person.tshirt_roh != person.tshirt %}
+          <span class="gedaempft">(eingetragen: {{ person.tshirt_roh }})</span>
+        {%- endif %}
+      </dd>
+
+      <dt>Verpflegung</dt>
+      <dd>
+        {%- if person.veggie == 1 %}vegetarisch
+        {%- elif person.veggie == 0 %}Fleisch
+        {%- else %}<span class="gedaempft">nicht angegeben</span>{% endif %}
+      </dd>
+
+      {% if person.bemerkung %}
+        <dt>Bemerkung</dt><dd class="mehrzeilig">{{ person.bemerkung }}</dd>
+      {% endif %}
+
+      <dt>Angelegt</dt><dd class="gedaempft">{{ person.angelegt_am }}</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Schichten ({{ schichten | length }})</h2>
+    {% if not schichten %}
+      <p class="leer">Noch keiner Schicht zugeteilt.</p>
+    {% else %}
+      <div class="tabelle-huelle">
+        <table>
+          <thead>
+            <tr><th scope="col">Tag</th><th scope="col">Zeit</th>
+              <th scope="col">Liste</th><th scope="col">Quelle</th>
+              <th scope="col"></th></tr>
+          </thead>
+          <tbody>
+            {% for s in schichten %}
+              <tr>
+                <td class="nowrap">{{ s.datum | tag }}</td>
+                <td class="zeit">{{ s | spanne }}</td>
+                <td><a href="/admin/schicht/{{ s.id }}">{{ s.liste }}</a></td>
+                <td class="gedaempft">{{ 'Import' if s.quelle == 'import' else 'von Hand' }}</td>
+                <td class="rechts">
+                  <form method="post"
+                        action="/admin/einteilung/{{ s.einteilung_id }}/austragen">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <input type="hidden" name="weiter"
+                           value="/admin/helfer/{{ person.id }}">
+                    <button type="submit" class="knopf-winzig">austragen</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+
+  <p class="zurueck-zeile"><a href="/admin/helfer">Zurück zur Helferliste</a></p>
+{% endblock %}

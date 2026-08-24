@@ -1,0 +1,122 @@
+{% extends "admin_base.html" %}
+{% block titel %}Schichten{% endblock %}
+{% block ueberschrift %}Schichten{% endblock %}
+
+{% block inhalt %}
+  <form method="get" action="/admin/schichten" class="filter">
+    <div>
+      <label for="f-liste">Liste</label>
+      <select id="f-liste" name="liste">
+        <option value="">alle</option>
+        {% for l in listen %}
+          <option value="{{ l }}" {% if l == f_liste %}selected{% endif %}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="f-tag">Tag</label>
+      <select id="f-tag" name="tag">
+        <option value="">alle</option>
+        {% for t in tage %}
+          <option value="{{ t }}" {% if t == f_tag %}selected{% endif %}>{{ t | tag }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="f-luecken">Nur mit Lücken</label>
+      <input type="checkbox" id="f-luecken" name="luecken" value="1"
+             {% if f_luecken %}checked{% endif %}>
+    </div>
+    <div class="filter-knoepfe">
+      <button type="submit" class="knopf">Anzeigen</button>
+      {% if f_liste or f_tag or f_luecken %}
+        <a class="knopf-schlicht" href="/admin/schichten">zurücksetzen</a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if not schichten %}
+    <p class="leer">Keine Schicht passt zu diesem Filter.</p>
+  {% else %}
+    <div class="sperre-suche">
+      <label for="suche">Liste suchen</label>
+      <div class="sperre-suche-zeile">
+        <input type="search" id="suche" autocomplete="off" spellcheck="false"
+               placeholder="z. B. Streckenposten">
+        <a class="knopf-schlicht weg" id="zuruecksetzen" href="#">zurücksetzen</a>
+      </div>
+      <p class="hilfe">
+        Wird beim Tippen gefiltert. Tippen auf eine Spaltenüberschrift sortiert
+        danach, nochmal tippen dreht um.
+      </p>
+    </div>
+
+    <p class="trefferzahl" id="trefferzahl">
+      {{ schichten|length }} Schicht{{ 'en' if schichten|length != 1 }}
+    </p>
+
+    <div class="tabelle-huelle">
+      <table data-liste data-sortspalte="0" data-einheit="Schicht"
+             data-einheit-mehrzahl="Schichten">
+        <thead>
+          <tr>
+            <th scope="col" aria-sort="ascending">
+              <button type="button" class="sortknopf" data-spalte="0">
+                Tag <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col" aria-sort="none">
+              <button type="button" class="sortknopf" data-spalte="1">
+                Zeit <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col" aria-sort="none">
+              <button type="button" class="sortknopf" data-spalte="2">
+                Liste <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col" aria-sort="none" class="rechts">
+              <button type="button" class="sortknopf" data-spalte="3">
+                besetzt <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col" aria-sort="none" class="rechts">
+              <button type="button" class="sortknopf" data-spalte="4">
+                fehlt <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in schichten %}
+            <tr data-suche="{{ s.suche }}"{% if s.fehlt %} class="hat-luecke"{% endif %}>
+              <td class="nowrap" data-wert="{{ s.beginn }}">{{ s.datum | tag }}</td>
+              <td class="zeit" data-wert="{{ s.beginn }}">{{ s | spanne }}</td>
+              <td><a href="/admin/schicht/{{ s.id }}">{{ s.liste }}</a></td>
+              <td class="rechts nowrap" data-wert="{{ s.besetzt }}">{{ s.besetzt }} / {{ s.bedarf }}</td>
+              <td class="rechts" data-wert="{{ s.fehlt }}">
+                {% if s.fehlt %}
+                  <span class="marke marke-luecke">{{ s.fehlt }}</span>
+                {% else %}
+                  <span class="marke marke-voll">voll</span>
+                {% endif %}
+              </td>
+              <td class="rechts">
+                <a class="knopf-schlicht" href="/admin/schicht/{{ s.id }}">einteilen</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="leer weg" id="nichts-gefunden">Kein Treffer.</p>
+
+    <p class="hilfe">
+      Bedarf {{ schichten | sum(attribute='bedarf') }} Plätze, davon
+      {{ schichten | sum(attribute='fehlt') }} offen.
+    </p>
+  {% endif %}
+{% endblock %}
+
+{% block skript %}<script src="/static/liste.js"></script>{% endblock %}

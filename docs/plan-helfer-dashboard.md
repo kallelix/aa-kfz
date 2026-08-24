@@ -217,18 +217,26 @@ zählt.
 
 ## 8. Umsetzungsschritte
 
+Reihenfolge bewusst umgestellt: der CSV-Import kommt vor den Einträgen, damit
+früh echte Daten in der App stehen und sich die Ansichten daran prüfen lassen.
+
 | # | Schritt | Aufwand |
 |---|---|---|
 | 1 | Gerüst `helfer/`, Config, Schema, Anmeldung (aus den Schwester-Apps) | 1,5 h |
-| 2 | Einträge: Liste, Detail, Anlegen, Ändern, Löschen, `updated_at`-Schutz | 3 h |
-| 3 | Zeitplan-Abruf mit Tabellenwahl, Wochentag-Zuordnung, Bericht | 3 h |
-| 4 | CSV-Import für Schichten und Helfer | 2 h |
-| 5 | Einteilung: Helfer auf Schichten, Bedarf und Lücken sichtbar | 3 h |
-| 6 | Programm-Band mit Schichten darunter | 3 h |
-| 7 | Monitor-Ansicht mit Token-Link und Selbstaktualisierung | 2,5 h |
-| 8 | CSV-Export | 0,5 h |
-| 9 | Deployment: dritte Unit, dritter nginx-Block, drittes Backup | 1 h |
-| 10 | Timetable ablösen: Daten übernehmen, alten Dienst abschalten | 1,5 h |
+| 2 | CSV-Import: Schichten, Helfer, Einteilungen samt Normalisierung | 2,5 h |
+| 3 | Schichtliste mit Bedarf, Besetzung und Lücken | 2 h |
+| 4 | Einteilung: Helfer zuordnen und entfernen | 2 h |
+| 5 | Einträge: Aufgabenplan und Programm, `updated_at`-Schutz | 3 h |
+| 6 | Zeitplan-Abruf mit Tabellenwahl, Wochentag-Zuordnung, Bericht | 3 h |
+| 7 | Programm-Band mit Schichten darunter | 3 h |
+| 8 | Monitor-Ansicht mit Token-Link und Selbstaktualisierung | 2,5 h |
+| 9 | CSV-Export | 0,5 h |
+| 10 | Deployment: dritte Unit, dritter nginx-Block, drittes Backup | 1 h |
+| 11 | Timetable abschalten | 0,5 h |
+
+**Kein Mailversand.** Damit entfallen `mail.py`, `worker.py` und die Tabelle
+`mail_out` – die App wird deutlich kleiner als ihre beiden Schwestern.
+Nachrüstbar bleibt es, der Unterbau steht zweimal daneben.
 
 ---
 
@@ -239,23 +247,24 @@ zählt.
 - Zeitplan per **echtem HTTP-Abruf** von den Serien-Websites
 - Monitor über **Token-Link ohne Anmeldung**
 - Planner-Import entfällt
+- **Dubletten sind echte Personen**: die acht Namen unter einer Adresse sind
+  acht Helfer, von einer Person angemeldet. Der Import legt sie getrennt an und
+  führt nichts automatisch zusammen. Nur reine Groß-/Kleinschreibung derselben
+  Person wird zusammengefasst – das betrifft drei Fälle, von 105 auf 102 Helfer.
+- **T-Shirt-Größen werden normalisiert** auf XS, S, M, L, XL, XXL, 3XL, 4XL.
+  Die Originaleingabe bleibt daneben stehen: „Damen L" ist beim Bestellen eine
+  Information. Was keine Größe ist („M und swet -schirt kurz t,-schirt"),
+  bleibt unverändert Freitext.
+- **Aus der Timetable-Datenbank wird nichts übernommen** – Schritt 11 ist nur
+  ein Abschalten.
+- **Kein Mailversand**, keine PWA, keine eigene Helferansicht.
 
-## 10. Offene Fragen
+## 10. Angenommen, falls falsch bitte widersprechen
 
-1. **Dubletten**: Soll der Import die acht Namen unter einer Adresse als acht
-   Helfer anlegen (vermutlich richtig – es sind acht Personen), und das
-   Backoffice bekommt ein „zusammenführen"? Oder anders herum?
-2. **T-Shirt-Größen**: normalisieren auf XS–4XL und Abweichungen wie
-   „Damen L" als Zusatz behalten – oder alles als Freitext lassen und nur beim
-   Bestellen sortieren?
-3. **Veranstaltungstage**: 28.–30.08.2026 wie in `seed.js`? Der Abruf braucht
-   sie, um Wochentage auf Daten abzubilden.
-4. **Bestandsdaten aus dem Timetable**: Gibt es dort schon gepflegte Aufgaben,
-   die übernommen werden müssen, oder ist die Datenbank noch leer?
-5. **PWA und Offline**: Der Timetable ist eine installierbare App mit Service
-   Worker. Braucht das Dashboard das auch – etwa für Helfer, die es auf dem
-   Handy dabeihaben – oder genügt die Monitor-Ansicht plus Backoffice?
-6. **Sehen Helfer ihre eigene Einteilung?** Ein zweiter Token-Link mit einer
-   „Wer hat wann Dienst"-Ansicht wäre naheliegend, ist aber nicht gefordert.
-7. **Benachrichtigung**: Sollen Helfer per Mail erfahren, wann sie eingeteilt
-   sind? Der Mailversand steht in beiden Schwester-Apps bereits.
+- **Veranstaltungstage 28.–30.08.2026.** So steht es in `seed.js`, und die
+  Schichten in den CSVs liegen passend darum herum (25.08.–01.09. mit Auf- und
+  Abbau). Der Zeitplan-Abruf braucht die drei Tage, um „Freitag" auf ein Datum
+  abzubilden.
+- **Die Schichtbezeichnung ist `Liste`.** Die Spalte `Aufgabe` ist in beiden
+  Dateien leer, also gibt es nichts Genaueres als „Streckenposten" oder
+  „Ordner Zeltplatz".

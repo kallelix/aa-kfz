@@ -1,0 +1,20 @@
+{% extends "admin_base.html" %}
+{% block titel %}Backoffice nicht eingerichtet{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Backoffice nicht eingerichtet{% endblock %}
+
+{% block inhalt %}
+  <p class="hinweis hinweis-fehler">
+    Es ist kein <code>ADMIN_PASSWORD_HASH</code> gesetzt. Das Backoffice bleibt
+    geschlossen, bis eines konfiguriert ist – ein offenes Backoffice wäre
+    schlimmer als gar keines.
+  </p>
+
+  <p>Hash erzeugen und in die Umgebung übernehmen:</p>
+  <pre><code>python -m app.passwort</code></pre>
+
+  <p class="hilfe">
+    Die Ausgabe beginnt mit <code>ADMIN_PASSWORD_HASH=</code> und gehört in die
+    <code>.env</code> bzw. in die systemd-Unit. Danach die App neu starten.
+  </p>
+{% endblock %}

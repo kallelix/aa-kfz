@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block titel %}Helfer{% endblock %} – {{ veranstaltung }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="huelle {% block breite %}huelle-breit{% endblock %}">
+    <header class="admin-kopf">
+      <div>
+        <p class="veranstaltung">{{ veranstaltung }} · Helfer-Dashboard</p>
+        <h1>{% block ueberschrift %}Übersicht{% endblock %}</h1>
+      </div>
+      {% if sitzung %}
+        <form method="post" action="/admin/logout" class="abmelden">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if sitzung.kuerzel %}<span class="kuerzel">{{ sitzung.kuerzel }}</span>{% endif %}
+          <button type="submit" class="knopf-schlicht">Abmelden</button>
+        </form>
+      {% endif %}
+    </header>
+
+    {% if sitzung %}
+      <nav class="admin-nav">
+        <a href="/admin">Übersicht</a>
+        <a href="/admin/schichten">Schichten</a>
+        <a href="/admin/helfer">Helfer</a>
+        <a href="/admin/import">Import</a>
+      </nav>
+    {% endif %}
+
+    {% set meldungen = {
+      'eingeteilt': 'Eingeteilt.',
+      'ausgetragen': 'Ausgetragen.',
+      'schon-drin': 'Diese Person steht bereits auf der Schicht.',
+      'keiner': 'Es war niemand ausgewählt.',
+      'unbekannt': 'Diese Schicht gibt es nicht.',
+    } %}
+    {% if hinweis %}
+      <p class="hinweis {{ 'hinweis-warnung' if hinweis in ('schon-drin', 'keiner', 'unbekannt') else 'hinweis-ok' }}"
+         role="status">{{ meldungen.get(hinweis, hinweis) }}</p>
+    {% endif %}
+
+    <main>
+      {% block inhalt %}{% endblock %}
+    </main>
+  </div>
+  {% block skript %}{% endblock %}
+</body>
+</html>

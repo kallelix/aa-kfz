@@ -1,0 +1,99 @@
+{% extends "admin_base.html" %}
+{% block titel %}{{ schicht.liste }}{% endblock %}
+{% block ueberschrift %}{{ schicht.liste }}{% endblock %}
+
+{% block inhalt %}
+  <p class="unterzeile">
+    {{ schicht.datum | tag }}, {{ schicht | spanne }}
+    {%- if schicht.ort %} · {{ schicht.ort }}{% endif %}
+  </p>
+
+  <section class="kasten {% if not schicht.fehlt %}kasten-ok{% endif %}">
+    <p>
+      <strong>{{ schicht.besetzt }} von {{ schicht.bedarf }}</strong> Plätzen besetzt –
+      {% if schicht.fehlt %}
+        <span class="marke marke-luecke">{{ schicht.fehlt }} fehlen</span>
+      {% else %}
+        <span class="marke marke-voll">voll</span>
+      {% endif %}
+    </p>
+    {% if schicht.hinweis %}<p class="hilfe">{{ schicht.hinweis }}</p>{% endif %}
+  </section>
+
+  <section>
+    <h2>Eingeteilt</h2>
+    {% if not besetzung %}
+      <p class="leer">Noch niemand eingeteilt.</p>
+    {% else %}
+      <div class="tabelle-huelle">
+        <table>
+          <thead>
+            <tr><th scope="col">Name</th><th scope="col">Kontakt</th>
+              <th scope="col">T-Shirt</th><th scope="col">Verpflegung</th>
+              <th scope="col">Quelle</th><th scope="col"></th></tr>
+          </thead>
+          <tbody>
+            {% for h in besetzung %}
+              <tr>
+                <td><a href="/admin/helfer/{{ h.id }}">{{ h.name }}</a></td>
+                <td>
+                  {% if h.email %}
+                    <a href="mailto:{{ h.email }}">{{ h.email }}</a>
+                  {% else %}
+                    <span class="gedaempft">–</span>
+                  {% endif %}
+                  {% if h.telefon %}<br><span class="gedaempft">{{ h.telefon }}</span>{% endif %}
+                </td>
+                <td>
+                  {% if h.tshirt %}{{ h.tshirt }}{% else %}<span class="gedaempft">–</span>{% endif %}
+                  {% if h.tshirt_roh and h.tshirt_roh != h.tshirt %}
+                    <br><span class="gedaempft">{{ h.tshirt_roh }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if h.veggie == 1 %}vegetarisch
+                  {% elif h.veggie == 0 %}Fleisch
+                  {% else %}<span class="gedaempft">–</span>{% endif %}
+                </td>
+                <td class="gedaempft">{{ 'Import' if h.quelle == 'import' else 'von Hand' }}</td>
+                <td class="rechts">
+                  <form method="post"
+                        action="/admin/einteilung/{{ h.einteilung_id }}/austragen">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <input type="hidden" name="weiter"
+                           value="/admin/schicht/{{ schicht.id }}">
+                    <button type="submit" class="knopf-winzig">austragen</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Jemanden einteilen</h2>
+    {% if not helfer %}
+      <p class="leer">Alle erfassten Helfer stehen bereits auf dieser Schicht.</p>
+    {% else %}
+      <form method="post" action="/admin/schicht/{{ schicht.id }}/einteilen"
+            class="einteilen">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label for="helfer_id">Helfer</label>
+        <select id="helfer_id" name="helfer_id" required>
+          <option value="">bitte wählen …</option>
+          {% for h in helfer %}
+            <option value="{{ h.id }}">
+              {{- h.name }}{% if h.email %} – {{ h.email }}{% endif %}
+              ({{ h.schichten }} Schichten)</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="knopf">Einteilen</button>
+      </form>
+    {% endif %}
+  </section>
+
+  <p class="zurueck-zeile"><a href="/admin/schichten">Zurück zu den Schichten</a></p>
+{% endblock %}
