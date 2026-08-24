@@ -32,6 +32,9 @@
         Bilder {{ 'erhalten' if anmeldung.bilder_erhalten_am else 'ausstehend' }}
       </span>
     {% endif %}
+    {% if anmeldung.verlinkung %}
+      <span class="marke marke-telefon">verlinken: {{ anmeldung.social_media }}</span>
+    {% endif %}
   </p>
 
   <h2>Angaben</h2>
@@ -106,6 +109,21 @@
       {{ fehlermeldung('gegenleistung') }}
     </fieldset>
 
+    <fieldset class="feld{% if fehler.get('social_media') %} feld-fehler{% endif %}">
+      <legend>Verlinkung auf Social Media</legend>
+      <p class="hilfe">Nur bei Bilderspende.</p>
+      <label class="auswahl">
+        <input type="checkbox" name="verlinkung" value="1"
+               {% if werte.get('verlinkung') %}checked{% endif %}>
+        <span class="auswahl-text"><span class="auswahl-titel">Bitte verlinken</span></span>
+      </label>
+      <label for="social_media" class="nachgerueckt">Profil</label>
+      <input type="text" id="social_media" name="social_media"
+             placeholder="z. B. @insta_profil"
+             value="{{ werte.get('social_media', '') }}">
+      {{ fehlermeldung('social_media') }}
+    </fieldset>
+
     <div class="feld{% if fehler.get('bemerkung') %} feld-fehler{% endif %}">
       <label for="bemerkung">Bemerkung</label>
       <textarea id="bemerkung" name="bemerkung" rows="3">{{ werte.get('bemerkung', '') }}</textarea>
@@ -162,6 +180,9 @@
     {% endif %}
     {% if anmeldung.bilder_erhalten_am %}
       <dt>Bilder erhalten</dt><dd>{{ anmeldung.bilder_erhalten_am|zeit }}</dd>
+    {% endif %}
+    {% if anmeldung.verlinkung %}
+      <dt>Verlinkung gewünscht</dt><dd><strong>{{ anmeldung.social_media }}</strong></dd>
     {% endif %}
     {% if anmeldung.remote_ip %}
       <dt>IP bei Anmeldung</dt><dd class="gedaempft">{{ anmeldung.remote_ip }}</dd>

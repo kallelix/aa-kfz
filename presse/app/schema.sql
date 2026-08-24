@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS anmeldung (
   bilder_erhalten_am TEXT,                    -- nur bei bilderspende
   erinnerung_am      TEXT,                    -- letzte Erinnerung an die Bilder
 
+  -- Verlinkung auf Social Media, wenn gewuenscht. Gehoert zur Bilderspende:
+  -- verlinkt wird, wer uns Bilder gibt.
+  verlinkung   INTEGER NOT NULL DEFAULT 0,
+  social_media TEXT,
+
   -- Zustimmungen mit Zeitstempel. Der Sicherheitshinweis ist bei einer
   -- Veranstaltung mit Sturzzonen mehr als Formalie, die Bildrechte sind eine
   -- Lizenz - beides gehoert belegt und nicht nur in einer Mail erwaehnt.
@@ -37,7 +42,12 @@ CREATE TABLE IF NOT EXISTS anmeldung (
   -- heisst: keine. Die Regel steht in der Validierung und hier als Netz.
   CHECK ((kommerziell = 1) = (gegenleistung IS NOT NULL)),
   -- Ohne zugestimmte Bildrechte keine Bilderspende.
-  CHECK (gegenleistung IS NOT 'bilderspende' OR bildrechte_ok_am IS NOT NULL)
+  CHECK (gegenleistung IS NOT 'bilderspende' OR bildrechte_ok_am IS NOT NULL),
+  CHECK (verlinkung IN (0, 1)),
+  -- Verlinken koennen wir nur, wenn wir wissen wohin.
+  CHECK (verlinkung = 0 OR COALESCE(TRIM(social_media), '') <> ''),
+  -- Und nur bei Bilderspende - sonst posten wir keine Bilder von der Person.
+  CHECK (verlinkung = 0 OR gegenleistung = 'bilderspende')
 );
 
 CREATE INDEX IF NOT EXISTS idx_anmeldung_status     ON anmeldung (status);

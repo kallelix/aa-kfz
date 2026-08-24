@@ -11,7 +11,7 @@
     <label for="suche">Name oder Firma</label>
     <div class="sperre-suche-zeile">
       <input type="search" id="suche" autofocus autocomplete="off" spellcheck="false"
-             placeholder="z. B. Blende">
+             value="{{ filter_suche }}" placeholder="z. B. Blende">
       <a class="knopf-schlicht weg" id="zuruecksetzen" href="#">zurücksetzen</a>
     </div>
     <p class="hilfe">
@@ -58,7 +58,7 @@
         </thead>
         <tbody>
           {% for z in zeilen %}
-            <tr data-suche="{{ z.suchtext }}">
+            <tr id="zeile-{{ z.id }}" data-suche="{{ z.suchtext }}">
               <td>
                 <a href="/admin/anmeldung/{{ z.id }}">{{ z.nachname }}, {{ z.vorname }}</a>
               </td>
@@ -75,6 +75,7 @@
               <td>
                 <form method="post" action="/admin/anmeldung/{{ z.id }}/badge">
                   <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <input type="hidden" name="suche" value="{{ filter_suche }}">
                   {% if z.status == 'ausgegeben' %}
                     <input type="hidden" name="ausgeben" value="0">
                     <span class="marke marke-genehmigt">ausgegeben</span>
@@ -89,6 +90,7 @@
                 {% if z.gegenleistung == 'gebuehr' %}
                   <form method="post" action="/admin/anmeldung/{{ z.id }}/gebuehr">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <input type="hidden" name="suche" value="{{ filter_suche }}">
                     {% if z.gebuehr_bezahlt_am %}
                       <input type="hidden" name="bezahlt" value="0">
                       <span class="marke marke-genehmigt">bezahlt</span>

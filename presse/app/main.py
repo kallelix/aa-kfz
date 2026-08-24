@@ -440,7 +440,8 @@ async def admin_loeschen(
 
 @app.get("/admin/abholung")
 async def admin_abholung(
-    request: Request, hinweis: str = "", sitzung=Depends(auth.sitzung_erforderlich)
+    request: Request, hinweis: str = "", suche: str = "",
+    sitzung=Depends(auth.sitzung_erforderlich)
 ):
     """Der Schalter: Namen suchen, Badge aushändigen, Häkchen setzen.
 
@@ -468,13 +469,32 @@ async def admin_abholung(
 
     return templates.TemplateResponse(
         "admin_abholung.html",
-        _admin_kontext(request, sitzung, zeilen=zeilen, hinweis=_meldung(hinweis)),
+        _admin_kontext(request, sitzung, zeilen=zeilen, hinweis=_meldung(hinweis),
+                       filter_suche=suche.strip()[:100]),
     )
 
 
-def _zurueck(daten, vorgabe: str = "/admin/abholung") -> str:
+# Listen, in denen nach einer Aktion zur bearbeiteten Zeile zurueckgesprungen
+# wird, statt oben zu landen. Am Schalter ist das der Unterschied zwischen
+# "weiterarbeiten" und "die Liste nochmal durchscrollen".
+_MIT_SPRUNGMARKE = ("/admin/abholung", "/admin/bilder")
+
+
+def _zurueck(daten, anmeldung_id: int, hinweis: str,
+             vorgabe: str = "/admin/abholung") -> str:
+    """Wohin nach einer Aktion – mit Rueckmeldung, Suchbegriff und Sprungmarke."""
     ziel = _weiter_pfad(str(daten.get("zurueck") or vorgabe))
-    return ziel + ("&" if "?" in ziel else "?")
+    url = ziel + ("&" if "?" in ziel else "?") + "hinweis=" + hinweis
+
+    # Den Suchbegriff mitnehmen: das Skript filtert die Liste beim Laden wieder
+    # genauso, wie sie vor dem Klick aussah.
+    suche = str(daten.get("suche") or "").strip()[:100]
+    if suche:
+        url += "&suche=" + quote(suche)
+
+    if any(ziel.startswith(pfad) for pfad in _MIT_SPRUNGMARKE):
+        url += "#zeile-" + str(anmeldung_id)
+    return url
 
 
 @app.post("/admin/anmeldung/{anmeldung_id}/badge")
@@ -494,7 +514,7 @@ async def admin_badge(
     else:
         hinweis = "badge_zurueck" if db.badge_zuruecknehmen(anmeldung_id) else "nichts"
 
-    return RedirectResponse(_zurueck(daten) + "hinweis=" + hinweis, status_code=303)
+    return RedirectResponse(_zurueck(daten, anmeldung_id, hinweis), status_code=303)
 
 
 @app.post("/admin/anmeldung/{anmeldung_id}/gebuehr")
@@ -512,7 +532,7 @@ async def admin_gebuehr(
     erledigt = db.gebuehr_setzen(anmeldung_id, bezahlt)
     hinweis = ("gebuehr" if bezahlt else "gebuehr_zurueck") if erledigt else "nichts"
 
-    return RedirectResponse(_zurueck(daten) + "hinweis=" + hinweis, status_code=303)
+    return RedirectResponse(_zurueck(daten, anmeldung_id, hinweis), status_code=303)
 
 
 # --- Bilderspende nachhalten ------------------------------------------------
@@ -555,7 +575,7 @@ async def admin_bilder_haken(
     hinweis = ("bilder" if erhalten else "bilder_zurueck") if erledigt else "nichts"
 
     return RedirectResponse(
-        _zurueck(daten, "/admin/bilder") + "hinweis=" + hinweis, status_code=303
+        _zurueck(daten, anmeldung_id, hinweis, "/admin/bilder"), status_code=303
     )
 
 
@@ -575,8 +595,8 @@ async def admin_erinnerung(
         anmeldung_id, mail.fuer(anmeldung, "erinnerung")
     )
     return RedirectResponse(
-        _zurueck(daten, "/admin/bilder")
-        + "hinweis=" + ("erinnert" if erledigt else "nichts"),
+        _zurueck(daten, anmeldung_id, "erinnert" if erledigt else "nichts",
+                 "/admin/bilder"),
         status_code=303,
     )
 
@@ -618,6 +638,8 @@ CSV_SPALTEN = (
     ("akkreditierung", "Akkreditierung"),
     ("gebuehr_bezahlt_am", "Gebühr bezahlt am"),
     ("bilder_erhalten_am", "Bilder erhalten am"),
+    ("verlinkung_text", "Verlinkung gewünscht"),
+    ("social_media", "Social-Media-Profil"),
     ("erinnerung_am", "Zuletzt erinnert am"),
     ("badge_am", "Badge ausgegeben am"),
     ("badge_durch", "Badge ausgegeben durch"),
@@ -640,6 +662,7 @@ _AKKREDITIERUNG = {
 def _csv_zeile(anmeldung) -> list:
     berechnet = {
         "kommerziell_text": "ja" if anmeldung["kommerziell"] else "nein",
+        "verlinkung_text": "ja" if anmeldung["verlinkung"] else "nein",
         "akkreditierung": _AKKREDITIERUNG.get(
             anmeldung["gegenleistung"], lambda: "keine"
         )(),

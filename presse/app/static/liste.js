@@ -160,6 +160,19 @@
       marken(spalte, absteigend);
     }
 
+    // Beim Absenden einer Zeilenaktion den aktuellen Suchbegriff mitgeben, damit
+    // die Liste nach dem Neuladen wieder genauso gefiltert ist. Zusammen mit der
+    // Sprungmarke aus der Antwort landet man dort, wo man geklickt hat.
+    tabelle.addEventListener("submit", function (ereignis) {
+      if (!eingabe) {
+        return;
+      }
+      var feld = ereignis.target.querySelector('input[name="suche"]');
+      if (feld) {
+        feld.value = eingabe.value;
+      }
+    });
+
     var aktuelleSpalte = Number(tabelle.getAttribute("data-sortspalte") || 0);
     var aktuellAbsteigend = false;
 

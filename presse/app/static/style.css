@@ -624,3 +624,15 @@ form:has(#gegen-gebuehr:checked) .nur-bilderspende { display: none; }
 /* Mehrere Knoepfe nebeneinander in einer Tabellenzelle. */
 .aktionen { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
 .aktionen form { margin: 0; }
+
+/* Beschriftung, die unter einem Haekchen einrueckt. */
+.nachgerueckt {
+  margin-top: .6rem;
+  font-size: .8rem;
+  color: var(--gedaempft);
+}
+
+/* Nach einer Aktion springt der Browser zur Zeile zurueck. Etwas Luft darueber,
+   damit sie nicht am oberen Rand klebt. */
+tr[id^="zeile-"] { scroll-margin-top: 4rem; }
+tr[id^="zeile-"]:target { background: var(--flaeche); }

@@ -139,6 +139,22 @@ try:
     pruefe("nicht kommerziell" in body, "dritte Variante nennt die Nutzung")
     pruefe("keine Gebühr" in body, "und dass nichts zu zahlen ist")
 
+    print("Verlinkung in der Bestaetigung")
+    anfrage("POST", "/", {
+        "vorname": "Timo", "nachname": "Verlinkt", "firma": "Verlinkt Media",
+        "email": "timo@example.org", "sicherheit": "1", "kommerziell": "ja",
+        "gegenleistung": "bilderspende", "bildrechte": "1",
+        "verlinkung": "1", "social_media": "@timo.verlinkt"})
+    body = zeilen("SELECT body FROM mail_out WHERE anmeldung_id = 4")[0]["body"]
+    pruefe("Verlinkung:    @timo.verlinkt" in body,
+           "das Profil steht in der Uebersicht")
+    pruefe("verlinken wir dich als @timo.verlinkt" in body,
+           "und die Zusage steht im Text")
+
+    body = zeilen("SELECT body FROM mail_out WHERE anmeldung_id = 2")[0]["body"]
+    pruefe("verlinken wir dich" not in body,
+           "ohne Wunsch wird nichts versprochen")
+
     print("Bilder ausstehend")
     anfrage("POST", "/admin/login",
             {"passwort": "test-passwort-123", "kuerzel": "KK", "weiter": "/admin"})
@@ -189,14 +205,15 @@ try:
            "Haken laesst sich zuruecknehmen")
 
     print("Sammelerinnerung")
-    anmelden("Timo", "Zweispende", "ja", "bilderspende")
-    anfrage("POST", "/admin/anmeldung/4/badge", {"csrf": CSRF})
+    anmelden("Uwe", "Zweispende", "ja", "bilderspende")
+    anfrage("POST", "/admin/anmeldung/5/badge", {"csrf": CSRF})
     status, ort, _ = anfrage("POST", "/admin/erinnerungen", {"csrf": CSRF})
     pruefe("anzahl=2" in ort, "beide offenen wurden erinnert: " + ort)
     pruefe(len(zeilen("SELECT id FROM mail_out WHERE typ = 'erinnerung'")) == 3,
            "insgesamt drei Erinnerungen in der Schlange")
 
     anfrage("POST", "/admin/anmeldung/2/bilder", {"csrf": CSRF})
+    anfrage("POST", "/admin/anmeldung/5/bilder", {"csrf": CSRF})
     anfrage("POST", "/admin/anmeldung/4/bilder", {"csrf": CSRF})
     status, ort, _ = anfrage("POST", "/admin/erinnerungen", {"csrf": CSRF})
     pruefe("anzahl=0" in ort, "ohne Offene wird nichts verschickt")

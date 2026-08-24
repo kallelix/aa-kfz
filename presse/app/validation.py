@@ -15,6 +15,7 @@ MAX_LAENGE = {
     "firma": 120,
     "email": 254,
     "telefon": 40,
+    "social_media": 120,
     "bemerkung": 1000,
 }
 
@@ -56,6 +57,7 @@ def pruefen(formular) -> tuple[dict, dict]:
     werte["gegenleistung"] = _saeubern(formular.get("gegenleistung"))
     werte["sicherheit"] = _angehakt(formular, "sicherheit")
     werte["bildrechte"] = _angehakt(formular, "bildrechte")
+    werte["verlinkung"] = _angehakt(formular, "verlinkung")
 
     fehler: dict[str, str] = {}
 
@@ -97,6 +99,17 @@ def pruefen(formular) -> tuple[dict, dict]:
 
     if werte["gegenleistung"] == "bilderspende" and not werte["bildrechte"]:
         fehler["bildrechte"] = "Für die Bilderspende brauchen wir deine Zustimmung zur Nutzung."
+
+    # Verlinkt wird nur, wer uns Bilder gibt – und nur, wenn wir wissen wohin.
+    if werte["gegenleistung"] != "bilderspende":
+        werte["verlinkung"] = False
+        werte["social_media"] = ""
+    elif werte["verlinkung"] and not werte["social_media"]:
+        fehler["social_media"] = (
+            "Bitte das Profil angeben, sonst können wir nicht verlinken."
+        )
+    elif not werte["verlinkung"]:
+        werte["social_media"] = ""
 
     for feld, grenze in MAX_LAENGE.items():
         if len(werte[feld]) > grenze:

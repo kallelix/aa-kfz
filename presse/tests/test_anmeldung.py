@@ -61,6 +61,30 @@ werte, meldungen = pruefen(dict(VOLL, kommerziell="nein", gegenleistung="gebuehr
 pruefe(meldungen == {} and werte["gegenleistung"] == "",
        "mitgeschickte Wahl wird bei 'nicht kommerziell' verworfen, nicht bemaengelt")
 
+print("Verlinkung auf Social Media")
+BILDER = dict(VOLL, kommerziell="ja", gegenleistung="bilderspende", bildrechte="1")
+
+werte, meldungen = pruefen(BILDER)
+pruefe(meldungen == {} and not werte["verlinkung"],
+       "ohne Haken keine Verlinkung, kein Fehler")
+
+_, meldungen = pruefen(dict(BILDER, verlinkung="1"))
+pruefe("social_media" in meldungen,
+       "Haken ohne Profil wird bemaengelt – verlinken ohne Ziel geht nicht")
+
+werte, meldungen = pruefen(dict(BILDER, verlinkung="1", social_media="@insta_profil"))
+pruefe(meldungen == {} and werte["social_media"] == "@insta_profil",
+       "mit Profil geht es durch")
+
+werte, _ = pruefen(dict(BILDER, social_media="@vergessen"))
+pruefe(werte["social_media"] == "",
+       "Profil ohne Haken wird verworfen – niemand wird ungefragt verlinkt")
+
+werte, meldungen = pruefen(dict(VOLL, kommerziell="ja", gegenleistung="gebuehr",
+                                verlinkung="1", social_media="@insta"))
+pruefe(meldungen == {} and not werte["verlinkung"] and werte["social_media"] == "",
+       "ohne Bilderspende wird nicht verlinkt")
+
 ohne_haken = {k: v for k, v in VOLL.items() if k != "sicherheit"}
 _, meldungen = pruefen(dict(ohne_haken, kommerziell="nein"))
 pruefe("sicherheit" in meldungen, "ohne Sicherheitshaken geht nichts")
@@ -128,7 +152,8 @@ try:
     status, _, seite = anfrage("GET", "/")
     pruefe(status == 200, "Formular laedt")
     for feld in ("vorname", "nachname", "firma", "email", "telefon",
-                 "kommerziell", "gegenleistung", "bildrechte", "sicherheit"):
+                 "kommerziell", "gegenleistung", "bildrechte", "sicherheit",
+                 "verlinkung", "social_media"):
         pruefe('name="' + feld + '"' in seite, "Feld " + feld + " ist da")
     pruefe("20 EUR" in seite, "die Gebuehr steht aus der Konfiguration im Text")
     pruefe("Sturzzonen" in seite, "der Sicherheitshinweis steht im Formular")
@@ -162,6 +187,21 @@ try:
     pruefe(eintrag["gegenleistung"] == "bilderspende", "Bilderspende ist gespeichert")
     pruefe(bool(eintrag["bildrechte_ok_am"]), "Zustimmung zu den Bildrechten ist vermerkt")
 
+    print("Verlinkung ueber HTTP")
+    status, ort, _ = anfrage("POST", "/", dict(
+        VOLL, kommerziell="ja", gegenleistung="bilderspende", bildrechte="1",
+        verlinkung="1", social_media="@insta_profil"))
+    pruefe(status == 303, "Anmeldung mit Verlinkung wird angenommen")
+    eintrag = zeilen("SELECT * FROM anmeldung ORDER BY id DESC LIMIT 1")[0]
+    pruefe(eintrag["verlinkung"] == 1 and eintrag["social_media"] == "@insta_profil",
+           "Wunsch und Profil sind gespeichert")
+
+    status, _, text = anfrage("POST", "/", dict(
+        VOLL, kommerziell="ja", gegenleistung="bilderspende", bildrechte="1",
+        verlinkung="1"))
+    pruefe(status == 422 and "Profil angeben" in text,
+           "Haken ohne Profil wird abgewiesen")
+
     print("Abgewiesen wird")
     status, _, text = anfrage("POST", "/", dict(VOLL, kommerziell="ja"))
     pruefe(status == 422 and "eine der beiden Möglichkeiten" in text,
@@ -173,13 +213,13 @@ try:
     status, _, text = anfrage("POST", "/", {k: v for k, v in VOLL.items()
                                             if k != "sicherheit"} | {"kommerziell": "nein"})
     pruefe(status == 422 and "Sicherheitshinweis" in text, "ohne Sicherheitshaken")
-    pruefe(len(zeilen("SELECT id FROM anmeldung")) == 3, "nichts davon wurde gespeichert")
+    pruefe(len(zeilen("SELECT id FROM anmeldung")) == 4, "nichts davon wurde gespeichert")
 
     print("Honeypot")
     status, ort, _ = anfrage("POST", "/", dict(VOLL, kommerziell="nein",
                                                webseite="http://spam.example"))
     pruefe(status == 303, "der Bot sieht eine Bestaetigung")
-    pruefe(len(zeilen("SELECT id FROM anmeldung")) == 3, "gespeichert wurde nichts")
+    pruefe(len(zeilen("SELECT id FROM anmeldung")) == 4, "gespeichert wurde nichts")
 
     print("Dankeseite")
     status, _, seite = anfrage("GET", "/danke?nr=2&art=gebuehr")
@@ -201,7 +241,7 @@ try:
            "bei BADGES_GESAMT=3 und drei Anmeldungen wird gewarnt")
     status, ort, _ = anfrage("POST", "/", dict(VOLL, kommerziell="nein"))
     pruefe(status == 303, "angenommen wird trotzdem weiter")
-    pruefe(len(zeilen("SELECT id FROM anmeldung")) == 4, "und gespeichert auch")
+    pruefe(len(zeilen("SELECT id FROM anmeldung")) == 5, "und gespeichert auch")
 
 finally:
     prozess.terminate()

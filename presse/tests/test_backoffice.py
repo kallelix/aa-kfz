@@ -188,11 +188,32 @@ try:
     print("Abholliste")
     status, _, abholung = anfrage("GET", "/admin/abholung")
     pruefe(status == 200, "Abholliste laedt")
-    pruefe(abholung.count("<tr data-suche=") == 3, "alle drei stehen drauf")
+    pruefe(abholung.count("data-suche=") == 3, "alle drei stehen drauf")
     pruefe('data-suche="petra blende-licht blende &amp; licht gmbh"' in abholung,
            "der Suchtext ist kleingeschrieben und enthaelt die Firma")
     pruefe("/static/liste.js" in abholung, "das Filterskript ist eingebunden")
     pruefe(abholung.count('class="sortknopf"') == 3, "drei Spalten sind sortierbar")
+
+    print("Zurueck zur Zeile statt nach oben")
+    pruefe('id="zeile-1"' in abholung, "jede Zeile hat eine Sprungmarke")
+    pruefe(abholung.count('name="suche"') >= 1,
+           "die Zeilenformulare tragen den Suchbegriff mit")
+
+    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/badge",
+                             {"csrf": CSRF, "suche": "blende"})
+    pruefe(ort.endswith("#zeile-1"),
+           "die Antwort springt zurueck zur Zeile: " + ort)
+    pruefe("suche=blende" in ort, "und nimmt den Suchbegriff mit")
+
+    _, _, gefiltert = anfrage("GET", ort.split("#")[0])
+    pruefe('value="blende"' in gefiltert,
+           "das Suchfeld ist danach wieder vorbelegt")
+
+    # Auf der Detailseite waere eine Sprungmarke sinnlos.
+    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/badge",
+                             {"csrf": CSRF, "ausgeben": "0",
+                              "zurueck": "/admin/anmeldung/1"})
+    pruefe("#zeile-" not in ort, "auf der Detailseite keine Sprungmarke: " + ort)
 
     print("Badge ausgeben")
     status, ort, _ = anfrage("POST", "/admin/anmeldung/1/badge", {"csrf": CSRF})

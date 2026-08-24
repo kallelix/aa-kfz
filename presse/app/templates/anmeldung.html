@@ -151,6 +151,25 @@
           </label>
           {{ fehlermeldung('bildrechte') }}
         </div>
+
+        <div class="feld{% if fehler.get('social_media') %} feld-fehler{% endif %}">
+          <label class="auswahl">
+            <input type="checkbox" name="verlinkung" value="1"
+                   {% if werte.get('verlinkung') %}checked{% endif %}>
+            <span class="auswahl-text">
+              <span class="auswahl-titel">Bitte verlinken</span>
+              <span class="auswahl-hilfe">
+                Wenn wir deine Bilder posten, verlinken wir dich gern.
+              </span>
+            </span>
+          </label>
+          <label for="social_media" class="nachgerueckt">Profil</label>
+          <input type="text" id="social_media" name="social_media"
+                 placeholder="z. B. @insta_profil"
+                 value="{{ werte.get('social_media', '') }}"
+                 {% if fehler.get('social_media') %}aria-describedby="fehler-social_media" aria-invalid="true"{% endif %}>
+          {{ fehlermeldung('social_media') }}
+        </div>
       </div>
     </div>
 

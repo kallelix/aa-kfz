@@ -83,6 +83,8 @@ BEARBEITBAR = (
     "telefon",
     "kommerziell",
     "gegenleistung",
+    "verlinkung",
+    "social_media",
     "bemerkung",
 )
 
@@ -95,7 +97,8 @@ SORTIERUNGEN = {
     "firma": "firma COLLATE NOCASE, nachname COLLATE NOCASE",
 }
 
-_SUCHFELDER = ("vorname", "nachname", "firma", "email", "telefon", "bemerkung")
+_SUCHFELDER = ("vorname", "nachname", "firma", "email", "telefon",
+               "social_media", "bemerkung")
 
 
 def anmeldung_anlegen(werte: dict, remote_ip: str | None) -> int:
@@ -113,9 +116,9 @@ def anmeldung_anlegen(werte: dict, remote_ip: str | None) -> int:
             """
             INSERT INTO anmeldung (
                 vorname, nachname, firma, email, telefon, kommerziell,
-                gegenleistung, bemerkung, status,
+                gegenleistung, verlinkung, social_media, bemerkung, status,
                 sicherheit_ok_am, bildrechte_ok_am, created_at, remote_ip
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'neu', ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'neu', ?, ?, ?, ?)
             """,
             (
                 werte["vorname"],
@@ -125,6 +128,8 @@ def anmeldung_anlegen(werte: dict, remote_ip: str | None) -> int:
                 werte["telefon"] or None,
                 kommerziell,
                 gegenleistung,
+                1 if werte.get("verlinkung") else 0,
+                werte.get("social_media") or None,
                 werte["bemerkung"] or None,
                 zeitpunkt,
                 zeitpunkt if gegenleistung == "bilderspende" else None,
@@ -189,7 +194,7 @@ def anmeldung_aktualisieren(anmeldung_id: int, werte: dict) -> bool:
     parameter = []
     for feld in BEARBEITBAR:
         wert = werte.get(feld)
-        if feld == "kommerziell":
+        if feld in ("kommerziell", "verlinkung"):
             parameter.append(1 if wert else 0)
         else:
             parameter.append(wert or None)

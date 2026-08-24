@@ -61,9 +61,13 @@ def _akkreditierung(anmeldung) -> list:
             " bitte passend mitbringen.",
         ]
     if anmeldung["gegenleistung"] == "bilderspende":
-        return [
+        zeilen = [
             f"  Nutzung:       kommerziell",
             f"  Akkreditierung: ca. {config.BILDER_ANZAHL} Bilder als Spende",
+        ]
+        if anmeldung["verlinkung"]:
+            zeilen.append(f"  Verlinkung:    {anmeldung['social_media']}")
+        zeilen.extend([
             "",
             "Interessiert sind wir dabei vor allem an emotionalen"
             " Stimmungsbildern, aber auch an Aufnahmen von 1–2 Fahrern unserer"
@@ -71,10 +75,15 @@ def _akkreditierung(anmeldung) -> list:
             " können.",
             "",
             "Die gespendeten Bilder nutzen wir für die zukünftige Promotion der"
-            " Veranstaltung – vor allem für Social Media, Print und Merch. Eine"
-            " Verlinkung auf Social Media ist dabei, wenn gewünscht,"
-            " selbstverständlich möglich.",
-        ]
+            " Veranstaltung – vor allem für Social Media, Print und Merch.",
+        ])
+        if anmeldung["verlinkung"]:
+            zeilen.append("")
+            zeilen.append(
+                "Wenn wir deine Bilder posten, verlinken wir dich als"
+                f" {anmeldung['social_media']}."
+            )
+        return zeilen
     return [
         "  Nutzung:       nicht kommerziell",
         "  Akkreditierung: keine Gebühr",

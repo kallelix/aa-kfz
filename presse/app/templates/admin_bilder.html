@@ -22,17 +22,25 @@
             <th>Name</th>
             <th>Firma</th>
             <th>E-Mail</th>
+            <th>Verlinkung</th>
             <th>Erinnert</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for a in anmeldungen %}
-            <tr>
+            <tr id="zeile-{{ a.id }}">
               <td><a href="/admin/anmeldung/{{ a.id }}">{{ a.id }}</a></td>
               <td><a href="/admin/anmeldung/{{ a.id }}">{{ a.nachname }}, {{ a.vorname }}</a></td>
               <td>{{ a.firma }}</td>
               <td><a href="mailto:{{ a.email }}">{{ a.email }}</a></td>
+              <td>
+                {% if a.verlinkung %}
+                  <strong>{{ a.social_media }}</strong>
+                {% else %}
+                  <span class="gedaempft">—</span>
+                {% endif %}
+              </td>
               <td class="nowrap">
                 {% if a.erinnerung_am %}
                   {{ a.erinnerung_am|zeit }}

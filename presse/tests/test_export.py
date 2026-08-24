@@ -105,6 +105,7 @@ try:
          "firma": 'Presse "Vor Ort"', "email": "sven@example.org",
          "kommerziell": "ja", "gegenleistung": "bilderspende",
          "bildrechte": "1", "sicherheit": "1",
+         "verlinkung": "1", "social_media": "@oehler.media",
          "bemerkung": "Zeile eins\nZeile zwei; mit Trenner"},
         {"vorname": "Anna", "nachname": "Hobby", "firma": "privat",
          "email": "anna@example.org", "kommerziell": "nein", "sicherheit": "1"},
@@ -150,6 +151,18 @@ try:
            "und bei Bilderspende der der Bildrechte")
     pruefe(nach_name["Hobby"]["Bildrechte zugestimmt am"] == "",
            "ohne Bilderspende bleibt die Spalte leer")
+
+    print("Verlinkung")
+    pruefe("Verlinkung gewünscht" in kopfzeile and "Social-Media-Profil" in kopfzeile,
+           "beide Spalten sind da")
+    pruefe(nach_name["Öhler; Sohn"]["Verlinkung gewünscht"] == "ja",
+           "der Wunsch steht drin")
+    pruefe(nach_name["Öhler; Sohn"]["Social-Media-Profil"] == "@oehler.media",
+           "und das Profil")
+    pruefe(nach_name["Gebuehr"]["Verlinkung gewünscht"] == "nein",
+           "ohne Wunsch steht nein")
+    pruefe(nach_name["Gebuehr"]["Social-Media-Profil"] == "",
+           "und das Profil bleibt leer")
 
     print("Sonderzeichen")
     heikel = nach_name["Öhler; Sohn"]
