@@ -157,6 +157,10 @@
       knoepfe[i].setAttribute("aria-pressed", eigen ? "true" : "false");
     }
     rueckkehr.hidden = !(offenerTag && tagesblickDauer > 0);
+    /* Im Tagesblick darf die Seite rollen - am Samstag passt der Tag nicht
+     * auf einen Bildschirm. In der Jetzt-Ansicht bleibt sie starr: dort soll
+     * alles Wichtige gleichzeitig zu sehen sein, ohne dass jemand hinfasst. */
+    document.body.classList.toggle("tagesblick", Boolean(offenerTag));
   }
 
   function tagWaehlen(tag) {
@@ -171,8 +175,25 @@
       rueckkehrRest.textContent = String(tagesblickDauer);
     }
     leisteMarkieren();
+    /* Nach dem Wechsel wieder nach oben - sonst landet man im neuen Tag an
+     * der Stelle, an der man im alten aufgehoert hat. */
+    window.scrollTo(0, 0);
     holen();
   }
+
+  /* Wer blaettert, liest. Solange jemand das tut, faengt die Uhr bis zur
+   * Rueckkehr von vorn an - sonst springt der Bildschirm mitten im Lesen auf
+   * die Jetzt-Ansicht zurueck. Bewusst nur benutzergetriebene Ereignisse:
+   * "scroll" allein feuert auch, wenn das Skript selbst nach oben rollt. */
+  function weiterlesen() {
+    if (offenerTag && tagesblickDauer > 0) {
+      tagEndetUm = Date.now() + tagesblickDauer * 1000;
+    }
+  }
+
+  ["wheel", "touchmove", "pointerdown", "keydown"].forEach(function (art) {
+    window.addEventListener(art, weiterlesen, { passive: true });
+  });
 
   function sekundentakt() {
     uhrStellen();

@@ -167,14 +167,61 @@ pruefe(band.bauen(TAG, [], []) is None, "ohne Inhalt kein Band")
 pruefe(band.bauen(TAG, [programmpunkt("Nur Text", None, None)], []) is None,
        "ein Punkt ohne Uhrzeit allein ergibt auch keine Achse")
 
+print("Randmarken")
+b = band.bauen(TAG, [], [schicht(1, "Dienst", "08:00", "18:00", 1, 1)])
+pruefe(b["stunden"][0]["rand"] == "links", "die erste Stundenzahl wird nach "
+       "innen gerueckt")
+pruefe(b["stunden"][-1]["rand"] == "rechts", "die letzte auch")
+pruefe(all(s["rand"] == "" for s in b["stunden"][1:-1]),
+       "die dazwischen bleiben mittig")
+
+b = band.bauen(TAG, [], [schicht(1, "Dienst", "08:00", "18:00", 1, 1)],
+               jetzt=datetime(2026, 8, 29, 8, 0))
+pruefe(b["jetzt_rand"] == "links",
+       "die Jetzt-Linie am linken Rand traegt ihre Beschriftung nach innen")
+b = band.bauen(TAG, [], [schicht(1, "Dienst", "08:00", "18:00", 1, 1)],
+               jetzt=datetime(2026, 8, 29, 18, 0))
+pruefe(b["jetzt_rand"] == "rechts", "am rechten Rand ebenso")
+b = band.bauen(TAG, [], [schicht(1, "Dienst", "08:00", "18:00", 1, 1)],
+               jetzt=datetime(2026, 8, 29, 13, 0))
+pruefe(b["jetzt_rand"] == "", "in der Mitte bleibt sie mittig")
+
+print("Aufgaben")
+b = band.bauen(TAG, [], [schicht(1, "Dienst", "08:00", "18:00", 1, 1)],
+               aufgaben=[{"id": 7, "titel": "Strom legen", "status": "offen",
+                          "beginn": TAG + " 09:00", "ende": TAG + " 10:00"},
+                         {"id": 8, "titel": "Pokale", "status": "offen",
+                          "beginn": None, "ende": None}])
+pruefe(len(b["aufgaben_spuren"]) == 1, "eine Aufgabenspur")
+pruefe(b["aufgaben_spuren"][0][0]["titel"] == "Strom legen",
+       "die mit Uhrzeit steht drin")
+pruefe(all(x["titel"] != "Pokale"
+           for spur in b["aufgaben_spuren"] for x in spur),
+       "die aus dem Pool nicht - auf einer Zeitachse hat sie keinen Ort")
+
+b = band.bauen(TAG, [], [], aufgaben=[
+    {"id": 9, "titel": "Allein", "status": "offen",
+     "beginn": TAG + " 09:00", "ende": TAG + " 10:00"}])
+pruefe(b is not None and len(b["aufgaben_spuren"]) == 1,
+       "eine Aufgabe allein ergibt schon ein Band")
+
 print("Balken bleiben innerhalb der Achse")
 b = band.bauen(TAG, [programmpunkt("A", "08:00", "09:00"),
                      programmpunkt("B", "17:00", "18:30")],
                [schicht(1, "S", "07:30", "19:00", 1, 2)])
 alle = [x for spur in b["programm_spuren"] + b["schicht_spuren"] for x in spur]
 pruefe(all(x["links"] >= 0 for x in alle), "keiner beginnt links vom Rand")
-pruefe(all(x["links"] + x["breite"] <= 100.01 for x in alle),
+pruefe(all(x["links"] + x["breite"] <= 100.0 for x in alle),
        "und keiner ragt rechts hinaus")
+
+# Ein sehr kurzer Balken ganz am Ende wuerde durch die Mindestbreite ueber die
+# Achse geschoben - dann muss er nach links ruecken statt hinauszuragen.
+b = band.bauen(TAG, [], [schicht(1, "Lang", "08:00", "11:58", 1, 1),
+                         schicht(2, "Winzig", "11:58", "12:00", 1, 1)])
+alle = [x for spur in b["schicht_spuren"] for x in spur]
+pruefe(all(x["links"] + x["breite"] <= 100.0 for x in alle),
+       "auch der Winzling am Ende bleibt innerhalb: "
+       + str([(x["titel"], round(x["links"] + x["breite"], 3)) for x in alle]))
 pruefe(all(x["breite"] > 0 for x in alle), "jeder ist sichtbar breit")
 
 print()

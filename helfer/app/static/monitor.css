@@ -768,3 +768,41 @@ a.band-balken { cursor: pointer; }
 .band-aufgabe { background: #a78bfa; }
 .band-status-erledigt { opacity: .55; }
 .band-status-offen { box-shadow: inset 3px 0 0 rgba(255, 255, 255, .85); }
+
+/* Erste und letzte Stundenzahl nach innen ruecken. Mittig ausgerichtet wuerde
+   je die halbe Zahl ueber die Achse hinausragen - und der Browser zeigte
+   einen waagerechten Rollbalken fuer zehn Pixel. Dasselbe fuer die
+   Beschriftung der Jetzt-Linie, wenn sie nah an den Rand kommt. */
+.band-stunde-links { transform: none; }
+.band-stunde-rechts { transform: translateX(-100%); }
+.band-jetzt-links::after { left: 0; transform: none; }
+.band-jetzt-rechts::after { left: auto; right: 0; transform: none; }
+
+/* --- Tagesblick: hier darf gerollt werden --------------------------------- */
+
+/* Die Jetzt-Ansicht bleibt starr - dort soll alles Wichtige gleichzeitig zu
+   sehen sein. Im Tagesblick geht das nicht: der Samstag hat 17 Schichten und
+   13 Programmpunkte. Also rollt dort die Seite, und Kopfzeile samt
+   Tagesleiste laufen mit, damit Uhr und Rueckkehrzeit sichtbar bleiben. */
+body.tagesblick { overflow-y: auto; }
+
+body.tagesblick .kopfbereich {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  /* Ohne eigenen Grund schiene der Inhalt beim Rollen durch. */
+  background: var(--grund);
+}
+
+body.tagesblick .raster-tag {
+  height: auto;
+  /* Etwas Luft unten, damit die letzte Zeile nicht am Rand klebt. */
+  padding-bottom: 1.5rem;
+}
+
+/* Die einzelnen Tafeln rollen dann nicht mehr selbst - sonst muesste man auf
+   einem Beruehrbildschirm erst treffen, welchen Kasten man erwischen will. */
+body.tagesblick .tafel-tagschichten,
+body.tagesblick .tafel-tagprogramm {
+  overflow: visible;
+}

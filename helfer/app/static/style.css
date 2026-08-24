@@ -950,3 +950,12 @@ a.band-balken { cursor: pointer; }
 .band-aufgabe { background: #8b5cf6; }
 .band-status-erledigt { opacity: .55; }
 .band-status-offen { box-shadow: inset 3px 0 0 rgba(255, 255, 255, .85); }
+
+/* Erste und letzte Stundenzahl nach innen ruecken. Mittig ausgerichtet wuerde
+   je die halbe Zahl ueber die Achse hinausragen - und der Browser zeigte
+   einen waagerechten Rollbalken fuer zehn Pixel. Dasselbe fuer die
+   Beschriftung der Jetzt-Linie, wenn sie nah an den Rand kommt. */
+.band-stunde-links { transform: none; }
+.band-stunde-rechts { transform: translateX(-100%); }
+.band-jetzt-links::after { left: 0; transform: none; }
+.band-jetzt-rechts::after { left: auto; right: 0; transform: none; }

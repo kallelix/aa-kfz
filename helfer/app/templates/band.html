@@ -18,12 +18,13 @@
     {% for s in band.stunden %}
       <span class="band-strich{% if s.tageswechsel %} band-tageswechsel{% endif %}"
             style="left: {{ s.prozent }}%"></span>
-      <span class="band-stunde{% if s.tageswechsel %} band-stunde-wechsel{% endif %}"
+      <span class="band-stunde{% if s.tageswechsel %} band-stunde-wechsel{% endif %}{% if s.rand %} band-stunde-{{ s.rand }}{% endif %}"
             style="left: {{ s.prozent }}%">{{ s.text }}</span>
     {% endfor %}
 
     {% if band.jetzt_prozent is not none %}
-      <span class="band-jetzt" style="left: {{ band.jetzt_prozent }}%"
+      <span class="band-jetzt{% if band.jetzt_rand %} band-jetzt-{{ band.jetzt_rand }}{% endif %}"
+            style="left: {{ band.jetzt_prozent }}%"
             role="img" aria-label="jetzt"></span>
     {% endif %}
 

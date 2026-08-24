@@ -13,37 +13,45 @@
   </noscript>
 </head>
 <body>
-  <header class="kopf">
-    <div class="kopf-links">
-      <img class="vereinslogo" src="/static/ilrc-logo.svg" alt=""
-           aria-hidden="true" width="72" height="72">
-      <div>
-        <p class="veranstaltung">{{ veranstaltung }}</p>
-        <p class="tag" id="tag">{{ stand.tag_lang }}</p>
+  {# Kopfzeile, Tagesleiste und Verbindungswarnung bilden einen Block: im
+     Tagesblick laeuft er beim Rollen mit, damit Uhr, Tagesauswahl und
+     Rueckkehrzeit sichtbar bleiben. Einzeln klebrig gemacht laegen sie
+     uebereinander, weil die Hoehe der Kopfzeile mit der Bildschirmbreite
+     waechst und sich nicht fest ausrechnen laesst. #}
+  <div class="kopfbereich">
+    <header class="kopf">
+      <div class="kopf-links">
+        <img class="vereinslogo" src="/static/ilrc-logo.svg" alt=""
+             aria-hidden="true" width="72" height="72">
+        <div>
+          <p class="veranstaltung">{{ veranstaltung }}</p>
+          <p class="tag" id="tag">{{ stand.tag_lang }}</p>
+        </div>
       </div>
-    </div>
-    {# Die Uhr zeigt immer den jetzigen Moment, auch im Tagesblick. #}
-    <p class="uhr" id="uhr">{{ stand.jetzt.strftime('%H:%M') }}</p>
-  </header>
+      {# Die Uhr zeigt immer den jetzigen Moment, auch im Tagesblick. #}
+      <p class="uhr" id="uhr">{{ stand.jetzt.strftime('%H:%M') }}</p>
+    </header>
 
-  {# Die Tagesleiste liegt im Rahmen, nicht im aufgefrischten Bereich: sie
-     ändert sich nicht und muss jeden Austausch überstehen. #}
-  <nav class="tagesleiste" id="tagesleiste" aria-label="Tag wählen">
-    <button type="button" class="tagknopf tagknopf-jetzt ist-aktiv"
-            data-tag="" id="knopf-jetzt">Jetzt</button>
-    {% for t in tagesleiste %}
-      <button type="button" class="tagknopf{% if t.datum == heute %} ist-heute{% endif %}"
-              data-tag="{{ t.datum }}" aria-label="{{ t.lang }}">{{ t.kurz }}</button>
-    {% endfor %}
-    <span class="rueckkehr" id="rueckkehr" hidden>
-      zurück zu <strong>Jetzt</strong> in <span id="rueckkehr-rest"></span> s
-    </span>
-  </nav>
+    {# Die Tagesleiste liegt im Rahmen, nicht im aufgefrischten Bereich: sie
+       ändert sich nicht und muss jeden Austausch überstehen. #}
+    <nav class="tagesleiste" id="tagesleiste" aria-label="Tag wählen">
+      <button type="button" class="tagknopf tagknopf-jetzt ist-aktiv"
+              data-tag="" id="knopf-jetzt">Jetzt</button>
+      {% for t in tagesleiste %}
+        <button type="button" class="tagknopf{% if t.datum == heute %} ist-heute{% endif %}"
+                data-tag="{{ t.datum }}" aria-label="{{ t.lang }}">{{ t.kurz }}</button>
+      {% endfor %}
+      <span class="rueckkehr" id="rueckkehr" hidden>
+        zurück zu <strong>Jetzt</strong> in <span id="rueckkehr-rest"></span> s
+      </span>
+    </nav>
 
-  <p class="warnung" id="warnung" hidden>
-    Keine Verbindung zum Server – angezeigt wird der Stand von
-    <span id="stand">{{ stand.jetzt.strftime('%H:%M') }}</span> Uhr.
-  </p>
+    <p class="warnung" id="warnung" hidden>
+      Keine Verbindung zum Server – angezeigt wird der Stand von
+      <span id="stand">{{ stand.jetzt.strftime('%H:%M') }}</span> Uhr.
+    </p>
+
+  </div>
 
   <main id="inhalt">
     {% include "monitor_inhalt.html" %}

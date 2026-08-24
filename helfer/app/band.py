@@ -163,6 +163,11 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
         links = prozent(eintrag["von"])
         rechts = 100.0 if eintrag["offen"] else prozent(eintrag["bis"])
         breite = max(0.4, rechts - links)
+        # Die Mindestbreite kann einen Balken ganz am rechten Rand über die
+        # Achse hinausschieben. Dann rückt er nach links statt hinauszuragen –
+        # sonst steht die Ansicht mit einem Rollbalken für zwei Pixel da.
+        if links + breite > 100:
+            links = max(0.0, 100 - breite)
         beschriftung = ""
         if breite >= MINDESTBREITE_SERIE and eintrag["art"] == "programm":
             beschriftung = eintrag["titel"]
@@ -191,7 +196,8 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
                        for spur in packen(aufgabenbalken)]
 
     stunden = []
-    for minute in range(von, bis + 1, 60):
+    marken = list(range(von, bis + 1, 60))
+    for nummer, minute in enumerate(marken):
         stunde = (minute // 60) % 24
         stunden.append({
             "prozent": prozent(minute),
@@ -199,13 +205,26 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
             # Mitternacht bekommt einen eigenen Strich: sonst läse sich die
             # "08" einer Nachtschicht wie der Morgen desselben Tages.
             "tageswechsel": minute > von and minute % 1440 == 0,
+            # Die Zahlen stehen mittig über ihrem Strich. Bei der ersten und
+            # der letzten ragt damit die halbe Zahl über die Achse hinaus –
+            # und schon zeigt der Browser einen waagerechten Rollbalken für
+            # zehn Pixel. Deshalb werden die beiden nach innen gerückt.
+            "rand": "links" if nummer == 0 else
+                    ("rechts" if nummer == len(marken) - 1 else ""),
         })
 
     jetzt_prozent = None
+    jetzt_rand = ""
     if jetzt is not None:
         marke = minuten(jetzt.strftime("%Y-%m-%d %H:%M"), datum)
         if marke is not None and von <= marke <= bis:
             jetzt_prozent = prozent(marke)
+            # Aus demselben Grund wie bei den Stundenzahlen: nah am Rand würde
+            # die Beschriftung "jetzt" hinausragen.
+            if jetzt_prozent < 4:
+                jetzt_rand = "links"
+            elif jetzt_prozent > 96:
+                jetzt_rand = "rechts"
 
     return {
         "datum": datum,
@@ -215,6 +234,7 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
         "bis_uhr": _uhr(bis),
         "stunden": stunden,
         "jetzt_prozent": jetzt_prozent,
+        "jetzt_rand": jetzt_rand,
         "programm_spuren": programm_spuren,
         "schicht_spuren": schicht_spuren,
         "aufgaben_spuren": aufgaben_spuren,
