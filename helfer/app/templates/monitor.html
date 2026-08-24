@@ -15,8 +15,12 @@
 <body>
   <header class="kopf">
     <div class="kopf-links">
-      <p class="veranstaltung">{{ veranstaltung }}</p>
-      <p class="tag" id="tag">{{ stand.tag_lang }}</p>
+      <img class="vereinslogo" src="/static/ilrc-logo.svg" alt=""
+           aria-hidden="true" width="72" height="72">
+      <div>
+        <p class="veranstaltung">{{ veranstaltung }}</p>
+        <p class="tag" id="tag">{{ stand.tag_lang }}</p>
+      </div>
     </div>
     {# Die Uhr zeigt immer den jetzigen Moment, auch im Tagesblick. #}
     <p class="uhr" id="uhr">{{ stand.jetzt.strftime('%H:%M') }}</p>

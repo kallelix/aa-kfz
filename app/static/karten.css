@@ -75,6 +75,16 @@ html, body {
   max-width: 30mm;
   width: auto;
   height: auto;
+  /* Wie in der Kopfzeile: das Vereinslogo hat weisse Anteile, die auf weissem
+     Papier verschwaenden. Deshalb die dunkle Kachel dahinter - und
+     print-color-adjust, weil Browser Hintergruende sonst beim Drucken
+     weglassen und genau dieser hier gebraucht wird. */
+  padding: 1mm;
+  box-sizing: border-box;
+  background: #13160f;
+  border-radius: 2mm;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .karte-veranstaltung {

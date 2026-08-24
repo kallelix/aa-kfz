@@ -643,3 +643,43 @@ tr[id^="zeile-"]:target { background: var(--flaeche); }
 }
 
 .datenschutz li { margin-bottom: .35rem; }
+
+/* --- Vereinslogo ---------------------------------------------------------- */
+
+/* Das Logo traegt die Vereinsfarben und weisse Anteile (Schriftzug, Kontur).
+   Auf hellem Grund waeren die weg, deshalb sitzt es auf einer dunklen Kachel
+   in seiner eigenen dunkelsten Farbe. Bringt es einen eigenen dunklen Grund
+   mit, faellt die Kachel nicht auf; bringt es keinen mit, rettet sie den
+   Schriftzug. Bewusst eine abgerundete Kachel und kein Kreis: ein Kreis
+   wuerde die Ecken eines quadratischen Logos abschneiden.
+
+   Heisst nicht .marke - so heisst in allen drei Apps schon die
+   Status-Plakette. */
+.vereinslogo {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: none;
+  padding: .3rem;
+  box-sizing: border-box;
+  background: #13160f;
+  border-radius: 12px;
+}
+
+.kopf-marke {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+}
+
+.kopfzeile {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+}
+.kopfzeile .kopftext { min-width: 0; }
+.kopfzeile h1 { margin-top: .1rem; }
+
+@media (max-width: 30rem) {
+  .vereinslogo { width: 2.6rem; height: 2.6rem; }
+  .kopf-marke, .kopfzeile { gap: .6rem; }
+}

@@ -571,3 +571,29 @@ html, body {
     gap: .3rem .6rem;
   }
 }
+
+/* --- Vereinslogo ---------------------------------------------------------- */
+
+/* Hier steht es ohnehin auf Dunkel, die Kachel dahinter faellt also nicht
+   auf. Sie bleibt trotzdem: das Logo hat weisse Anteile, und mit ihr sieht es
+   auf jedem Untergrund gleich aus - im Monitor wie im Backoffice. */
+.kopf-links {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  min-width: 0;
+}
+
+.vereinslogo {
+  width: 4.2rem;
+  height: 4.2rem;
+  flex: none;
+  padding: .25rem;
+  box-sizing: border-box;
+  background: #13160f;
+  border-radius: 14px;
+}
+
+@media (max-width: 60rem) {
+  .vereinslogo { width: 3rem; height: 3rem; }
+}

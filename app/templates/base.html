@@ -9,9 +9,12 @@
 </head>
 <body>
   <div class="huelle">
-    <header>
-      <p class="veranstaltung">{{ veranstaltung }}</p>
+    <header class="kopfzeile">
+      <img class="vereinslogo" src="/static/ilrc-logo.svg" alt="" aria-hidden="true" width="52" height="52">
+      <div class="kopftext">
+        <p class="veranstaltung">{{ veranstaltung }}</p>
       <h1>{% block ueberschrift %}Kennzeichen-Antrag{% endblock %}</h1>
+      </div>
     </header>
 
     <main>
