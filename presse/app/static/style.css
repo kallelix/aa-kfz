@@ -604,3 +604,19 @@ form:has(#kommerziell-nein:checked) .nur-kommerziell { display: none; }
 form:has(#gegen-gebuehr:checked) .nur-bilderspende { display: none; }
 
 .nur-kommerziell > .feld:first-child { margin-top: 0; }
+
+/* Kleiner Knopf fuer Nebenaktionen in Tabellenzellen. */
+.knopf-winzig {
+  font: inherit;
+  font-size: .75rem;
+  color: var(--gedaempft);
+  background: none;
+  border: 0;
+  padding: .15rem .2rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.knopf-winzig:hover { color: var(--text); background: none; }
+
+.sperre-tabelle td form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }

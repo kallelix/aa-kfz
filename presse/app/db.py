@@ -186,7 +186,6 @@ def anmeldung_aktualisieren(anmeldung_id: int, werte: dict) -> bool:
     Bildrechte gesetzt – dann hat allerdings die Orga zugestimmt, nicht der
     Antragsteller. Das steht so in der Detailansicht.
     """
-    zuweisungen = ", ".join(feld + " = ?" for feld in BEARBEITBAR)
     parameter = []
     for feld in BEARBEITBAR:
         wert = werte.get(feld)
@@ -197,26 +196,24 @@ def anmeldung_aktualisieren(anmeldung_id: int, werte: dict) -> bool:
 
     with transaktion() as con:
         vorher = con.execute(
-            "SELECT gegenleistung, bildrechte_ok_am FROM anmeldung WHERE id = ?",
-            (anmeldung_id,),
+            "SELECT bildrechte_ok_am FROM anmeldung WHERE id = ?", (anmeldung_id,)
         ).fetchone()
         if vorher is None:
             return False
 
+        # Gegenleistung und Bildrechte muessen in EINEM Statement wandern: die
+        # CHECK-Regel verlangt bei Bilderspende einen Zeitstempel, und
+        # Zwischenzustaende gibt es dabei nicht.
+        if werte.get("gegenleistung") == "bilderspende":
+            bildrechte = vorher["bildrechte_ok_am"] or jetzt()
+        else:
+            bildrechte = None
+
+        zuweisungen = ", ".join(feld + " = ?" for feld in BEARBEITBAR)
         cur = con.execute(
-            f"UPDATE anmeldung SET {zuweisungen} WHERE id = ?",
-            parameter + [anmeldung_id],
+            f"UPDATE anmeldung SET {zuweisungen}, bildrechte_ok_am = ? WHERE id = ?",
+            parameter + [bildrechte, anmeldung_id],
         )
-        if werte.get("gegenleistung") == "bilderspende" and not vorher["bildrechte_ok_am"]:
-            con.execute(
-                "UPDATE anmeldung SET bildrechte_ok_am = ? WHERE id = ?",
-                (jetzt(), anmeldung_id),
-            )
-        elif werte.get("gegenleistung") != "bilderspende":
-            con.execute(
-                "UPDATE anmeldung SET bildrechte_ok_am = NULL WHERE id = ?",
-                (anmeldung_id,),
-            )
         return cur.rowcount > 0
 
 
@@ -385,3 +382,63 @@ def einstellung_setzen(schluessel: str, wert: str) -> None:
             " geaendert_am = excluded.geaendert_am",
             (schluessel, wert, jetzt()),
         )
+
+
+# --- Abholung am Orga-Buero -------------------------------------------------
+
+
+def anmeldungen_abholung() -> list:
+    """Alle Anmeldungen fuer den Schalter, sortiert nach Nachname.
+
+    Bewusst ohne Statusfilter: wer schon ein Badge hat, muss ebenfalls
+    auffindbar sein - sonst gibt man ihm versehentlich ein zweites.
+    """
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT * FROM anmeldung"
+            " ORDER BY nachname COLLATE NOCASE, vorname COLLATE NOCASE"
+        ).fetchall()
+    finally:
+        con.close()
+
+
+def badge_ausgeben(anmeldung_id: int, kuerzel: str = "") -> bool:
+    """Badge uebergeben. Der Ausgangsstatus steckt in der Bedingung, damit
+    zwei gleichzeitige Klicks sich nicht ueberholen."""
+    with transaktion() as con:
+        return con.execute(
+            "UPDATE anmeldung SET status = 'ausgegeben', badge_am = ?,"
+            " badge_durch = ? WHERE id = ? AND status = 'neu'",
+            (jetzt(), kuerzel or None, anmeldung_id),
+        ).rowcount > 0
+
+
+def badge_zuruecknehmen(anmeldung_id: int) -> bool:
+    """Versehentlich abgehakt - zurueck auf neu."""
+    with transaktion() as con:
+        return con.execute(
+            "UPDATE anmeldung SET status = 'neu', badge_am = NULL,"
+            " badge_durch = NULL WHERE id = ? AND status = 'ausgegeben'",
+            (anmeldung_id,),
+        ).rowcount > 0
+
+
+def gebuehr_setzen(anmeldung_id: int, bezahlt: bool) -> bool:
+    """Haekchen 'Gebuehr bezahlt'. Nur sinnvoll, wo die Gebuehr gewaehlt wurde -
+    die Bedingung steht deshalb im UPDATE."""
+    with transaktion() as con:
+        return con.execute(
+            "UPDATE anmeldung SET gebuehr_bezahlt_am = ?"
+            " WHERE id = ? AND gegenleistung = 'gebuehr'",
+            (jetzt() if bezahlt else None, anmeldung_id),
+        ).rowcount > 0
+
+
+def bilder_setzen(anmeldung_id: int, erhalten: bool) -> bool:
+    with transaktion() as con:
+        return con.execute(
+            "UPDATE anmeldung SET bilder_erhalten_am = ?"
+            " WHERE id = ? AND gegenleistung = 'bilderspende'",
+            (jetzt() if erhalten else None, anmeldung_id),
+        ).rowcount > 0

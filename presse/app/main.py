@@ -183,3 +183,313 @@ async def danke(request: Request, nr: str = "", art: str = ""):
     return templates.TemplateResponse(
         "danke.html", _kontext(request, nummer=nummer, gegenleistung=gegenleistung)
     )
+
+
+# --- Anmeldung --------------------------------------------------------------
+
+
+@app.exception_handler(auth.NichtAngemeldet)
+async def _nicht_angemeldet(request: Request, ausnahme):
+    return RedirectResponse(
+        "/admin/login?weiter=" + quote(ausnahme.ziel), status_code=303
+    )
+
+
+@app.exception_handler(auth.NichtEingerichtet)
+async def _nicht_eingerichtet(request: Request, ausnahme):
+    return templates.TemplateResponse(
+        "admin_nicht_eingerichtet.html", _kontext(request), status_code=503
+    )
+
+
+def _weiter_pfad(roh: str) -> str:
+    """Nur eigene Backoffice-Pfade zulassen – sonst wäre das eine offene
+    Weiterleitung."""
+    if roh.startswith("/admin") and not roh.startswith("//") and "\\" not in roh:
+        return roh
+    return "/admin"
+
+
+@app.get("/admin/login")
+async def login_formular(request: Request, weiter: str = "/admin"):
+    if not auth.eingerichtet():
+        raise auth.NichtEingerichtet()
+    if auth.sitzung_lesen(request) is not None:
+        return RedirectResponse(_weiter_pfad(weiter), status_code=303)
+    return templates.TemplateResponse(
+        "admin_login.html",
+        _kontext(request, fehler="", weiter=_weiter_pfad(weiter),
+                 kuerzel_abfragen=config.KUERZEL_ABFRAGEN, kuerzel=""),
+    )
+
+
+@app.post("/admin/login")
+async def login_absenden(request: Request):
+    if not auth.eingerichtet():
+        raise auth.NichtEingerichtet()
+
+    daten = await request.form()
+    weiter = _weiter_pfad(str(daten.get("weiter") or "/admin"))
+    kuerzel = str(daten.get("kuerzel") or "").strip()[:20]
+    ip = _remote_ip(request, immer=True) or "unbekannt"
+
+    def abweisen(meldung, code=401):
+        return templates.TemplateResponse(
+            "admin_login.html",
+            _kontext(request, fehler=meldung, weiter=weiter,
+                     kuerzel_abfragen=config.KUERZEL_ABFRAGEN, kuerzel=kuerzel),
+            status_code=code,
+        )
+
+    if auth.login_gesperrt(ip):
+        return abweisen("Zu viele Fehlversuche. Bitte eine Minute warten.", 429)
+
+    if not auth.passwort_pruefen(str(daten.get("passwort") or "")):
+        auth.login_fehlversuch(ip)
+        return abweisen("Passwort stimmt nicht.")
+
+    auth.login_zuruecksetzen(ip)
+    antwort = RedirectResponse(weiter, status_code=303)
+    auth.cookie_setzen(antwort, request, auth.token_erzeugen(kuerzel))
+    return antwort
+
+
+@app.post("/admin/logout")
+async def logout(request: Request):
+    sitzung = auth.sitzung_lesen(request)
+    daten = await request.form()
+    if sitzung is not None and not auth.csrf_pruefen(
+        sitzung, str(daten.get("csrf") or "")
+    ):
+        raise auth.NichtAngemeldet("/admin")
+    antwort = RedirectResponse("/admin/login", status_code=303)
+    auth.cookie_loeschen(antwort)
+    return antwort
+
+
+# --- Backoffice -------------------------------------------------------------
+
+MELDUNGEN = {
+    "gespeichert": "Änderungen gespeichert.",
+    "geloescht": "Anmeldung gelöscht.",
+    "badge": "Badge als ausgegeben vermerkt.",
+    "badge_zurueck": "Badge-Häkchen zurückgenommen.",
+    "gebuehr": "Gebühr als bezahlt vermerkt.",
+    "gebuehr_zurueck": "Gebühren-Häkchen zurückgenommen.",
+    "nichts": "Nichts geändert – der Zustand passte nicht zu dieser Aktion.",
+}
+
+
+def _meldung(schluessel: str) -> str:
+    return MELDUNGEN.get(schluessel, "")
+
+
+def _admin_kontext(request: Request, sitzung, **extra) -> dict:
+    return _kontext(
+        request,
+        sitzung=sitzung,
+        csrf=auth.csrf_token(sitzung.token),
+        status_werte=db.STATUS_WERTE,
+        **extra,
+    )
+
+
+def _csrf_fehler(request: Request, sitzung):
+    return templates.TemplateResponse(
+        "admin_fehlt.html",
+        _admin_kontext(request, sitzung, meldung="Ungültiges Formular-Token."),
+        status_code=400,
+    )
+
+
+def _nicht_gefunden(request: Request, sitzung):
+    return templates.TemplateResponse(
+        "admin_fehlt.html",
+        _admin_kontext(
+            request, sitzung, meldung="Diese Anmeldung gibt es nicht (mehr)."
+        ),
+        status_code=404,
+    )
+
+
+@app.get("/admin")
+async def admin_liste(
+    request: Request,
+    status: str = "",
+    gegenleistung: str = "",
+    suche: str = "",
+    sortierung: str = "neueste",
+    hinweis: str = "",
+    sitzung=Depends(auth.sitzung_erforderlich),
+):
+    status = status if status in db.STATUS_WERTE else ""
+    if gegenleistung not in ("gebuehr", "bilderspende", "keine"):
+        gegenleistung = ""
+    sortierung = sortierung if sortierung in db.SORTIERUNGEN else "neueste"
+    suche = suche.strip()[:100]
+
+    return templates.TemplateResponse(
+        "admin_liste.html",
+        _admin_kontext(
+            request,
+            sitzung,
+            anmeldungen=db.anmeldungen_suchen(status, gegenleistung, suche, sortierung),
+            zaehler=db.zaehler(),
+            mails_aufgegeben=db.mails_aufgegeben(),
+            hinweis=_meldung(hinweis),
+            filter_status=status,
+            filter_gegenleistung=gegenleistung,
+            filter_suche=suche,
+            sortierung=sortierung,
+        ),
+    )
+
+
+def _detail_seite(request, sitzung, anmeldung, werte=None, fehler=None, hinweis="",
+                  status_code=200):
+    if werte is None:
+        werte = {feld: (anmeldung[feld] or "") for feld in db.BEARBEITBAR}
+        werte["kommerziell"] = bool(anmeldung["kommerziell"])
+    return templates.TemplateResponse(
+        "admin_detail.html",
+        _admin_kontext(
+            request,
+            sitzung,
+            anmeldung=anmeldung,
+            werte=werte,
+            fehler=fehler or {},
+            hinweis=hinweis,
+            mails=db.mails_zu_anmeldung(anmeldung["id"]),
+        ),
+        status_code=status_code,
+    )
+
+
+@app.get("/admin/anmeldung/{anmeldung_id}")
+async def admin_detail(
+    request: Request,
+    anmeldung_id: int,
+    hinweis: str = "",
+    sitzung=Depends(auth.sitzung_erforderlich),
+):
+    anmeldung = db.anmeldung_laden(anmeldung_id)
+    if anmeldung is None:
+        return _nicht_gefunden(request, sitzung)
+    return _detail_seite(request, sitzung, anmeldung, hinweis=_meldung(hinweis))
+
+
+@app.post("/admin/anmeldung/{anmeldung_id}/speichern")
+async def admin_speichern(
+    request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
+):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return _csrf_fehler(request, sitzung)
+
+    anmeldung = db.anmeldung_laden(anmeldung_id)
+    if anmeldung is None:
+        return _nicht_gefunden(request, sitzung)
+
+    # Im Backoffice wird korrigiert, nicht neu zugestimmt: die beiden Häkchen
+    # sind hier keine Pflicht, ihre Zeitstempel bleiben unangetastet.
+    werte, fehler = validation.pruefen_backoffice(daten)
+    if fehler:
+        return _detail_seite(
+            request, sitzung, anmeldung, werte=werte, fehler=fehler, status_code=422
+        )
+
+    db.anmeldung_aktualisieren(anmeldung_id, werte)
+    return RedirectResponse(
+        f"/admin/anmeldung/{anmeldung_id}?hinweis=gespeichert", status_code=303
+    )
+
+
+@app.post("/admin/anmeldung/{anmeldung_id}/loeschen")
+async def admin_loeschen(
+    request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
+):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return _csrf_fehler(request, sitzung)
+    db.anmeldung_loeschen(anmeldung_id)
+    return RedirectResponse("/admin?hinweis=geloescht", status_code=303)
+
+
+# --- Abholliste am Orga-Büro ------------------------------------------------
+
+
+@app.get("/admin/abholung")
+async def admin_abholung(
+    request: Request, hinweis: str = "", sitzung=Depends(auth.sitzung_erforderlich)
+):
+    """Der Schalter: Namen suchen, Badge aushändigen, Häkchen setzen.
+
+    Die vollständige Liste geht in die Seite, gesucht wird im Browser – am
+    Schalter soll das Tippen sofort etwas zeigen und nicht auf den Server
+    warten. Die Häkchen ändern Serverzustand und laden neu; das ist in Ordnung,
+    weil pro Besucher ohnehin einmal gesucht wird.
+    """
+    zeilen = [
+        {
+            "id": a["id"],
+            "vorname": a["vorname"],
+            "nachname": a["nachname"],
+            "firma": a["firma"],
+            "gegenleistung": a["gegenleistung"] or "",
+            "status": a["status"],
+            "badge_am": a["badge_am"],
+            "badge_durch": a["badge_durch"] or "",
+            "gebuehr_bezahlt_am": a["gebuehr_bezahlt_am"],
+            # Vorgekaut fürs Filtern im Browser.
+            "suchtext": f"{a['vorname']} {a['nachname']} {a['firma']}".lower(),
+        }
+        for a in db.anmeldungen_abholung()
+    ]
+
+    return templates.TemplateResponse(
+        "admin_abholung.html",
+        _admin_kontext(request, sitzung, zeilen=zeilen, hinweis=_meldung(hinweis)),
+    )
+
+
+def _zurueck(daten, vorgabe: str = "/admin/abholung") -> str:
+    ziel = _weiter_pfad(str(daten.get("zurueck") or vorgabe))
+    return ziel + ("&" if "?" in ziel else "?")
+
+
+@app.post("/admin/anmeldung/{anmeldung_id}/badge")
+async def admin_badge(
+    request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
+):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return _csrf_fehler(request, sitzung)
+
+    if db.anmeldung_laden(anmeldung_id) is None:
+        return _nicht_gefunden(request, sitzung)
+
+    if str(daten.get("ausgeben") or "1") == "1":
+        # Das Kürzel kommt aus der Sitzung – wer angemeldet ist, gibt aus.
+        hinweis = "badge" if db.badge_ausgeben(anmeldung_id, sitzung.kuerzel) else "nichts"
+    else:
+        hinweis = "badge_zurueck" if db.badge_zuruecknehmen(anmeldung_id) else "nichts"
+
+    return RedirectResponse(_zurueck(daten) + "hinweis=" + hinweis, status_code=303)
+
+
+@app.post("/admin/anmeldung/{anmeldung_id}/gebuehr")
+async def admin_gebuehr(
+    request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
+):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return _csrf_fehler(request, sitzung)
+
+    if db.anmeldung_laden(anmeldung_id) is None:
+        return _nicht_gefunden(request, sitzung)
+
+    bezahlt = str(daten.get("bezahlt") or "1") == "1"
+    erledigt = db.gebuehr_setzen(anmeldung_id, bezahlt)
+    hinweis = ("gebuehr" if bezahlt else "gebuehr_zurueck") if erledigt else "nichts"
+
+    return RedirectResponse(_zurueck(daten) + "hinweis=" + hinweis, status_code=303)

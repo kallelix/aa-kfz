@@ -1,0 +1,212 @@
+{% extends "admin_base.html" %}
+{% block titel %}Anmeldung {{ anmeldung.id }}{% endblock %}
+{% block ueberschrift %}Anmeldung {{ anmeldung.id }}{% endblock %}
+
+{% macro fehlermeldung(feld) %}
+  {% if fehler.get(feld) %}<p class="fehler" id="fehler-{{ feld }}">{{ fehler[feld] }}</p>{% endif %}
+{% endmacro %}
+
+{% block inhalt %}
+  <p class="zurueck-zeile"><a href="/admin">← zurück zur Liste</a></p>
+
+  {% if hinweis %}
+    <p class="hinweis hinweis-ok" role="status">{{ hinweis }}</p>
+  {% endif %}
+
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">
+      Bitte die markierten Felder prüfen – nichts wurde gespeichert.
+    </p>
+  {% endif %}
+
+  <p class="status-zeile">
+    <span class="marke marke-{{ 'genehmigt' if anmeldung.status == 'ausgegeben' else 'neu' }}">
+      {{ 'Badge ausgegeben' if anmeldung.status == 'ausgegeben' else 'Badge offen' }}
+    </span>
+    {% if anmeldung.gegenleistung == 'gebuehr' %}
+      <span class="marke marke-{{ 'genehmigt' if anmeldung.gebuehr_bezahlt_am else 'abgelehnt' }}">
+        {{ gebuehr }} {{ 'bezahlt' if anmeldung.gebuehr_bezahlt_am else 'offen' }}
+      </span>
+    {% elif anmeldung.gegenleistung == 'bilderspende' %}
+      <span class="marke marke-{{ 'genehmigt' if anmeldung.bilder_erhalten_am else 'neu' }}">
+        Bilder {{ 'erhalten' if anmeldung.bilder_erhalten_am else 'ausstehend' }}
+      </span>
+    {% endif %}
+  </p>
+
+  <h2>Angaben</h2>
+  <p class="hilfe">
+    Korrekturen sind erwünscht: Schreibfehler im Namen, Firma nachtragen,
+    Akkreditierung umbiegen.
+  </p>
+
+  <form method="post" action="/admin/anmeldung/{{ anmeldung.id }}/speichern">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="paar">
+      <div class="feld{% if fehler.get('vorname') %} feld-fehler{% endif %}">
+        <label for="vorname">Vorname</label>
+        <input type="text" id="vorname" name="vorname" value="{{ werte.get('vorname', '') }}">
+        {{ fehlermeldung('vorname') }}
+      </div>
+      <div class="feld{% if fehler.get('nachname') %} feld-fehler{% endif %}">
+        <label for="nachname">Name</label>
+        <input type="text" id="nachname" name="nachname" value="{{ werte.get('nachname', '') }}">
+        {{ fehlermeldung('nachname') }}
+      </div>
+    </div>
+
+    <div class="feld{% if fehler.get('firma') %} feld-fehler{% endif %}">
+      <label for="firma">Firma</label>
+      <input type="text" id="firma" name="firma" value="{{ werte.get('firma', '') }}">
+      {{ fehlermeldung('firma') }}
+    </div>
+
+    <div class="paar">
+      <div class="feld{% if fehler.get('email') %} feld-fehler{% endif %}">
+        <label for="email">E-Mail</label>
+        <input type="email" id="email" name="email" value="{{ werte.get('email', '') }}">
+        {{ fehlermeldung('email') }}
+      </div>
+      <div class="feld{% if fehler.get('telefon') %} feld-fehler{% endif %}">
+        <label for="telefon">Telefon</label>
+        <input type="tel" id="telefon" name="telefon" value="{{ werte.get('telefon', '') }}">
+        {{ fehlermeldung('telefon') }}
+      </div>
+    </div>
+
+    <fieldset class="feld{% if fehler.get('kommerziell') %} feld-fehler{% endif %}">
+      <legend>Kommerzielle Verwertung</legend>
+      <label class="auswahl">
+        <input type="radio" name="kommerziell" value="ja"
+               {% if werte.get('kommerziell') %}checked{% endif %}>
+        <span class="auswahl-text"><span class="auswahl-titel">Ja</span></span>
+      </label>
+      <label class="auswahl">
+        <input type="radio" name="kommerziell" value="nein"
+               {% if not werte.get('kommerziell') %}checked{% endif %}>
+        <span class="auswahl-text"><span class="auswahl-titel">Nein</span></span>
+      </label>
+      {{ fehlermeldung('kommerziell') }}
+    </fieldset>
+
+    <fieldset class="feld{% if fehler.get('gegenleistung') %} feld-fehler{% endif %}">
+      <legend>Akkreditierung</legend>
+      <p class="hilfe">Nur bei kommerzieller Verwertung.</p>
+      <label class="auswahl">
+        <input type="radio" name="gegenleistung" value="gebuehr"
+               {% if werte.get('gegenleistung') == 'gebuehr' %}checked{% endif %}>
+        <span class="auswahl-text"><span class="auswahl-titel">{{ gebuehr }} Gebühr</span></span>
+      </label>
+      <label class="auswahl">
+        <input type="radio" name="gegenleistung" value="bilderspende"
+               {% if werte.get('gegenleistung') == 'bilderspende' %}checked{% endif %}>
+        <span class="auswahl-text"><span class="auswahl-titel">Bilderspende</span></span>
+      </label>
+      {{ fehlermeldung('gegenleistung') }}
+    </fieldset>
+
+    <div class="feld{% if fehler.get('bemerkung') %} feld-fehler{% endif %}">
+      <label for="bemerkung">Bemerkung</label>
+      <textarea id="bemerkung" name="bemerkung" rows="3">{{ werte.get('bemerkung', '') }}</textarea>
+      {{ fehlermeldung('bemerkung') }}
+    </div>
+
+    <div class="knopfreihe">
+      <button type="submit">Änderungen speichern</button>
+    </div>
+  </form>
+
+  <h2>Badge und Gebühr</h2>
+  <div class="knopfreihe">
+    <form method="post" action="/admin/anmeldung/{{ anmeldung.id }}/badge">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="zurueck" value="/admin/anmeldung/{{ anmeldung.id }}">
+      {% if anmeldung.status == 'ausgegeben' %}
+        <input type="hidden" name="ausgeben" value="0">
+        <button type="submit" class="knopf-schlicht">Badge doch nicht ausgegeben</button>
+      {% else %}
+        <input type="hidden" name="ausgeben" value="1">
+        <button type="submit">Badge ausgegeben</button>
+      {% endif %}
+    </form>
+
+    {% if anmeldung.gegenleistung == 'gebuehr' %}
+      <form method="post" action="/admin/anmeldung/{{ anmeldung.id }}/gebuehr">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="zurueck" value="/admin/anmeldung/{{ anmeldung.id }}">
+        {% if anmeldung.gebuehr_bezahlt_am %}
+          <input type="hidden" name="bezahlt" value="0">
+          <button type="submit" class="knopf-schlicht">Gebühr doch nicht bezahlt</button>
+        {% else %}
+          <input type="hidden" name="bezahlt" value="1">
+          <button type="submit">Gebühr bezahlt</button>
+        {% endif %}
+      </form>
+    {% endif %}
+  </div>
+
+  <h2>Verlauf</h2>
+  <dl class="daten">
+    <dt>Angemeldet</dt><dd>{{ anmeldung.created_at|zeit }}</dd>
+    <dt>Sicherheitshinweis bestätigt</dt><dd>{{ anmeldung.sicherheit_ok_am|zeit }}</dd>
+    {% if anmeldung.bildrechte_ok_am %}
+      <dt>Bildrechte zugestimmt</dt><dd>{{ anmeldung.bildrechte_ok_am|zeit }}</dd>
+    {% endif %}
+    {% if anmeldung.badge_am %}
+      <dt>Badge ausgegeben</dt>
+      <dd>{{ anmeldung.badge_am|zeit }}{% if anmeldung.badge_durch %} durch {{ anmeldung.badge_durch }}{% endif %}</dd>
+    {% endif %}
+    {% if anmeldung.gebuehr_bezahlt_am %}
+      <dt>Gebühr bezahlt</dt><dd>{{ anmeldung.gebuehr_bezahlt_am|zeit }}</dd>
+    {% endif %}
+    {% if anmeldung.bilder_erhalten_am %}
+      <dt>Bilder erhalten</dt><dd>{{ anmeldung.bilder_erhalten_am|zeit }}</dd>
+    {% endif %}
+    {% if anmeldung.remote_ip %}
+      <dt>IP bei Anmeldung</dt><dd class="gedaempft">{{ anmeldung.remote_ip }}</dd>
+    {% endif %}
+  </dl>
+
+  <p class="hilfe">
+    Die Zeitstempel der beiden Zustimmungen stammen aus dem Formular. Wird hier
+    nachträglich auf Bilderspende umgestellt, trägt die App den Zeitpunkt der
+    Änderung ein – dann hat allerdings die Orga zugestimmt, nicht der
+    Antragsteller.
+  </p>
+
+  <h2>Mails</h2>
+  {% if mails %}
+    <div class="tabelle-huelle">
+      <table>
+        <thead><tr><th>Anlass</th><th>An</th><th>Zustand</th><th>Versuche</th></tr></thead>
+        <tbody>
+          {% for m in mails %}
+            <tr>
+              <td>{{ m.typ }}</td>
+              <td>{{ m.empfaenger }}</td>
+              <td>
+                {% if m.gesendet_am %}
+                  <span class="marke marke-genehmigt">gesendet</span> {{ m.gesendet_am|zeit }}
+                {% else %}
+                  <span class="marke marke-neu">wartet</span>
+                  {% if m.letzter_fehler %}<span class="hilfe">{{ m.letzter_fehler }}</span>{% endif %}
+                {% endif %}
+              </td>
+              <td>{{ m.versuche }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="hilfe">Noch keine Mail erzeugt – der Versand kommt in Schritt 6.</p>
+  {% endif %}
+
+  <form method="post" action="/admin/anmeldung/{{ anmeldung.id }}/loeschen" class="loeschen"
+        onsubmit="return confirm('Anmeldung {{ anmeldung.id }} wirklich endgültig löschen?');">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="knopf-gefahr">Anmeldung löschen</button>
+    <span class="hilfe">Löscht den Datensatz endgültig, ohne Papierkorb.</span>
+  </form>
+{% endblock %}

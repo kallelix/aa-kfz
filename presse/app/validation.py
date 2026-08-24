@@ -103,3 +103,16 @@ def pruefen(formular) -> tuple[dict, dict]:
             fehler[feld] = f"Bitte auf {grenze} Zeichen kürzen."
 
     return werte, fehler
+
+
+def pruefen_backoffice(formular) -> tuple[dict, dict]:
+    """Wie `pruefen`, aber ohne die beiden Zustimmungs-Häkchen.
+
+    Die Orga korrigiert Tippfehler und biegt die Gegenleistung um; zugestimmt
+    hat der Antragsteller beim Absenden, und dieser Zeitstempel bleibt stehen.
+    Ihn hier erneut zu verlangen würde bedeuten, dass die Orga für ihn zustimmt.
+    """
+    werte, fehler = pruefen(formular)
+    fehler.pop("sicherheit", None)
+    fehler.pop("bildrechte", None)
+    return werte, fehler
