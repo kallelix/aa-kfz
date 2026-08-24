@@ -1,0 +1,51 @@
+[Unit]
+Description=Presse-Akkreditierung "Die absolute Abfahrt"
+Documentation=file:/opt/abfahrt/docs/plan-presse-akkreditierung.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=presse
+Group=presse
+
+# Dasselbe Repository wie die Kennzeichen-App, nur ein anderes Unterverzeichnis.
+# Im eigenen Container liegt der Klon trotzdem unter /opt/abfahrt, damit die
+# Pfade in beiden Containern gleich aussehen.
+WorkingDirectory=/opt/abfahrt/presse
+
+EnvironmentFile=/etc/abfahrt/presse.env
+
+# Bind-Adresse, vertraute Proxys und --proxy-headers kommen aus der Umgebung,
+# siehe presse/app/__main__.py.
+ExecStart=/opt/abfahrt/.venv/bin/python -m app
+
+Restart=always
+RestartSec=5
+
+# --- Absicherung ---
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+# AF_UNIX muss mit: unter Ubuntu loest glibc ueber systemd-resolved auf,
+# und das laeuft ueber einen Unix-Socket. Ohne die Familie findet der
+# Mailversand den SMTP-Server nicht.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+
+# Einziger Pfad, in den geschrieben werden darf: die Datenbank.
+ReadWritePaths=/var/lib/presse
+
+[Install]
+WantedBy=multi-user.target

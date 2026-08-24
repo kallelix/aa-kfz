@@ -1,8 +1,13 @@
 # Deployment
 
-Aufbau: die App läuft in einem **LXC-Container** (Debian/Ubuntu), ein
-**nginx auf einem anderen Host** mit öffentlicher IP terminiert HTTPS und leitet
-weiter. Adresse: `kennzeichen.example.de`.
+Zwei Anwendungen aus einem Repository, je ein **LXC-Container**
+(Debian/Ubuntu), davor ein **nginx auf einem anderen Host** mit öffentlicher IP,
+der HTTPS terminiert.
+
+- Abschnitte 1 bis 6: **Kennzeichen-App** unter `kennzeichen.example.de`
+- Abschnitt 7: **Presse-Akkreditierung** unter `presse.example.de`
+
+Der Aufbau ist für beide gleich; Abschnitt 7 nennt nur die Unterschiede.
 
 ```text
 Internet ──HTTPS──▶ nginx (10.0.0.10)  ──HTTP──▶ LXC (10.0.0.42:8080)
@@ -291,3 +296,125 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 | 502 vom nginx | Dienst läuft nicht oder Firewall blockt. `systemctl status kennzeichen`, dann vom nginx-Host `curl http://10.0.0.42:8080/`. |
 | Mails bleiben liegen | `SMTP_HOST`/`MAIL_FROM` fehlen, oder Zugangsdaten stimmen nicht. Der Fehler steht in der Detailansicht des Antrags und im Journal. |
 | 429 beim Absenden | Rate Limit im nginx. Bei geteilten NAT-Adressen `rate=` in der Config hochsetzen. |
+
+---
+
+## 7. Zweite Anwendung: Presse-Akkreditierung
+
+Eigener LXC-Container, eigene Adresse, eigene Datenbank – aber **dasselbe
+Repository**. Der Klon liegt auch dort unter `/opt/abfahrt`, der Dienst läuft
+aus dem Unterverzeichnis `presse/`.
+
+```text
+Internet ──HTTPS──▶ nginx (10.0.0.10) ──┬─▶ LXC kfz    (10.0.0.42:8080)
+                                        └─▶ LXC presse (10.0.0.43:8081)
+```
+
+Ein `git pull` je Container aktualisiert die jeweilige App; der gemeinsame Code
+bleibt automatisch in Sicht. Die Pfade sind absichtlich in beiden Containern
+gleich – nur `WorkingDirectory` unterscheidet sich.
+
+### Im Presse-Container
+
+```bash
+apt update
+apt install -y python3 python3-venv sqlite3 git
+
+adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin presse
+
+mkdir -p /var/lib/presse /etc/abfahrt /var/backups/presse
+chown presse:presse /var/lib/presse /var/backups/presse
+chmod 750 /var/lib/presse /var/backups/presse
+
+git clone https://github.com/kallelix/aa-kfz.git /opt/abfahrt
+cd /opt/abfahrt
+python3 -m venv .venv
+.venv/bin/pip install --no-cache-dir -r requirements.txt
+```
+
+`/opt/abfahrt` bleibt **root:root** – der Dienst liest seinen Code nur. Siehe
+Abschnitt 1, die Begründung gilt hier genauso.
+
+Die `requirements.txt` im Wurzelverzeichnis deckt beide Anwendungen ab; `segno`
+braucht nur die Kennzeichen-App und stört hier nicht.
+
+### Konfiguration
+
+```bash
+install -o root -g root -m 600 deploy/presse.env.example /etc/abfahrt/presse.env
+
+cd /opt/abfahrt/presse
+/opt/abfahrt/.venv/bin/python -m app.passwort
+/opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
+
+editor /etc/abfahrt/presse.env
+```
+
+Mindestens setzen: `BIND`, `FORWARDED_ALLOW_IPS`, `ADMIN_PASSWORD_HASH`,
+`APP_SECRET_KEY`, `SMTP_PASS`, `KONTAKT_MAIL`.
+
+**Eigenes Passwort.** Beide Anwendungen haben getrennte Anmeldungen – eigene
+Adresse heißt eigene Cookie-Domain, ein gemeinsames Passwort brächte also
+nichts als ein zweites Geheimnis mit demselben Wert.
+
+### Dienst
+
+```bash
+install -m 644 deploy/presse.service /etc/systemd/system/presse.service
+systemctl daemon-reload
+systemctl enable --now presse
+systemctl status presse
+journalctl -u presse -f
+```
+
+### Firewall
+
+Wie in Abschnitt 1, nur mit dem anderen Port:
+
+```bash
+ufw default deny incoming
+ufw allow from 10.0.0.10 to any port 8081 proto tcp
+ufw allow from 10.0.0.0/24 to any port 22 proto tcp
+ufw enable
+```
+
+### Auf dem nginx-Host
+
+```bash
+install -m 644 deploy/presse-proxy.conf /etc/nginx/snippets/presse-proxy.conf
+install -m 644 deploy/nginx-presse.conf /etc/nginx/sites-available/presse.example.de
+ln -s ../sites-available/presse.example.de /etc/nginx/sites-enabled/
+
+# Adresse und Container-IP in der Datei anpassen, dann:
+nginx -t
+certbot --nginx -d presse.example.de
+systemctl reload nginx
+```
+
+Die Rate-Limit-Zonen und der `map`-Block heißen **anders** als in
+`nginx-kennzeichen.conf`. Gleiche Namen zweimal zu definieren ist ein
+Konfigurationsfehler, und `nginx -t` sagt das erst beim Einbinden.
+
+### Sicherung
+
+`backup.sh` ist nicht auf eine Datenbank festgelegt – Pfade kommen aus der
+Umgebung. Im Presse-Container:
+
+```bash
+crontab -u presse -e
+```
+
+```cron
+15 3 * * * DB_PATH=/var/lib/presse/presse.db BACKUP_DIR=/var/backups/presse /opt/abfahrt/deploy/backup.sh >> /var/log/presse-backup.log 2>&1
+```
+
+### Prüfliste
+
+Wie in Abschnitt 4, zusätzlich:
+
+- [ ] Anmeldung absenden, Bestätigungsmail kommt an – einmal je Variante
+      (Gebühr, Bilderspende, nicht kommerziell)
+- [ ] Die Mail nennt den richtigen Betrag und den richtigen Abholort
+- [ ] Abholliste: Suche filtert beim Tippen, Badge- und Gebühren-Häkchen wirken
+- [ ] `BILDER_ABGABE` gesetzt – sonst nennt die Erinnerungsmail keinen Weg
+- [ ] `BADGES_GESAMT` auf die Zahl der vorproduzierten Badges gesetzt

@@ -7,6 +7,8 @@ macht der Reverse Proxy davor; gestartet wird mit `python -m app`.
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -14,7 +16,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -595,4 +597,94 @@ async def admin_erinnerungen(
 
     return RedirectResponse(
         "/admin/bilder?hinweis=sammel&anzahl=" + str(verschickt), status_code=303
+    )
+
+
+# --- CSV-Export -------------------------------------------------------------
+
+# Spalte -> Überschrift. `remote_ip` fehlt hier bewusst: die IP steht nur für
+# Missbrauchsfälle in der Datenbank und hat in einer Datei, die per Mail
+# herumgereicht wird, nichts verloren.
+CSV_SPALTEN = (
+    ("id", "Nr."),
+    ("created_at", "Angemeldet"),
+    ("status", "Status"),
+    ("vorname", "Vorname"),
+    ("nachname", "Name"),
+    ("firma", "Firma"),
+    ("email", "E-Mail"),
+    ("telefon", "Telefon"),
+    ("kommerziell_text", "Kommerziell"),
+    ("akkreditierung", "Akkreditierung"),
+    ("gebuehr_bezahlt_am", "Gebühr bezahlt am"),
+    ("bilder_erhalten_am", "Bilder erhalten am"),
+    ("erinnerung_am", "Zuletzt erinnert am"),
+    ("badge_am", "Badge ausgegeben am"),
+    ("badge_durch", "Badge ausgegeben durch"),
+    ("sicherheit_ok_am", "Sicherheitshinweis bestätigt am"),
+    ("bildrechte_ok_am", "Bildrechte zugestimmt am"),
+    ("bemerkung", "Bemerkung"),
+)
+
+_CSV_ZEITSPALTEN = (
+    "created_at", "gebuehr_bezahlt_am", "bilder_erhalten_am", "erinnerung_am",
+    "badge_am", "sicherheit_ok_am", "bildrechte_ok_am",
+)
+
+_AKKREDITIERUNG = {
+    "gebuehr": lambda: config.gebuehr() + " Gebühr",
+    "bilderspende": lambda: f"Bilderspende (ca. {config.BILDER_ANZAHL} Bilder)",
+}
+
+
+def _csv_zeile(anmeldung) -> list:
+    berechnet = {
+        "kommerziell_text": "ja" if anmeldung["kommerziell"] else "nein",
+        "akkreditierung": _AKKREDITIERUNG.get(
+            anmeldung["gegenleistung"], lambda: "keine"
+        )(),
+    }
+    werte = []
+    for spalte, _ in CSV_SPALTEN:
+        if spalte in berechnet:
+            werte.append(berechnet[spalte])
+        elif spalte in _CSV_ZEITSPALTEN:
+            werte.append(_lokal(anmeldung[spalte]))
+        else:
+            werte.append(anmeldung[spalte] if anmeldung[spalte] is not None else "")
+    return werte
+
+
+@app.get("/admin/export.csv")
+async def admin_export(
+    request: Request,
+    status: str = "",
+    gegenleistung: str = "",
+    suche: str = "",
+    sortierung: str = "neueste",
+    sitzung=Depends(auth.sitzung_erforderlich),
+):
+    """Dieselbe Auswahl wie in der Liste, nur als Datei."""
+    status = status if status in db.STATUS_WERTE else ""
+    if gegenleistung not in ("gebuehr", "bilderspende", "keine"):
+        gegenleistung = ""
+    sortierung = sortierung if sortierung in db.SORTIERUNGEN else "neueste"
+    suche = suche.strip()[:100]
+
+    puffer = io.StringIO(newline="")
+    schreiber = csv.writer(
+        puffer, delimiter=config.CSV_TRENNER, quoting=csv.QUOTE_MINIMAL,
+        lineterminator="\r\n",
+    )
+    schreiber.writerow([ueberschrift for _, ueberschrift in CSV_SPALTEN])
+    for anmeldung in db.anmeldungen_suchen(status, gegenleistung, suche, sortierung):
+        schreiber.writerow(_csv_zeile(anmeldung))
+
+    # BOM voran, sonst zeigt Excel unter Windows Umlaute als Buchstabensalat.
+    inhalt = ("﻿" + puffer.getvalue()).encode("utf-8")
+    dateiname = "presse-" + datetime.now().strftime("%Y-%m-%d") + ".csv"
+    return Response(
+        content=inhalt,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{dateiname}"'},
     )

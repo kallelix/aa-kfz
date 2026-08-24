@@ -88,8 +88,13 @@
     </div>
   </form>
 
+  {% set filterteil = 'status=' ~ filter_status|urlencode ~ '&gegenleistung=' ~ filter_gegenleistung|urlencode ~ '&suche=' ~ filter_suche|urlencode ~ '&sortierung=' ~ sortierung|urlencode %}
+
   <p class="trefferzahl">
     {{ anmeldungen|length }} Anmeldung{{ 'en' if anmeldungen|length != 1 }} angezeigt.
+    {% if anmeldungen %}
+      <a href="/admin/export.csv?{{ filterteil }}">Diese Auswahl als CSV</a>
+    {% endif %}
   </p>
 
   {% if anmeldungen %}

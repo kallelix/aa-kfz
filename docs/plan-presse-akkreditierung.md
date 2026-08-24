@@ -294,8 +294,8 @@ wird.
 | 5 | Abholliste mit Badge- und Gebühren-Häkchen | fertig |
 | 6 | Mail-Queue, Bestätigungsmail in drei Varianten | fertig |
 | 7 | Ansicht „Bilder ausstehend" samt Erinnerungsmail | fertig |
-| 8 | CSV-Export | offen |
-| 9 | Deployment: zweite Unit, zweiter nginx-Block, zweites Backup | offen |
+| 8 | CSV-Export | fertig |
+| 9 | Deployment: zweite Unit, zweiter nginx-Block, zweites Backup | fertig |
 | 10 | Später: Kern ziehen, `kfz/` umziehen | offen |
 
 ---
