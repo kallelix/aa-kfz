@@ -110,3 +110,50 @@ CREATE TABLE IF NOT EXISTS einstellung (
     wert          TEXT NOT NULL DEFAULT '',
     geaendert_am  TEXT NOT NULL
 );
+
+-- Das Programm der Rennserien, abgerufen von deren Websites.
+--
+-- Fachlicher Schlüssel ist (serie, datum, titel). beginn und ende dürfen NULL
+-- sein: "ab 13.30 Uhr" hat kein Ende, "anschließend" nicht einmal einen
+-- Anfang. Das steht so auf den Seiten und wird nicht erfunden.
+CREATE TABLE IF NOT EXISTS programm (
+    id            INTEGER PRIMARY KEY,
+    serie         TEXT NOT NULL,
+    titel         TEXT NOT NULL,
+    datum         TEXT NOT NULL,
+    beginn        TEXT,
+    ende          TEXT,
+
+    -- Was in der Tabelle stand, im Wortlaut. Macht nachvollziehbar, warum
+    -- etwas als geändert gilt, und trägt die Fälle ohne Uhrzeit.
+    tag_roh       TEXT NOT NULL DEFAULT '',
+    zeit_roh      TEXT NOT NULL DEFAULT '',
+
+    -- Von Hand geändert: der nächste Abruf meldet Abweichungen, überschreibt
+    -- aber nicht. Die Orga gewinnt gegen die fremde Website.
+    von_hand      INTEGER NOT NULL DEFAULT 0 CHECK (von_hand IN (0, 1)),
+
+    -- Steht nicht mehr auf der Website. Bleibt stehen und wird angezeigt,
+    -- statt still zu verschwinden.
+    entfallen_am  TEXT,
+
+    angelegt_am   TEXT NOT NULL,
+    geaendert_am  TEXT,
+
+    CHECK (ende IS NULL OR beginn IS NULL OR ende > beginn),
+    UNIQUE (serie, datum, titel)
+);
+
+CREATE INDEX IF NOT EXISTS idx_programm_zeit ON programm (beginn, ende);
+
+-- Jeder Abrufversuch, erfolgreich oder nicht. Das Backoffice zeigt daraus,
+-- wann zuletzt etwas geklappt hat.
+CREATE TABLE IF NOT EXISTS abruf_lauf (
+    id            INTEGER PRIMARY KEY,
+    serie         TEXT NOT NULL,
+    erfolg        INTEGER NOT NULL DEFAULT 0 CHECK (erfolg IN (0, 1)),
+    meldung       TEXT NOT NULL DEFAULT '',
+    bericht       TEXT NOT NULL DEFAULT '',
+    ausloeser     TEXT NOT NULL DEFAULT '',
+    gelaufen_am   TEXT NOT NULL
+);

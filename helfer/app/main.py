@@ -10,6 +10,7 @@ macht der Reverse Proxy davor; gestartet wird mit `python -m app`.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -21,7 +22,7 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import auth, config, csv_import, db
+from . import auth, config, csv_import, db, worker, zeitplan
 
 BASIS = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASIS / "templates"))
@@ -73,10 +74,21 @@ def _spanne(zeile):
     return _uhr(beginn) + "–" + _uhr(ende) + " (+1)"
 
 
+def _programmzeit(zeile):
+    """Die Zeitangabe eines Programmpunkts. Offene Enden bleiben offen, und
+    was gar keine Uhrzeit hat, zeigt seinen Wortlaut ('anschließend')."""
+    if not zeile["beginn"]:
+        return zeile["zeit_roh"] or "ohne Zeit"
+    if not zeile["ende"]:
+        return "ab " + _uhr(zeile["beginn"])
+    return _uhr(zeile["beginn"]) + "–" + _uhr(zeile["ende"])
+
+
 templates.env.filters["zeitpunkt"] = _zeitpunkt
 templates.env.filters["uhr"] = _uhr
 templates.env.filters["tag"] = _tag
 templates.env.filters["spanne"] = _spanne
+templates.env.filters["programmzeit"] = _programmzeit
 
 
 # --- Start -----------------------------------------------------------------
@@ -112,7 +124,25 @@ async def lifespan(app: FastAPI):
                 "FORWARDED_ALLOW_IPS steht auf %s, der Proxy sitzt aber "
                 "offenbar woanders.", config.FORWARDED_ALLOW_IPS,
             )
-    yield
+
+    stop = asyncio.Event()
+    aufgabe = None
+    if config.serien() and 0 <= config.ZEITPLAN_STUNDE <= 23:
+        aufgabe = asyncio.create_task(worker.schleife(stop))
+    else:
+        protokoll.info(
+            "Kein automatischer Zeitplan-Abruf - im Backoffice geht er von Hand."
+        )
+
+    try:
+        yield
+    finally:
+        stop.set()
+        if aufgabe is not None:
+            try:
+                await asyncio.wait_for(aufgabe, timeout=5)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                aufgabe.cancel()
 
 
 app = FastAPI(
@@ -356,6 +386,45 @@ async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
         "admin_helfer_detail.html",
         _admin(request, sitzung, hinweis=hinweis, person=person,
                schichten=db.helfer_schichten(helfer_id)))
+
+
+# --- Zeitplan der Rennserien -----------------------------------------------
+
+def _zeitplan_seite(request: Request, sitzung, berichte=None, code: int = 200):
+    serien = []
+    for eintrag in config.serien():
+        letzter = db.letzter_erfolg(eintrag["schluessel"])
+        serien.append({
+            **eintrag,
+            "eintraege": db.programm(serie=eintrag["schluessel"]),
+            "letzter_erfolg": letzter["gelaufen_am"] if letzter else "",
+        })
+    return templates.TemplateResponse(
+        "admin_zeitplan.html",
+        _admin(request, sitzung, hinweis="", serien=serien, berichte=berichte,
+               abrufe=db.abrufe(8), stunde=config.ZEITPLAN_STUNDE,
+               tage=config.TAGE), status_code=code)
+
+
+@app.get("/admin/zeitplan")
+async def zeitplan_ansicht(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    return _zeitplan_seite(request, sitzung)
+
+
+@app.post("/admin/zeitplan/abrufen")
+async def zeitplan_abrufen(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    # urllib blockiert; im Thread bleibt die Anwendung derweil ansprechbar.
+    berichte = await asyncio.to_thread(
+        zeitplan.alle_abrufen, sitzung.kuerzel or "von Hand")
+    return _zeitplan_seite(request, sitzung, berichte=berichte)
 
 
 # --- Import ----------------------------------------------------------------

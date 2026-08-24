@@ -111,6 +111,66 @@ def tag_zu_datum(wochentag: str) -> date | None:
     return treffer[0] if len(treffer) == 1 else None
 
 
+# --- Zeitplan der Rennserien -----------------------------------------------
+
+# Welche Serien abgerufen werden. Je Schlüssel gibt es drei weitere Variablen,
+# siehe unten. Leer heißt: kein Abruf.
+ZEITPLAN_SERIEN = [t.strip() for t in
+                   os.environ.get("ZEITPLAN_SERIEN", "dhc,kids").split(",")
+                   if t.strip()]
+
+# Voreinstellungen für die beiden Serien, die 2026 in Ilmenau fahren. Alles
+# davon lässt sich per Env überschreiben, ohne den Code anzufassen.
+_ZEITPLAN_VORGABEN = {
+    "dhc": {
+        "titel": "iXS Downhill Cup",
+        "url": "https://www.ixsdownhillcup.com/zeitplan/dhc-zeitplan",
+        # Auf der Seite stehen zwei Tabellen: "allgemein" und "Willingen".
+        # Ilmenau braucht die allgemeine.
+        "abschnitt": "allgemein",
+        "farbe": "#95bf0b",
+    },
+    "kids": {
+        "titel": "iXS Kids Cup",
+        "url": "https://www.kidscup.bike/zeitplan",
+        "abschnitt": "allgemein",
+        "farbe": "#4e690f",
+    },
+}
+
+
+def serien() -> list[dict]:
+    ergebnis = []
+    for schluessel in ZEITPLAN_SERIEN:
+        vorgabe = _ZEITPLAN_VORGABEN.get(schluessel, {})
+        praefix = "ZEITPLAN_" + schluessel.upper() + "_"
+        eintrag = {
+            "schluessel": schluessel,
+            "titel": os.environ.get(praefix + "TITEL",
+                                    vorgabe.get("titel", schluessel)),
+            "url": os.environ.get(praefix + "URL", vorgabe.get("url", "")).strip(),
+            "abschnitt": os.environ.get(praefix + "ABSCHNITT",
+                                        vorgabe.get("abschnitt", "allgemein")),
+            "farbe": os.environ.get(praefix + "FARBE",
+                                    vorgabe.get("farbe", "#95bf0b")),
+        }
+        if eintrag["url"]:
+            ergebnis.append(eintrag)
+    return ergebnis
+
+
+def serie(schluessel: str) -> dict | None:
+    for eintrag in serien():
+        if eintrag["schluessel"] == schluessel:
+            return eintrag
+    return None
+
+
+# Täglicher Abruf zu dieser vollen Stunde (0–23). Leer oder -1 schaltet ihn
+# ab; von Hand geht er im Backoffice immer.
+ZEITPLAN_STUNDE = _zahl("ZEITPLAN_STUNDE", 4)
+
+
 # --- Monitor ---------------------------------------------------------------
 
 # Wie oft die Monitoransicht neu lädt (Sekunden).

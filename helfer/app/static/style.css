@@ -705,3 +705,10 @@ tr.hat-luecke td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
 .hochladen input[type="file"], .einteilen select { width: 100%; }
 
 .leer { color: var(--gedaempft); font-style: italic; }
+
+/* Zeitplan: was von der Website verschwunden ist, bleibt sichtbar, tritt
+   aber zurueck. */
+tr.entfallen td { opacity: .55; text-decoration: line-through; }
+tr.entfallen td:last-child { text-decoration: none; }
+
+.hinweisliste-warnung li { color: #8a6100; }

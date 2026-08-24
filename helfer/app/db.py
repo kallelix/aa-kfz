@@ -427,6 +427,76 @@ def zaehler() -> dict:
         con.close()
 
 
+# --- Programm der Rennserien -----------------------------------------------
+
+def programm(serie: str = "", tag: str = "",
+             mit_entfallenen: bool = True) -> list[sqlite3.Row]:
+    bedingungen, werte = [], []
+    if serie:
+        bedingungen.append("serie = ?")
+        werte.append(serie)
+    if tag:
+        bedingungen.append("datum = ?")
+        werte.append(tag)
+    if not mit_entfallenen:
+        bedingungen.append("entfallen_am IS NULL")
+    wo = (" WHERE " + " AND ".join(bedingungen)) if bedingungen else ""
+
+    con = verbinden()
+    try:
+        # Einträge ohne Uhrzeit ("anschließend") ganz nach hinten, sonst
+        # stünden sie wegen NULL am Anfang des Tages.
+        return con.execute(
+            "SELECT * FROM programm" + wo +
+            " ORDER BY datum, beginn IS NULL, beginn, titel COLLATE NOCASE",
+            werte).fetchall()
+    finally:
+        con.close()
+
+
+def programm_eintrag(programm_id: int) -> sqlite3.Row | None:
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM programm WHERE id = ?",
+                           (programm_id,)).fetchone()
+    finally:
+        con.close()
+
+
+def abruf_vermerken(serie: str, erfolg: bool, meldung: str = "",
+                    bericht: str = "", ausloeser: str = "") -> None:
+    con = verbinden()
+    try:
+        with con:
+            con.execute(
+                "INSERT INTO abruf_lauf (serie, erfolg, meldung, bericht,"
+                " ausloeser, gelaufen_am) VALUES (?, ?, ?, ?, ?, ?)",
+                (serie, 1 if erfolg else 0, meldung, bericht, ausloeser,
+                 jetzt()))
+    finally:
+        con.close()
+
+
+def abrufe(grenze: int = 20) -> list[sqlite3.Row]:
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT * FROM abruf_lauf ORDER BY id DESC LIMIT ?",
+            (grenze,)).fetchall()
+    finally:
+        con.close()
+
+
+def letzter_erfolg(serie: str) -> sqlite3.Row | None:
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT * FROM abruf_lauf WHERE serie = ? AND erfolg = 1"
+            " ORDER BY id DESC LIMIT 1", (serie,)).fetchone()
+    finally:
+        con.close()
+
+
 def import_vermerken(art: str, datei: str, zeilen: int, bericht: str,
                      kuerzel: str = "") -> None:
     con = verbinden()

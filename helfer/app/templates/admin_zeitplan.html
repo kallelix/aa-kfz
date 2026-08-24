@@ -1,0 +1,139 @@
+{% extends "admin_base.html" %}
+{% block titel %}Zeitplan{% endblock %}
+{% block ueberschrift %}Zeitplan der Rennserien{% endblock %}
+
+{% block inhalt %}
+  <section class="kasten">
+    <p>Der Zeitplan wird von den Websites der Serien geholt – er wird nicht
+      hier gepflegt. Automatisch einmal täglich
+      {% if stunde >= 0 and stunde <= 23 %}gegen {{ '%02d' % stunde }}:00 Uhr{% endif %},
+      und hier jederzeit von Hand.</p>
+    <p class="hilfe">Schlägt ein Abruf fehl, bleibt der letzte erfolgreiche
+      Stand unverändert stehen. Was hier von Hand geändert wurde, überschreibt
+      der Abruf nicht – er meldet die Abweichung und lässt deine Fassung.</p>
+    <form method="post" action="/admin/zeitplan/abrufen">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="knopf">Jetzt abrufen</button>
+    </form>
+  </section>
+
+  {% if berichte %}
+    {% for b in berichte %}
+      <section class="kasten {{ 'kasten-ok' if not b.fehler and not b.probleme else '' }}">
+        <h2>{{ b.titel }}</h2>
+        {% if b.fehler %}
+          <p class="hinweis hinweis-fehler" role="alert">{{ b.fehler }}</p>
+          <p class="hilfe">Es wurde nichts geändert. Der zuletzt erfolgreich
+            geholte Stand steht unverändert unten.</p>
+        {% else %}
+          <p>{{ b.gelesen }} Zeilen gelesen, aus der Tabelle unter
+            „{{ b.ueberschrift }}".</p>
+
+          {% set nichts = not (b.neu or b.geaendert or b.geschuetzt
+                               or b.entfallen or b.zurueck) %}
+          {% if nichts %}
+            <p class="hilfe">Nichts hat sich geändert.</p>
+          {% endif %}
+
+          {% for titel, eintraege, klasse in [
+              ('Neu', b.neu, ''),
+              ('Geändert', b.geaendert, ''),
+              ('Nicht überschrieben', b.geschuetzt, 'hinweisliste-warnung'),
+              ('Entfallen', b.entfallen, 'hinweisliste-warnung'),
+              ('Wieder da', b.zurueck, ''),
+              ('Übersprungen', b.probleme, 'hinweisliste-warnung'),
+              ('Hinweise', b.hinweise, '')] %}
+            {% if eintraege %}
+              <h3>{{ titel }} ({{ eintraege | length }})</h3>
+              <ul class="hinweisliste {{ klasse }}">
+                {% for e in eintraege %}<li>{{ e }}</li>{% endfor %}
+              </ul>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      </section>
+    {% endfor %}
+  {% endif %}
+
+  {% for s in serien %}
+    <section>
+      <h2>{{ s.titel }}</h2>
+      <p class="hilfe">
+        {% if s.letzter_erfolg %}
+          Zuletzt erfolgreich geholt: {{ s.letzter_erfolg }}.
+        {% else %}
+          <span class="marke marke-luecke">noch nie erfolgreich geholt</span>
+        {% endif %}
+        · <a href="{{ s.url }}" rel="noreferrer noopener">Quelle</a>
+        (Abschnitt „{{ s.abschnitt }}")
+      </p>
+
+      {% if not s.eintraege %}
+        <p class="leer">Noch nichts geholt.</p>
+      {% else %}
+        <div class="tabelle-huelle">
+          <table>
+            <thead>
+              <tr><th scope="col">Tag</th><th scope="col">Zeit</th>
+                <th scope="col">Programmpunkt</th><th scope="col"></th></tr>
+            </thead>
+            <tbody>
+              {% for e in s.eintraege %}
+                <tr{% if e.entfallen_am %} class="entfallen"{% endif %}>
+                  <td class="nowrap">{{ e.datum | tag }}</td>
+                  <td class="zeit">{{ e | programmzeit }}</td>
+                  <td>{{ e.titel }}</td>
+                  <td class="rechts">
+                    {% if e.entfallen_am %}
+                      <span class="marke marke-luecke">entfallen</span>
+                    {% elif e.von_hand %}
+                      <span class="marke">von Hand</span>
+                    {% elif not e.beginn %}
+                      <span class="marke gedaempft">ohne Uhrzeit</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </section>
+  {% endfor %}
+
+  {% if not serien %}
+    <p class="leer">Es ist keine Rennserie eingerichtet
+      (<code>ZEITPLAN_SERIEN</code> in der <code>.env</code>).</p>
+  {% endif %}
+
+  {% if abrufe %}
+    <section>
+      <h2>Bisherige Abrufe</h2>
+      <div class="tabelle-huelle">
+        <table>
+          <thead>
+            <tr><th scope="col">Wann</th><th scope="col">Serie</th>
+              <th scope="col">Auslöser</th><th scope="col">Ergebnis</th></tr>
+          </thead>
+          <tbody>
+            {% for a in abrufe %}
+              <tr>
+                <td class="nowrap">{{ a.gelaufen_am }}</td>
+                <td>{{ a.serie }}</td>
+                <td class="gedaempft">{{ a.ausloeser or '–' }}</td>
+                <td>
+                  {% if a.erfolg %}
+                    <span class="marke marke-voll">ok</span>
+                  {% else %}
+                    <span class="marke marke-luecke">Fehler</span>
+                    <span class="gedaempft">{{ a.meldung }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}
