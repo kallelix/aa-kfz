@@ -205,9 +205,15 @@ zählt.
 
 ## 7. Was aus dem Timetable erhalten bleibt
 
-- **`updated_at`-Konfliktschutz**: jeder Schreibvorgang setzt ihn neu, der
-  Client schickt seinen Stand mit, bei Abweichung `409` statt stillem
-  Überschreiben. Bei mehreren Leuten am selben Plan ist das kein Luxus.
+- **Konfliktschutz**: jeder Schreibvorgang zählt eine Fassungsnummer hoch,
+  das Formular schickt die mit, die es geladen hat, bei Abweichung `409` statt
+  stillem Überschreiben. Bei mehreren Leuten am selben Plan kein Luxus.
+
+  Umgesetzt als Zähler, nicht als `updated_at` wie ursprünglich skizziert:
+  der Zeitstempel hat Sekundenauflösung, zwei Speichervorgänge in derselben
+  Sekunde sähen damit gleich aus und der Schutz griffe nicht. Beim Ausprobieren
+  mit gestellter Uhr (`JETZT_FEST`) fiel genau das auf – dort steht der
+  Zeitstempel still und der Schutz wäre komplett wirkungslos gewesen.
 - **Programm-Band** mit Zeitachse, roter Linie für „jetzt", Balken nach Serie
   gefärbt.
 - **Vorschlagslisten** aus dem Bestand statt fester Auswahlfelder.
@@ -226,7 +232,7 @@ früh echte Daten in der App stehen und sich die Ansichten daran prüfen lassen.
 | 2 | CSV-Import: Schichten, Helfer, Einteilungen samt Normalisierung | 2,5 h |
 | 3 | Schichtliste mit Bedarf, Besetzung und Lücken | 2 h |
 | 4 | Einteilung: Helfer zuordnen und entfernen | 2 h |
-| 5 | Einträge: Aufgabenplan und Programm, `updated_at`-Schutz | 3 h |
+| 5 | Einträge: Aufgabenplan und Programm, Konfliktschutz | 3 h |
 | 6 | Zeitplan-Abruf mit Tabellenwahl, Wochentag-Zuordnung, Bericht | 3 h |
 | 7 | Programm-Band mit Schichten darunter | 3 h |
 | 8 | Monitor-Ansicht mit Token-Link und Selbstaktualisierung | 2,5 h |

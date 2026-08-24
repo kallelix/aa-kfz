@@ -87,9 +87,11 @@ def _grenzen(stuecke: list[dict]) -> tuple[int, int]:
 
 def bauen(datum: str, programm: list[dict], schichten: list[dict],
           jetzt: datetime | None = None,
-          farben: dict[str, str] | None = None) -> dict | None:
+          farben: dict[str, str] | None = None,
+          aufgaben: list[dict] | None = None) -> dict | None:
     """Baut das Band eines Tages. None, wenn es nichts zu zeigen gibt."""
     farben = farben or {}
+    aufgaben = aufgaben or []
 
     balken = []
     ohne_zeit = []
@@ -130,10 +132,28 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
             "fehlt": eintrag["fehlt"],
         })
 
-    if not balken and not schichtbalken:
+    # Aufgaben mit Uhrzeit kommen als dritte Gruppe unter die Schichten. Die
+    # ohne stehen im Pool und haben auf einer Zeitachse nichts verloren.
+    aufgabenbalken = []
+    for eintrag in aufgaben:
+        beginn = minuten(eintrag["beginn"], datum)
+        if beginn is None:
+            continue
+        ende = minuten(eintrag["ende"], datum)
+        aufgabenbalken.append({
+            "art": "aufgabe",
+            "id": eintrag["id"],
+            "titel": eintrag["titel"],
+            "von": beginn,
+            "bis": ende if ende is not None else beginn + 30,
+            "offen": False,
+            "status": eintrag["status"],
+        })
+
+    if not balken and not schichtbalken and not aufgabenbalken:
         return None
 
-    von, bis = _grenzen(balken + schichtbalken)
+    von, bis = _grenzen(balken + schichtbalken + aufgabenbalken)
     spanne = max(1, bis - von)
 
     def prozent(minute: int) -> float:
@@ -167,6 +187,8 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
 
     schicht_spuren = [[zeichnen(b) for b in spur]
                       for spur in packen(schichtbalken)]
+    aufgaben_spuren = [[zeichnen(b) for b in spur]
+                       for spur in packen(aufgabenbalken)]
 
     stunden = []
     for minute in range(von, bis + 1, 60):
@@ -195,6 +217,7 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
         "jetzt_prozent": jetzt_prozent,
         "programm_spuren": programm_spuren,
         "schicht_spuren": schicht_spuren,
+        "aufgaben_spuren": aufgaben_spuren,
         "ohne_zeit": ohne_zeit,
         "serien": sorted({b["serie"] for b in balken}),
     }

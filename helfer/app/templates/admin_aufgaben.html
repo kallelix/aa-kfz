@@ -1,0 +1,132 @@
+{% extends "admin_base.html" %}
+{% block titel %}Aufgaben{% endblock %}
+{% block ueberschrift %}Aufgabenplan{% endblock %}
+
+{% block inhalt %}
+  <section class="zaehler">
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Aufgaben</p>
+      <p class="zaehler-zahl">{{ zaehler.gesamt }}</p>
+      <p class="zaehler-detail">{{ zaehler.pool }} noch ohne Termin</p>
+    </div>
+    <div class="zaehler-kachel {% if zaehler.offen %}zaehler-voll{% endif %}">
+      <p class="zaehler-titel">Offen</p>
+      <p class="zaehler-zahl">{{ zaehler.offen }}</p>
+      <p class="zaehler-detail">noch nicht angefangen</p>
+    </div>
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">In Arbeit</p>
+      <p class="zaehler-zahl">{{ zaehler.arbeit }}</p>
+      <p class="zaehler-detail">läuft gerade</p>
+    </div>
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Erledigt</p>
+      <p class="zaehler-zahl">{{ zaehler.erledigt }}</p>
+      <p class="zaehler-detail">abgehakt</p>
+    </div>
+  </section>
+
+  <form method="get" action="/admin/aufgaben" class="filter">
+    <div>
+      <label for="f-phase">Phase</label>
+      <select id="f-phase" name="phase">
+        <option value="">alle</option>
+        {% for schluessel, text in phasen.items() %}
+          <option value="{{ schluessel }}" {% if schluessel == f_phase %}selected{% endif %}>{{ text }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="f-status">Status</label>
+      <select id="f-status" name="status">
+        <option value="">alle</option>
+        {% for schluessel, text in status_texte.items() %}
+          <option value="{{ schluessel }}" {% if schluessel == f_status %}selected{% endif %}>{{ text }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-knoepfe">
+      <button type="submit" class="knopf">Anzeigen</button>
+      {% if f_phase or f_status %}
+        <a class="knopf-schlicht" href="/admin/aufgaben">zurücksetzen</a>
+      {% endif %}
+      <a class="knopf" href="/admin/aufgabe/neu">Neue Aufgabe</a>
+    </div>
+  </form>
+
+  {% if not aufgaben %}
+    <p class="leer">
+      {% if f_phase or f_status %}
+        Keine Aufgabe passt zu diesem Filter.
+      {% else %}
+        Noch keine Aufgabe erfasst.
+        <a href="/admin/aufgabe/neu">Die erste anlegen</a>.
+      {% endif %}
+    </p>
+  {% else %}
+    {% set ns = namespace(tag='__start__') %}
+    {% for a in aufgaben %}
+      {% if a.datum != ns.tag %}
+        {% if not loop.first %}</tbody></table></div>{% endif %}
+        {% set ns.tag = a.datum %}
+        <h2 class="tagestitel">
+          {% if a.datum %}
+            {{ a.datum | tag }}
+          {% else %}
+            Pool
+            <span class="klein">– zu tun, aber noch nicht terminiert</span>
+          {% endif %}
+        </h2>
+        <div class="tabelle-huelle">
+          <table>
+            <thead>
+              <tr><th scope="col">Zeit</th><th scope="col">Was</th>
+                <th scope="col">Phase</th><th scope="col">Wer</th>
+                <th scope="col">Wo</th><th scope="col">Status</th>
+                <th scope="col"></th></tr>
+            </thead>
+            <tbody>
+      {% endif %}
+
+      <tr id="aufgabe-{{ a.id }}">
+        <td class="zeit">
+          {%- if a.beginn %}
+            {{ a.beginn[11:] }}{% if a.ende %}–{{ a.ende[11:] }}{% endif %}
+            {%- if a.ende and a.ende[:10] != a.beginn[:10] %} (+1){% endif %}
+          {%- else %}<span class="gedaempft">–</span>{% endif %}
+        </td>
+        <td>
+          <a href="/admin/aufgabe/{{ a.id }}">{{ a.titel }}</a>
+          {% if a.notiz %}<br><span class="gedaempft">{{ a.notiz }}</span>{% endif %}
+        </td>
+        <td><span class="marke marke-{{ a.phase }}">{{ phasen[a.phase] }}</span></td>
+        <td>
+          {%- if a.verantwortlich %}{{ a.verantwortlich }}
+            {%- if a.kontakt %}<br><span class="gedaempft">{{ a.kontakt }}</span>{% endif %}
+          {%- else %}<span class="gedaempft">–</span>{% endif %}
+        </td>
+        <td>{% if a.ort %}{{ a.ort }}{% else %}<span class="gedaempft">–</span>{% endif %}</td>
+        <td>
+          <form method="post" action="/admin/aufgabe/{{ a.id }}/status"
+                class="statuswahl">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="f_phase" value="{{ f_phase }}">
+            <input type="hidden" name="f_status" value="{{ f_status }}">
+            {% for schluessel, text in status_texte.items() %}
+              <button type="submit" name="status" value="{{ schluessel }}"
+                      class="statusknopf status-{{ schluessel }}
+                             {% if a.status == schluessel %}ist-aktiv{% endif %}"
+                      {% if a.status == schluessel %}aria-pressed="true"{% endif %}
+                      title="Status auf {{ text }} setzen">{{ text }}</button>
+            {% endfor %}
+          </form>
+        </td>
+        <td class="rechts">
+          <a class="knopf-winzig" href="/admin/aufgabe/{{ a.id }}">ändern</a>
+        </td>
+      </tr>
+
+      {% if loop.last %}</tbody></table></div>{% endif %}
+    {% endfor %}
+  {% endif %}
+{% endblock %}

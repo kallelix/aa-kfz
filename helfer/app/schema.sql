@@ -157,3 +157,53 @@ CREATE TABLE IF NOT EXISTS abruf_lauf (
     ausloeser     TEXT NOT NULL DEFAULT '',
     gelaufen_am   TEXT NOT NULL
 );
+
+-- Der Aufgabenplan der Orga: was rund um die Veranstaltung zu tun ist.
+--
+-- Bewusst eine eigene Tabelle und nicht, wie im Plan skizziert, eine
+-- gemeinsame `eintrag`-Tabelle mit `kind` fuer Programm und Aufgabe. Im
+-- Timetable waren beide von Hand gepflegt und teilten sich deshalb zurecht
+-- eine Tabelle. Hier hat das Programm eine fremde Quelle und eine eigene
+-- Abgleichlogik (von_hand, entfallen_am, serie, UNIQUE je Serie und Titel),
+-- von der eine Aufgabe nichts braucht. Zusammengelegt haetten beide Haelften
+-- Spalten getragen, die fuer sie nie gelten.
+CREATE TABLE IF NOT EXISTS aufgabe (
+    id            INTEGER PRIMARY KEY,
+    titel         TEXT NOT NULL,
+
+    -- Grobe Einordnung. 'sonstiges' faengt alles, was sich nicht zuordnen
+    -- laesst - besser als eine erfundene Phase.
+    phase         TEXT NOT NULL DEFAULT 'event'
+                  CHECK (phase IN ('aufbau', 'event', 'abbau', 'sonstiges')),
+
+    -- Ohne Datum landet die Aufgabe im Pool: zu tun, aber noch nicht
+    -- terminiert. Das ist ein eigener Zustand und kein fehlender Wert.
+    datum         TEXT,
+    beginn        TEXT,
+    ende          TEXT,
+
+    ort           TEXT NOT NULL DEFAULT '',
+    verantwortlich TEXT NOT NULL DEFAULT '',
+    kontakt       TEXT NOT NULL DEFAULT '',
+    notiz         TEXT NOT NULL DEFAULT '',
+
+    status        TEXT NOT NULL DEFAULT 'offen'
+                  CHECK (status IN ('offen', 'arbeit', 'erledigt')),
+
+    angelegt_am   TEXT NOT NULL,
+    geaendert_am  TEXT NOT NULL,
+    kuerzel       TEXT NOT NULL DEFAULT '',
+
+    -- Traegt den Konfliktschutz. Bewusst ein Zaehler und kein Zeitstempel:
+    -- geaendert_am hat Sekundenaufloesung, zwei Speichervorgaenge in
+    -- derselben Sekunde saehen damit gleich aus und der Schutz griffe nicht.
+    -- Ein Zaehler ist exakt, unabhaengig von der Uhr - und bleibt es auch,
+    -- wenn JETZT_FEST sie fuer eine Durchsicht anhaelt.
+    version       INTEGER NOT NULL DEFAULT 1,
+
+    -- Eine Zeit ohne Tag waere ortlos, und ein Ende vor dem Beginn falsch.
+    CHECK (beginn IS NULL OR datum IS NOT NULL),
+    CHECK (ende IS NULL OR (beginn IS NOT NULL AND ende > beginn))
+);
+
+CREATE INDEX IF NOT EXISTS idx_aufgabe_tag ON aufgabe (datum, beginn);

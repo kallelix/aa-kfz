@@ -1,0 +1,87 @@
+{% extends "admin_base.html" %}
+{% block titel %}Programmpunkt{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Programmpunkt ändern{% endblock %}
+
+{% block inhalt %}
+  <p class="unterzeile">
+    {{ serie.titel if serie else eintrag.serie }} · {{ eintrag.datum | tag }}
+  </p>
+
+  <div class="hinweis hinweis-warnung">
+    <p>Dieser Punkt kommt vom <a href="/admin/zeitplan">Zeitplan-Abruf</a>.
+      Wer ihn hier ändert, macht ihn zur eigenen Fassung: der nächste Abruf
+      meldet dann nur noch, dass die Website etwas anderes sagt, und
+      überschreibt nichts mehr.</p>
+    <p class="hilfe">Auf der Website steht derzeit:
+      <strong>{{ eintrag.zeit_roh or 'keine Zeitangabe' }}</strong>
+      {%- if eintrag.tag_roh %} ({{ eintrag.tag_roh }}){% endif %}.</p>
+  </div>
+
+  {% if konflikt %}
+    <div class="hinweis hinweis-warnung" role="alert">
+      <p><strong>Jemand anderes war schneller.</strong> Seit du das Formular
+        geöffnet hast, wurde dieser Punkt gespeichert. Deine Eingabe steht
+        unverändert unten – gespeichert wurde sie nicht.</p>
+      <p>Was jetzt in der Datenbank steht: {{ konflikt.titel }},
+        {{ konflikt.beginn or 'ohne Zeit' }}
+        {%- if konflikt.ende %}–{{ konflikt.ende }}{% endif %}
+        {%- if konflikt.notiz %}, Notiz: {{ konflikt.notiz }}{% endif %}.</p>
+      <p>Noch einmal auf <em>Speichern</em> übernimmt deine Fassung.
+        <a href="/admin/programm/{{ eintrag.id }}">Verwerfen und neu laden</a>
+        nimmt die andere.</p>
+    </div>
+  {% endif %}
+
+  <form method="post" action="/admin/programm/{{ eintrag.id }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="version" value="{{ werte.version }}">
+
+    <div class="feld {% if fehler.titel %}feld-fehler{% endif %}">
+      <label for="titel">Bezeichnung <span class="pflicht">*</span></label>
+      <input type="text" id="titel" name="titel" maxlength="200" required
+             value="{{ werte.titel }}">
+      {% if fehler.titel %}<p class="fehler">{{ fehler.titel }}</p>{% endif %}
+    </div>
+
+    <div class="paar">
+      <div class="feld {% if fehler.beginn %}feld-fehler{% endif %}">
+        <label for="beginn">Von <span class="optional">optional</span></label>
+        <input type="time" id="beginn" name="beginn" value="{{ werte.beginn }}">
+        {% if fehler.beginn %}<p class="fehler">{{ fehler.beginn }}</p>{% endif %}
+      </div>
+      <div class="feld {% if fehler.ende %}feld-fehler{% endif %}">
+        <label for="ende">Bis <span class="optional">optional</span></label>
+        <input type="time" id="ende" name="ende" value="{{ werte.ende }}">
+        <p class="hilfe">Leer lassen heißt „offenes Ende“ – der Balken im Band
+          läuft dann aus, statt ein Ende zu behaupten.</p>
+        {% if fehler.ende %}<p class="fehler">{{ fehler.ende }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="feld">
+      <label for="notiz">Notiz <span class="optional">optional</span></label>
+      <textarea id="notiz" name="notiz" rows="3" maxlength="2000">{{ werte.notiz }}</textarea>
+      <p class="hilfe">Etwa, woher die abweichende Zeit stammt.</p>
+    </div>
+
+    <div class="knopfreihe">
+      <button type="submit" class="knopf">Speichern</button>
+      <a class="knopf-schlicht" href="/admin/zeitplan">Abbrechen</a>
+    </div>
+  </form>
+
+  {% if eintrag.von_hand %}
+    <section class="loeschen">
+      <h2>Wieder der Website folgen</h2>
+      <p class="hilfe">Nimmt die eigene Fassung zurück. Beim nächsten Abruf
+        gilt wieder, was auf der Website der Rennserie steht.</p>
+      <form method="post" action="/admin/programm/{{ eintrag.id }}/freigeben">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="knopf-schlicht">Eigene Fassung aufgeben</button>
+      </form>
+    </section>
+  {% endif %}
+
+  <p class="zurueck-zeile"><a href="/admin/zeitplan">Zurück zum Zeitplan</a></p>
+{% endblock %}

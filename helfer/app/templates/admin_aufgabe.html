@@ -1,0 +1,150 @@
+{% extends "admin_base.html" %}
+{% block titel %}{{ 'Aufgabe ändern' if aufgabe else 'Neue Aufgabe' }}{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}{{ 'Aufgabe ändern' if aufgabe else 'Neue Aufgabe' }}{% endblock %}
+
+{% block inhalt %}
+  {% if konflikt %}
+    <div class="hinweis hinweis-warnung" role="alert">
+      <p><strong>Jemand anderes war schneller.</strong> Seit du das Formular
+        geöffnet hast, wurde diese Aufgabe gespeichert. Deine Eingabe steht
+        unverändert unten – gespeichert wurde sie nicht.</p>
+      <p>Was jetzt in der Datenbank steht:</p>
+      <ul class="hinweisliste">
+        <li>Bezeichnung: {{ konflikt.titel }}</li>
+        <li>Zeit: {{ konflikt.datum or 'ohne Tag' }}
+          {%- if konflikt.beginn %}, {{ konflikt.beginn }}
+            {%- if konflikt.ende %}–{{ konflikt.ende }}{% endif %}{% endif %}</li>
+        <li>Status: {{ status_texte[konflikt.status] }}</li>
+        {% if konflikt.verantwortlich %}<li>Wer: {{ konflikt.verantwortlich }}</li>{% endif %}
+        {% if konflikt.ort %}<li>Wo: {{ konflikt.ort }}</li>{% endif %}
+        {% if konflikt.notiz %}<li>Notiz: {{ konflikt.notiz }}</li>{% endif %}
+      </ul>
+      <p>Noch einmal auf <em>Speichern</em> übernimmt deine Fassung und
+        überschreibt die andere. <a href="/admin/aufgabe/{{ aufgabe.id }}">Verwerfen
+        und neu laden</a> nimmt die andere.</p>
+    </div>
+  {% endif %}
+
+  <form method="post"
+        action="{{ '/admin/aufgabe/' ~ aufgabe.id if aufgabe else '/admin/aufgabe/neu' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {# Traegt den Konfliktschutz: die Version, die beim Laden galt. #}
+    <input type="hidden" name="version" value="{{ werte.version }}">
+
+    <div class="feld {% if fehler.titel %}feld-fehler{% endif %}">
+      <label for="titel">Was ist zu tun <span class="pflicht">*</span></label>
+      <input type="text" id="titel" name="titel" maxlength="200" required
+             value="{{ werte.titel }}" autofocus>
+      {% if fehler.titel %}<p class="fehler">{{ fehler.titel }}</p>{% endif %}
+    </div>
+
+    <div class="paar">
+      <div class="feld">
+        <label for="phase">Phase</label>
+        <select id="phase" name="phase">
+          {% for schluessel, text in phasen.items() %}
+            <option value="{{ schluessel }}"
+                    {% if schluessel == werte.phase %}selected{% endif %}>{{ text }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="feld">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          {% for schluessel, text in status_texte.items() %}
+            <option value="{{ schluessel }}"
+                    {% if schluessel == werte.status %}selected{% endif %}>{{ text }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="feld {% if fehler.datum %}feld-fehler{% endif %}">
+      <label for="datum">Tag <span class="optional">optional</span></label>
+      <input type="date" id="datum" name="datum" value="{{ werte.datum }}"
+             list="tage">
+      <datalist id="tage">
+        {% for t in tage %}<option value="{{ t.datum }}">{{ t.lang }}</option>{% endfor %}
+      </datalist>
+      <p class="hilfe">Ohne Tag landet die Aufgabe im Pool – zu tun, aber noch
+        nicht terminiert.</p>
+      {% if fehler.datum %}<p class="fehler">{{ fehler.datum }}</p>{% endif %}
+    </div>
+
+    <div class="paar">
+      <div class="feld {% if fehler.beginn %}feld-fehler{% endif %}">
+        <label for="beginn">Von <span class="optional">optional</span></label>
+        <input type="time" id="beginn" name="beginn" value="{{ werte.beginn }}">
+        {% if fehler.beginn %}<p class="fehler">{{ fehler.beginn }}</p>{% endif %}
+      </div>
+      <div class="feld {% if fehler.ende %}feld-fehler{% endif %}">
+        <label for="ende">Bis <span class="optional">optional</span></label>
+        <input type="time" id="ende" name="ende" value="{{ werte.ende }}">
+        {% if fehler.ende %}<p class="fehler">{{ fehler.ende }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="paar">
+      <div class="feld">
+        <label for="verantwortlich">Wer <span class="optional">optional</span></label>
+        <input type="text" id="verantwortlich" name="verantwortlich"
+               maxlength="120" value="{{ werte.verantwortlich }}"
+               list="v-verantwortlich" autocomplete="off">
+        <datalist id="v-verantwortlich">
+          {% for v in vorschlaege.verantwortlich %}<option value="{{ v }}">{% endfor %}
+        </datalist>
+      </div>
+      <div class="feld">
+        <label for="kontakt">Kontakt <span class="optional">optional</span></label>
+        <input type="text" id="kontakt" name="kontakt" maxlength="120"
+               value="{{ werte.kontakt }}" list="v-kontakt" autocomplete="off">
+        <datalist id="v-kontakt">
+          {% for v in vorschlaege.kontakt %}<option value="{{ v }}">{% endfor %}
+        </datalist>
+      </div>
+    </div>
+
+    <div class="feld">
+      <label for="ort">Wo <span class="optional">optional</span></label>
+      <input type="text" id="ort" name="ort" maxlength="120"
+             value="{{ werte.ort }}" list="v-ort" autocomplete="off">
+      <datalist id="v-ort">
+        {% for v in vorschlaege.ort %}<option value="{{ v }}">{% endfor %}
+      </datalist>
+      <p class="hilfe">Die Vorschläge sind das, was schon irgendwo steht –
+        keine feste Auswahl. Was fehlt, einfach tippen.</p>
+    </div>
+
+    <div class="feld">
+      <label for="notiz">Notiz <span class="optional">optional</span></label>
+      <textarea id="notiz" name="notiz" rows="3" maxlength="2000">{{ werte.notiz }}</textarea>
+    </div>
+
+    <div class="knopfreihe">
+      <button type="submit" class="knopf">Speichern</button>
+      <a class="knopf-schlicht" href="/admin/aufgaben">Abbrechen</a>
+    </div>
+  </form>
+
+  {% if aufgabe %}
+    <section class="loeschen">
+      <h2>Löschen</h2>
+      <p class="hilfe">Ist unwiderruflich. Erledigte Aufgaben lässt man besser
+        stehen – sie sind der Nachweis, dass es gemacht wurde.</p>
+      <form method="post" action="/admin/aufgabe/{{ aufgabe.id }}/loeschen">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="knopf-gefahr">Endgültig löschen</button>
+      </form>
+    </section>
+
+    <p class="hilfe">
+      Angelegt {{ aufgabe.angelegt_am }},
+      zuletzt geändert {{ aufgabe.geaendert_am }}
+      {%- if aufgabe.kuerzel %} durch {{ aufgabe.kuerzel }}{% endif %}
+      (Fassung {{ aufgabe.version }}).
+    </p>
+  {% endif %}
+
+  <p class="zurueck-zeile"><a href="/admin/aufgaben">Zurück zum Aufgabenplan</a></p>
+{% endblock %}

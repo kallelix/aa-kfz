@@ -410,7 +410,8 @@ def uebernehmen(ergebnis: Ergebnis, ausloeser: str = "") -> dict:
 
                 con.execute(
                     "UPDATE programm SET beginn = ?, ende = ?, tag_roh = ?,"
-                    " zeit_roh = ?, entfallen_am = NULL, geaendert_am = ?"
+                    " zeit_roh = ?, entfallen_am = NULL, geaendert_am = ?,"
+                    " version = version + 1"
                     " WHERE id = ?",
                     (eintrag.beginn, eintrag.ende, eintrag.tag_roh,
                      eintrag.zeit_roh, db.jetzt(), alt["id"]))

@@ -762,3 +762,9 @@ a.band-balken { cursor: pointer; }
   border-radius: 2px;
 }
 .band-ohne-zeit { font-style: italic; }
+
+/* Aufgaben im Band. Eigene Farbe, damit sie sich von Programm und Schichten
+   abheben; der Status faerbt den linken Rand. */
+.band-aufgabe { background: #a78bfa; }
+.band-status-erledigt { opacity: .55; }
+.band-status-offen { box-shadow: inset 3px 0 0 rgba(255, 255, 255, .85); }

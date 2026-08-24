@@ -65,6 +65,25 @@
         {% endfor %}
       </div>
     {% endfor %}
+    {% if band.aufgaben_spuren %}
+      <div class="band-trenner"></div>
+      {% for spur in band.aufgaben_spuren %}
+        <div class="band-spur">
+          {% for b in spur %}
+            {% set marke = b.titel ~ ' · ' ~ b.von_uhr ~ '–' ~ b.bis_uhr %}
+            {% if ziel == 'admin' %}
+              <a class="band-balken band-aufgabe band-status-{{ b.status }}"
+                 style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                 href="/admin/aufgabe/{{ b.id }}" title="{{ marke }}">{{ b.beschriftung }}</a>
+            {% else %}
+              <span class="band-balken band-aufgabe band-status-{{ b.status }}"
+                    style="left: {{ b.links }}%; width: {{ b.breite }}%"
+                    title="{{ marke }}">{{ b.beschriftung }}</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endfor %}
+    {% endif %}
   </div>
 
   <p class="band-fuss">
@@ -79,6 +98,11 @@
       </span>
       <span class="band-schluessel">
         <span class="band-tupfer band-schicht band-luecke"></span>Schicht mit Lücke
+      </span>
+    {% endif %}
+    {% if band.aufgaben_spuren %}
+      <span class="band-schluessel">
+        <span class="band-tupfer band-aufgabe"></span>Aufgabe
       </span>
     {% endif %}
     {% if band.ohne_zeit %}

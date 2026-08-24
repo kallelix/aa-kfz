@@ -31,6 +31,7 @@
         <a href="/admin">Übersicht</a>
         <a href="/admin/schichten">Schichten</a>
         <a href="/admin/band">Band</a>
+        <a href="/admin/aufgaben">Aufgaben</a>
         <a href="/admin/helfer">Helfer</a>
         <a href="/admin/zeitplan">Zeitplan</a>
         <a href="/admin/monitor">Monitor</a>
@@ -46,6 +47,11 @@
       'unbekannt': 'Diese Schicht gibt es nicht.',
       'neuer-link': 'Neuer Monitor-Link erzeugt. Der alte gilt nicht mehr.',
       'widerrufen': 'Der Monitor-Link ist widerrufen.',
+      'angelegt': 'Angelegt.',
+      'gespeichert': 'Gespeichert.',
+      'geloescht': 'Gelöscht.',
+      'status': 'Status geändert.',
+      'freigegeben': 'Der Punkt folgt wieder der Website.',
     } %}
     {% if hinweis %}
       <p class="hinweis {{ 'hinweis-warnung' if hinweis in ('schon-drin', 'keiner', 'unbekannt', 'widerrufen') else 'hinweis-ok' }}"

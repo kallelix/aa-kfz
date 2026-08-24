@@ -10,7 +10,8 @@
       und hier jederzeit von Hand.</p>
     <p class="hilfe">Schlägt ein Abruf fehl, bleibt der letzte erfolgreiche
       Stand unverändert stehen. Was hier von Hand geändert wurde, überschreibt
-      der Abruf nicht – er meldet die Abweichung und lässt deine Fassung.</p>
+      der Abruf nicht – er meldet die Abweichung und lässt deine Fassung.
+      Ein Klick auf einen Programmpunkt öffnet ihn zum Ändern.</p>
     <form method="post" action="/admin/zeitplan/abrufen">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <button type="submit" class="knopf">Jetzt abrufen</button>
@@ -82,7 +83,8 @@
                 <tr{% if e.entfallen_am %} class="entfallen"{% endif %}>
                   <td class="nowrap">{{ e.datum | tag }}</td>
                   <td class="zeit">{{ e | programmzeit }}</td>
-                  <td>{{ e.titel }}</td>
+                  <td><a href="/admin/programm/{{ e.id }}">{{ e.titel }}</a>
+                    {%- if e.notiz %}<br><span class="gedaempft">{{ e.notiz }}</span>{% endif %}</td>
                   <td class="rechts">
                     {% if e.entfallen_am %}
                       <span class="marke marke-luecke">entfallen</span>

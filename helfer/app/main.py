@@ -23,7 +23,8 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import auth, band, config, csv_import, db, worker, zeitplan
+from . import (auth, band, config, csv_import, db, eintraege,
+               worker, zeitplan)
 
 BASIS = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASIS / "templates"))
@@ -429,7 +430,8 @@ def _band(tag: str, jetzt) -> dict | None:
         # Die Jetzt-Linie gehoert nur auf den laufenden Tag. An einem anderen
         # stuende sie an einer Stelle, die dort nichts bedeutet.
         jetzt=jetzt if stand["ist_heute"] else None,
-        farben={s["schluessel"]: s["farbe"] for s in config.serien()})
+        farben={s["schluessel"]: s["farbe"] for s in config.serien()},
+        aufgaben=[dict(a) for a in db.aufgaben(tag=tag)])
 
 
 def _tag_pruefen(roh: str) -> str:
@@ -541,6 +543,228 @@ async def zeitplan_abrufen(
     berichte = await asyncio.to_thread(
         zeitplan.alle_abrufen, sitzung.kuerzel or "von Hand")
     return _zeitplan_seite(request, sitzung, berichte=berichte)
+
+
+# --- Aufgabenplan ----------------------------------------------------------
+
+def _aufgabe_kontext(request: Request, sitzung, aufgabe, werte, fehler,
+                     konflikt=None):
+    return _admin(
+        request, sitzung, hinweis="", aufgabe=aufgabe, werte=werte,
+        fehler=fehler, konflikt=konflikt,
+        phasen=eintraege.PHASEN, status_texte=eintraege.STATUS,
+        tage=db.monitor_tage(),
+        vorschlaege={s: db.vorschlaege(s)
+                     for s in ("ort", "verantwortlich", "kontakt")})
+
+
+def _aus_zeile(zeile) -> dict:
+    """Ein gespeicherter Datensatz in der Form, die das Formular erwartet."""
+    return {
+        "titel": zeile["titel"], "phase": zeile["phase"],
+        "status": zeile["status"], "datum": zeile["datum"] or "",
+        "beginn": eintraege.uhr(zeile["beginn"]),
+        "ende": eintraege.uhr(zeile["ende"]),
+        "ort": zeile["ort"], "verantwortlich": zeile["verantwortlich"],
+        "kontakt": zeile["kontakt"], "notiz": zeile["notiz"],
+        "version": zeile["version"],
+    }
+
+
+@app.get("/admin/aufgaben")
+async def aufgaben(request: Request, phase: str = "", status: str = "",
+                   hinweis: str = "",
+                   sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    liste = db.aufgaben(phase=phase if phase in eintraege.PHASEN else "",
+                        status=status if status in eintraege.STATUS else "")
+    return templates.TemplateResponse(
+        "admin_aufgaben.html",
+        _admin(request, sitzung, hinweis=hinweis, aufgaben=liste,
+               zaehler=db.aufgaben_zaehler(), f_phase=phase, f_status=status,
+               phasen=eintraege.PHASEN, status_texte=eintraege.STATUS))
+
+
+@app.get("/admin/aufgabe/neu")
+async def aufgabe_neu(request: Request, tag: str = "",
+                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    leer = {"titel": "", "phase": "event", "status": "offen",
+            "datum": _tag_pruefen(tag), "beginn": "", "ende": "", "ort": "",
+            "verantwortlich": "", "kontakt": "", "notiz": "", "version": 0}
+    return templates.TemplateResponse(
+        "admin_aufgabe.html",
+        _aufgabe_kontext(request, sitzung, None, leer, {}))
+
+
+@app.post("/admin/aufgabe/neu")
+async def aufgabe_anlegen(request: Request,
+                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    werte, fehler = eintraege.pruefen(dict(daten))
+    if fehler:
+        eingabe = {**{k: str(v) for k, v in daten.items()}, "version": 0}
+        return templates.TemplateResponse(
+            "admin_aufgabe.html",
+            _aufgabe_kontext(request, sitzung, None, eingabe, fehler),
+            status_code=400)
+
+    nummer = db.aufgabe_anlegen(werte, sitzung.kuerzel)
+    return _zurueck("/admin/aufgaben", "angelegt",
+                    sprung="aufgabe-" + str(nummer))
+
+
+@app.get("/admin/aufgabe/{aufgabe_id}")
+async def aufgabe_formular(request: Request, aufgabe_id: int,
+                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    zeile = db.aufgabe_laden(aufgabe_id)
+    if zeile is None:
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+    return templates.TemplateResponse(
+        "admin_aufgabe.html",
+        _aufgabe_kontext(request, sitzung, zeile, _aus_zeile(zeile), {}))
+
+
+@app.post("/admin/aufgabe/{aufgabe_id}")
+async def aufgabe_sichern(request: Request, aufgabe_id: int,
+                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    zeile = db.aufgabe_laden(aufgabe_id)
+    if zeile is None:
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+
+    werte, fehler = eintraege.pruefen(dict(daten))
+    eingabe = {**{k: str(v) for k, v in daten.items()},
+               "version": daten.get("version") or 0}
+    if fehler:
+        return templates.TemplateResponse(
+            "admin_aufgabe.html",
+            _aufgabe_kontext(request, sitzung, zeile, eingabe, fehler),
+            status_code=400)
+
+    ergebnis = db.aufgabe_speichern(aufgabe_id, werte,
+                                    daten.get("version"), sitzung.kuerzel)
+    if ergebnis == "weg":
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+    if ergebnis == "konflikt":
+        # Nicht überschreiben, sondern zeigen, was inzwischen dasteht. Die
+        # eigene Eingabe bleibt im Formular; die Version wird auf den jetzigen
+        # Stand gesetzt, damit ein zweites Absenden bewusst gewinnt.
+        aktuell = db.aufgabe_laden(aufgabe_id)
+        eingabe["version"] = aktuell["version"]
+        return templates.TemplateResponse(
+            "admin_aufgabe.html",
+            _aufgabe_kontext(request, sitzung, aktuell, eingabe, {},
+                             konflikt=_aus_zeile(aktuell)),
+            status_code=409)
+
+    return _zurueck("/admin/aufgaben", "gespeichert",
+                    sprung="aufgabe-" + str(aufgabe_id))
+
+
+@app.post("/admin/aufgabe/{aufgabe_id}/status")
+async def aufgabe_status(request: Request, aufgabe_id: int,
+                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    neu = str(daten.get("status") or "")
+    if neu not in eintraege.STATUS:
+        return _zurueck("/admin/aufgaben", "unbekannt")
+    db.aufgabe_status(aufgabe_id, neu, sitzung.kuerzel)
+    return _zurueck("/admin/aufgaben", "status",
+                    phase=str(daten.get("f_phase") or ""),
+                    status=str(daten.get("f_status") or ""),
+                    sprung="aufgabe-" + str(aufgabe_id))
+
+
+@app.post("/admin/aufgabe/{aufgabe_id}/loeschen")
+async def aufgabe_weg(request: Request, aufgabe_id: int,
+                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.aufgabe_loeschen(aufgabe_id)
+    return _zurueck("/admin/aufgaben", "geloescht")
+
+
+# --- Programmpunkt von Hand ------------------------------------------------
+
+@app.get("/admin/programm/{programm_id}")
+async def programm_formular(request: Request, programm_id: int,
+                            sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    zeile = db.programm_eintrag(programm_id)
+    if zeile is None:
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+    werte = {"titel": zeile["titel"], "beginn": eintraege.uhr(zeile["beginn"]),
+             "ende": eintraege.uhr(zeile["ende"]), "notiz": zeile["notiz"],
+             "version": zeile["version"]}
+    return templates.TemplateResponse(
+        "admin_programm.html",
+        _admin(request, sitzung, hinweis="", eintrag=zeile, werte=werte,
+               fehler={}, konflikt=None,
+               serie=config.serie(zeile["serie"])))
+
+
+@app.post("/admin/programm/{programm_id}")
+async def programm_sichern(request: Request, programm_id: int,
+                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    zeile = db.programm_eintrag(programm_id)
+    if zeile is None:
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+
+    werte, fehler = eintraege.programm_pruefen(dict(daten), zeile["datum"])
+    eingabe = {**{k: str(v) for k, v in daten.items()},
+               "version": daten.get("version") or 0}
+
+    def seite(konflikt=None, code=200):
+        return templates.TemplateResponse(
+            "admin_programm.html",
+            _admin(request, sitzung, hinweis="",
+                   eintrag=db.programm_eintrag(programm_id),
+                   werte=eingabe, fehler=fehler, konflikt=konflikt,
+                   serie=config.serie(zeile["serie"])), status_code=code)
+
+    if fehler:
+        return seite(code=400)
+
+    ergebnis = db.programm_speichern(programm_id, werte, daten.get("version"))
+    if ergebnis == "weg":
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+    if ergebnis == "konflikt":
+        aktuell = db.programm_eintrag(programm_id)
+        eingabe["version"] = aktuell["version"]
+        return seite(konflikt={
+            "titel": aktuell["titel"],
+            "beginn": eintraege.uhr(aktuell["beginn"]),
+            "ende": eintraege.uhr(aktuell["ende"]),
+            "notiz": aktuell["notiz"]}, code=409)
+
+    return _zurueck("/admin/zeitplan", "gespeichert")
+
+
+@app.post("/admin/programm/{programm_id}/freigeben")
+async def programm_freigeben(request: Request, programm_id: int,
+                             sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.programm_freigeben(programm_id)
+    return _zurueck("/admin/zeitplan", "freigegeben")
 
 
 # --- Programm-Band ---------------------------------------------------------

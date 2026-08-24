@@ -19,6 +19,12 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 # würde eine bestehende Tabelle nicht anfassen.
 NACHTRAEGLICHE_SPALTEN: list[tuple[str, str, str]] = [
     # (Tabelle, Spalte, vollständige Definition)
+    # Die Notiz kam mit dem Bearbeiten von Programmpunkten dazu. Bestehende
+    # Datenbanken haben die Spalte nicht, CREATE TABLE IF NOT EXISTS würde sie
+    # dort nicht ergänzen.
+    ("programm", "notiz", "notiz TEXT NOT NULL DEFAULT ''"),
+    # Versionszaehler fuer den Konfliktschutz, siehe aufgabe.version.
+    ("programm", "version", "version INTEGER NOT NULL DEFAULT 1"),
 ]
 
 
@@ -701,5 +707,203 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
             "offen_jetzt": sum(z["fehlt"] for z in laufend),
             "offen_gesamt": gesamt["offen"],
         }
+    finally:
+        con.close()
+
+
+# --- Aufgabenplan ----------------------------------------------------------
+
+def aufgaben(phase: str = "", status: str = "",
+             tag: str = "") -> list[sqlite3.Row]:
+    bedingungen, werte = [], []
+    for spalte, wert in (("phase", phase), ("status", status), ("datum", tag)):
+        if wert:
+            bedingungen.append(spalte + " = ?")
+            werte.append(wert)
+    wo = (" WHERE " + " AND ".join(bedingungen)) if bedingungen else ""
+
+    con = verbinden()
+    try:
+        # Der Pool (ohne Datum) ganz nach hinten: er hat keinen Platz im
+        # Ablauf, soll aber nicht zwischen den Tagen verschwinden.
+        return con.execute(
+            "SELECT *, suchtext(titel, ort, verantwortlich, notiz) AS suche"
+            " FROM aufgabe" + wo +
+            " ORDER BY datum IS NULL, datum, beginn IS NULL, beginn,"
+            " titel COLLATE NOCASE", werte).fetchall()
+    finally:
+        con.close()
+
+
+def aufgabe_laden(aufgabe_id: int) -> sqlite3.Row | None:
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM aufgabe WHERE id = ?",
+                           (aufgabe_id,)).fetchone()
+    finally:
+        con.close()
+
+
+_AUFGABE_SPALTEN = ("titel", "phase", "datum", "beginn", "ende", "ort",
+                    "verantwortlich", "kontakt", "notiz", "status")
+
+
+def aufgabe_anlegen(werte: dict, kuerzel: str = "") -> int:
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute(
+                "INSERT INTO aufgabe (" + ", ".join(_AUFGABE_SPALTEN) +
+                ", angelegt_am, geaendert_am, kuerzel) VALUES (" +
+                ", ".join("?" for _ in _AUFGABE_SPALTEN) + ", ?, ?, ?)",
+                (*[werte.get(s) for s in _AUFGABE_SPALTEN],
+                 jetzt(), jetzt(), kuerzel))
+        return int(zeiger.lastrowid)
+    finally:
+        con.close()
+
+
+def aufgabe_speichern(aufgabe_id: int, werte: dict, stand,
+                      kuerzel: str = "") -> str:
+    """'ok', 'konflikt' oder 'weg'.
+
+    `stand` ist die Version, die dem Formular beim Laden mitgegeben wurde.
+    Weicht sie von der aktuellen ab, hat jemand anderes dazwischen
+    gespeichert – dann wird nichts überschrieben, sondern zurückgemeldet.
+
+    Der Vergleich passiert INNERHALB der Transaktion. Läge er davor, könnte
+    zwischen Lesen und Schreiben genau das passieren, wovor er schützen soll.
+    """
+    try:
+        stand = int(stand)
+    except (TypeError, ValueError):
+        stand = 0
+
+    con = verbinden()
+    try:
+        with con:
+            vorhanden = con.execute(
+                "SELECT version FROM aufgabe WHERE id = ?",
+                (aufgabe_id,)).fetchone()
+            if vorhanden is None:
+                return "weg"
+            if stand and vorhanden["version"] != stand:
+                return "konflikt"
+            con.execute(
+                "UPDATE aufgabe SET " +
+                ", ".join(s + " = ?" for s in _AUFGABE_SPALTEN) +
+                ", geaendert_am = ?, kuerzel = ?, version = version + 1"
+                " WHERE id = ?",
+                (*[werte.get(s) for s in _AUFGABE_SPALTEN],
+                 jetzt(), kuerzel, aufgabe_id))
+        return "ok"
+    finally:
+        con.close()
+
+
+def aufgabe_status(aufgabe_id: int, status: str, kuerzel: str = "") -> bool:
+    """Schneller Statuswechsel aus der Liste heraus – ohne Konfliktprüfung.
+
+    Absicht: ein Status ist ein einzelner Wert, kein Formular. Wer ihn
+    umstellt, überschreibt niemandes Text; das Schlimmste, was passieren kann,
+    ist ein zweimal gesetzter Haken.
+    """
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute(
+                "UPDATE aufgabe SET status = ?, geaendert_am = ?, kuerzel = ?"
+                " WHERE id = ?", (status, jetzt(), kuerzel, aufgabe_id))
+        return zeiger.rowcount > 0
+    finally:
+        con.close()
+
+
+def aufgabe_loeschen(aufgabe_id: int) -> bool:
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute("DELETE FROM aufgabe WHERE id = ?",
+                                 (aufgabe_id,))
+        return zeiger.rowcount > 0
+    finally:
+        con.close()
+
+
+def aufgaben_zaehler() -> dict:
+    con = verbinden()
+    try:
+        je_status = {z["status"]: z["anzahl"] for z in con.execute(
+            "SELECT status, COUNT(*) AS anzahl FROM aufgabe GROUP BY status")}
+        return {
+            "gesamt": sum(je_status.values()),
+            "offen": je_status.get("offen", 0),
+            "arbeit": je_status.get("arbeit", 0),
+            "erledigt": je_status.get("erledigt", 0),
+            "pool": con.execute(
+                "SELECT COUNT(*) FROM aufgabe WHERE datum IS NULL").fetchone()[0],
+        }
+    finally:
+        con.close()
+
+
+def vorschlaege(spalte: str) -> list[str]:
+    """Was in dieser Spalte schon vorkommt – für die Vorschlagsliste am Feld.
+
+    Feste Auswahlfelder wären hier falsch: welche Orte und Verantwortlichen es
+    gibt, weiß die Orga und nicht diese Anwendung.
+    """
+    if spalte not in ("ort", "verantwortlich", "kontakt"):
+        return []
+    con = verbinden()
+    try:
+        return [z[0] for z in con.execute(
+            "SELECT DISTINCT " + spalte + " FROM aufgabe"
+            " WHERE TRIM(" + spalte + ") <> ''"
+            " ORDER BY " + spalte + " COLLATE NOCASE LIMIT 50")]
+    finally:
+        con.close()
+
+
+def programm_speichern(programm_id: int, werte: dict, stand) -> str:
+    """Ein Programmpunkt von Hand. Setzt von_hand, damit der nächste Abruf
+    die Änderung meldet statt sie zu überschreiben. Konfliktschutz wie bei den
+    Aufgaben."""
+    try:
+        stand = int(stand)
+    except (TypeError, ValueError):
+        stand = 0
+
+    con = verbinden()
+    try:
+        with con:
+            vorhanden = con.execute(
+                "SELECT version FROM programm WHERE id = ?",
+                (programm_id,)).fetchone()
+            if vorhanden is None:
+                return "weg"
+            if stand and vorhanden["version"] != stand:
+                return "konflikt"
+            con.execute(
+                "UPDATE programm SET titel = ?, beginn = ?, ende = ?,"
+                " zeit_roh = ?, notiz = ?, von_hand = 1, geaendert_am = ?,"
+                " version = version + 1 WHERE id = ?",
+                (werte["titel"], werte["beginn"], werte["ende"],
+                 werte["zeit_roh"], werte["notiz"], jetzt(), programm_id))
+        return "ok"
+    finally:
+        con.close()
+
+
+def programm_freigeben(programm_id: int) -> bool:
+    """Nimmt von_hand zurück: ab dem nächsten Abruf gilt wieder, was auf der
+    Website steht."""
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute(
+                "UPDATE programm SET von_hand = 0, geaendert_am = ?"
+                " WHERE id = ?", (jetzt(), programm_id))
+        return zeiger.rowcount > 0
     finally:
         con.close()
