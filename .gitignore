@@ -7,3 +7,10 @@ data/
 *.db
 *.db-wal
 *.db-shm
+
+# Echte Helfer- und Schichtdaten aus dem bisherigen Registrierungstool.
+# "Vergebene Posten.csv" enthaelt Namen, Kontaktdaten, Verpflegung und
+# T-Shirt-Groessen - das Repo ist oeffentlich. Nichts davon gehoert hinein.
+docs/*.csv
+*.csv
+!tests/**/*.csv
