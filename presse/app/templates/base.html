@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block titel %}Presse-Akkreditierung{% endblock %} – {{ veranstaltung }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="huelle">
+    <header>
+      <p class="veranstaltung">{{ veranstaltung }}{% if ort %} · {{ ort }}{% endif %}</p>
+      <h1>{% block ueberschrift %}Presse-Akkreditierung{% endblock %}</h1>
+    </header>
+
+    <main>
+      {% block inhalt %}{% endblock %}
+    </main>
+
+    <footer>
+      <p>
+        Fragen? {{ kontakt_name }}{% if kontakt_mail %} ·
+        <a href="mailto:{{ kontakt_mail }}">{{ kontakt_mail }}</a>{% endif %}{% if kontakt_telefon %} ·
+        {{ kontakt_telefon }}{% endif %}
+      </p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block ueberschrift %}Presse-Akkreditierung{% endblock %}
+
+{% macro fehlermeldung(feld) %}
+  {% if fehler.get(feld) %}<p class="fehler" id="fehler-{{ feld }}">{{ fehler[feld] }}</p>{% endif %}
+{% endmacro %}
+
+{% block inhalt %}
+  <p class="einleitung">
+    Du möchtest {{ veranstaltung }} mit Fotos oder Videos begleiten? Melde dich
+    hier an – dein Presse-Badge bekommst du vor Ort am {{ abholort }}.
+  </p>
+
+  {% if badges_knapp %}
+    <p class="hinweis hinweis-warnung">
+      Die vorproduzierten Badges sind rechnerisch vergeben. Du kannst dich
+      weiter anmelden, wir melden uns aber gegebenenfalls bei dir.
+    </p>
+  {% endif %}
+
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">
+      Bitte die markierten Felder prüfen – die Anmeldung wurde noch nicht abgeschickt.
+    </p>
+  {% endif %}
+
+  <form method="post" action="{{ form_pfad }}" novalidate>
+
+    <div class="paar">
+      <div class="feld{% if fehler.get('vorname') %} feld-fehler{% endif %}">
+        <label for="vorname">Vorname <span class="pflicht" aria-hidden="true">*</span></label>
+        <input type="text" id="vorname" name="vorname" required autocomplete="given-name"
+               value="{{ werte.get('vorname', '') }}"
+               {% if fehler.get('vorname') %}aria-describedby="fehler-vorname" aria-invalid="true"{% endif %}>
+        {{ fehlermeldung('vorname') }}
+      </div>
+      <div class="feld{% if fehler.get('nachname') %} feld-fehler{% endif %}">
+        <label for="nachname">Name <span class="pflicht" aria-hidden="true">*</span></label>
+        <input type="text" id="nachname" name="nachname" required autocomplete="family-name"
+               value="{{ werte.get('nachname', '') }}"
+               {% if fehler.get('nachname') %}aria-describedby="fehler-nachname" aria-invalid="true"{% endif %}>
+        {{ fehlermeldung('nachname') }}
+      </div>
+    </div>
+
+    <div class="feld{% if fehler.get('firma') %} feld-fehler{% endif %}">
+      <label for="firma">Firma <span class="pflicht" aria-hidden="true">*</span></label>
+      <input type="text" id="firma" name="firma" required autocomplete="organization"
+             placeholder="Redaktion, Agentur – oder „freiberuflich“"
+             value="{{ werte.get('firma', '') }}"
+             {% if fehler.get('firma') %}aria-describedby="fehler-firma" aria-invalid="true"{% endif %}>
+      {{ fehlermeldung('firma') }}
+    </div>
+
+    <div class="paar">
+      <div class="feld{% if fehler.get('email') %} feld-fehler{% endif %}">
+        <label for="email">E-Mail <span class="pflicht" aria-hidden="true">*</span></label>
+        <input type="email" id="email" name="email" required autocomplete="email"
+               value="{{ werte.get('email', '') }}"
+               {% if fehler.get('email') %}aria-describedby="fehler-email" aria-invalid="true"{% endif %}>
+        <p class="hilfe">Dorthin geht die Bestätigung mit allen Angaben.</p>
+        {{ fehlermeldung('email') }}
+      </div>
+      <div class="feld{% if fehler.get('telefon') %} feld-fehler{% endif %}">
+        <label for="telefon">Telefon <span class="optional">(optional)</span></label>
+        <input type="tel" id="telefon" name="telefon" autocomplete="tel"
+               value="{{ werte.get('telefon', '') }}"
+               {% if fehler.get('telefon') %}aria-describedby="fehler-telefon" aria-invalid="true"{% endif %}>
+        <p class="hilfe">Nur für Rückfragen.</p>
+        {{ fehlermeldung('telefon') }}
+      </div>
+    </div>
+
+    <fieldset class="feld{% if fehler.get('kommerziell') %} feld-fehler{% endif %}">
+      <legend>Kommerzielle Verwertung <span class="pflicht" aria-hidden="true">*</span></legend>
+      <label class="auswahl">
+        <input type="radio" id="kommerziell-ja" name="kommerziell" value="ja" required
+               {% if werte.get('kommerziell') %}checked{% endif %}>
+        <span class="auswahl-text">
+          <span class="auswahl-titel">Ja</span>
+          <span class="auswahl-hilfe">
+            Ich verkaufe oder verwerte die Aufnahmen kommerziell. Dafür ist das
+            Presse-Badge obligatorisch.
+          </span>
+        </span>
+      </label>
+      <label class="auswahl">
+        <input type="radio" id="kommerziell-nein" name="kommerziell" value="nein" required
+               {% if werte and not werte.get('kommerziell') %}checked{% endif %}>
+        <span class="auswahl-text">
+          <span class="auswahl-titel">Nein</span>
+          <span class="auswahl-hilfe">
+            Ich fotografiere privat und verwerte die Aufnahmen nicht kommerziell.
+          </span>
+        </span>
+      </label>
+      {{ fehlermeldung('kommerziell') }}
+    </fieldset>
+
+    {# Wird per CSS ausgeblendet, sobald „Nein" gewählt ist. Ohne :has()-
+       Unterstützung bleibt alles sichtbar – die Validierung verwirft die
+       Auswahl dann ohnehin. #}
+    <div class="nur-kommerziell">
+      <fieldset class="feld{% if fehler.get('gegenleistung') %} feld-fehler{% endif %}">
+        <legend>Akkreditierung <span class="pflicht" aria-hidden="true">*</span></legend>
+        <p class="hilfe">Bei kommerzieller Verwertung – eines von beiden.</p>
+
+        <label class="auswahl">
+          <input type="radio" id="gegen-gebuehr" name="gegenleistung" value="gebuehr"
+                 {% if werte.get('gegenleistung') == 'gebuehr' %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">{{ gebuehr }} Akkreditierungsgebühr</span>
+            <span class="auswahl-hilfe">Bar zu zahlen bei der Abholung am {{ abholort }}.</span>
+          </span>
+        </label>
+
+        <label class="auswahl">
+          <input type="radio" id="gegen-bilder" name="gegenleistung" value="bilderspende"
+                 {% if werte.get('gegenleistung') == 'bilderspende' %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">Bilderspende an den Verein</span>
+            <span class="auswahl-hilfe">
+              Ca. {{ bilder_anzahl }} Bilder der Veranstaltung. Interessiert sind
+              wir vor allem an emotionalen Stimmungsbildern, aber auch an
+              Aufnahmen von 1–2 Fahrern unserer Wahl, die wir im Nachgang auf
+              eurer Vertriebsplattform auswählen können.
+            </span>
+          </span>
+        </label>
+        {{ fehlermeldung('gegenleistung') }}
+      </fieldset>
+
+      <div class="nur-bilderspende">
+        <div class="feld bedingungen{% if fehler.get('bildrechte') %} feld-fehler{% endif %}">
+          <h2>Nutzung der gespendeten Bilder</h2>
+          <p>
+            Die gespendeten Bilder nutzen wir für die zukünftige Promotion der
+            Veranstaltung – vor allem für Social Media, Print und Merch. Eine
+            Verlinkung auf Social Media ist, wenn gewünscht, selbstverständlich
+            möglich.
+          </p>
+          <label class="auswahl">
+            <input type="checkbox" name="bildrechte" value="1"
+                   {% if werte.get('bildrechte') %}checked{% endif %}>
+            <span class="auswahl-text">
+              <span class="auswahl-titel">
+                Ich bin mit dieser Nutzung einverstanden
+                <span class="pflicht" aria-hidden="true">*</span>
+              </span>
+            </span>
+          </label>
+          {{ fehlermeldung('bildrechte') }}
+        </div>
+      </div>
+    </div>
+
+    <div class="feld{% if fehler.get('bemerkung') %} feld-fehler{% endif %}">
+      <label for="bemerkung">Bemerkung <span class="optional">(optional)</span></label>
+      <textarea id="bemerkung" name="bemerkung" rows="3"
+                {% if fehler.get('bemerkung') %}aria-describedby="fehler-bemerkung" aria-invalid="true"{% endif %}>{{ werte.get('bemerkung', '') }}</textarea>
+      {{ fehlermeldung('bemerkung') }}
+    </div>
+
+    <div class="feld bedingungen{% if fehler.get('sicherheit') %} feld-fehler{% endif %}">
+      <h2>Wichtiger Hinweis</h2>
+      <p>
+        Durch das Presse-Badge hast du <strong>keine Sonderrechte</strong>, was
+        das Betreten der abgesperrten Bereiche betrifft. Dies gilt insbesondere
+        für die Strecke und die ausgewiesenen Sturzzonen. Bitte halte dich aus
+        Sicherheitsgründen unbedingt an die Absperrungen und die Anweisungen des
+        Veranstaltungspersonals.
+      </p>
+      <label class="auswahl">
+        <input type="checkbox" name="sicherheit" value="1" required
+               {% if werte.get('sicherheit') %}checked{% endif %}>
+        <span class="auswahl-text">
+          <span class="auswahl-titel">
+            Ich habe den Sicherheitshinweis gelesen
+            <span class="pflicht" aria-hidden="true">*</span>
+          </span>
+        </span>
+      </label>
+      {{ fehlermeldung('sicherheit') }}
+    </div>
+
+    {# Honeypot: für Menschen unsichtbar, Bots füllen es gern aus. #}
+    <div class="honigtopf" aria-hidden="true">
+      <label for="{{ honeypot }}">Webseite (bitte freilassen)</label>
+      <input type="text" id="{{ honeypot }}" name="{{ honeypot }}" tabindex="-1" autocomplete="off">
+    </div>
+
+    <button type="submit">Anmeldung absenden</button>
+  </form>
+
+  <section class="datenschutz">
+    <h2>Datenschutz</h2>
+    <p>
+      Die Angaben werden von {{ kontakt_name }} ausschließlich zur Abwicklung
+      der Presse-Akkreditierung für {{ veranstaltung }} verwendet. Sie werden
+      nicht an Dritte weitergegeben. {{ aufbewahrung_hinweis }}
+      {% if kontakt_mail %}Auskunft und Löschung: <a href="mailto:{{ kontakt_mail }}">{{ kontakt_mail }}</a>.{% endif %}
+    </p>
+  </section>
+{% endblock %}

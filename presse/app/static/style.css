@@ -1,0 +1,606 @@
+/* Keine externen Fonts, keine CDNs – siehe Datenschutz im Plan. */
+
+:root {
+  --grund: #ffffff;
+  --flaeche: #f4f5f7;
+  --rand: #d6d9de;
+  --text: #1c1f23;
+  --gedaempft: #5b6169;
+  --akzent: #1f6feb;
+  --fehler: #b3261e;
+  --ok: #1a7f37;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grund: #16181c;
+    --flaeche: #1f2227;
+    --rand: #343a42;
+    --text: #e8eaed;
+    --gedaempft: #a2a9b3;
+    --akzent: #6aa4ff;
+    --fehler: #ff8f86;
+    --ok: #6fcf8b;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 1.5rem 1rem 3rem;
+  background: var(--flaeche);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.huelle {
+  max-width: 40rem;
+  margin: 0 auto;
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 12px;
+  padding: 1.75rem;
+}
+
+header { margin-bottom: 1.5rem; }
+
+.veranstaltung {
+  margin: 0;
+  font-size: .8rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gedaempft);
+}
+
+h1 { margin: .25rem 0 0; font-size: 1.5rem; line-height: 1.25; }
+h2 { font-size: 1rem; margin: 0 0 .4rem; }
+
+.feld { margin-bottom: 1.1rem; }
+
+fieldset.feld {
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: .75rem 1rem 1rem;
+}
+
+legend { font-weight: 600; padding: 0 .35rem; }
+
+label { display: block; font-weight: 600; margin-bottom: .3rem; }
+
+/* Mit Erklaerungstext werden die Zeilen mehrzeilig, deshalb oben ausrichten
+   statt mittig. Das ganze Label ist klickbar - auf dem Telefon zaehlt das. */
+.auswahl {
+  font-weight: 400;
+  display: flex;
+  gap: .6rem;
+  align-items: flex-start;
+  margin-bottom: .75rem;
+  cursor: pointer;
+}
+
+.auswahl input { width: auto; margin-top: .25rem; flex: none; }
+.auswahl-text { display: flex; flex-direction: column; }
+.auswahl-titel { font-weight: 600; }
+
+.auswahl-hilfe {
+  font-size: .875rem;
+  line-height: 1.35;
+  color: var(--gedaempft);
+  margin-top: .1rem;
+}
+
+.pflicht { color: var(--fehler); }
+.optional { font-weight: 400; color: var(--gedaempft); font-size: .85rem; }
+
+input[type="text"], input[type="email"], input[type="tel"], textarea {
+  width: 100%;
+  padding: .55rem .65rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+}
+
+input:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--akzent);
+  outline-offset: 1px;
+}
+
+textarea { resize: vertical; }
+
+.feld-fehler input, .feld-fehler textarea, fieldset.feld-fehler { border-color: var(--fehler); }
+
+.fehler { color: var(--fehler); font-size: .875rem; margin: .35rem 0 0; }
+.hilfe { color: var(--gedaempft); font-size: .85rem; margin: .3rem 0 0; }
+
+.gruppenhinweis {
+  background: var(--flaeche);
+  border-left: 3px solid var(--akzent);
+  padding: .6rem .8rem;
+  border-radius: 0 8px 8px 0;
+  font-size: .925rem;
+}
+
+.hinweis { padding: .7rem .9rem; border-radius: 8px; border: 1px solid var(--rand); }
+.hinweis-fehler { border-color: var(--fehler); color: var(--fehler); }
+.hinweis-ok { border-color: var(--ok); }
+
+button {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--akzent);
+  border: 0;
+  border-radius: 8px;
+  padding: .7rem 1.4rem;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(1.08); }
+
+/* Honeypot: aus dem Bild schieben statt display:none – manche Bots prüfen das. */
+.honigtopf {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.datenschutz {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rand);
+  color: var(--gedaempft);
+  font-size: .875rem;
+}
+
+.zurueck, a { color: var(--akzent); }
+
+footer {
+  margin-top: 1.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rand);
+  color: var(--gedaempft);
+  font-size: .875rem;
+}
+
+/* --- Backoffice ---------------------------------------------------------- */
+
+.huelle-breit { max-width: 68rem; }
+
+.admin-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.abmelden { display: flex; align-items: center; gap: .6rem; }
+
+.kuerzel {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 999px;
+  padding: .15rem .6rem;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.knopf-schlicht {
+  display: inline-block;
+  font: inherit;
+  font-size: .9rem;
+  color: var(--text);
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: .45rem .9rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.knopf-gefahr {
+  background: transparent;
+  color: var(--fehler);
+  border: 1px solid var(--fehler);
+}
+
+.knopf-gefahr:hover { background: var(--fehler); color: #fff; filter: none; }
+
+/* Zähler pro Kategorie */
+.zaehler {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: .75rem;
+  margin-bottom: 1.25rem;
+}
+
+.zaehler-kachel {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  padding: .7rem .9rem;
+}
+
+.zaehler-titel { margin: 0; font-size: .8rem; color: var(--gedaempft); }
+.zaehler-zahl { margin: .1rem 0; font-size: 1.6rem; font-weight: 700; line-height: 1; }
+.zaehler-detail { margin: 0; font-size: .78rem; color: var(--gedaempft); }
+
+/* Filterleiste */
+.filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: flex-end;
+  padding: .9rem;
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.filter label { font-size: .78rem; color: var(--gedaempft); margin-bottom: .2rem; }
+.filter-suche { flex: 1 1 14rem; }
+.filter-knoepfe { display: flex; gap: .5rem; align-items: center; }
+
+select, input[type="search"], input[type="password"] {
+  font: inherit;
+  padding: .45rem .55rem;
+  color: var(--text);
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+}
+
+input[type="search"], input[type="password"] { width: 100%; }
+
+.trefferzahl { font-size: .85rem; color: var(--gedaempft); margin: 0 0 .6rem; }
+
+/* Tabelle */
+.tabelle-huelle { overflow-x: auto; }
+
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+
+th, td {
+  text-align: left;
+  padding: .55rem .6rem;
+  border-bottom: 1px solid var(--rand);
+  vertical-align: top;
+}
+
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--gedaempft); }
+
+tbody tr:hover { background: var(--flaeche); }
+
+.nowrap { white-space: nowrap; }
+
+.kennzeichen {
+  display: inline-block;
+  margin-left: .4rem;
+  font-size: .75rem;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  color: var(--gedaempft);
+}
+
+/* Status-Marken */
+.marke {
+  display: inline-block;
+  padding: .1rem .5rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 600;
+  border: 1px solid var(--rand);
+  white-space: nowrap;
+}
+
+.marke-neu { border-color: var(--akzent); color: var(--akzent); }
+.marke-genehmigt { border-color: var(--ok); color: var(--ok); }
+.marke-abgelehnt { border-color: var(--fehler); color: var(--fehler); }
+.marke-ausgegeben { border-color: var(--gedaempft); color: var(--gedaempft); }
+.marke-telefon { border-style: dashed; color: var(--gedaempft); }
+
+/* Detailansicht */
+.zurueck-zeile { margin-top: 0; font-size: .9rem; }
+.status-zeile { display: flex; gap: .4rem; margin: 0 0 1rem; }
+
+.daten {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  gap: .35rem 1rem;
+  margin: 0 0 1.5rem;
+}
+
+.daten dt { font-weight: 600; color: var(--gedaempft); font-size: .875rem; }
+.daten dd { margin: 0; }
+.mehrzeilig { white-space: pre-line; }
+.gedaempft { color: var(--gedaempft); }
+
+.loeschen {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rand);
+}
+
+.loeschen .hilfe { margin: 0; }
+
+pre {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: .7rem .9rem;
+  overflow-x: auto;
+}
+
+code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; }
+
+@media (max-width: 34rem) {
+  .daten { grid-template-columns: 1fr; gap: 0 0; }
+  .daten dd { margin-bottom: .6rem; }
+}
+
+/* --- Freigabe (Schritt 5) ------------------------------------------------- */
+
+.hinweis-warnung { border-color: #d29200; color: #8a6100; }
+
+@media (prefers-color-scheme: dark) {
+  .hinweis-warnung { color: #e8b339; }
+}
+
+.zaehler-voll { border-color: #d29200; }
+.zaehler-grenze { font-size: 1rem; font-weight: 400; color: var(--gedaempft); }
+
+/* Zwei Felder nebeneinander, solange Platz ist */
+.paar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0 1rem;
+}
+
+.knopfreihe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.knopfreihe form { margin: 0; }
+
+.ablehnen { margin-bottom: 1rem; }
+
+.sammelaktion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.sammelaktion .hilfe { margin: 0; flex: 1 1 16rem; }
+
+h2 {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rand);
+}
+
+/* Nur für Screenreader */
+.nur-vorleser {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* --- Mail und Telefonliste (Schritt 6) ------------------------------------ */
+
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: .75rem;
+  border-bottom: 1px solid var(--rand);
+  font-size: .9rem;
+}
+
+.admin-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.admin-nav a:hover { text-decoration: underline; }
+
+td .hilfe { display: block; margin-top: .2rem; }
+td form { margin: 0; }
+
+/* --- Kennzeichen in der Liste --------------------------------------------- */
+
+.kennzeichen-spalte {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Schmale Schirme ------------------------------------------------------ */
+
+/* Auf dem Telefon frisst der aeussere Rahmen nur Platz: die Seite IST der
+   Inhalt, es gibt daneben nichts, wovon sie sich absetzen muesste. */
+@media (max-width: 40rem) {
+  body {
+    padding: 0;
+    background: var(--grund);
+  }
+
+  .huelle {
+    max-width: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    padding: 1.25rem 1rem 2.5rem;
+  }
+
+  .gruppenhinweis {
+    border-radius: 0 6px 6px 0;
+  }
+
+  /* Die Filterleiste stapelt sich, sonst wird jedes Feld handtuchschmal. */
+  .filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter select,
+  .filter-knoepfe { width: 100%; }
+  .filter-knoepfe button { flex: 1; }
+
+  .admin-kopf { gap: .5rem; }
+}
+
+/* --- Durchfahrtsliste an der Strassensperre ------------------------------- */
+
+/* Wird vermutlich am Telefon im Stehen bedient: grosse Trefferflaechen,
+   grosse Schrift, wenig drumherum. */
+
+.sperre-suche { margin-bottom: 1.25rem; }
+
+.sperre-suche label { font-size: .8rem; color: var(--gedaempft); }
+
+.sperre-suche-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: stretch;
+}
+
+.sperre-suche input[type="search"] {
+  flex: 1 1 12rem;
+  font-size: 1.15rem;
+  padding: .6rem .7rem;
+}
+
+.sperre-suche button { font-size: 1rem; }
+.sperre-suche .knopf-schlicht { display: flex; align-items: center; }
+.sperre-suche .hilfe { margin-top: .4rem; }
+
+.sperre-tabelle { font-size: 1rem; }
+.sperre-tabelle th { font-size: .75rem; padding: 0; }
+.sperre-tabelle td { padding: .7rem .6rem; }
+
+/* Die Ueberschrift ist ein Knopf, damit sie auch per Tastatur und Screenreader
+   bedienbar ist. Sie fuellt die ganze Zelle - auf dem Telefon zaehlt jede
+   Millimeter Trefferflaeche. */
+.sortknopf {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  width: 100%;
+  padding: .6rem;
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--gedaempft);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sortknopf:hover { background: var(--flaeche); color: var(--text); }
+
+th[aria-sort="ascending"] .sortknopf,
+th[aria-sort="descending"] .sortknopf { color: var(--text); }
+
+.sortpfeil { font-size: .7em; line-height: 1; }
+
+.sperre-kennzeichen {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.sperre-fuss {
+  margin-top: 1.5rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--rand);
+}
+
+/* Vom Filterskript gesetzt. !important, weil display bei Tabellenzeilen sonst
+   von der Tabellendarstellung gewinnt. */
+.weg { display: none !important; }
+
+@media (max-width: 40rem) {
+  .sperre-suche-zeile input[type="search"] { flex-basis: 100%; }
+  .sperre-suche-zeile button { flex: 1; }
+}
+
+/* Der offene Link zur Durchfahrtsliste – muss abschreibbar und antippbar sein. */
+.teilen-url {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: .7rem .9rem;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: .85rem;
+  overflow-wrap: anywhere;
+}
+
+/* --- Presse-Akkreditierung ------------------------------------------------ */
+
+.einleitung {
+  font-size: 1.05rem;
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+/* Bedingungen zum Anhaken: Sicherheitshinweis und Bildrechte. Abgesetzt, damit
+   niemand behaupten kann, er habe es uebersehen. */
+.bedingungen {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+
+.bedingungen h2 {
+  margin: 0 0 .5rem;
+  font-size: .95rem;
+}
+
+.bedingungen p {
+  margin: 0 0 .75rem;
+  font-size: .925rem;
+  line-height: 1.5;
+}
+
+.bedingungen .auswahl { margin-bottom: 0; }
+.bedingungen.feld-fehler { border-color: var(--fehler); }
+
+/* Bedingte Felder ohne JavaScript.
+   Sichtbar ist der Standard - faellt :has() aus, steht schlicht alles da und
+   die Validierung verwirft, was nicht passt. Kein kaputtes Formular. */
+form:has(#kommerziell-nein:checked) .nur-kommerziell { display: none; }
+form:has(#gegen-gebuehr:checked) .nur-bilderspende { display: none; }
+
+.nur-kommerziell > .feld:first-child { margin-top: 0; }
