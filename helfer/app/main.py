@@ -14,7 +14,7 @@ import asyncio
 import hmac
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
@@ -400,17 +400,37 @@ def _token_stimmt(uebermittelt: str) -> bool:
     return hmac.compare_digest(hinterlegt, uebermittelt)
 
 
-def _monitor_kontext(request: Request, token: str) -> dict:
-    stand = db.monitor_stand(db.jetzt_lokal(), config.MONITOR_VORSCHAU)
+def _monitor_kontext(request: Request, token: str, tag: str = "") -> dict:
+    jetzt = db.jetzt_lokal()
+    stand = db.monitor_stand(jetzt, config.MONITOR_VORSCHAU)
     # strftime('%A') käme im C-Locale als "Saturday" heraus, und ein Locale
     # auf dem Server zu setzen wäre für einen Wochentag zu viel Aufwand.
-    stand["tag_lang"] = (config.WOCHENTAGE[stand["jetzt"].weekday()] + ", " +
-                         stand["jetzt"].strftime("%d.%m.%Y"))
-    return _kontext(request, token=token, stand=stand,
-                    intervall=config.MONITOR_INTERVALL,
-                    warnschwelle=config.MONITOR_WARNUNG,
-                    overlay_sekunden=config.MONITOR_OVERLAY_SEKUNDEN,
-                    tage=config.TAGE)
+    stand["tag_lang"] = (config.WOCHENTAGE[jetzt.weekday()] + ", " +
+                         jetzt.strftime("%d.%m.%Y"))
+    return _kontext(
+        request, token=token, stand=stand,
+        # Nur der Tagesblick, wenn ein Tag angefragt ist – sonst None.
+        tagesblick=db.tagesstand(tag, jetzt) if tag else None,
+        tagesleiste=db.monitor_tage(),
+        heute=jetzt.strftime("%Y-%m-%d"),
+        intervall=config.MONITOR_INTERVALL,
+        warnschwelle=config.MONITOR_WARNUNG,
+        overlay_sekunden=config.MONITOR_OVERLAY_SEKUNDEN,
+        tagesblick_sekunden=config.MONITOR_TAGESBLICK_SEKUNDEN,
+        tage=config.TAGE)
+
+
+def _tag_pruefen(roh: str) -> str:
+    """Nur ein Datum, das es wirklich gibt. Alles andere wird verworfen,
+    statt es in eine Abfrage zu reichen."""
+    roh = (roh or "").strip()
+    if not roh:
+        return ""
+    try:
+        date.fromisoformat(roh)
+    except ValueError:
+        return ""
+    return roh
 
 
 @app.get("/monitor/{token}")
@@ -425,13 +445,20 @@ async def monitor(request: Request, token: str):
 
 
 @app.get("/monitor/{token}/inhalt")
-async def monitor_inhalt(request: Request, token: str):
+async def monitor_inhalt(request: Request, token: str, tag: str = ""):
     """Nur der wechselnde Teil. Die Seite holt ihn sich selbst, damit der
-    Bildschirm nicht alle Minute weiß aufblitzt."""
+    Bildschirm nicht alle Minute weiß aufblitzt.
+
+    Mit `tag` kommt der Tagesblick statt der Jetzt-Ansicht zurück. Auch der
+    frischt sich weiter auf: wer am Sonntag plant, während im Backoffice
+    jemand einteilt, soll die neuen Zahlen sehen.
+    """
     if not _token_stimmt(token):
         return Response("", status_code=404)
-    antwort = templates.TemplateResponse("monitor_inhalt.html",
-                                         _monitor_kontext(request, token))
+    tag = _tag_pruefen(tag)
+    antwort = templates.TemplateResponse(
+        "monitor_tag.html" if tag else "monitor_inhalt.html",
+        _monitor_kontext(request, token, tag))
     antwort.headers["Cache-Control"] = "no-store"
     return antwort
 

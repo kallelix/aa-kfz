@@ -190,6 +190,12 @@ MONITOR_WARNUNG = _zahl("MONITOR_WARNUNG", 1)
 # ab – dann muss von Hand geschlossen werden.
 MONITOR_OVERLAY_SEKUNDEN = _zahl("MONITOR_OVERLAY_SEKUNDEN", 90)
 
+# Wie lange der Tagesblick offen bleibt (Sekunden), bevor der Monitor von
+# selbst auf "Jetzt" zurückspringt. Aus demselben Grund wie beim Overlay: wer
+# einen Tag aufschlägt und weggeht, darf den Bildschirm nicht dort festsetzen.
+# 0 schaltet den Rücksprung ab.
+MONITOR_TAGESBLICK_SEKUNDEN = _zahl("MONITOR_TAGESBLICK_SEKUNDEN", 120)
+
 # Feste Zeitzone – der Monitor steht in Ilmenau, egal wo der Server läuft.
 ZEITZONE = os.environ.get("ZEITZONE", "Europe/Berlin").strip() or "Europe/Berlin"
 

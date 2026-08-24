@@ -1,0 +1,72 @@
+{# Ein ganzer Tag am Stück. Tritt an die Stelle der Jetzt-Ansicht, sobald in
+   der Tagesleiste ein Tag angetippt wird.
+
+   data-jetzt bleibt die echte Serverzeit – die Uhr oben rechts zeigt immer
+   den jetzigen Moment, auch während man auf den Sonntag schaut. Alles andere
+   wäre auf einem Monitor, an dem Leute vorbeigehen, gefährlich missdeutbar.
+   data-tagesblick sagt dem Skript, welcher Tag gerade offen ist. #}
+
+{% import "monitor_bausteine.html" as bausteine %}
+
+<div class="raster raster-tag"
+     data-jetzt="{{ stand.jetzt.isoformat(timespec='seconds') }}"
+     data-tag="{{ stand.tag_lang }}"
+     data-tagesblick="{{ tagesblick.datum }}">
+
+  <p class="tagesbanner">
+    <span class="tagesbanner-marke">Vorschau</span>
+    <span class="tagesbanner-tag">{{ tagesblick.tag_lang }}</span>
+    <span class="tagesbanner-zahlen">
+      {{ tagesblick.besetzt }} von {{ tagesblick.bedarf }} Plätzen besetzt
+      {%- if tagesblick.offen %} ·
+        <span class="fehlt">{{ tagesblick.offen }} offen auf
+          {{ tagesblick.luecken }} Schichten</span>
+      {%- endif %}
+    </span>
+  </p>
+
+  <section class="tafel tafel-tagschichten">
+    <h2>Schichten
+      <span class="klein">{{ tagesblick.schichten | length }} an diesem Tag</span>
+    </h2>
+
+    {% if not tagesblick.schichten %}
+      <p class="leer">An diesem Tag ist keine Schicht eingeplant.</p>
+    {% else %}
+      <ul class="tagesliste">
+        {% for s in tagesblick.schichten %}
+          <li class="{% if warnschwelle and s.fehlt >= warnschwelle %}schicht-luecke{% endif %}">
+            <button type="button" class="kachel" data-schicht="{{ s.id }}">
+              <span class="zeit">{{ s.beginn[11:] }}–{{ s.ende[11:] }}</span>
+              <span class="liste">{{ s.liste }}</span>
+              <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.bedarf }}</span></span>
+              {% if s.fehlt %}
+                <span class="fehlt">{{ s.fehlt }} offen</span>
+              {% else %}
+                <span class="voll">voll</span>
+              {% endif %}
+            </button>
+            {{ bausteine.detail(s) }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+
+  <section class="tafel tafel-tagprogramm">
+    <h2>Programm</h2>
+    {% if not tagesblick.programm %}
+      <p class="leer">Für diesen Tag ist kein Programm hinterlegt.</p>
+    {% else %}
+      <ul class="programm">
+        {% for p in tagesblick.programm %}
+          <li>
+            <span class="zeit">{{ p | programmzeit }}</span>
+            <span class="titel">{{ p.titel }}</span>
+            <span class="serie serie-{{ p.serie }}">{{ p.serie }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+</div>

@@ -8,33 +8,7 @@
    und es funktioniert damit auch dann noch, wenn die Verbindung gerade weg
    ist und nur der letzte Stand dasteht. #}
 
-{% macro detail(s) %}
-  <div class="detail" hidden>
-    <h3 class="detail-titel">{{ s.liste }}</h3>
-    <p class="detail-zeit">
-      {{ s.datum | tag }} · {{ s.beginn[11:] }}–{{ s.ende[11:] }}
-      {%- if s.beginn[:10] != s.ende[:10] %} (am Folgetag){% endif %}
-      {%- if s.ort %} · {{ s.ort }}{% endif %}
-    </p>
-    <p class="detail-quote">
-      <span class="{% if s.fehlt %}zahl-fehlt{% else %}zahl-voll{% endif %}">
-        {{ s.besetzt }} von {{ s.bedarf }}</span>
-      {% if s.fehlt %}
-        <span class="marke marke-luecke">{{ s.fehlt }} fehlen</span>
-      {% else %}
-        <span class="marke marke-voll">voll besetzt</span>
-      {% endif %}
-    </p>
-    {% if s.hinweis %}<p class="detail-hinweis">{{ s.hinweis }}</p>{% endif %}
-    {% if s.namen %}
-      <ol class="detail-namen">
-        {% for name in s.namen %}<li>{{ name }}</li>{% endfor %}
-      </ol>
-    {% else %}
-      <p class="leer">Für diese Schicht ist niemand eingeteilt.</p>
-    {% endif %}
-  </div>
-{% endmacro %}
+{% import "monitor_bausteine.html" as bausteine %}
 
 <div class="raster" data-jetzt="{{ stand.jetzt.isoformat(timespec='seconds') }}"
      data-tag="{{ stand.tag_lang }}">
@@ -67,7 +41,7 @@
                 <span class="namen leer">niemand eingeteilt</span>
               {% endif %}
             </button>
-            {{ detail(s) }}
+            {{ bausteine.detail(s) }}
           </li>
         {% endfor %}
       </ul>
@@ -137,7 +111,7 @@
               <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.bedarf }}</span></span>
               {% if s.fehlt %}<span class="fehlt">{{ s.fehlt }} offen</span>{% endif %}
             </button>
-            {{ detail(s) }}
+            {{ bausteine.detail(s) }}
           </li>
         {% endfor %}
       </ul>

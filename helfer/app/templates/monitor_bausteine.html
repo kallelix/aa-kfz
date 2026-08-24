@@ -1,0 +1,37 @@
+{# Gemeinsame Bausteine der beiden Monitoransichten (Jetzt und Tagesblick).
+
+   Eigene Datei, damit keine der beiden die andere importieren muss: ein
+   Import fuehrt in Jinja den Rumpf der Vorlage mit aus, und dann rechnete der
+   Tagesblick jedes Mal die Jetzt-Ansicht mit durch, nur um an dieses Makro zu
+   kommen. #}
+
+{% macro detail(s) %}
+  {# Die Langfassung einer Schicht. Liegt versteckt in jeder Kachel, damit das
+     Overlay sie ohne zweiten Abruf herausholen kann - und damit sie auch dann
+     noch da ist, wenn die Verbindung gerade weg ist. #}
+  <div class="detail" hidden>
+    <h3 class="detail-titel">{{ s.liste }}</h3>
+    <p class="detail-zeit">
+      {{ s.datum | tag }} · {{ s.beginn[11:] }}–{{ s.ende[11:] }}
+      {%- if s.beginn[:10] != s.ende[:10] %} (am Folgetag){% endif %}
+      {%- if s.ort %} · {{ s.ort }}{% endif %}
+    </p>
+    <p class="detail-quote">
+      <span class="{% if s.fehlt %}zahl-fehlt{% else %}zahl-voll{% endif %}">
+        {{ s.besetzt }} von {{ s.bedarf }}</span>
+      {% if s.fehlt %}
+        <span class="marke marke-luecke">{{ s.fehlt }} fehlen</span>
+      {% else %}
+        <span class="marke marke-voll">voll besetzt</span>
+      {% endif %}
+    </p>
+    {% if s.hinweis %}<p class="detail-hinweis">{{ s.hinweis }}</p>{% endif %}
+    {% if s.namen %}
+      <ol class="detail-namen">
+        {% for name in s.namen %}<li>{{ name }}</li>{% endfor %}
+      </ol>
+    {% else %}
+      <p class="leer">Für diese Schicht ist niemand eingeteilt.</p>
+    {% endif %}
+  </div>
+{% endmacro %}

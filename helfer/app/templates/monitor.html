@@ -18,8 +18,23 @@
       <p class="veranstaltung">{{ veranstaltung }}</p>
       <p class="tag" id="tag">{{ stand.tag_lang }}</p>
     </div>
+    {# Die Uhr zeigt immer den jetzigen Moment, auch im Tagesblick. #}
     <p class="uhr" id="uhr">{{ stand.jetzt.strftime('%H:%M') }}</p>
   </header>
+
+  {# Die Tagesleiste liegt im Rahmen, nicht im aufgefrischten Bereich: sie
+     ändert sich nicht und muss jeden Austausch überstehen. #}
+  <nav class="tagesleiste" id="tagesleiste" aria-label="Tag wählen">
+    <button type="button" class="tagknopf tagknopf-jetzt ist-aktiv"
+            data-tag="" id="knopf-jetzt">Jetzt</button>
+    {% for t in tagesleiste %}
+      <button type="button" class="tagknopf{% if t.datum == heute %} ist-heute{% endif %}"
+              data-tag="{{ t.datum }}" aria-label="{{ t.lang }}">{{ t.kurz }}</button>
+    {% endfor %}
+    <span class="rueckkehr" id="rueckkehr" hidden>
+      zurück zu <strong>Jetzt</strong> in <span id="rueckkehr-rest"></span> s
+    </span>
+  </nav>
 
   <p class="warnung" id="warnung" hidden>
     Keine Verbindung zum Server – angezeigt wird der Stand von
@@ -47,6 +62,7 @@
   <script src="/static/monitor.js"
           data-quelle="/monitor/{{ token }}/inhalt"
           data-intervall="{{ intervall }}"
-          data-overlay-sekunden="{{ overlay_sekunden }}"></script>
+          data-overlay-sekunden="{{ overlay_sekunden }}"
+          data-tagesblick-sekunden="{{ tagesblick_sekunden }}"></script>
 </body>
 </html>

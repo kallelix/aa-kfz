@@ -544,6 +544,105 @@ def monitor_token_loeschen() -> None:
     einstellung_setzen(MONITOR_SCHLUESSEL, "")
 
 
+def _schichten_mit_namen(con: sqlite3.Connection, bedingung: str,
+                         werte: tuple) -> list[dict]:
+    """Schichten samt der Namen aller Eingeteilten.
+
+    Die Namen kommen in einer zweiten Abfrage für alle Schichten zusammen,
+    nicht in einer je Schicht – sonst wären es auf dem Monitor bei jedem
+    Auffrischen zwei Dutzend Abfragen statt zwei.
+    """
+    zeilen = [dict(z) for z in con.execute(
+        "SELECT " + _SCHICHT_SPALTEN + " FROM schicht s WHERE " + bedingung +
+        " ORDER BY s.beginn, s.liste COLLATE NOCASE", werte)]
+    if not zeilen:
+        return []
+
+    platzhalter = ",".join("?" for _ in zeilen)
+    namen: dict[int, list[str]] = {z["id"]: [] for z in zeilen}
+    for eintrag in con.execute(
+            "SELECT e.schicht_id, h.name FROM einteilung e"
+            " JOIN helfer h ON h.id = e.helfer_id"
+            " WHERE e.schicht_id IN (" + platzhalter + ")"
+            " ORDER BY h.name COLLATE NOCASE",
+            [z["id"] for z in zeilen]):
+        namen[eintrag["schicht_id"]].append(eintrag["name"])
+    for zeile in zeilen:
+        zeile["namen"] = namen[zeile["id"]]
+    return zeilen
+
+
+def monitor_tage() -> list[dict]:
+    """Alle Tage, an denen etwas ansteht – für die Tagesleiste im Monitor.
+
+    Schicht- und Programmtage zusammen: der Aufbau am 25.08. hat kein
+    Programm, ein reiner Programmtag hätte keine Schicht. Beides gehört in
+    die Leiste.
+    """
+    con = verbinden()
+    try:
+        tage = {z["datum"] for z in con.execute(
+            "SELECT DISTINCT datum FROM schicht")}
+        tage |= {z["datum"] for z in con.execute(
+            "SELECT DISTINCT datum FROM programm WHERE entfallen_am IS NULL")}
+    finally:
+        con.close()
+
+    ergebnis = []
+    for datum in sorted(tage):
+        try:
+            zeit = datetime.fromisoformat(datum)
+        except ValueError:
+            continue
+        ergebnis.append({
+            "datum": datum,
+            "kurz": config.WOCHENTAGE[zeit.weekday()][:2] + zeit.strftime(" %d.%m."),
+            "lang": config.WOCHENTAGE[zeit.weekday()] + ", " + zeit.strftime("%d.%m.%Y"),
+        })
+    return ergebnis
+
+
+def tagesstand(datum: str, zeitpunkt: datetime) -> dict:
+    """Ein ganzer Tag am Stück – der Blick voraus, den die Kollegen brauchen.
+
+    Bewusst eine eigene Ansicht und nicht derselbe Aufbau mit anderem Datum:
+    "Jetzt im Dienst" und "Als Nächstes" beziehen sich auf diesen Moment. An
+    einem künftigen Tag gibt es keinen, und zwei der drei Tafeln blieben leer.
+    Hier zählt stattdessen der Tagesablauf von früh bis spät.
+    """
+    con = verbinden()
+    try:
+        schichten = _schichten_mit_namen(con, "s.datum = ?", (datum,))
+        programm = [dict(z) for z in con.execute(
+            "SELECT * FROM programm WHERE entfallen_am IS NULL AND datum = ?"
+            " ORDER BY beginn IS NULL, beginn, titel COLLATE NOCASE",
+            (datum,))]
+    finally:
+        con.close()
+
+    try:
+        zeit = datetime.fromisoformat(datum)
+        lang = (config.WOCHENTAGE[zeit.weekday()] + ", " +
+                zeit.strftime("%d.%m.%Y"))
+    except ValueError:
+        lang = datum
+
+    bedarf = sum(s["bedarf"] for s in schichten)
+    besetzt = sum(s["besetzt"] for s in schichten)
+    return {
+        "jetzt": zeitpunkt,
+        "datum": datum,
+        "tag_lang": lang,
+        "ist_heute": datum == zeitpunkt.strftime("%Y-%m-%d"),
+        "schichten": schichten,
+        "programm": programm,
+        "bedarf": bedarf,
+        "besetzt": besetzt,
+        "offen": max(0, bedarf - besetzt),
+        "luecken": sum(1 for s in schichten if s["fehlt"]),
+    }
+
+
 def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
     """Alles, was der Monitor anzeigt, in einem Rutsch.
 
@@ -558,29 +657,10 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
 
     con = verbinden()
     try:
-        def schichten_mit(bedingung: str, werte: tuple) -> list[dict]:
-            zeilen = [dict(z) for z in con.execute(
-                "SELECT " + _SCHICHT_SPALTEN + " FROM schicht s WHERE " +
-                bedingung + " ORDER BY s.beginn, s.liste COLLATE NOCASE",
-                werte)]
-            if not zeilen:
-                return []
-            # Namen in einer zweiten Abfrage statt in einer je Schicht.
-            platzhalter = ",".join("?" for _ in zeilen)
-            namen: dict[int, list[str]] = {z["id"]: [] for z in zeilen}
-            for eintrag in con.execute(
-                    "SELECT e.schicht_id, h.name FROM einteilung e"
-                    " JOIN helfer h ON h.id = e.helfer_id"
-                    " WHERE e.schicht_id IN (" + platzhalter + ")"
-                    " ORDER BY h.name COLLATE NOCASE",
-                    [z["id"] for z in zeilen]):
-                namen[eintrag["schicht_id"]].append(eintrag["name"])
-            for zeile in zeilen:
-                zeile["namen"] = namen[zeile["id"]]
-            return zeilen
-
-        laufend = schichten_mit("s.beginn <= ? AND s.ende > ?", (jetzt, jetzt))
-        demnaechst = schichten_mit("s.beginn > ? AND s.beginn <= ?", (jetzt, bis))
+        laufend = _schichten_mit_namen(con, "s.beginn <= ? AND s.ende > ?",
+                                       (jetzt, jetzt))
+        demnaechst = _schichten_mit_namen(con, "s.beginn > ? AND s.beginn <= ?",
+                                          (jetzt, bis))
 
         programm = [dict(z) for z in con.execute(
             "SELECT * FROM programm WHERE entfallen_am IS NULL"

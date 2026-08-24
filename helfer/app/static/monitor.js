@@ -1,6 +1,7 @@
-/* Hält die Monitoransicht aktuell und zeigt eine angetippte Schicht groß.
+/* Hält die Monitoransicht aktuell, zeigt eine angetippte Schicht groß und
+ * lässt einen ganzen Tag vorausschauen.
  *
- * Drei Dinge, die auf einem Bildschirm an der Wand zählen:
+ * Vier Dinge, die auf einem Bildschirm an der Wand zählen:
  *
  * 1. Reißt die Verbindung ab, bleibt das Letzte stehen, was da war – mit
  *    einem sichtbaren Hinweis, von wann es ist. Eine leere oder halb geladene
@@ -9,29 +10,38 @@
  *    Abstand zwischen beiden wird bei jedem geglückten Abruf neu bestimmt;
  *    dazwischen zählt die lokale Uhr weiter, damit die Anzeige jede Sekunde
  *    stimmt und nicht nur jede Minute.
- * 3. Das Overlay schließt sich von selbst. Ohne das bliebe der Monitor in
- *    einer einzelnen Schicht hängen, sobald jemand sie öffnet und weggeht –
- *    und niemand merkt es, weil da ja etwas steht.
+ * 3. Alles, was jemand aufschlägt, schließt sich von selbst wieder: das
+ *    Overlay und der Tagesblick. Ohne das bliebe der Monitor beim ersten
+ *    Neugierigen stehen, der weggeht – und niemandem fiele es auf, weil ja
+ *    etwas zu sehen ist.
+ * 4. Der Selbstrücksprung ruht, solange ein Overlay offen ist. Jemandem die
+ *    Namensliste unter den Augen wegzuziehen, weil im Hintergrund eine Uhr
+ *    abgelaufen ist, wäre die unangenehmste Art, hilfreich sein zu wollen.
  */
 (function () {
   "use strict";
 
   var skript = document.currentScript;
   var quelle = skript.getAttribute("data-quelle");
-  var intervall = Number(skript.getAttribute("data-intervall") || 60) * 1000;
-  if (!(intervall > 5000)) {
-    intervall = 60000;
+
+  function zahl(name, vorgabe, mindest) {
+    var wert = Number(skript.getAttribute(name));
+    return wert >= (mindest === undefined ? 0 : mindest) ? wert : vorgabe;
   }
-  var overlayDauer = Number(skript.getAttribute("data-overlay-sekunden") || 90);
-  if (!(overlayDauer >= 0)) {
-    overlayDauer = 90;
-  }
+
+  var intervall = zahl("data-intervall", 60, 5) * 1000;
+  var overlayDauer = zahl("data-overlay-sekunden", 90);
+  var tagesblickDauer = zahl("data-tagesblick-sekunden", 120);
 
   var inhalt = document.getElementById("inhalt");
   var warnung = document.getElementById("warnung");
   var standAnzeige = document.getElementById("stand");
   var uhrAnzeige = document.getElementById("uhr");
   var tagAnzeige = document.getElementById("tag");
+
+  var leiste = document.getElementById("tagesleiste");
+  var rueckkehr = document.getElementById("rueckkehr");
+  var rueckkehrRest = document.getElementById("rueckkehr-rest");
 
   var overlay = document.getElementById("overlay");
   var overlayInhalt = document.getElementById("overlay-inhalt");
@@ -45,10 +55,14 @@
 
   /* Welche Schicht gerade offen ist (null = keine) und wann sie zugeht. */
   var offeneSchicht = null;
-  var schliesstUm = 0;
+  var overlaySchliesstUm = 0;
 
-  function zweistellig(zahl) {
-    return (zahl < 10 ? "0" : "") + zahl;
+  /* Welcher Tag gerade vorausgeschaut wird ("" = die Jetzt-Ansicht). */
+  var offenerTag = "";
+  var tagEndetUm = 0;
+
+  function zweistellig(wert) {
+    return (wert < 10 ? "0" : "") + wert;
   }
 
   function serverzeit() {
@@ -93,7 +107,7 @@
     }
   }
 
-  /* --- Overlay ----------------------------------------------------------- */
+  /* --- Overlay: eine Schicht groß ---------------------------------------- */
 
   function detailSuchen(nummer) {
     var kachel = inhalt.querySelector('.kachel[data-schicht="' + nummer + '"]');
@@ -103,7 +117,7 @@
     return kachel.parentNode.querySelector(".detail");
   }
 
-  function oeffnen(nummer) {
+  function overlayOeffnen(nummer) {
     var detail = detailSuchen(nummer);
     if (!detail) {
       return;
@@ -112,66 +126,136 @@
     overlayInhalt.innerHTML = detail.innerHTML;
     overlay.hidden = false;
     if (overlayDauer > 0) {
-      schliesstUm = Date.now() + overlayDauer * 1000;
+      overlaySchliesstUm = Date.now() + overlayDauer * 1000;
       overlayFuss.hidden = false;
-      restStellen();
+      overlayRest.textContent = String(overlayDauer);
     } else {
       overlayFuss.hidden = true;
     }
     overlayZu.focus();
   }
 
-  function schliessen() {
+  function overlaySchliessen() {
     offeneSchicht = null;
-    schliesstUm = 0;
+    overlaySchliesstUm = 0;
     overlay.hidden = true;
     overlayInhalt.innerHTML = "";
+    /* Die Uhr des Tagesblicks lief derweil nicht weiter – sie fängt jetzt von
+     * vorn an, damit nach dem Zuklappen noch Zeit zum Weiterschauen bleibt. */
+    if (offenerTag && tagesblickDauer > 0) {
+      tagEndetUm = Date.now() + tagesblickDauer * 1000;
+    }
   }
 
-  function restStellen() {
-    if (!offeneSchicht || !schliesstUm) {
-      return;
+  /* --- Tagesblick --------------------------------------------------------- */
+
+  function leisteMarkieren() {
+    var knoepfe = leiste.querySelectorAll(".tagknopf");
+    for (var i = 0; i < knoepfe.length; i += 1) {
+      var eigen = knoepfe[i].getAttribute("data-tag") === offenerTag;
+      knoepfe[i].classList.toggle("ist-aktiv", eigen);
+      knoepfe[i].setAttribute("aria-pressed", eigen ? "true" : "false");
     }
-    var rest = Math.ceil((schliesstUm - Date.now()) / 1000);
-    if (rest <= 0) {
-      schliessen();
-      return;
-    }
-    overlayRest.textContent = String(rest);
+    rueckkehr.hidden = !(offenerTag && tagesblickDauer > 0);
   }
+
+  function tagWaehlen(tag) {
+    if (offeneSchicht) {
+      overlaySchliessen();
+    }
+    offenerTag = tag || "";
+    tagEndetUm = offenerTag && tagesblickDauer > 0
+      ? Date.now() + tagesblickDauer * 1000
+      : 0;
+    if (rueckkehrRest) {
+      rueckkehrRest.textContent = String(tagesblickDauer);
+    }
+    leisteMarkieren();
+    holen();
+  }
+
+  function sekundentakt() {
+    uhrStellen();
+
+    if (offeneSchicht && overlaySchliesstUm) {
+      var restOverlay = Math.ceil((overlaySchliesstUm - Date.now()) / 1000);
+      if (restOverlay <= 0) {
+        overlaySchliessen();
+      } else {
+        overlayRest.textContent = String(restOverlay);
+      }
+      /* Solange jemand liest, ruht der Rücksprung zur Jetzt-Ansicht. */
+      if (offenerTag && tagesblickDauer > 0) {
+        tagEndetUm = Date.now() + tagesblickDauer * 1000;
+      }
+    }
+
+    if (offenerTag && tagEndetUm) {
+      var restTag = Math.ceil((tagEndetUm - Date.now()) / 1000);
+      if (restTag <= 0) {
+        tagWaehlen("");
+      } else if (rueckkehrRest) {
+        rueckkehrRest.textContent = String(restTag);
+      }
+    }
+  }
+
+  /* --- Bedienung ---------------------------------------------------------- */
 
   inhalt.addEventListener("click", function (ereignis) {
     var kachel = ereignis.target.closest
       ? ereignis.target.closest(".kachel")
       : null;
     if (kachel) {
-      oeffnen(kachel.getAttribute("data-schicht"));
+      overlayOeffnen(kachel.getAttribute("data-schicht"));
     }
   });
 
-  overlayZu.addEventListener("click", schliessen);
+  leiste.addEventListener("click", function (ereignis) {
+    var knopf = ereignis.target.closest
+      ? ereignis.target.closest(".tagknopf")
+      : null;
+    if (knopf) {
+      tagWaehlen(knopf.getAttribute("data-tag"));
+    }
+  });
+
+  overlayZu.addEventListener("click", overlaySchliessen);
 
   /* Tippen neben den Kasten schließt ebenfalls – auf einem Touchscreen die
    * naheliegendste Geste. */
   overlay.addEventListener("click", function (ereignis) {
     if (ereignis.target === overlay) {
-      schliessen();
+      overlaySchliessen();
     }
   });
 
   document.addEventListener("keydown", function (ereignis) {
-    if (ereignis.key === "Escape" && offeneSchicht) {
-      schliessen();
+    if (ereignis.key !== "Escape") {
+      return;
+    }
+    if (offeneSchicht) {
+      overlaySchliessen();
+    } else if (offenerTag) {
+      tagWaehlen("");
     }
   });
 
-  /* --- Auffrischen ------------------------------------------------------- */
+  /* --- Auffrischen -------------------------------------------------------- */
 
   function holen() {
-    /* Kein AbortSignal.timeout: das kennen ältere Browser nicht, und auf so
+    /* Der Tagesblick frischt sich mit auf: wer den Sonntag durchgeht, während
+     * im Backoffice jemand einteilt, soll die neuen Zahlen sehen.
+     *
+     * Kein AbortSignal.timeout: das kennen ältere Browser nicht, und auf so
      * einem Monitor steht gern etwas Betagtes. Bleibt die Antwort aus, greift
      * beim nächsten Durchlauf ohnehin dieselbe Warnung. */
-    fetch(quelle, { cache: "no-store", credentials: "same-origin" })
+    var gefragterTag = offenerTag;
+    var adresse = gefragterTag
+      ? quelle + "?tag=" + encodeURIComponent(gefragterTag)
+      : quelle;
+
+    fetch(adresse, { cache: "no-store", credentials: "same-origin" })
       .then(function (antwort) {
         if (!antwort.ok) {
           throw new Error("HTTP " + antwort.status);
@@ -179,6 +263,11 @@
         return antwort.text();
       })
       .then(function (text) {
+        /* Zwischen Absenden und Antwort kann jemand den Tag gewechselt haben.
+         * Dann gehört diese Antwort nicht mehr auf den Bildschirm. */
+        if (gefragterTag !== offenerTag) {
+          return;
+        }
         inhalt.innerHTML = text;
         standMerken();
         warnungZeigen(false);
@@ -203,9 +292,7 @@
   }
 
   standMerken();
-  setInterval(function () {
-    uhrStellen();
-    restStellen();
-  }, 1000);
+  leisteMarkieren();
+  setInterval(sekundentakt, 1000);
   setInterval(holen, intervall);
 })();

@@ -76,6 +76,9 @@ with con:
     # Nachtschicht über Mitternacht, läuft am Abend.
     nacht, _ = db.schicht_sichern(con, "Nachtwache", "2026-08-29 20:00",
                                   "2026-08-30 08:00", "2026-08-29", bedarf=2)
+    # Am Folgetag – nur über den Tagesblick zu sehen.
+    sonntag, _ = db.schicht_sichern(con, "Sonntagsdienst", "2026-08-30 09:00",
+                                    "2026-08-30 17:00", "2026-08-30", bedarf=3)
 
     anna, _ = db.helfer_anlegen(con, {"name": "Anna Berg",
                                       "email": "anna@example.org"})
@@ -98,7 +101,20 @@ with con:
             " tag_roh, zeit_roh, angelegt_am) VALUES ('dhc', ?, ?, ?, ?,"
             " 'Samstag', ?, ?)",
             (titel, "2026-08-29", beginn, ende, roh, db.jetzt()))
+    con.execute(
+        "INSERT INTO programm (serie, titel, datum, beginn, ende, tag_roh,"
+        " zeit_roh, angelegt_am) VALUES ('dhc', 'Sonntagsprogramm',"
+        " '2026-08-30', '2026-08-30 11:30', NULL, 'Sonntag', 'ab 11.30 Uhr', ?)",
+        (db.jetzt(),))
 con.close()
+
+
+def zeilen(sql, *parameter):
+    con = db.verbinden()
+    try:
+        return con.execute(sql, parameter).fetchall()
+    finally:
+        con.close()
 
 TOKEN = db.monitor_token(anlegen=True)
 hafen = freier_hafen()
@@ -266,6 +282,64 @@ try:
     pruefe("<html" not in bruchstueck.lower(),
            "es ist wirklich nur ein Ausschnitt")
     pruefe("Ordner Zeltplatz" in bruchstueck, "mit demselben Inhalt")
+
+    print("Tagesleiste")
+    pruefe('id="tagesleiste"' in seite, "die Leiste ist da")
+    pruefe(seite.index('id="tagesleiste"') < seite.index("<main"),
+           "und liegt im Rahmen, nicht im aufgefrischten Bereich")
+    pruefe('data-tag="" id="knopf-jetzt"' in seite, "mit einem Jetzt-Knopf")
+    pruefe(seite.count('class="tagknopf') == 3,
+           "je ein Knopf fuer Jetzt und die zwei Tage mit Inhalt: "
+           + str(seite.count('class="tagknopf')))
+    pruefe('data-tag="2026-08-29"' in seite and 'data-tag="2026-08-30"' in seite,
+           "beide Tage stehen drin")
+    pruefe("ist-heute" in seite, "der heutige Tag ist markiert")
+    pruefe('data-tagesblick-sekunden="120"' in seite, "die Rueckkehrdauer steht am Skript")
+    pruefe("zurück zu" in seite, "und wird angesagt")
+
+    print("Tagesblick")
+    status, _, _, tagseite = anfrage(
+        "GET", "/monitor/" + TOKEN + "/inhalt?tag=2026-08-30")
+    pruefe(status == 200, "ein anderer Tag laesst sich abrufen")
+    pruefe('data-tagesblick="2026-08-30"' in tagseite,
+           "das Bruchstueck sagt, welcher Tag offen ist")
+    pruefe("Vorschau" in tagseite and "Sonntag, 30.08.2026" in tagseite,
+           "unmissverstaendlich als Vorschau ausgezeichnet")
+    pruefe('data-jetzt="2026-08-29T10:30:00"' in tagseite,
+           "die Uhr bleibt trotzdem die echte Serverzeit")
+    pruefe("Jetzt im Dienst" not in tagseite,
+           "kein 'Jetzt im Dienst' an einem kuenftigen Tag - das gibt es dort nicht")
+    pruefe("Als Nächstes" not in tagseite, "und kein 'Als Naechstes'")
+
+    print("Inhalt des Tagesblicks")
+    pruefe("Sonntagsdienst" in tagseite, "die Schicht des Tages steht drauf")
+    pruefe("Merchandise" not in tagseite, "die vom Samstag nicht")
+    pruefe("Ordner Zeltplatz" not in tagseite, "auch nicht die laufende von heute")
+    pruefe('data-schicht="' + str(sonntag) + '"' in tagseite,
+           "die Schicht ist antippbar wie ueberall")
+    pruefe(tagseite.count('class="detail" hidden') == 1,
+           "mit ihrer Langfassung")
+    pruefe("Sonntagsprogramm" in tagseite, "das Programm des Tages steht dabei")
+    pruefe("Pflichttraining" not in tagseite, "das von heute nicht")
+
+    print("Leerer Tag")
+    _, _, _, leer = anfrage("GET", "/monitor/" + TOKEN + "/inhalt?tag=2026-08-28")
+    pruefe("keine Schicht eingeplant" in leer,
+           "ein Tag ohne Schichten sagt das auch")
+
+    print("Unsinnige Tagesangaben")
+    for schrott in ("morgen", "2026-13-45", "'; DROP TABLE schicht--", "2026-08-30x"):
+        status, _, _, antwort = anfrage(
+            "GET", "/monitor/" + TOKEN + "/inhalt?tag="
+            + urllib.parse.quote(schrott))
+        pruefe(status == 200 and "Jetzt im Dienst" in antwort,
+               "faellt auf die Jetzt-Ansicht zurueck: " + repr(schrott))
+    pruefe(len(zeilen("SELECT id FROM schicht")) == 7,
+           "und die Schichten stehen alle noch da")
+
+    print("Tagesblick ohne Token")
+    status, _, _, _ = anfrage("GET", "/monitor/falsch/inhalt?tag=2026-08-30")
+    pruefe(status == 404, "geht nicht")
 
     print("Backoffice")
     anfrage("POST", "/admin/login",

@@ -433,3 +433,141 @@ html, body {
   .overlay-kasten { padding: 1.1rem 1rem 1rem; }
   .detail-titel { font-size: 1.6em; }
 }
+
+/* --- Tagesleiste ---------------------------------------------------------- */
+
+/* Liegt im Rahmen, nicht im aufgefrischten Bereich. Bewusst zurueckhaltend:
+   im Normalbetrieb soll die Leiste nicht vom Dienstplan ablenken, im
+   Zweifelsfall aber ohne Suchen zu finden sein. */
+.tagesleiste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem 1.2rem;
+  background: #171b12;
+  border-bottom: 1px solid var(--rand);
+}
+
+.tagknopf {
+  padding: .3rem .8rem;
+  border: 1px solid var(--rand);
+  border-radius: 999px;
+  background: none;
+  color: var(--gedaempft);
+  font: inherit;
+  font-size: .92em;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tagknopf:hover { background: var(--kachel); color: var(--schrift); }
+.tagknopf:focus-visible { outline: 3px solid var(--limette); outline-offset: 2px; }
+
+/* Der heutige Tag bekommt einen Punkt, damit man ihn in der Reihe findet. */
+.tagknopf.ist-heute::before {
+  content: "•";
+  margin-right: .3rem;
+  color: var(--limette);
+}
+
+.tagknopf.ist-aktiv {
+  background: var(--limette);
+  border-color: var(--limette);
+  color: #13160f;
+  font-weight: 700;
+}
+
+.tagknopf-jetzt { font-weight: 700; }
+
+.rueckkehr {
+  margin-left: auto;
+  font-size: .9em;
+  color: var(--warn);
+  font-variant-numeric: tabular-nums;
+}
+.rueckkehr[hidden] { display: none; }
+
+/* --- Tagesblick ----------------------------------------------------------- */
+
+.raster-tag {
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "banner banner"
+    "schichten programm";
+  /* Kopf plus Tagesleiste. */
+  height: calc(100% - 7.4rem);
+}
+
+.tafel-tagschichten { grid-area: schichten; overflow-y: auto; }
+.tafel-tagprogramm { grid-area: programm; overflow-y: auto; }
+
+/* Unmissverstaendlich: hier steht nicht, was jetzt los ist. */
+.tagesbanner {
+  grid-area: banner;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .8rem;
+  margin: 0;
+  padding: .5rem .9rem;
+  background: #2b2412;
+  border: 1px solid var(--warn);
+  border-radius: 10px;
+}
+.tagesbanner-marke {
+  padding: .1rem .6rem;
+  border-radius: 999px;
+  background: var(--warn);
+  color: #1a1200;
+  font-size: .8em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.tagesbanner-tag { font-size: 1.5em; font-weight: 700; }
+.tagesbanner-zahlen { color: var(--gedaempft); }
+
+.tagesliste { list-style: none; margin: 0; padding: 0; }
+
+.tagesliste li {
+  background: var(--kachel);
+  border-left: 5px solid var(--gruen);
+  border-radius: 6px;
+  margin-bottom: .35rem;
+  overflow: hidden;
+}
+.tagesliste li.schicht-luecke { border-left-color: var(--fehlt); }
+
+.tagesliste .kachel {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr auto auto;
+  gap: .8rem;
+  align-items: baseline;
+  padding: .45rem .8rem;
+}
+.tagesliste .zeit {
+  font-size: 1.15em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tagesliste .liste { font-size: 1.15em; }
+.tagesliste .quote { font-size: 1.15em; }
+.tagesliste li.schicht-luecke .quote { color: var(--fehlt); }
+.tagesliste .voll { color: var(--ok); font-size: .9em; }
+.tagesliste .fehlt { font-size: .9em; white-space: nowrap; }
+
+@media (max-width: 60rem) {
+  .raster-tag {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas: "banner" "schichten" "programm";
+    height: auto;
+  }
+  .tagesliste .kachel {
+    grid-template-columns: 1fr auto;
+    gap: .3rem .6rem;
+  }
+}
