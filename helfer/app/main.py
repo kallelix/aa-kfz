@@ -11,6 +11,7 @@ macht der Reverse Proxy davor; gestartet wird mit `python -m app`.
 from __future__ import annotations
 
 import asyncio
+import hmac
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -386,6 +387,81 @@ async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
         "admin_helfer_detail.html",
         _admin(request, sitzung, hinweis=hinweis, person=person,
                schichten=db.helfer_schichten(helfer_id)))
+
+
+# --- Monitor ---------------------------------------------------------------
+
+def _token_stimmt(uebermittelt: str) -> bool:
+    """Vergleich in gleichbleibender Zeit. Ein leerer Token in der Datenbank
+    heißt: der Link ist widerrufen, dann stimmt gar nichts mehr."""
+    hinterlegt = db.monitor_token()
+    if not hinterlegt:
+        return False
+    return hmac.compare_digest(hinterlegt, uebermittelt)
+
+
+def _monitor_kontext(request: Request, token: str) -> dict:
+    stand = db.monitor_stand(db.jetzt_lokal(), config.MONITOR_VORSCHAU)
+    # strftime('%A') käme im C-Locale als "Saturday" heraus, und ein Locale
+    # auf dem Server zu setzen wäre für einen Wochentag zu viel Aufwand.
+    stand["tag_lang"] = (config.WOCHENTAGE[stand["jetzt"].weekday()] + ", " +
+                         stand["jetzt"].strftime("%d.%m.%Y"))
+    return _kontext(request, token=token, stand=stand,
+                    intervall=config.MONITOR_INTERVALL,
+                    warnschwelle=config.MONITOR_WARNUNG,
+                    tage=config.TAGE)
+
+
+@app.get("/monitor/{token}")
+async def monitor(request: Request, token: str):
+    # 404 statt 403: ein falscher Link soll nicht verraten, dass es einen
+    # richtigen gibt.
+    if not _token_stimmt(token):
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+    return templates.TemplateResponse("monitor.html",
+                                      _monitor_kontext(request, token))
+
+
+@app.get("/monitor/{token}/inhalt")
+async def monitor_inhalt(request: Request, token: str):
+    """Nur der wechselnde Teil. Die Seite holt ihn sich selbst, damit der
+    Bildschirm nicht alle Minute weiß aufblitzt."""
+    if not _token_stimmt(token):
+        return Response("", status_code=404)
+    antwort = templates.TemplateResponse("monitor_inhalt.html",
+                                         _monitor_kontext(request, token))
+    antwort.headers["Cache-Control"] = "no-store"
+    return antwort
+
+
+@app.get("/admin/monitor")
+async def monitor_verwalten(
+        request: Request, hinweis: str = "",
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    token = db.monitor_token()
+    basis = config.BASIS_URL or str(request.base_url).rstrip("/")
+    return templates.TemplateResponse(
+        "admin_monitor.html",
+        _admin(request, sitzung, hinweis=hinweis, token=token,
+               adresse=(basis + "/monitor/" + token) if token else "",
+               intervall=config.MONITOR_INTERVALL,
+               vorschau=config.MONITOR_VORSCHAU))
+
+
+@app.post("/admin/monitor")
+async def monitor_link(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    if str(daten.get("aktion")) == "widerrufen":
+        db.monitor_token_loeschen()
+        return _zurueck("/admin/monitor", "widerrufen")
+    db.monitor_token_neu()
+    return _zurueck("/admin/monitor", "neuer-link")
 
 
 # --- Zeitplan der Rennserien -----------------------------------------------

@@ -7,7 +7,7 @@ einem `with con`-Block, damit sie ganz oder gar nicht passieren.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import config, normalisieren
@@ -515,5 +515,111 @@ def importe() -> list[sqlite3.Row]:
     try:
         return con.execute(
             "SELECT * FROM import_lauf ORDER BY id DESC LIMIT 20").fetchall()
+    finally:
+        con.close()
+
+
+# --- Monitor ---------------------------------------------------------------
+
+MONITOR_SCHLUESSEL = "monitor_token"
+
+
+def monitor_token(anlegen: bool = False) -> str:
+    """Der Token für den Monitor-Link. Wie bei der Durchfahrtsliste: lang,
+    zufällig, jederzeit widerrufbar."""
+    vorhanden = einstellung(MONITOR_SCHLUESSEL)
+    if vorhanden or not anlegen:
+        return vorhanden
+    return monitor_token_neu()
+
+
+def monitor_token_neu() -> str:
+    import secrets
+    neu = secrets.token_urlsafe(24)
+    einstellung_setzen(MONITOR_SCHLUESSEL, neu)
+    return neu
+
+
+def monitor_token_loeschen() -> None:
+    einstellung_setzen(MONITOR_SCHLUESSEL, "")
+
+
+def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
+    """Alles, was der Monitor anzeigt, in einem Rutsch.
+
+    Die Uhr kommt von außen, damit sich die Ansicht für eine Durchsicht auf
+    einen beliebigen Zeitpunkt stellen lässt (JETZT_FEST) und der Test nicht
+    auf den Renntag warten muss.
+    """
+    jetzt = zeitpunkt.strftime("%Y-%m-%d %H:%M")
+    bis = (zeitpunkt + timedelta(minutes=vorschau_minuten)).strftime(
+        "%Y-%m-%d %H:%M")
+    heute = zeitpunkt.strftime("%Y-%m-%d")
+
+    con = verbinden()
+    try:
+        def schichten_mit(bedingung: str, werte: tuple) -> list[dict]:
+            zeilen = [dict(z) for z in con.execute(
+                "SELECT " + _SCHICHT_SPALTEN + " FROM schicht s WHERE " +
+                bedingung + " ORDER BY s.beginn, s.liste COLLATE NOCASE",
+                werte)]
+            if not zeilen:
+                return []
+            # Namen in einer zweiten Abfrage statt in einer je Schicht.
+            platzhalter = ",".join("?" for _ in zeilen)
+            namen: dict[int, list[str]] = {z["id"]: [] for z in zeilen}
+            for eintrag in con.execute(
+                    "SELECT e.schicht_id, h.name FROM einteilung e"
+                    " JOIN helfer h ON h.id = e.helfer_id"
+                    " WHERE e.schicht_id IN (" + platzhalter + ")"
+                    " ORDER BY h.name COLLATE NOCASE",
+                    [z["id"] for z in zeilen]):
+                namen[eintrag["schicht_id"]].append(eintrag["name"])
+            for zeile in zeilen:
+                zeile["namen"] = namen[zeile["id"]]
+            return zeilen
+
+        laufend = schichten_mit("s.beginn <= ? AND s.ende > ?", (jetzt, jetzt))
+        demnaechst = schichten_mit("s.beginn > ? AND s.beginn <= ?", (jetzt, bis))
+
+        programm = [dict(z) for z in con.execute(
+            "SELECT * FROM programm WHERE entfallen_am IS NULL"
+            " AND (datum = ? OR beginn >= ?)"
+            " ORDER BY datum, beginn IS NULL, beginn LIMIT 40",
+            (heute, jetzt))]
+
+        laufendes_programm = [
+            p for p in programm
+            if p["beginn"] and p["beginn"] <= jetzt
+            and (p["ende"] or p["beginn"]) > jetzt]
+        # Ohne Ende gilt ein Programmpunkt eine Stunde lang als "laufend" –
+        # sonst verschwaende "ab 11.30 Uhr" sofort nach seinem Beginn.
+        for p in programm:
+            if (p["beginn"] and not p["ende"] and p["beginn"] <= jetzt
+                    and p not in laufendes_programm):
+                ende = datetime.fromisoformat(p["beginn"]) + timedelta(hours=1)
+                if ende.strftime("%Y-%m-%d %H:%M") > jetzt:
+                    laufendes_programm.append(p)
+
+        kommendes_programm = [p for p in programm
+                              if p["beginn"] and p["beginn"] > jetzt][:6]
+        ohne_zeit = [p for p in programm
+                     if not p["beginn"] and p["datum"] == heute]
+
+        gesamt = zaehler()
+        return {
+            "jetzt": zeitpunkt,
+            "heute": heute,
+            "bis": bis,
+            "vorschau_minuten": vorschau_minuten,
+            "laufend": laufend,
+            "demnaechst": demnaechst,
+            "programm_laufend": sorted(laufendes_programm,
+                                       key=lambda p: p["beginn"] or ""),
+            "programm_kommend": kommendes_programm,
+            "programm_ohne_zeit": ohne_zeit,
+            "offen_jetzt": sum(z["fehlt"] for z in laufend),
+            "offen_gesamt": gesamt["offen"],
+        }
     finally:
         con.close()

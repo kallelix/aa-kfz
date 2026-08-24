@@ -1,0 +1,58 @@
+{% extends "admin_base.html" %}
+{% block titel %}Monitor{% endblock %}
+{% block ueberschrift %}Monitor-Ansicht{% endblock %}
+
+{% block inhalt %}
+  <section class="kasten">
+    <p>Die Monitoransicht zeigt, wer gerade Dienst hat, was im Programm läuft
+      und welche Schichten als Nächstes beginnen. Sie ist für den Bildschirm
+      im Orga-Zelt gemacht: große Schrift, dunkler Hintergrund, keine
+      Bedienelemente.</p>
+    <p class="hilfe">Sie aktualisiert sich alle {{ intervall }} Sekunden von
+      selbst und schaut {{ vorschau }} Minuten voraus. Reißt die Verbindung
+      ab, bleibt der letzte Stand stehen – mit einem Hinweis, von wann er ist.
+      Niemand steht dann vor einem leeren Bildschirm.</p>
+  </section>
+
+  {% if not token %}
+    <section class="kasten">
+      <h2>Kein Link vorhanden</h2>
+      <p>Es gibt derzeit keinen gültigen Monitor-Link. Wer die alte Adresse
+        noch offen hat, sieht nichts mehr.</p>
+      <form method="post" action="/admin/monitor">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="aktion" value="neu">
+        <button type="submit" class="knopf">Link erzeugen</button>
+      </form>
+    </section>
+  {% else %}
+    <section class="kasten kasten-ok">
+      <h2>Der Link</h2>
+      <p class="teilen-url"><a href="{{ adresse }}">{{ adresse }}</a></p>
+      <p class="hilfe">Ohne Anmeldung erreichbar – wie die Durchfahrtsliste.
+        Wer ihn hat, sieht die Einteilung samt Namen. Also nur an den
+        Monitorrechner geben, nicht in einen offenen Verteiler.</p>
+      <p class="knopfreihe">
+        <a class="knopf" href="{{ adresse }}">Ansicht öffnen</a>
+      </p>
+    </section>
+
+    <section>
+      <h2>Link wechseln oder widerrufen</h2>
+      <p class="hilfe">Ein neuer Link macht den alten sofort ungültig. Beim
+        Widerrufen gibt es gar keinen mehr, bis ein neuer erzeugt wird.</p>
+      <div class="knopfreihe">
+        <form method="post" action="/admin/monitor">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="aktion" value="neu">
+          <button type="submit" class="knopf-schlicht">Neuen Link erzeugen</button>
+        </form>
+        <form method="post" action="/admin/monitor">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="aktion" value="widerrufen">
+          <button type="submit" class="knopf-gefahr">Widerrufen</button>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

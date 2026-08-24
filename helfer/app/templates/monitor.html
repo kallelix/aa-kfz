@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Helferplan – {{ veranstaltung }}</title>
+  <link rel="stylesheet" href="/static/monitor.css">
+  <noscript>
+    <!-- Ohne JavaScript lädt die ganze Seite neu. Das flackert, hält den
+         Bildschirm aber aktuell. -->
+    <meta http-equiv="refresh" content="{{ intervall }}">
+  </noscript>
+</head>
+<body>
+  <header class="kopf">
+    <div class="kopf-links">
+      <p class="veranstaltung">{{ veranstaltung }}</p>
+      <p class="tag" id="tag">{{ stand.tag_lang }}</p>
+    </div>
+    <p class="uhr" id="uhr">{{ stand.jetzt.strftime('%H:%M') }}</p>
+  </header>
+
+  <p class="warnung" id="warnung" hidden>
+    Keine Verbindung zum Server – angezeigt wird der Stand von
+    <span id="stand">{{ stand.jetzt.strftime('%H:%M') }}</span> Uhr.
+  </p>
+
+  <main id="inhalt">
+    {% include "monitor_inhalt.html" %}
+  </main>
+
+  <script src="/static/monitor.js"
+          data-quelle="/monitor/{{ token }}/inhalt"
+          data-intervall="{{ intervall }}"></script>
+</body>
+</html>

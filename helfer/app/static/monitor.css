@@ -1,0 +1,297 @@
+/* Monitoransicht für den Bildschirm im Orga-Zelt.
+ *
+ * Eigene Datei, nicht die des Backoffice: hier gelten andere Regeln. Gelesen
+ * wird aus mehreren Metern Entfernung, bedient wird gar nichts, und der
+ * Bildschirm läuft den ganzen Tag – deshalb dunkel, kontrastreich und ohne
+ * jedes Bedienelement.
+ *
+ * Die Schriftgrößen hängen an der Fensterbreite (clamp mit vw), damit
+ * derselbe Aufbau auf einem 24-Zoll-Monitor und auf einem Fernseher passt,
+ * ohne dass jemand etwas einstellen muss.
+ */
+
+:root {
+  --grund: #13160f;          /* ILRC-Dunkel, wie im Timetable */
+  --tafel: #1c2116;
+  --rand: #2f3a24;
+  --schrift: #f2f5ec;
+  --gedaempft: #9aa88a;
+  --limette: #95bf0b;        /* ILRC-Limette */
+  --gruen: #4e690f;
+  --warn: #f97316;
+  --fehlt: #ef4444;
+  --ok: #22c55e;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--grund);
+  color: var(--schrift);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: clamp(15px, 1.15vw, 24px);
+  line-height: 1.35;
+  overflow: hidden;          /* der Monitor scrollt nicht, er zeigt */
+}
+
+/* --- Kopfzeile ------------------------------------------------------------ */
+
+.kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .6rem 1.2rem;
+  background: linear-gradient(90deg, #13160f, #2a3320);
+  border-bottom: 3px solid var(--limette);
+}
+
+.veranstaltung {
+  margin: 0;
+  font-size: 1.5em;
+  font-weight: 700;
+  color: var(--limette);
+  letter-spacing: .01em;
+}
+
+.tag { margin: 0; font-size: 1.05em; color: var(--gedaempft); }
+
+.uhr {
+  margin: 0;
+  font-size: 3.2em;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+
+/* --- Verbindungswarnung --------------------------------------------------- */
+
+.warnung {
+  margin: 0;
+  padding: .5rem 1.2rem;
+  background: var(--warn);
+  color: #1a1200;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+.warnung[hidden] { display: none; }
+
+/* --- Raster --------------------------------------------------------------- */
+
+/* Links breit der Dienst, rechts schmal das Programm, unten quer die
+   kommenden Schichten. Bei schmalem Fenster fällt alles untereinander. */
+.raster {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    "jetzt programm"
+    "naechst naechst";
+  gap: .8rem;
+  padding: .8rem 1.2rem 1rem;
+  height: calc(100% - 5.2rem);
+}
+
+.tafel-jetzt { grid-area: jetzt; }
+.tafel-programm { grid-area: programm; }
+.tafel-naechst { grid-area: naechst; }
+
+.tafel {
+  background: var(--tafel);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  padding: .7rem .9rem;
+  min-height: 0;             /* sonst wächst das Raster über den Bildschirm */
+  overflow: hidden;
+}
+
+.tafel h2 {
+  margin: 0 0 .5rem;
+  font-size: 1.25em;
+  font-weight: 700;
+  color: var(--limette);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+}
+
+.klein { font-size: .72em; font-weight: 400; color: var(--gedaempft);
+         text-transform: none; letter-spacing: 0; }
+
+.leer { color: var(--gedaempft); font-style: italic; margin: .2rem 0; }
+
+/* --- Laufende Schichten --------------------------------------------------- */
+
+.schichten {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  gap: .5rem;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.schicht {
+  background: #232a1b;
+  border-left: 5px solid var(--gruen);
+  border-radius: 6px;
+  padding: .45rem .6rem;
+}
+
+.schicht-luecke { border-left-color: var(--fehlt); }
+
+.schicht-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .6rem;
+  margin: 0;
+}
+
+.liste { font-size: 1.3em; font-weight: 700; }
+
+.quote {
+  font-size: 1.3em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ok);
+  white-space: nowrap;
+}
+.schicht-luecke .quote { color: var(--fehlt); }
+.von { font-size: .72em; font-weight: 400; color: var(--gedaempft); }
+
+.schicht-zeit {
+  margin: 0;
+  font-size: .95em;
+  color: var(--gedaempft);
+  font-variant-numeric: tabular-nums;
+}
+
+.fehlt { color: var(--fehlt); font-weight: 600; }
+
+.namen {
+  margin: .25rem 0 0;
+  font-size: 1.02em;
+  color: #dfe6d3;
+  /* Lange Besetzungen dürfen die Kachel nicht sprengen: nach vier Zeilen ist
+     Schluss, der Rest steht im Backoffice. */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.namen.leer { color: var(--fehlt); font-style: italic; }
+
+/* --- Programm ------------------------------------------------------------- */
+
+.programm { list-style: none; margin: 0 0 .5rem; padding: 0; }
+
+.programm li {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr auto;
+  gap: .5rem;
+  align-items: baseline;
+  padding: .28rem 0;
+  border-bottom: 1px solid #262e1c;
+}
+.programm li:last-child { border-bottom: none; }
+
+.programm .zeit {
+  font-variant-numeric: tabular-nums;
+  color: var(--gedaempft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.programm .titel { font-size: 1.1em; }
+
+/* Was gerade läuft, hebt sich ab – das ist die Zeile, die vom anderen Ende
+   des Zeltes erkennbar sein muss. */
+.programm-laufend li {
+  background: #2b3520;
+  border-left: 5px solid var(--limette);
+  border-bottom: none;
+  border-radius: 6px;
+  padding: .4rem .5rem;
+  margin-bottom: .3rem;
+}
+.programm-laufend .titel { font-size: 1.35em; font-weight: 700; }
+.programm-laufend .zeit { color: var(--limette); font-weight: 600; }
+
+.programm-offen .zeit { font-style: italic; }
+
+.serie {
+  font-size: .7em;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: .1rem .4rem;
+  border-radius: 999px;
+  border: 1px solid var(--rand);
+  color: var(--gedaempft);
+  white-space: nowrap;
+}
+.serie-dhc { border-color: var(--limette); color: var(--limette); }
+.serie-kids { border-color: #7aa0c8; color: #7aa0c8; }
+
+/* --- Als Nächstes --------------------------------------------------------- */
+
+.kommende {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.kommende li {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  background: #232a1b;
+  border-left: 5px solid var(--gruen);
+  border-radius: 6px;
+  padding: .35rem .7rem;
+}
+.kommende li.schicht-luecke { border-left-color: var(--fehlt); }
+.kommende .zeit {
+  font-size: 1.3em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.kommende .liste { font-size: 1.05em; font-weight: 600; }
+.kommende .quote { font-size: 1.05em; }
+
+/* --- Marken --------------------------------------------------------------- */
+
+.marke {
+  font-size: .72em;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: .12rem .5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.marke-luecke { color: var(--fehlt); }
+
+/* --- Schmale Bildschirme -------------------------------------------------- */
+
+@media (max-width: 60rem) {
+  .raster {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas: "jetzt" "programm" "naechst";
+    height: auto;
+  }
+  html, body { overflow: auto; }
+  .uhr { font-size: 2.4em; }
+}

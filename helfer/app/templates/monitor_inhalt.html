@@ -1,0 +1,106 @@
+{# Nur der Teil, der sich ändert. Wird sowohl in die Seite eingebettet als
+   auch einzeln ausgeliefert, damit die Ansicht sich ohne Neuladen auffrischt.
+   data-jetzt trägt die Serverzeit: danach stellt der Browser seine Anzeige,
+   auch wenn die Uhr des Monitors falsch geht. #}
+<div class="raster" data-jetzt="{{ stand.jetzt.isoformat(timespec='seconds') }}"
+     data-tag="{{ stand.tag_lang }}">
+
+  <section class="tafel tafel-jetzt">
+    <h2>Jetzt im Dienst
+      {% if stand.offen_jetzt %}
+        <span class="marke marke-luecke">{{ stand.offen_jetzt }} fehlen</span>
+      {% endif %}
+    </h2>
+
+    {% if not stand.laufend %}
+      <p class="leer">Gerade läuft keine Schicht.</p>
+    {% else %}
+      <ul class="schichten">
+        {% for s in stand.laufend %}
+          <li class="schicht{% if warnschwelle and s.fehlt >= warnschwelle %} schicht-luecke{% endif %}">
+            <p class="schicht-kopf">
+              <span class="liste">{{ s.liste }}</span>
+              <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.bedarf }}</span></span>
+            </p>
+            <p class="schicht-zeit">
+              {{ s.beginn[11:] }}–{{ s.ende[11:] }}
+              {%- if s.fehlt %} · <span class="fehlt">{{ s.fehlt }} offen</span>{% endif %}
+            </p>
+            {% if s.namen %}
+              <p class="namen">{{ s.namen | join(' · ') }}</p>
+            {% else %}
+              <p class="namen leer">niemand eingeteilt</p>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+
+  <section class="tafel tafel-programm">
+    <h2>Programm</h2>
+
+    {% if stand.programm_laufend %}
+      <ul class="programm programm-laufend">
+        {% for p in stand.programm_laufend %}
+          <li>
+            <span class="zeit">{{ p | programmzeit }}</span>
+            <span class="titel">{{ p.titel }}</span>
+            <span class="serie serie-{{ p.serie }}">{{ p.serie }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if stand.programm_kommend %}
+      <ul class="programm">
+        {% for p in stand.programm_kommend %}
+          <li>
+            <span class="zeit">{{ p | programmzeit }}</span>
+            <span class="titel">{{ p.titel }}</span>
+            <span class="serie serie-{{ p.serie }}">{{ p.serie }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if stand.programm_ohne_zeit %}
+      <ul class="programm programm-offen">
+        {% for p in stand.programm_ohne_zeit %}
+          <li>
+            <span class="zeit">{{ p.zeit_roh }}</span>
+            <span class="titel">{{ p.titel }}</span>
+            <span class="serie serie-{{ p.serie }}">{{ p.serie }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if not (stand.programm_laufend or stand.programm_kommend
+               or stand.programm_ohne_zeit) %}
+      <p class="leer">Kein Programm hinterlegt.</p>
+    {% endif %}
+  </section>
+
+  <section class="tafel tafel-naechst">
+    <h2>Als Nächstes
+      <span class="klein">bis {{ stand.bis[11:] }} Uhr</span>
+    </h2>
+
+    {% if not stand.demnaechst %}
+      <p class="leer">In den nächsten
+        {{ stand.vorschau_minuten }} Minuten beginnt keine Schicht.</p>
+    {% else %}
+      <ul class="kommende">
+        {% for s in stand.demnaechst %}
+          <li class="{% if warnschwelle and s.fehlt >= warnschwelle %}schicht-luecke{% endif %}">
+            <span class="zeit">{{ s.beginn[11:] }}</span>
+            <span class="liste">{{ s.liste }}</span>
+            <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.bedarf }}</span></span>
+            {% if s.fehlt %}<span class="fehlt">{{ s.fehlt }} offen</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+</div>

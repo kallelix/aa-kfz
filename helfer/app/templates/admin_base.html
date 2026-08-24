@@ -29,6 +29,7 @@
         <a href="/admin/schichten">Schichten</a>
         <a href="/admin/helfer">Helfer</a>
         <a href="/admin/zeitplan">Zeitplan</a>
+        <a href="/admin/monitor">Monitor</a>
         <a href="/admin/import">Import</a>
       </nav>
     {% endif %}
@@ -39,9 +40,11 @@
       'schon-drin': 'Diese Person steht bereits auf der Schicht.',
       'keiner': 'Es war niemand ausgewählt.',
       'unbekannt': 'Diese Schicht gibt es nicht.',
+      'neuer-link': 'Neuer Monitor-Link erzeugt. Der alte gilt nicht mehr.',
+      'widerrufen': 'Der Monitor-Link ist widerrufen.',
     } %}
     {% if hinweis %}
-      <p class="hinweis {{ 'hinweis-warnung' if hinweis in ('schon-drin', 'keiner', 'unbekannt') else 'hinweis-ok' }}"
+      <p class="hinweis {{ 'hinweis-warnung' if hinweis in ('schon-drin', 'keiner', 'unbekannt', 'widerrufen') else 'hinweis-ok' }}"
          role="status">{{ meldungen.get(hinweis, hinweis) }}</p>
     {% endif %}
 
