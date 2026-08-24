@@ -211,13 +211,50 @@
     <button type="submit">Anmeldung absenden</button>
   </form>
 
+  {# Wie Sicherheitshinweis und Bildrechte steht auch dieser Text im Code und
+     nicht in einer Env-Variablen: es muss nachvollziehbar bleiben, welchem
+     Wortlaut jemand zugestimmt hat. #}
   <section class="datenschutz">
     <h2>Datenschutz</h2>
+
     <p>
-      Die Angaben werden von {{ kontakt_name }} ausschließlich zur Abwicklung
-      der Presse-Akkreditierung für {{ veranstaltung }} verwendet. Sie werden
-      nicht an Dritte weitergegeben. {{ aufbewahrung_hinweis }}
-      {% if kontakt_mail %}Auskunft und Löschung: <a href="mailto:{{ kontakt_mail }}">{{ kontakt_mail }}</a>.{% endif %}
+      Deine Angaben verwendet {{ kontakt_name }} für die Presse-Akkreditierung
+      zu {{ veranstaltung }}: Ausgabe des Badges, Abrechnung der
+      Akkreditierungsgebühr und – wenn du die Bilderspende gewählt hast – die
+      Zuordnung deiner Bilder und die vereinbarte Verlinkung.
+    </p>
+
+    <p>
+      <strong>Wie lange wir speichern.</strong> So lange, wie wir die Angaben
+      für diese Zwecke brauchen:
+    </p>
+
+    <ul>
+      <li>
+        Name, Firma und Kontaktdaten bis zum Ende der Veranstaltung, die auf
+        deine Akkreditierung folgt – so können wir dich für die nächste Ausgabe
+        wieder ansprechen.
+      </li>
+      <li>
+        Angaben zur Bilderspende samt Social-Media-Profil so lange, wie wir
+        deine Bilder für die Promotion der Veranstaltung nutzen. Das Profil
+        brauchen wir, um dich auch in späteren Saisons noch verlinken zu können.
+      </li>
+    </ul>
+
+    <p>
+      Danach löschen wir sie. Gesetzliche Aufbewahrungsfristen – etwa für die
+      Abrechnung der Gebühr – bleiben davon unberührt.
+    </p>
+
+    <p>
+      Wir geben die Angaben nicht an Dritte weiter. Verlinkt wirst du nur, wenn
+      du es oben ausdrücklich gewünscht hast; diesen Wunsch kannst du jederzeit
+      zurückziehen.
+      {% if kontakt_mail %}
+        Auskunft, Berichtigung und Löschung:
+        <a href="mailto:{{ kontakt_mail }}">{{ kontakt_mail }}</a>.
+      {% endif %}
     </p>
   </section>
 {% endblock %}

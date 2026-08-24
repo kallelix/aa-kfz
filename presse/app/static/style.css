@@ -636,3 +636,10 @@ form:has(#gegen-gebuehr:checked) .nur-bilderspende { display: none; }
    damit sie nicht am oberen Rand klebt. */
 tr[id^="zeile-"] { scroll-margin-top: 4rem; }
 tr[id^="zeile-"]:target { background: var(--flaeche); }
+
+.datenschutz ul {
+  margin: .4rem 0 .8rem;
+  padding-left: 1.2rem;
+}
+
+.datenschutz li { margin-bottom: .35rem; }

@@ -162,6 +162,18 @@ try:
            "die bedingten Bloecke sind markiert")
     pruefe("<script" not in seite, "das Formular kommt ohne JavaScript aus")
 
+    print("Datenschutzhinweis")
+    pruefe("Wie lange wir speichern" in seite, "die Aufbewahrung wird erklaert")
+    pruefe("nächste Ausgabe" in seite,
+           "und warum die Kontaktdaten laenger bleiben")
+    pruefe("in späteren Saisons noch verlinken" in seite,
+           "und warum das Profil laenger bleibt")
+    pruefe("Gesetzliche Aufbewahrungsfristen" in seite,
+           "der Vorbehalt fuer gesetzliche Fristen steht da")
+    pruefe("vier Wochen nach der Veranstaltung" not in seite,
+           "die alte kurze Frist steht nicht mehr drin")
+    pruefe("zurückziehen" in seite, "der Widerruf der Verlinkung wird genannt")
+
     print("Absenden")
     status, ort, _ = anfrage("POST", "/", dict(VOLL, kommerziell="nein"))
     pruefe(status == 303 and "nr=1" in ort, "nicht kommerziell wird angenommen: " + ort)

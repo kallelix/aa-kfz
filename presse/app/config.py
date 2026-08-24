@@ -105,10 +105,12 @@ KONTAKT_TELEFON = os.environ.get("KONTAKT_TELEFON", "")
 # --- Datenschutz -----------------------------------------------------------
 
 IP_SPEICHERN = _flag("IP_SPEICHERN")
-AUFBEWAHRUNG_HINWEIS = os.environ.get(
-    "AUFBEWAHRUNG_HINWEIS",
-    "Die Daten werden spätestens vier Wochen nach der Veranstaltung gelöscht.",
-)
+
+# Kein AUFBEWAHRUNG_HINWEIS wie in der Kennzeichen-App: dort werden die Daten
+# kurz nach der Veranstaltung geloescht, hier haengt die Frist an der weiteren
+# Nutzung der gespendeten Bilder. Der Text steht deshalb in der Vorlage - wie
+# Sicherheitshinweis und Bildrechte, aus demselben Grund: es muss belegbar
+# bleiben, welchem Wortlaut jemand zugestimmt hat.
 
 # --- Backoffice / Anmeldung ------------------------------------------------
 

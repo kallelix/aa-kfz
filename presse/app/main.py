@@ -118,7 +118,6 @@ def _kontext(request: Request, **extra) -> dict:
         "kontakt_name": config.KONTAKT_NAME,
         "kontakt_mail": config.KONTAKT_MAIL,
         "kontakt_telefon": config.KONTAKT_TELEFON,
-        "aufbewahrung_hinweis": config.AUFBEWAHRUNG_HINWEIS,
         "form_pfad": config.FORM_PATH,
         "honeypot": validation.HONEYPOT,
     }

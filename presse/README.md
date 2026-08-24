@@ -51,6 +51,20 @@ Siehe [.env.example](.env.example). Erwaehnenswert:
   den Fotografen, den die Orga eigentlich dabeihaben will.
 - `ABHOLORT` – steht im Formular, auf der Bestaetigungsseite und in der Mail
 
+Kein `AUFBEWAHRUNG_HINWEIS` wie in der Kennzeichen-App. Dort werden die Daten
+kurz nach der Veranstaltung geloescht; hier haengt die Frist an der weiteren
+Nutzung der gespendeten Bilder, und das ist eine Rechtsaussage. Sie steht
+deshalb in `app/templates/anmeldung.html` – wie Sicherheitshinweis und
+Bildrechte, aus demselben Grund: es muss belegbar bleiben, welchem Wortlaut
+jemand zugestimmt hat.
+
+### Aufbewahrung
+
+Der Hinweis nennt nicht nur „so lange wie noetig", sondern **Kriterien**:
+Kontaktdaten bis zum Ende der folgenden Veranstaltung, Bilderspende samt
+Social-Media-Profil so lange, wie die Bilder genutzt werden. Art. 13 Abs. 2
+lit. a DSGVO verlangt genau das – Dauer *oder* die Kriterien ihrer Festlegung.
+
 ## Tests
 
 ```bash
