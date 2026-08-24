@@ -184,6 +184,12 @@ MONITOR_VORSCHAU = _zahl("MONITOR_VORSCHAU", 120)
 # gilt. 0 schaltet die Hervorhebung ab.
 MONITOR_WARNUNG = _zahl("MONITOR_WARNUNG", 1)
 
+# Wie lange ein angetipptes Schicht-Overlay offen bleibt (Sekunden), bevor es
+# sich von selbst schließt. Ohne das bliebe der Wandmonitor in der Ansicht
+# hängen, sobald jemand sie öffnet und weggeht. 0 schaltet den Selbstschließer
+# ab – dann muss von Hand geschlossen werden.
+MONITOR_OVERLAY_SEKUNDEN = _zahl("MONITOR_OVERLAY_SEKUNDEN", 90)
+
 # Feste Zeitzone – der Monitor steht in Ilmenau, egal wo der Server läuft.
 ZEITZONE = os.environ.get("ZEITZONE", "Europe/Berlin").strip() or "Europe/Berlin"
 

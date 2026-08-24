@@ -1,7 +1,41 @@
 {# Nur der Teil, der sich ändert. Wird sowohl in die Seite eingebettet als
    auch einzeln ausgeliefert, damit die Ansicht sich ohne Neuladen auffrischt.
    data-jetzt trägt die Serverzeit: danach stellt der Browser seine Anzeige,
-   auch wenn die Uhr des Monitors falsch geht. #}
+   auch wenn die Uhr des Monitors falsch geht.
+
+   Jede Schichtkachel bringt ihre Langfassung als verstecktes .detail schon
+   mit. Das Overlay kopiert sie beim Antippen nur heraus – kein zweiter Abruf,
+   und es funktioniert damit auch dann noch, wenn die Verbindung gerade weg
+   ist und nur der letzte Stand dasteht. #}
+
+{% macro detail(s) %}
+  <div class="detail" hidden>
+    <h3 class="detail-titel">{{ s.liste }}</h3>
+    <p class="detail-zeit">
+      {{ s.datum | tag }} · {{ s.beginn[11:] }}–{{ s.ende[11:] }}
+      {%- if s.beginn[:10] != s.ende[:10] %} (am Folgetag){% endif %}
+      {%- if s.ort %} · {{ s.ort }}{% endif %}
+    </p>
+    <p class="detail-quote">
+      <span class="{% if s.fehlt %}zahl-fehlt{% else %}zahl-voll{% endif %}">
+        {{ s.besetzt }} von {{ s.bedarf }}</span>
+      {% if s.fehlt %}
+        <span class="marke marke-luecke">{{ s.fehlt }} fehlen</span>
+      {% else %}
+        <span class="marke marke-voll">voll besetzt</span>
+      {% endif %}
+    </p>
+    {% if s.hinweis %}<p class="detail-hinweis">{{ s.hinweis }}</p>{% endif %}
+    {% if s.namen %}
+      <ol class="detail-namen">
+        {% for name in s.namen %}<li>{{ name }}</li>{% endfor %}
+      </ol>
+    {% else %}
+      <p class="leer">Für diese Schicht ist niemand eingeteilt.</p>
+    {% endif %}
+  </div>
+{% endmacro %}
+
 <div class="raster" data-jetzt="{{ stand.jetzt.isoformat(timespec='seconds') }}"
      data-tag="{{ stand.tag_lang }}">
 
@@ -18,19 +52,22 @@
       <ul class="schichten">
         {% for s in stand.laufend %}
           <li class="schicht{% if warnschwelle and s.fehlt >= warnschwelle %} schicht-luecke{% endif %}">
-            <p class="schicht-kopf">
-              <span class="liste">{{ s.liste }}</span>
-              <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.bedarf }}</span></span>
-            </p>
-            <p class="schicht-zeit">
-              {{ s.beginn[11:] }}–{{ s.ende[11:] }}
-              {%- if s.fehlt %} · <span class="fehlt">{{ s.fehlt }} offen</span>{% endif %}
-            </p>
-            {% if s.namen %}
-              <p class="namen">{{ s.namen | join(' · ') }}</p>
-            {% else %}
-              <p class="namen leer">niemand eingeteilt</p>
-            {% endif %}
+            <button type="button" class="kachel" data-schicht="{{ s.id }}">
+              <span class="schicht-kopf">
+                <span class="liste">{{ s.liste }}</span>
+                <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.bedarf }}</span></span>
+              </span>
+              <span class="schicht-zeit">
+                {{ s.beginn[11:] }}–{{ s.ende[11:] }}
+                {%- if s.fehlt %} · <span class="fehlt">{{ s.fehlt }} offen</span>{% endif %}
+              </span>
+              {% if s.namen %}
+                <span class="namen">{{ s.namen | join(' · ') }}</span>
+              {% else %}
+                <span class="namen leer">niemand eingeteilt</span>
+              {% endif %}
+            </button>
+            {{ detail(s) }}
           </li>
         {% endfor %}
       </ul>
@@ -94,10 +131,13 @@
       <ul class="kommende">
         {% for s in stand.demnaechst %}
           <li class="{% if warnschwelle and s.fehlt >= warnschwelle %}schicht-luecke{% endif %}">
-            <span class="zeit">{{ s.beginn[11:] }}</span>
-            <span class="liste">{{ s.liste }}</span>
-            <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.bedarf }}</span></span>
-            {% if s.fehlt %}<span class="fehlt">{{ s.fehlt }} offen</span>{% endif %}
+            <button type="button" class="kachel" data-schicht="{{ s.id }}">
+              <span class="zeit">{{ s.beginn[11:] }}</span>
+              <span class="liste">{{ s.liste }}</span>
+              <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.bedarf }}</span></span>
+              {% if s.fehlt %}<span class="fehlt">{{ s.fehlt }} offen</span>{% endif %}
+            </button>
+            {{ detail(s) }}
           </li>
         {% endfor %}
       </ul>

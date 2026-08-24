@@ -409,6 +409,7 @@ def _monitor_kontext(request: Request, token: str) -> dict:
     return _kontext(request, token=token, stand=stand,
                     intervall=config.MONITOR_INTERVALL,
                     warnschwelle=config.MONITOR_WARNUNG,
+                    overlay_sekunden=config.MONITOR_OVERLAY_SEKUNDEN,
                     tage=config.TAGE)
 
 

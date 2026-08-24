@@ -1,9 +1,12 @@
 /* Monitoransicht für den Bildschirm im Orga-Zelt.
  *
  * Eigene Datei, nicht die des Backoffice: hier gelten andere Regeln. Gelesen
- * wird aus mehreren Metern Entfernung, bedient wird gar nichts, und der
- * Bildschirm läuft den ganzen Tag – deshalb dunkel, kontrastreich und ohne
- * jedes Bedienelement.
+ * wird aus mehreren Metern Entfernung, und der Bildschirm läuft den ganzen
+ * Tag – deshalb dunkel, kontrastreich und ohne Beiwerk.
+ *
+ * Bedient wird nur an einer Stelle: eine Schicht antippen öffnet sie groß.
+ * Die Schaltflächen sind deshalb so groß wie die Kachel selbst, damit sie
+ * sich auch mit dem Daumen und ohne Zielen treffen lassen.
  *
  * Die Schriftgrößen hängen an der Fensterbreite (clamp mit vw), damit
  * derselbe Aufbau auf einem 24-Zoll-Monitor und auf einem Fernseher passt,
@@ -13,6 +16,8 @@
 :root {
   --grund: #13160f;          /* ILRC-Dunkel, wie im Timetable */
   --tafel: #1c2116;
+  --kachel: #232a1b;
+  --kachel-hell: #2c3524;
   --rand: #2f3a24;
   --schrift: #f2f5ec;
   --gedaempft: #9aa88a;
@@ -126,6 +131,29 @@ html, body {
 
 .leer { color: var(--gedaempft); font-style: italic; margin: .2rem 0; }
 
+/* --- Kacheln zum Antippen ------------------------------------------------- */
+
+/* Die Schaltfläche füllt die ganze Kachel. Nichts an ihr sieht nach Knopf
+   aus – aus fünf Metern soll die Ansicht ruhig bleiben –, aber sie nimmt
+   jeden Fingertipp entgegen, der irgendwo auf der Kachel landet. */
+.kachel {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: .45rem .6rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kachel:hover { background: var(--kachel-hell); }
+.kachel:active { background: #35402a; }
+.kachel:focus-visible { outline: 3px solid var(--limette); outline-offset: -3px; }
+
 /* --- Laufende Schichten --------------------------------------------------- */
 
 .schichten {
@@ -140,10 +168,10 @@ html, body {
 }
 
 .schicht {
-  background: #232a1b;
+  background: var(--kachel);
   border-left: 5px solid var(--gruen);
   border-radius: 6px;
-  padding: .45rem .6rem;
+  overflow: hidden;
 }
 
 .schicht-luecke { border-left-color: var(--fehlt); }
@@ -153,7 +181,6 @@ html, body {
   justify-content: space-between;
   align-items: baseline;
   gap: .6rem;
-  margin: 0;
 }
 
 .liste { font-size: 1.3em; font-weight: 700; }
@@ -169,7 +196,7 @@ html, body {
 .von { font-size: .72em; font-weight: 400; color: var(--gedaempft); }
 
 .schicht-zeit {
-  margin: 0;
+  display: block;
   font-size: .95em;
   color: var(--gedaempft);
   font-variant-numeric: tabular-nums;
@@ -178,12 +205,12 @@ html, body {
 .fehlt { color: var(--fehlt); font-weight: 600; }
 
 .namen {
-  margin: .25rem 0 0;
+  display: -webkit-box;
+  margin-top: .25rem;
   font-size: 1.02em;
   color: #dfe6d3;
   /* Lange Besetzungen dürfen die Kachel nicht sprengen: nach vier Zeilen ist
-     Schluss, der Rest steht im Backoffice. */
-  display: -webkit-box;
+     Schluss. Vollständig steht die Liste im Overlay – genau dafür ist es da. */
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -253,15 +280,20 @@ html, body {
 }
 
 .kommende li {
+  background: var(--kachel);
+  border-left: 5px solid var(--gruen);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.kommende li.schicht-luecke { border-left-color: var(--fehlt); }
+
+.kommende .kachel {
   display: flex;
   align-items: baseline;
   gap: .5rem;
-  background: #232a1b;
-  border-left: 5px solid var(--gruen);
-  border-radius: 6px;
+  width: auto;
   padding: .35rem .7rem;
 }
-.kommende li.schicht-luecke { border-left-color: var(--fehlt); }
 .kommende .zeit {
   font-size: 1.3em;
   font-weight: 700;
@@ -269,6 +301,107 @@ html, body {
 }
 .kommende .liste { font-size: 1.05em; font-weight: 600; }
 .kommende .quote { font-size: 1.05em; }
+.kommende li.schicht-luecke .quote { color: var(--fehlt); }
+
+/* --- Overlay: eine Schicht groß ------------------------------------------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2vh 2vw;
+  background: rgba(8, 10, 6, .82);
+}
+.overlay[hidden] { display: none; }
+
+.overlay-kasten {
+  position: relative;
+  width: min(64rem, 96vw);
+  max-height: 96vh;
+  overflow-y: auto;
+  background: var(--tafel);
+  border: 2px solid var(--limette);
+  border-radius: 14px;
+  padding: 1.4rem 1.8rem 1.1rem;
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, .6);
+}
+
+/* Groß genug, um ihn im Vorbeigehen zu treffen. */
+.overlay-zu {
+  position: absolute;
+  top: .5rem;
+  right: .6rem;
+  width: 3rem;
+  height: 3rem;
+  border: 1px solid var(--rand);
+  border-radius: 50%;
+  background: var(--kachel);
+  color: var(--schrift);
+  font-size: 1.8em;
+  line-height: 1;
+  cursor: pointer;
+}
+.overlay-zu:hover { background: var(--kachel-hell); }
+.overlay-zu:focus-visible { outline: 3px solid var(--limette); outline-offset: 2px; }
+
+.detail-titel {
+  margin: 0 3rem .2rem 0;
+  font-size: 2.1em;
+  font-weight: 700;
+  color: var(--limette);
+}
+
+.detail-zeit {
+  margin: 0 0 .6rem;
+  font-size: 1.3em;
+  color: var(--gedaempft);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-quote {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  margin: 0 0 .8rem;
+  font-size: 1.5em;
+  font-weight: 700;
+}
+.zahl-voll { color: var(--ok); }
+.zahl-fehlt { color: var(--fehlt); }
+
+.detail-hinweis {
+  margin: 0 0 .8rem;
+  padding: .5rem .7rem;
+  background: var(--kachel);
+  border-left: 4px solid var(--warn);
+  border-radius: 4px;
+}
+
+/* Alle Namen, nichts abgeschnitten – der Grund, warum es das Overlay gibt.
+   Mehrere Spalten, damit auch 18 Streckenposten ohne Scrollen hineinpassen. */
+.detail-namen {
+  margin: 0;
+  padding: 0 0 0 2.2rem;
+  columns: 3 14rem;
+  column-gap: 1.5rem;
+  font-size: 1.25em;
+}
+.detail-namen li {
+  padding: .12rem 0;
+  break-inside: avoid;
+  color: #e8eede;
+}
+
+.overlay-fuss {
+  margin: 1rem 0 0;
+  font-size: .9em;
+  color: var(--gedaempft);
+  font-variant-numeric: tabular-nums;
+}
+.overlay-fuss[hidden] { display: none; }
 
 /* --- Marken --------------------------------------------------------------- */
 
@@ -280,8 +413,10 @@ html, body {
   padding: .12rem .5rem;
   border-radius: 999px;
   border: 1px solid currentColor;
+  white-space: nowrap;
 }
 .marke-luecke { color: var(--fehlt); }
+.marke-voll { color: var(--ok); }
 
 /* --- Schmale Bildschirme -------------------------------------------------- */
 
@@ -294,4 +429,7 @@ html, body {
   }
   html, body { overflow: auto; }
   .uhr { font-size: 2.4em; }
+  .detail-namen { columns: 1; }
+  .overlay-kasten { padding: 1.1rem 1rem 1rem; }
+  .detail-titel { font-size: 1.6em; }
 }

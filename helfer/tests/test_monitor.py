@@ -183,6 +183,11 @@ try:
            is not None, "1 von 4 bei der lueckigen Schicht")
     pruefe(re.search(r"Orgabüro.*?2<span class=\"von\">/2", laufend, re.S)
            is not None, "2 von 2 bei der vollen")
+    # Anna steht auf beiden laufenden Schichten, und jede Kachel traegt den
+    # Namen zweimal: kurz auf der Kachel und noch einmal in der Langfassung.
+    pruefe(laufend.count("Anna Berg") == 4,
+           "der Name steht je Schicht auf der Kachel und in der Langfassung: "
+           + str(laufend.count("Anna Berg")))
     pruefe("3 fehlen" in seite, "die Summe der Luecken steht in der Ueberschrift")
     pruefe(laufend.count("schicht-luecke") == 1,
            "genau eine laufende Schicht ist als lueckig markiert")
@@ -200,6 +205,48 @@ try:
     pruefe("Merchandise" not in kommend,
            "was erst in fuenf Stunden beginnt, nicht")
     pruefe("Nachtwache" not in kommend, "die Nachtschicht auch nicht")
+
+    print("Kacheln zum Antippen")
+    pruefe(re.search(r'<button type="button" class="kachel" data-schicht="'
+                     + str(lueckig) + r'"', seite) is not None,
+           "die laufende Schicht ist eine Schaltflaeche")
+    pruefe(re.search(r'<button type="button" class="kachel" data-schicht="'
+                     + str(bald) + r'"', seite) is not None,
+           "die kommende auch - damit sich Zukuenftiges begutachten laesst")
+    pruefe(seite.count('class="kachel"') == 3,
+           "drei Kacheln insgesamt: " + str(seite.count('class="kachel"')))
+
+    print("Langfassung liegt schon bei")
+    pruefe(seite.count('class="detail" hidden') == 3,
+           "jede Kachel bringt ihre Langfassung versteckt mit")
+    pruefe("overlay-inhalt" in seite, "und das Overlay ist da, sie aufzunehmen")
+    pruefe(seite.index('id="overlay"') > seite.index('</main>'),
+           "das Overlay liegt ausserhalb des aufgefrischten Bereichs")
+
+    # Die Langfassung der lueckigen Schicht herausschneiden und pruefen.
+    stueck = seite.split('data-schicht="' + str(lueckig) + '"')[1]
+    stueck = stueck.split("</li>")[0]
+    pruefe("Sa 29.08." in stueck, "die Langfassung nennt den Tag")
+    pruefe("1 von 4" in stueck, "und die Besetzung ausgeschrieben")
+    pruefe("3 fehlen" in stueck, "und wie viele fehlen")
+    pruefe("<ol class=\"detail-namen\">" in stueck,
+           "die Namen stehen als vollstaendige Liste drin")
+    pruefe("Anna Berg" in stueck, "mit dem Namen")
+
+    print("Nachtschicht in der Langfassung")
+    nachtstueck = seite.split('data-schicht="' + str(nacht) + '"')
+    pruefe(len(nachtstueck) == 1,
+           "die Nachtschicht ist um 10:30 auf keiner Kachel")
+
+    print("Leere Schicht")
+    stueck = seite.split('data-schicht="' + str(bald) + '"')[1].split("</li>")[0]
+    pruefe("Bert Öhl" in stueck, "die kommende Schicht zeigt ihre Leute")
+
+    print("Selbstschliesser")
+    pruefe('data-overlay-sekunden="90"' in seite,
+           "die Dauer steht am Skript")
+    pruefe("Schließt sich in" in seite,
+           "und wird im Overlay angesagt - sonst wirkt das Zuklappen wie ein Fehler")
 
     print("Verbindungswarnung")
     pruefe('id="warnung" hidden' in seite,
