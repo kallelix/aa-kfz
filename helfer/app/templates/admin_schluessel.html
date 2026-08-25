@@ -52,7 +52,7 @@
         <label for="name">Wer bekommt ihn</label>
         <input type="text" id="name" name="name" maxlength="200"
                list="v-namen" autocomplete="off"
-               placeholder="Name, so wie er gerufen wird">
+               placeholder="Name">
         <datalist id="v-namen">
           {% for n in namen %}<option value="{{ n }}">{% endfor %}
         </datalist>
