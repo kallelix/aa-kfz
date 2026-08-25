@@ -4,7 +4,7 @@
 {% block ueberschrift %}Funkgeräte und Material{% endblock %}
 
 {% block inhalt %}
-  <section class="zaehler">
+  <section class="zaehler zaehler-flach">
     {% for stueck in material %}
       <div class="zaehler-kachel {% if zaehler[stueck].offen %}zaehler-voll{% endif %}">
         <p class="zaehler-titel">{{ material_text[stueck] }}</p>
@@ -41,9 +41,6 @@
         <label for="neuer_name">… oder neue Person</label>
         <input type="text" id="neuer_name" name="neuer_name" maxlength="120"
                autocomplete="off" placeholder="Name eintippen">
-        <p class="hilfe">Wer hier steht, wird angelegt und bekommt das
-          Material – für alle, die auf keiner Schicht stehen. Die Auswahl
-          darüber wird dann nicht beachtet.</p>
       </div>
 
       <div class="feld">
@@ -55,9 +52,6 @@
                     {% if t.datum == heute %}selected{% endif %}>{{ t.lang }}</option>
           {% endfor %}
         </select>
-        <p class="hilfe">Ein Funkgerät wird für einen Tag geholt, nicht für
-          eine einzelne Schicht – wer es holt, steht oft auf mehreren. Der
-          heutige Tag ist vorbelegt.</p>
       </div>
 
       <div class="feld">
@@ -72,9 +66,6 @@
             </span>
           {% endfor %}
         </div>
-        <p class="hilfe">Was auf 0 steht, wird nicht ausgegeben. Die
-          Vorbelegung lässt sich unter
-          <a href="/admin/einstellungen">Einstellungen</a> ändern.</p>
       </div>
 
       <div class="feld">

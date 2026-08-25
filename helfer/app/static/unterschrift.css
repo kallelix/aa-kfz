@@ -37,7 +37,7 @@ body {
   background: var(--grund);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: clamp(16px, 1.6vw, 22px);
+  font-size: clamp(15px, min(1.6vw, 2.6vh), 22px);
   line-height: 1.4;
   /* Auf einem Tablet soll das Wischen im Feld zeichnen und nicht die Seite
      verschieben. */
@@ -155,7 +155,15 @@ body {
   border: 2px solid var(--rand);
   border-radius: 10px;
 }
+/* Absolut im Rahmen und nicht einfach darin: ein <canvas> hat eine
+   Eigengroesse von 300x150 und damit ein Seitenverhaeltnis von 2:1. Steht es
+   im Fluss, zwingt es dem Rahmen diese Hoehe auf - bei 700 Pixeln Breite also
+   350 Pixel -, und der Rahmen laesst sich nicht mehr kleiner rechnen. Genau
+   daran lief die Seite ueber: die Flaeche blieb gross, und die Knoepfe
+   rutschten aus dem Bild. So haengt die Hoehe allein am Rahmen. */
 .flaeche {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -208,7 +216,7 @@ body {
 
 /* Abbrechen tritt zurueck: es ist der seltene Weg und soll nicht neben dem
    haeufigen gleich gross stehen. */
-.abbrechen { margin: 1.5rem 0 0; text-align: center; }
+.abbrechen { margin: .9rem 0 0; text-align: center; }
 .knopf-leise {
   border: 0;
   background: none;
@@ -251,9 +259,22 @@ body {
 
 /* Auf sehr flachen Bildschirmen zuerst das Beiwerk kuerzen, nicht die
    Zeichenflaeche. */
-@media (max-height: 600px) {
+@media (max-height: 800px) {
   .vorgang-wortlaut { font-size: 1.1em; padding: .5rem .7rem; margin-bottom: .7rem; }
   .namensfeld { font-size: 1.1em; padding: .6rem .7rem; margin-bottom: .7rem; }
   .hinweistext { font-size: .78em; margin: .5rem 0 .6rem; }
   .abbrechen { margin-top: .8rem; }
+}
+
+/* Noch flacher - ein auf Fensterhoehe gestauchter Browser. Jetzt darf auch
+   der Kopf schmaler werden und die Zeichenflaeche unter ihre sonstige
+   Untergrenze. Lieber ein niedriges Feld als Knoepfe ausserhalb des Bildes:
+   unterschreiben laesst sich auch auf zwei Zentimetern, drucken laesst sich
+   nur, was man sieht. */
+@media (max-height: 620px) {
+  .kopf { padding: .3rem 1rem; }
+  .vereinslogo { width: 2.1rem; height: 2.1rem; }
+  .feldrahmen { min-height: 5rem; }
+  .vorgang { padding: .5rem 1.2rem .7rem; }
+  .abbrechen { margin-top: .5rem; }
 }

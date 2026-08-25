@@ -246,6 +246,20 @@ main.spalte-schmal { max-width: 52rem; }
 .zaehler-zahl { margin: .1rem 0; font-size: 1.6rem; font-weight: 700; line-height: 1; }
 .zaehler-detail { margin: 0; font-size: .78rem; color: var(--gedaempft); }
 
+/* An den beiden Ausgabetischen steht der Zaehler in einer Zeile statt in
+   dreien. Die drei Kacheln kosteten sonst die Hoehe, die unten dem Knopf
+   fehlt - und wer ausgibt, liest sie nebenbei, nicht andaechtig. */
+.zaehler-flach { margin-bottom: .9rem; }
+.zaehler-flach .zaehler-kachel {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .1rem .5rem;
+  padding: .45rem .8rem;
+}
+.zaehler-flach .zaehler-titel { font-size: .85rem; color: var(--text); font-weight: 600; }
+.zaehler-flach .zaehler-zahl { margin: 0; font-size: 1.25rem; }
+
 /* Filterleiste */
 .filter {
   display: flex;
@@ -1294,6 +1308,13 @@ main > p:not(.trefferzahl):not(.knopfreihe):not(.balken),
 
 /* Die Mengenfelder bleiben schmal - drei nebeneinander. */
 .mengen .menge input { width: 4.5rem; }
+
+/* An einem Ausgabetisch soll der Knopf zu sehen sein, ohne zu scrollen: das
+   Formular steht fest, die Liste daneben rollt. Deshalb hier enger als in
+   einem Formular, das die Seite fuer sich hat. */
+.arbeit-formular .feld { margin-bottom: .7rem; }
+.arbeit-formular .hilfe { margin-top: .15rem; line-height: 1.35; }
+.arbeit-formular label { margin-bottom: .2rem; }
 
 /* --- Umschalter statt Haekchen und Knopf ---------------------------------- */
 

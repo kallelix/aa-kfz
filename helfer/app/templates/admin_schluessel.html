@@ -7,7 +7,7 @@
   {# anzahl_offen und anzahl_alle statt der angezeigten Liste: die zaehlte mit
      aktivem Filter nur, was gerade zu sehen ist - "insgesamt erfasst" haette
      dann die Zahl der offenen gezeigt. #}
-  <section class="zaehler">
+  <section class="zaehler zaehler-flach">
     <div class="zaehler-kachel {% if anzahl_offen %}zaehler-voll{% endif %}">
       <p class="zaehler-titel">Draußen</p>
       <p class="zaehler-zahl">{{ anzahl_offen }}</p>
@@ -46,10 +46,6 @@
             <option value="{{ f.kennzeichen }}">{{ f.name }}</option>
           {% endfor %}
         </datalist>
-        <p class="hilfe">Bindestriche und Leerzeichen sind egal – „IL-A 123“
-          und „ila123“ sind derselbe Wagen. Ein Kennzeichen, das es noch nicht
-          gibt, kommt damit in den Stamm; beim nächsten Mal steht der Name
-          schon da.</p>
       </div>
 
       <div class="feld">
@@ -60,10 +56,6 @@
         <datalist id="v-namen">
           {% for n in namen %}<option value="{{ n }}">{% endfor %}
         </datalist>
-        <p class="hilfe">Ein Feld, nicht Vor- und Nachname getrennt: die
-          Bestandsdaten geben die Trennung nicht her. Die Vorschläge sind die
-          erfassten Helfer, die vom Shuttle zuerst – wer nicht dabei ist, wird
-          einfach getippt, ein Schlüssel kann an jeden gehen.</p>
       </div>
 
       <div class="feld">
