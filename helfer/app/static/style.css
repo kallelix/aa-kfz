@@ -171,7 +171,13 @@ footer {
 
 /* --- Backoffice ---------------------------------------------------------- */
 
-.huelle-breit { max-width: 68rem; }
+/* Das Backoffice zeigt vor allem Tabellen, und die brauchen Breite. 68 rem
+   liessen auf einem 1920er Bildschirm gut 800 Pixel Grau links und rechts
+   liegen, waehrend die Funkliste mit sechs Spalten eng wurde.
+
+   Gedeckelt wird stattdessen der Fliesstext weiter unten: eine Erklaerung
+   ueber 1800 Pixel Breite liest niemand mehr. */
+.huelle-breit { max-width: min(118rem, 100%); }
 
 .admin-kopf {
   display: flex;
@@ -1096,10 +1102,12 @@ tr.ist-draussen td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
    zuklappen. */
 .arbeitsflaeche { display: block; }
 
-@media (min-width: 82rem) {
+@media (min-width: 76rem) {
   .arbeitsflaeche {
     display: grid;
-    grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);
+    /* Das Formular so schmal, wie es gerade noch bequem ist - der Rest gehoert
+       der Liste, die bei sechs Spalten jeden Millimeter braucht. */
+    grid-template-columns: minmax(19rem, 22rem) minmax(0, 1fr);
     gap: 1.5rem;
     align-items: start;
   }
@@ -1143,3 +1151,23 @@ details.kasten:not([open]) { padding-bottom: .7rem; }
   border-top: 1px solid var(--rand);
   padding-top: .8rem;
 }
+
+/* --- Fliesstext bleibt lesbar breit --------------------------------------- */
+
+/* Die Huelle ist breit, damit Tabellen Platz haben. Erklaerungen sollen davon
+   nichts abbekommen - ueber etwa 60 Zeichen Zeilenlaenge findet das Auge den
+   Zeilenanfang nicht mehr zuverlaessig wieder. */
+.kasten > p,
+.hilfe,
+main > p:not(.trefferzahl):not(.knopfreihe):not(.balken),
+.hinweisliste {
+  max-width: 62rem;
+}
+
+/* In der schmalen Spalte neben der Liste gilt die Breite der Spalte. */
+.arbeit-formular .kasten > p,
+.arbeit-formular .hilfe { max-width: none; }
+
+/* Die Kacheln sollen sich nicht ueber die volle Breite strecken - vier Stueck
+   auf 1900 Pixel waeren je 460 Pixel breit fuer eine zweistellige Zahl. */
+.zaehler { max-width: 74rem; }
