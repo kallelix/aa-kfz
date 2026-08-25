@@ -481,6 +481,20 @@ try:
             pruefe(aktiv is not None and aktiv.group(1) == erwartet_aktiv,
                    "die gewählte Seite ist hervorgehoben: "
                    + (aktiv.group(1) if aktiv else "keine"))
+
+            # admin_merken.js vergleicht die gemerkte Wahl mit dem data-wert
+            # des hervorgehobenen Teils - das ist sein Halt. Stimmte der
+            # nicht, schickte es sich im Kreis: die Seite "Alle" hat keinen
+            # Filter in der Adresse, es fände dort also immer wieder nichts
+            # und lüde immer wieder neu.
+            teile = re.findall(
+                r'<a class="umschalter-teil([^"]*)"\s*'
+                r'href="[^"]*" data-wert="(\d)"', seite)
+            markiert = [wert for klassen, wert in teile
+                        if "ist-aktiv" in klassen]
+            pruefe(markiert == ["1" if anhang else "0"],
+                   "genau ein data-wert ist markiert, und zwar der richtige: "
+                   + str(markiert))
             pruefe(seite.count('<tr data-suche=') == erwartete_zeilen,
                    "und es stehen %d Zeilen da" % erwartete_zeilen)
 

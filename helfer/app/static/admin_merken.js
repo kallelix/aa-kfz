@@ -61,9 +61,8 @@
         });
       });
 
-      /* Nur anwenden, wenn die Adresse gar nichts dazu sagt - eine
-       * ausdrueckliche Wahl in der Adresse hat immer Vorrang, sonst koennte
-       * man einen Link nicht mehr teilen. */
+      /* Eine ausdrueckliche Wahl in der Adresse hat Vorrang: sonst liesse
+       * sich ein Link nicht mehr teilen. */
       if (window.location.search.indexOf(feld + "=") !== -1) {
         return;
       }
@@ -71,13 +70,31 @@
       if (!gemerkt) {
         return;
       }
-      var ziel = gruppe.querySelector('[data-wert="' + gemerkt + '"]');
-      if (ziel && ziel.getAttribute("href")) {
-        /* replace statt assign: der Zurueck-Knopf soll nicht auf die
-         * Fassung ohne Filter zeigen und einen dorthin zuruecktreten
-         * lassen, aus der er sofort wieder wegspringt. */
-        window.location.replace(ziel.getAttribute("href"));
+
+      /* Der entscheidende Vergleich ist der mit dem, was die Seite gerade
+       * ZEIGT - nicht der mit dem, was in der Adresse steht.
+       *
+       * Die Seite "Alle" hat keinen Filter in der Adresse. Wer danach ginge,
+       * faende dort nie eine Angabe, wuerde die gemerkte Wahl anwenden,
+       * wieder auf "Alle" landen, wieder nichts finden - und so fort. Genau
+       * dieses endlose Neuladen stand hier. Steht ohnehin schon das Richtige
+       * da, ist nichts zu tun; damit kann es sich nicht wiederholen. */
+      var aktiv = gruppe.querySelector("[data-wert].ist-aktiv");
+      if (aktiv && aktiv.getAttribute("data-wert") === gemerkt) {
+        return;
       }
+
+      var ziel = gruppe.querySelector('[data-wert="' + gemerkt + '"]');
+      if (!ziel || !ziel.getAttribute("href")) {
+        return;
+      }
+      if (ziel.pathname + ziel.search === window.location.pathname
+                                         + window.location.search) {
+        return;
+      }
+      /* replace statt assign: der Zurueck-Knopf soll nicht auf die Fassung
+       * zeigen, aus der man gerade weggeschickt wurde. */
+      window.location.replace(ziel.getAttribute("href"));
     });
   }
 
