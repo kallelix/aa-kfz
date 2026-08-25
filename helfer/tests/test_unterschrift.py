@@ -56,6 +56,10 @@ from app import db, unterschriften  # noqa: E402
 
 print("Was in einen Pfad darf")
 for roh, gut in (("M10,10L20,30", True),
+                 # Ein i-Punkt: eine Strecke der Laenge null, die SVG mit
+                 # runder Kappe als Punkt zeichnet.
+                 ("M20,8L20,8", True),
+                 ("M20,60L20,20M20,8L20,8", True),
                  ("M1.5,2.5L3,4 L5,6", True),
                  ("M-10,10L20,-30", True),
                  ("", False),
@@ -365,6 +369,16 @@ try:
     pruefe(float(flach[2]) / float(flach[3]) <= 4.01,
            "eine sehr flache Unterschrift wird nicht bis zur Unkenntlichkeit "
            "gestreckt: " + str(flach))
+
+    # Ein einzelner Tupfer hat keine Ausdehnung. Ohne Rand waere die viewBox
+    # null mal null und die Vorschau leer.
+    tupfer = [float(z) for z in unterschriften.ausschnitt("M30,30L30,30").split()]
+    pruefe(tupfer[2] > 0 and tupfer[3] > 0,
+           "ein einzelner Punkt bekommt trotzdem einen Ausschnitt: "
+           + str(tupfer))
+    pruefe(tupfer[0] < 30 < tupfer[0] + tupfer[2]
+           and tupfer[1] < 30 < tupfer[1] + tupfer[3],
+           "und liegt darin")
 
     print("Keine Erfolgsmeldung, die stehen bleibt")
     _, _, seite = anfrage("GET", "/unterschrift/" + TOKEN)

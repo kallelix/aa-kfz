@@ -83,13 +83,24 @@
       stift.lineCap = "round";
       stift.lineJoin = "round";
       stift.strokeStyle = "#13160f";
+      stift.fillStyle = "#13160f";
       neuZeichnen(kasten.width, kasten.height);
+    }
+
+    function tupfen(punkt) {
+      stift.beginPath();
+      stift.arc(punkt.x, punkt.y, stift.lineWidth / 2, 0, 2 * Math.PI);
+      stift.fill();
     }
 
     function neuZeichnen(breite, hoehe) {
       stift.clearRect(0, 0, breite || canvas.width, hoehe || canvas.height);
       punkte.forEach(function (einStrich) {
         if (einStrich.length < 1) {
+          return;
+        }
+        if (einStrich.length === 1) {
+          tupfen(einStrich[0]);
           return;
         }
         stift.beginPath();
@@ -110,7 +121,7 @@
     }
 
     function stand() {
-      var etwasDa = punkte.some(function (s) { return s.length > 1; });
+      var etwasDa = punkte.some(function (s) { return s.length >= 1; });
       if (fertig) {
         fertig.disabled = !etwasDa;
       }
@@ -124,6 +135,7 @@
       canvas.setPointerCapture(ereignis.pointerId);
       strich = [stelle(ereignis)];
       punkte.push(strich);
+      tupfen(strich[0]);
       stand();
     });
 
@@ -170,7 +182,15 @@
       formular.addEventListener("submit", function (ereignis) {
         var teile = [];
         punkte.forEach(function (einStrich) {
-          if (einStrich.length < 2) {
+          if (einStrich.length < 1) {
+            return;
+          }
+          if (einStrich.length === 1) {
+            /* Eine Strecke der Laenge null. Mit stroke-linecap="round"
+             * zeichnet SVG daraus einen Punkt - so ueberlebt der i-Punkt
+             * den Weg vom Tablet in die Vorschau. */
+            teile.push("M" + einStrich[0].x + "," + einStrich[0].y
+                       + "L" + einStrich[0].x + "," + einStrich[0].y);
             return;
           }
           var stueck = "M" + einStrich[0].x + "," + einStrich[0].y;
