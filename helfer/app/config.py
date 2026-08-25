@@ -196,6 +196,30 @@ MONITOR_OVERLAY_SEKUNDEN = _zahl("MONITOR_OVERLAY_SEKUNDEN", 90)
 # 0 schaltet den Rücksprung ab.
 MONITOR_TAGESBLICK_SEKUNDEN = _zahl("MONITOR_TAGESBLICK_SEKUNDEN", 120)
 
+# --- Unterschriften --------------------------------------------------------
+
+# Wie lange eine Unterschriftsanforderung auf dem Tablet steht, bevor sie
+# verfällt (Minuten). Das ist die Sicherheitsgrenze der Tablet-Adresse: sie
+# nimmt Eingaben entgegen, anders als der Monitor. Verfällt der Eintrag, kann
+# ein abhandengekommener Link nichts anrichten, solange niemand am Tisch steht.
+UNTERSCHRIFT_MINUTEN = _zahl("UNTERSCHRIFT_MINUTEN", 5)
+
+# Nachfrist für das Absenden. Wer beim Ablaufen gerade zeichnet, soll nicht
+# von vorn anfangen müssen – angezeigt wird der Eintrag dann nicht mehr, aber
+# eine schon begonnene Unterschrift wird noch angenommen (Minuten).
+UNTERSCHRIFT_NACHFRIST = _zahl("UNTERSCHRIFT_NACHFRIST", 10)
+
+# Wie oft das Tablet nachfragt, ob etwas ansteht (Sekunden).
+UNTERSCHRIFT_TAKT = _zahl("UNTERSCHRIFT_TAKT", 2)
+
+# Was den Helfern am Tablet über die Aufbewahrung gesagt wird. Eine
+# Unterschrift ist ein personenbezogenes Datum – sie braucht einen Zweck und
+# eine Frist, und beides gehört dorthin, wo unterschrieben wird.
+UNTERSCHRIFT_AUFBEWAHRUNG = os.environ.get(
+    "UNTERSCHRIFT_AUFBEWAHRUNG",
+    "Die Unterschrift belegt nur die Übergabe und wird nach der "
+    "Veranstaltung gelöscht.").strip()
+
 # Feste Zeitzone – der Monitor steht in Ilmenau, egal wo der Server läuft.
 ZEITZONE = os.environ.get("ZEITZONE", "Europe/Berlin").strip() or "Europe/Berlin"
 

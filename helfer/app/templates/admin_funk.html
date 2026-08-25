@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% import "unterschrift_knopf.html" as unterschrift %}
 {% block titel %}Funk{% endblock %}
 {% block ueberschrift %}Funkgeräte und Material{% endblock %}
 
@@ -195,6 +196,12 @@
                       </form>
                     </details>
                   {% endif %}
+                  {{ unterschrift.knopf(
+                       'material', a.id,
+                       'rueckgabe' if a.zurueck_am else 'ausgabe',
+                       '/admin/funk', csrf, tablet,
+                       (unterschrieben.get(a.id) or {}).get(
+                           'rueckgabe' if a.zurueck_am else 'ausgabe')) }}
                   <form method="post" action="/admin/ausleihe/{{ a.id }}/loeschen">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <button type="submit" class="knopf-winzig">löschen</button>

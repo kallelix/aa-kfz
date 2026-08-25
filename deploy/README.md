@@ -470,10 +470,11 @@ von ihnen erst im Betrieb auffällt, wenn man ihn beim Aufsetzen übersieht:
    Basic-Auth-Riegel vor `/admin` darf **nicht** auf `/monitor/` ausgedehnt
    werden – der Bildschirm im Zelt kann kein Passwort eingeben.
 3. **Die Content-Security-Policy braucht `connect-src 'self'`.** Die
-   Monitoransicht holt sich ihren Inhalt per `fetch` selbst. Ohne die
-   Direktive fällt das auf `default-src 'none'` zurück und wird geblockt: der
-   Monitor bliebe stumm auf dem ersten Stand stehen. `nginx-helfer.conf` hat
-   sie als einzige der drei.
+   Monitoransicht holt sich ihren Inhalt per `fetch` selbst, das
+   Unterschriften-Tablet ebenso. Ohne die Direktive fällt das auf
+   `default-src 'none'` zurück und wird geblockt: der Monitor bliebe stumm auf
+   dem ersten Stand stehen, und das Tablet bekäme nie mit, dass etwas
+   ansteht. `nginx-helfer.conf` hat sie als einzige der drei.
 
 Kein Mailversand – es gibt keine SMTP-Werte zu setzen.
 
@@ -665,6 +666,11 @@ Wie in Abschnitt 4, zusätzlich:
       die Leiste sofort und dauerhaft
 - [ ] `/monitor/<token>` ist **ohne** Anmeldung erreichbar, `/admin` nicht
 - [ ] Ein falscher Token gibt 404
+- [ ] Falls Unterschriften genutzt werden: Tablet-Link erzeugt, auf dem Tablet
+      im Vollbild geöffnet, Bildschirmsperre aus. Eine Übergabe probeweise
+      anfordern und unterschreiben
+- [ ] Der Tablet-Link ist ein **anderer** als der des Monitors – die eine
+      Adresse nimmt Eingaben entgegen, die andere nicht
 
 ---
 

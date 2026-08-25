@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% import "unterschrift_knopf.html" as unterschrift %}
 {% block titel %}Schlüssel{% endblock %}
 {% block ueberschrift %}KFZ-Schlüssel{% endblock %}
 
@@ -152,6 +153,12 @@
                       <button type="submit" class="knopf-winzig">zurück</button>
                     </form>
                   {% endif %}
+                  {{ unterschrift.knopf(
+                       'schluessel', s.id,
+                       'rueckgabe' if s.zurueck_am else 'ausgabe',
+                       '/admin/schluessel', csrf, tablet,
+                       (unterschrieben.get(s.id) or {}).get(
+                           'rueckgabe' if s.zurueck_am else 'ausgabe')) }}
                   <form method="post" action="/admin/schluessel/{{ s.id }}/loeschen">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <button type="submit" class="knopf-winzig">löschen</button>

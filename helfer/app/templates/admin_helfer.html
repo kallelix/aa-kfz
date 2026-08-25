@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% import "unterschrift_knopf.html" as unterschrift %}
 {% block titel %}Helfer{% endblock %}
 {% block ueberschrift %}Helfer{% endblock %}
 
@@ -135,6 +136,10 @@
                     {% endif %}
                     <span class="gedaempft">{{ h.tshirt_ausgegeben_am[:16] }}
                       {%- if h.tshirt_kuerzel %} · {{ h.tshirt_kuerzel }}{% endif %}</span>
+                    {{ unterschrift.knopf(
+                         'tshirt', h.id, 'ausgabe', '/admin/helfer', csrf,
+                         tablet,
+                         (unterschrieben.get(h.id) or {}).get('ausgabe')) }}
                     <form method="post"
                           action="/admin/helfer/{{ h.id }}/tshirt/zurueck">
                       <input type="hidden" name="csrf" value="{{ csrf }}">

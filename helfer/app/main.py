@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import (auth, band, config, csv_import, db, eintraege,
-               normalisieren, worker, zeitplan)
+               normalisieren, unterschriften, worker, zeitplan)
 
 BASIS = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASIS / "templates"))
@@ -375,7 +375,9 @@ async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",
         "admin_helfer.html",
         _admin(request, sitzung, hinweis=hinweis, helfer=db.helfer_liste(),
                zaehler=db.zaehler(), tshirt=db.tshirt_zaehler(),
-               groessen=normalisieren.GROESSEN, suche=suche))
+               groessen=normalisieren.GROESSEN, suche=suche,
+               unterschrieben=unterschriften.je_vorgang("tshirt"),
+               tablet=bool(db.tablet_token())))
 
 
 # ACHTUNG, Reihenfolge: /admin/helfer/neu muss VOR
@@ -969,7 +971,9 @@ async def funk(request: Request, hinweis: str = "", offen: str = "",
                nur_offen=bool(offen), zaehler=db.material_zaehler(),
                material=db.MATERIAL, material_text=db.MATERIAL_TEXT,
                helfer=db.helfer_liste(), tage=db.monitor_tage(),
-               heute=db.jetzt_lokal().strftime("%Y-%m-%d")))
+               heute=db.jetzt_lokal().strftime("%Y-%m-%d"),
+               unterschrieben=unterschriften.je_vorgang("material"),
+               tablet=bool(db.tablet_token())))
 
 
 @app.post("/admin/funk/ausgeben")
@@ -1029,7 +1033,9 @@ async def schluessel(request: Request, hinweis: str = "", offen: str = "",
         _admin(request, sitzung, hinweis=hinweis,
                schluessel=db.schluessel_liste(nur_offen=bool(offen)),
                nur_offen=bool(offen), fahrzeuge=db.fahrzeuge(),
-               namen=db.namen_vorschlaege()))
+               namen=db.namen_vorschlaege(),
+               unterschrieben=unterschriften.je_vorgang("schluessel"),
+               tablet=bool(db.tablet_token())))
 
 
 @app.post("/admin/schluessel/ausgeben")
@@ -1073,6 +1079,134 @@ async def schluessel_weg(request: Request, schluessel_id: int,
         return Response("Ungültiger CSRF-Token", status_code=400)
     db.schluessel_loeschen(schluessel_id)
     return _zurueck("/admin/schluessel", "geloescht")
+
+
+# --- Unterschriften: Tablet und Verwaltung ---------------------------------
+
+def _tablet_token_stimmt(uebermittelt: str) -> bool:
+    hinterlegt = db.tablet_token()
+    if not hinterlegt:
+        return False
+    return hmac.compare_digest(hinterlegt, uebermittelt)
+
+
+def _tablet_kontext(request: Request, token: str, **extra) -> dict:
+    return _kontext(request, token=token, offen=unterschriften.offen(),
+                    takt=config.UNTERSCHRIFT_TAKT,
+                    aufbewahrung=config.UNTERSCHRIFT_AUFBEWAHRUNG, **extra)
+
+
+@app.get("/unterschrift/{token}")
+async def tablet(request: Request, token: str, hinweis: str = ""):
+    # 404 statt 403: ein falscher Link soll nicht verraten, dass es einen
+    # richtigen gibt.
+    if not _tablet_token_stimmt(token):
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+    return templates.TemplateResponse(
+        "unterschrift.html", _tablet_kontext(request, token, hinweis=hinweis))
+
+
+@app.get("/unterschrift/{token}/stand")
+async def tablet_stand(request: Request, token: str):
+    """Nur der wechselnde Teil. Das Tablet fragt im Takt nach – ohne das
+    müsste jemand am Tisch die Seite neu laden, während er ausgibt."""
+    if not _tablet_token_stimmt(token):
+        return Response("", status_code=404)
+    antwort = templates.TemplateResponse("unterschrift_stand.html",
+                                         _tablet_kontext(request, token))
+    antwort.headers["Cache-Control"] = "no-store"
+    return antwort
+
+
+@app.post("/unterschrift/{token}/zeichnen")
+async def tablet_zeichnen(request: Request, token: str):
+    if not _tablet_token_stimmt(token):
+        return Response("", status_code=404)
+
+    daten = await request.form()
+    try:
+        nummer = int(str(daten.get("id") or ""))
+    except ValueError:
+        return _zurueck("/unterschrift/" + token, "weg")
+
+    ergebnis = unterschriften.zeichnen(nummer, str(daten.get("pfad") or ""))
+    return _zurueck("/unterschrift/" + token, ergebnis)
+
+
+@app.post("/unterschrift/{token}/abbrechen")
+async def tablet_abbrechen(request: Request, token: str):
+    """Auch vom Tablet aus – wer die Übergabe abbricht, steht dort und nicht
+    am Rechner."""
+    if not _tablet_token_stimmt(token):
+        return Response("", status_code=404)
+    await request.form()
+    unterschriften.abbrechen()
+    return _zurueck("/unterschrift/" + token, "abgebrochen")
+
+
+@app.get("/admin/unterschriften")
+async def unterschriften_verwalten(
+        request: Request, hinweis: str = "",
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    token = db.tablet_token()
+    basis = config.BASIS_URL or str(request.base_url).rstrip("/")
+    return templates.TemplateResponse(
+        "admin_unterschriften.html",
+        _admin(request, sitzung, hinweis=hinweis, token=token,
+               adresse=(basis + "/unterschrift/" + token) if token else "",
+               offen=unterschriften.offen(), liste=unterschriften.liste(),
+               zaehler=unterschriften.zaehler(),
+               minuten=config.UNTERSCHRIFT_MINUTEN))
+
+
+@app.post("/admin/unterschriften/link")
+async def unterschriften_link(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    if str(daten.get("aktion")) == "widerrufen":
+        db.tablet_token_loeschen()
+        return _zurueck("/admin/unterschriften", "widerrufen")
+    db.tablet_token_neu()
+    return _zurueck("/admin/unterschriften", "neuer-link")
+
+
+@app.post("/admin/unterschrift/anfordern")
+async def unterschrift_anfordern(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    ziel = _weiter_pfad(str(daten.get("weiter") or "/admin/unterschriften"))
+    if not db.tablet_token():
+        return _zurueck(ziel, "kein-tablet")
+
+    try:
+        vorgang = int(str(daten.get("vorgang_id") or ""))
+    except ValueError:
+        return _zurueck(ziel, "unbekannt")
+
+    _, meldung = unterschriften.anfordern(
+        str(daten.get("art") or ""), vorgang,
+        str(daten.get("richtung") or ""), sitzung.kuerzel)
+    return _zurueck(ziel, meldung)
+
+
+@app.post("/admin/unterschrift/abbrechen")
+async def unterschrift_abbrechen(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    unterschriften.abbrechen()
+    return _zurueck(_weiter_pfad(str(daten.get("weiter") or "")),
+                    "abgebrochen")
 
 
 # --- Import ----------------------------------------------------------------

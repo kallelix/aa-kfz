@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Übergabe – {{ veranstaltung }}</title>
+  <link rel="stylesheet" href="/static/unterschrift.css">
+  <noscript>
+    <!-- Ohne JavaScript gibt es kein Unterschriftenfeld. Dann bleibt nur,
+         die Seite von Hand neu zu laden und auf Papier zu unterschreiben. -->
+    <meta http-equiv="refresh" content="{{ takt }}">
+  </noscript>
+</head>
+<body>
+  <header class="kopf">
+    <img class="vereinslogo" src="/static/ilrc-logo.svg" alt=""
+         aria-hidden="true" width="56" height="56">
+    <p class="veranstaltung">{{ veranstaltung }} · Übergabe</p>
+  </header>
+
+  {% set meldungen = {
+    'ok': 'Danke. Die Unterschrift ist gespeichert.',
+    'leer': 'Da war noch nichts gezeichnet.',
+    'weg': 'Dieser Vorgang steht nicht mehr an.',
+    'zu-spaet': 'Die Anforderung ist abgelaufen. Bitte am Tisch neu anfordern.',
+    'abgebrochen': 'Abgebrochen.',
+  } %}
+  {% if hinweis %}
+    <p class="meldung {{ 'meldung-gut' if hinweis == 'ok' else 'meldung-warnung' }}"
+       role="status">{{ meldungen.get(hinweis, hinweis) }}</p>
+  {% endif %}
+
+  <main id="inhalt">
+    {% include "unterschrift_stand.html" %}
+  </main>
+
+  <script src="/static/unterschrift.js"
+          data-quelle="/unterschrift/{{ token }}/stand"
+          data-takt="{{ takt }}"></script>
+</body>
+</html>

@@ -1026,3 +1026,13 @@ tr.ist-draussen td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
 .teilrueckgabe summary::-webkit-details-marker { display: none; }
 .teilrueckgabe[open] { display: block; margin-top: .4rem; }
 .teilrueckgabe[open] > form { margin-top: .4rem; }
+
+/* Unterschriften im Backoffice. */
+.unterschriftbild {
+  width: 12rem;
+  height: 4rem;
+  background: #fff;
+  border: 1px solid var(--rand);
+  border-radius: 6px;
+}
+.pruefsumme { font-family: ui-monospace, Consolas, monospace; font-size: .72rem; }

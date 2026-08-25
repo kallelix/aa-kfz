@@ -283,3 +283,49 @@ CREATE TABLE IF NOT EXISTS schluessel (
 );
 
 CREATE INDEX IF NOT EXISTS idx_schluessel_offen ON schluessel (zurueck_am);
+
+-- Unterschriften bei Ausgabe und Ruecknahme.
+--
+-- Zwei Rollen in einer Tabelle: solange unterschrieben_am leer ist, ist die
+-- Zeile die Warteschlange fuers Tablet; danach ist sie der Beleg.
+--
+-- Der WORTLAUT wird mitgespeichert, nicht nur ein Verweis auf den Vorgang.
+-- Wer "1 Funkgeraet, 1 Headset, 2 Ersatzakkus" unterschreibt, hat das
+-- unterschrieben - wird der Vorgang spaeter korrigiert, dokumentiert die
+-- Unterschrift weiter den Stand, der auf dem Tablet stand. Ein Fremdschluessel
+-- allein taete das nicht.
+CREATE TABLE IF NOT EXISTS unterschrift (
+    id            INTEGER PRIMARY KEY,
+
+    art           TEXT NOT NULL
+                  CHECK (art IN ('tshirt', 'material', 'schluessel')),
+    vorgang_id    INTEGER NOT NULL,
+    richtung      TEXT NOT NULL
+                  CHECK (richtung IN ('ausgabe', 'rueckgabe')),
+
+    titel         TEXT NOT NULL,
+    wortlaut      TEXT NOT NULL,
+    person        TEXT NOT NULL DEFAULT '',
+
+    -- Warteschlange. Laeuft ein Eintrag ab, zeigt das Tablet ihn nicht mehr:
+    -- ein abhandengekommener Link kann dann nichts anrichten, solange
+    -- niemand am Tisch steht.
+    angefordert_am TEXT NOT NULL,
+    laeuft_ab_am  TEXT NOT NULL,
+    kuerzel       TEXT NOT NULL DEFAULT '',
+
+    -- Ergebnis. bild ist ein SVG-Pfad, kein Rasterbild: klein, scharf in
+    -- jeder Groesse und ohne data:-URI, die die CSP ohnehin abweisen wuerde.
+    unterschrieben_am TEXT,
+    bild          TEXT,
+    -- sha256 ueber Wortlaut, Bild und Zeitpunkt. Macht nicht faelschungs-
+    -- sicher, aber nachtraegliche Aenderungen erkennbar.
+    pruefsumme    TEXT,
+
+    abgebrochen_am TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_unterschrift_offen
+    ON unterschrift (unterschrieben_am, abgebrochen_am, angefordert_am);
+CREATE INDEX IF NOT EXISTS idx_unterschrift_vorgang
+    ON unterschrift (art, vorgang_id);

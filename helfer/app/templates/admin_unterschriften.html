@@ -1,0 +1,136 @@
+{% extends "admin_base.html" %}
+{% block titel %}Unterschriften{% endblock %}
+{% block ueberschrift %}Unterschriften{% endblock %}
+
+{% block inhalt %}
+  <section class="kasten">
+    <p>Ein Tablet steht dauerhaft auf der Adresse unten und zeigt „Bereit".
+      Wird im Backoffice zu einer Ausgabe oder Rücknahme eine Unterschrift
+      angefordert, springt es um, zeigt den Vorgang groß und nimmt die
+      Unterschrift entgegen.</p>
+    <p class="hilfe">Die Übergabe hängt nicht daran: der Vorgang ist längst
+      gespeichert, wenn die Anforderung entsteht. Hakt das Tablet, geht die
+      Ausgabe trotzdem durch und die Unterschrift lässt sich nachholen. Eine
+      Anforderung verfällt nach {{ minuten }} Minuten – solange nichts ansteht,
+      kann ein abhandengekommener Link nichts anrichten.</p>
+    <p class="hinweis hinweis-warnung">
+      <strong>Was das nicht ist:</strong> eine qualifizierte elektronische
+      Signatur. Eine auf Glas gemalte Unterschrift belegt nicht, <em>wer</em>
+      gezeichnet hat. Ihr Wert liegt in der Verbindlichkeit – wer
+      unterschreibt, hat gesehen, was er mitnimmt. Zeitpunkt, Kürzel und
+      Prüfsumme heben den Beweiswert, sie ersetzen ihn nicht.
+    </p>
+  </section>
+
+  <section class="zaehler">
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Unterschrieben</p>
+      <p class="zaehler-zahl">{{ zaehler.unterschrieben }}</p>
+      <p class="zaehler-detail">Vorgänge belegt</p>
+    </div>
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Abgebrochen</p>
+      <p class="zaehler-zahl">{{ zaehler.abgebrochen }}</p>
+      <p class="zaehler-detail">zurückgenommen oder abgelöst</p>
+    </div>
+    <div class="zaehler-kachel {% if offen %}zaehler-voll{% endif %}">
+      <p class="zaehler-titel">Steht an</p>
+      <p class="zaehler-zahl">{{ 1 if offen else 0 }}</p>
+      <p class="zaehler-detail">auf dem Tablet</p>
+    </div>
+  </section>
+
+  {% if offen %}
+    <section class="kasten kasten-ok">
+      <h2>Auf dem Tablet</h2>
+      <p><strong>{{ offen.titel }}</strong>
+        {%- if offen.person %} · {{ offen.person }}{% endif %}<br>
+        {{ offen.wortlaut }}</p>
+      <p class="hilfe">Angefordert {{ offen.angefordert_am[:16] }}
+        {%- if offen.kuerzel %} durch {{ offen.kuerzel }}{% endif %},
+        läuft ab {{ offen.laeuft_ab_am[:16] }}.</p>
+      <form method="post" action="/admin/unterschrift/abbrechen">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="weiter" value="/admin/unterschriften">
+        <button type="submit" class="knopf-schlicht">Anforderung zurücknehmen</button>
+      </form>
+    </section>
+  {% endif %}
+
+  {% if not token %}
+    <section class="kasten">
+      <h2>Kein Tablet-Link vorhanden</h2>
+      <p>Ohne Link kann nichts angefordert werden.</p>
+      <form method="post" action="/admin/unterschriften/link">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="aktion" value="neu">
+        <button type="submit" class="knopf">Link erzeugen</button>
+      </form>
+    </section>
+  {% else %}
+    <section class="kasten">
+      <h2>Der Tablet-Link</h2>
+      <p class="teilen-url"><a href="{{ adresse }}">{{ adresse }}</a></p>
+      <p class="hilfe">Eigener Link, nicht der des Monitors: diese Adresse
+        nimmt Eingaben entgegen. Auf dem Tablet im Vollbild öffnen,
+        Bildschirmsperre aus.</p>
+      <div class="knopfreihe">
+        <a class="knopf" href="{{ adresse }}">Ansicht öffnen</a>
+        <form method="post" action="/admin/unterschriften/link">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="aktion" value="neu">
+          <button type="submit" class="knopf-schlicht">Neuen Link erzeugen</button>
+        </form>
+        <form method="post" action="/admin/unterschriften/link">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="aktion" value="widerrufen">
+          <button type="submit" class="knopf-gefahr">Widerrufen</button>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+
+  <section>
+    <h2>Geleistete Unterschriften</h2>
+    {% if not liste %}
+      <p class="leer">Noch nichts unterschrieben.</p>
+    {% else %}
+      <div class="tabelle-huelle">
+        <table>
+          <thead>
+            <tr><th scope="col">Wann</th><th scope="col">Was</th>
+              <th scope="col">Wer</th><th scope="col">Unterschrift</th>
+              <th scope="col">Prüfsumme</th></tr>
+          </thead>
+          <tbody>
+            {% for u in liste %}
+              <tr>
+                <td class="nowrap gedaempft">{{ u.unterschrieben_am[:16] }}
+                  {%- if u.kuerzel %}<br>{{ u.kuerzel }}{% endif %}</td>
+                <td>
+                  <strong>{{ u.titel }}</strong><br>
+                  <span class="gedaempft">{{ u.wortlaut }}</span>
+                </td>
+                <td>{{ u.person or '–' }}</td>
+                <td>
+                  {# Inline-SVG, kein data:-URI – den wiese die CSP ab. #}
+                  <svg class="unterschriftbild" viewBox="0 0 600 200"
+                       preserveAspectRatio="xMidYMid meet" role="img"
+                       aria-label="Unterschrift von {{ u.person }}">
+                    <path d="{{ u.bild }}" fill="none" stroke="#13160f"
+                          stroke-width="2.5" stroke-linecap="round"
+                          stroke-linejoin="round"/>
+                  </svg>
+                </td>
+                <td class="gedaempft pruefsumme">{{ u.pruefsumme[:16] }}…</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="hilfe">Die Prüfsumme ist über Wortlaut, Unterschrift und
+        Zeitpunkt gebildet. Sie macht nichts fälschungssicher, aber
+        nachträgliche Änderungen erkennbar.</p>
+    {% endif %}
+  </section>
+{% endblock %}

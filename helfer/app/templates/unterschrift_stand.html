@@ -1,0 +1,53 @@
+{# Der wechselnde Teil der Tablet-Seite. Wird sowohl eingebettet als auch
+   einzeln ausgeliefert; das Tablet holt ihn im Takt und ersetzt damit den
+   Inhalt, ohne die Seite neu zu laden.
+
+   data-vorgang sagt dem Skript, was gerade ansteht - wechselt die Nummer,
+   fängt es mit einem leeren Feld an. #}
+
+{% if not offen %}
+  <div class="bereit" data-vorgang="">
+    <p class="bereit-zeichen" aria-hidden="true">✓</p>
+    <p class="bereit-text">Bereit</p>
+    <p class="bereit-klein">Sobald am Tisch eine Übergabe abgeschlossen wird,
+      erscheint sie hier.</p>
+  </div>
+{% else %}
+  <div class="vorgang" data-vorgang="{{ offen.id }}">
+    <p class="vorgang-art">{{ offen.titel }}</p>
+    {% if offen.person %}
+      <p class="vorgang-person">{{ offen.person }}</p>
+    {% endif %}
+    <p class="vorgang-wortlaut">{{ offen.wortlaut }}</p>
+
+    <form method="post" action="/unterschrift/{{ token }}/zeichnen"
+          id="zeichenformular">
+      <input type="hidden" name="id" value="{{ offen.id }}">
+      {# Das Skript füllt das Feld beim Absenden mit dem gezeichneten Pfad. #}
+      <input type="hidden" name="pfad" id="pfad" value="">
+
+      <p class="feldtitel">Bitte hier unterschreiben</p>
+      <div class="feldrahmen">
+        <canvas id="flaeche" class="flaeche"
+                aria-label="Unterschriftenfeld"></canvas>
+        <span class="grundlinie" aria-hidden="true"></span>
+      </div>
+
+      <p class="hinweistext">
+        Mit der Unterschrift bestätigst du, das oben Genannte erhalten
+        beziehungsweise zurückgegeben zu haben.
+        {% if aufbewahrung %}{{ aufbewahrung }}{% endif %}
+      </p>
+
+      <div class="knopfreihe">
+        <button type="button" class="knopf-schlicht" id="loeschen">Noch einmal</button>
+        <button type="submit" class="knopf-gross" id="fertig" disabled>Fertig</button>
+      </div>
+    </form>
+
+    <form method="post" action="/unterschrift/{{ token }}/abbrechen"
+          class="abbrechen">
+      <button type="submit" class="knopf-leise">Abbrechen</button>
+    </form>
+  </div>
+{% endif %}

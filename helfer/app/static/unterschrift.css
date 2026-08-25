@@ -1,0 +1,197 @@
+/* Das Unterschriften-Tablet.
+ *
+ * Eigene Datei: hier gelten wieder andere Regeln als im Backoffice und auf
+ * dem Monitor. Bedient wird von jemandem, der zum ersten und einzigen Mal vor
+ * diesem Geraet steht - also grosse Schrift, ein einziger offensichtlicher
+ * Weg und keine Verzierung, die nach Bedienelement aussieht, ohne eines zu
+ * sein.
+ */
+
+:root {
+  --grund: #f4f5f7;
+  --flaeche: #ffffff;
+  --rand: #d6d9de;
+  --text: #13160f;
+  --gedaempft: #5b6169;
+  --limette: #95bf0b;
+  --gruen: #4e690f;
+  --ok: #1a7f37;
+  --warn: #d29200;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--grund);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: clamp(16px, 1.6vw, 22px);
+  line-height: 1.4;
+  /* Auf einem Tablet soll das Wischen im Feld zeichnen und nicht die Seite
+     verschieben. */
+  overscroll-behavior: none;
+}
+
+.kopf {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  padding: .7rem 1.2rem;
+  background: linear-gradient(90deg, #13160f, #2a3320);
+  border-bottom: 3px solid var(--limette);
+}
+.vereinslogo {
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  padding: .25rem;
+  background: #13160f;
+  border-radius: 10px;
+}
+.veranstaltung {
+  margin: 0;
+  color: var(--limette);
+  font-weight: 700;
+  font-size: 1.1em;
+}
+
+.meldung {
+  margin: 0;
+  padding: .8rem 1.2rem;
+  font-size: 1.15em;
+  font-weight: 600;
+}
+.meldung-gut { background: var(--ok); color: #fff; }
+.meldung-warnung { background: var(--warn); color: #1a1200; }
+
+/* --- Wartezustand --------------------------------------------------------- */
+
+.bereit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  padding: 4rem 2rem;
+  text-align: center;
+  color: var(--gedaempft);
+}
+.bereit-zeichen {
+  margin: 0;
+  width: 5rem;
+  height: 5rem;
+  line-height: 5rem;
+  border-radius: 50%;
+  background: var(--flaeche);
+  border: 2px solid var(--rand);
+  font-size: 2.4rem;
+  color: var(--ok);
+}
+.bereit-text { margin: .6rem 0 0; font-size: 1.6em; font-weight: 700;
+               color: var(--text); }
+.bereit-klein { margin: 0; max-width: 26rem; }
+
+/* --- Ein Vorgang ---------------------------------------------------------- */
+
+.vorgang { padding: 1.2rem 1.2rem 2rem; max-width: 46rem; margin: 0 auto; }
+
+.vorgang-art {
+  margin: 0;
+  font-size: .85em;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--gruen);
+  font-weight: 700;
+}
+.vorgang-person { margin: .1rem 0 0; font-size: 1.9em; font-weight: 700; }
+.vorgang-wortlaut {
+  margin: .3rem 0 1.2rem;
+  font-size: 1.35em;
+  padding: .7rem .9rem;
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-left: 5px solid var(--limette);
+  border-radius: 8px;
+}
+
+.feldtitel {
+  margin: 0 0 .3rem;
+  font-size: .9em;
+  color: var(--gedaempft);
+}
+
+/* Der Rahmen traegt die Grundlinie, damit klar ist, wo man ansetzt. */
+.feldrahmen {
+  position: relative;
+  background: var(--flaeche);
+  border: 2px solid var(--rand);
+  border-radius: 10px;
+  height: min(38vh, 16rem);
+}
+.flaeche {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Ohne das schiebt der Finger die Seite, statt zu zeichnen. */
+  touch-action: none;
+  cursor: crosshair;
+}
+.grundlinie {
+  position: absolute;
+  left: 1.5rem;
+  right: 1.5rem;
+  bottom: 2.5rem;
+  border-bottom: 1px dashed var(--rand);
+  pointer-events: none;
+}
+
+.hinweistext {
+  margin: .7rem 0 1rem;
+  font-size: .85em;
+  color: var(--gedaempft);
+}
+
+.knopfreihe { display: flex; gap: .8rem; align-items: center; }
+
+/* Gross genug, um ihn ohne Zielen zu treffen. */
+.knopf-gross {
+  flex: 1;
+  padding: 1rem 1.4rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--gruen);
+  color: #fff;
+  font: inherit;
+  font-size: 1.2em;
+  font-weight: 700;
+  cursor: pointer;
+}
+.knopf-gross:disabled { background: var(--rand); color: var(--gedaempft);
+                        cursor: default; }
+
+.knopf-schlicht {
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  background: var(--flaeche);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Abbrechen tritt zurueck: es ist der seltene Weg und soll nicht neben dem
+   haeufigen gleich gross stehen. */
+.abbrechen { margin: 1.5rem 0 0; text-align: center; }
+.knopf-leise {
+  border: 0;
+  background: none;
+  color: var(--gedaempft);
+  font: inherit;
+  font-size: .9em;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: .5rem;
+}

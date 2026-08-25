@@ -535,6 +535,10 @@ def importe() -> list[sqlite3.Row]:
 # --- Monitor ---------------------------------------------------------------
 
 MONITOR_SCHLUESSEL = "monitor_token"
+# Eigener Token fuers Unterschriften-Tablet. Bewusst nicht derselbe wie beim
+# Monitor: diese Adresse nimmt Eingaben entgegen, die andere nicht. Wer den
+# Monitor an der Wand teilt, soll damit nicht das Tablet mitgeben.
+TABLET_SCHLUESSEL = "tablet_token"
 
 
 def monitor_token(anlegen: bool = False) -> str:
@@ -555,6 +559,24 @@ def monitor_token_neu() -> str:
 
 def monitor_token_loeschen() -> None:
     einstellung_setzen(MONITOR_SCHLUESSEL, "")
+
+
+def tablet_token(anlegen: bool = False) -> str:
+    vorhanden = einstellung(TABLET_SCHLUESSEL)
+    if vorhanden or not anlegen:
+        return vorhanden
+    return tablet_token_neu()
+
+
+def tablet_token_neu() -> str:
+    import secrets
+    neu = secrets.token_urlsafe(24)
+    einstellung_setzen(TABLET_SCHLUESSEL, neu)
+    return neu
+
+
+def tablet_token_loeschen() -> None:
+    einstellung_setzen(TABLET_SCHLUESSEL, "")
 
 
 def _schichten_mit_namen(con: sqlite3.Connection, bedingung: str,
