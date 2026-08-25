@@ -220,6 +220,11 @@ UNTERSCHRIFT_AUFBEWAHRUNG = os.environ.get(
     "Die Unterschrift belegt nur die Übergabe und wird nach der "
     "Veranstaltung gelöscht.").strip()
 
+# Wie oft das Backoffice nachfragt, ob eine Unterschrift eingegangen ist
+# (Sekunden). 0 schaltet das Nachfragen ab; dann muss man neu laden, um zu
+# sehen, ob jemand unterschrieben hat.
+ADMIN_TAKT = _zahl("ADMIN_TAKT", 3)
+
 # Feste Zeitzone – der Monitor steht in Ilmenau, egal wo der Server läuft.
 ZEITZONE = os.environ.get("ZEITZONE", "Europe/Berlin").strip() or "Europe/Berlin"
 

@@ -1036,3 +1036,54 @@ tr.ist-draussen td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
   border-radius: 6px;
 }
 .pruefsumme { font-family: ui-monospace, Consolas, monospace; font-size: .72rem; }
+
+/* --- Was gerade auf dem Tablet steht -------------------------------------- */
+
+/* Auf jeder Backoffice-Seite. Man soll nicht raten muessen, ob schon
+   unterschrieben wurde - und nicht neu laden, um es zu erfahren. */
+.tabletleiste {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+  margin: 0 0 1rem;
+  padding: .5rem .8rem;
+  border: 1px solid #d29200;
+  border-radius: 8px;
+  background: #fff8e6;
+  color: #6b4d00;
+  font-size: .9rem;
+}
+.tabletleiste-punkt {
+  width: .6rem;
+  height: .6rem;
+  border-radius: 50%;
+  background: #d29200;
+  flex: none;
+  animation: tabletpuls 1.6s ease-in-out infinite;
+}
+@keyframes tabletpuls {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tabletleiste-punkt { animation: none; }
+}
+@media (prefers-color-scheme: dark) {
+  .tabletleiste { background: #2b2412; color: #f0d9a0; }
+}
+
+/* Die Zelle, in der der Knopf oder die Marke sitzt. */
+.unterschrift-feld { display: inline-flex; align-items: center; }
+.unterschrift-feld form { margin: 0; }
+
+/* Kurz hervorheben, wenn eine Unterschrift gerade eingegangen ist - sonst
+   uebersieht man die Aenderung in einer langen Liste. */
+.frisch { animation: frischauf 2.5s ease-out; }
+@keyframes frischauf {
+  0% { background: #d3f0d8; }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .frisch { animation: none; }
+}

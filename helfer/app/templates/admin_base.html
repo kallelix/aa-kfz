@@ -42,6 +42,24 @@
       </nav>
     {% endif %}
 
+    {% if sitzung %}
+      {# Was gerade auf dem Tablet steht - auf jeder Seite sichtbar, damit man
+         nicht raten muss, ob schon unterschrieben wurde. Das Skript blendet
+         die Leiste ein und aus, ohne die Seite neu zu laden. #}
+      <p class="tabletleiste{% if not tabletstand.offen %} weg{% endif %}"
+         id="tabletleiste" role="status">
+        <span class="tabletleiste-punkt" aria-hidden="true"></span>
+        Auf dem Tablet:
+        <strong id="tabletleiste-titel">
+          {{- tabletstand.offen.titel if tabletstand.offen else '' -}}
+        </strong>
+        <span id="tabletleiste-person" class="gedaempft">
+          {{- tabletstand.offen.person if tabletstand.offen else '' -}}
+        </span>
+        <span class="gedaempft">– wartet auf Unterschrift</span>
+      </p>
+    {% endif %}
+
     {% set meldungen = {
       'eingeteilt': 'Eingeteilt.',
       'ausgetragen': 'Ausgetragen.',
@@ -82,6 +100,11 @@
       {% block inhalt %}{% endblock %}
     </main>
   </div>
+  {% if sitzung and admin_takt %}
+    <script src="/static/admin_stand.js"
+            data-marke="{{ tabletstand.marke }}"
+            data-takt="{{ admin_takt }}"></script>
+  {% endif %}
   {% block skript %}{% endblock %}
 </body>
 </html>

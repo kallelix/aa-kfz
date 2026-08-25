@@ -19,7 +19,8 @@ from pathlib import Path
 from urllib.parse import quote, urlencode
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import (JSONResponse, RedirectResponse,
+                               Response)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -172,8 +173,16 @@ def _kontext(request: Request, **extra) -> dict:
 
 
 def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
+    # Marke und Takt gehen an jede Backoffice-Seite: das Skript in der
+    # Grundvorlage fragt damit nach, ob inzwischen jemand unterschrieben hat.
+    #
+    # Heisst tabletstand und nicht stand: /admin/band reicht unter dem Namen
+    # bereits den Tagesstand durch, und zwei gleiche Schluesselwoerter waeren
+    # keine stille Ueberdeckung, sondern ein Fehler auf jeder solchen Seite.
     return _kontext(request, sitzung=sitzung,
-                    csrf=auth.csrf_token(sitzung.token), **extra)
+                    csrf=auth.csrf_token(sitzung.token),
+                    tabletstand=unterschriften.stand(),
+                    admin_takt=config.ADMIN_TAKT, **extra)
 
 
 def _remote_ip(request: Request) -> str:
@@ -1087,6 +1096,18 @@ async def schluessel_weg(request: Request, schluessel_id: int,
         return Response("Ungültiger CSRF-Token", status_code=400)
     db.schluessel_loeschen(schluessel_id)
     return _zurueck("/admin/schluessel", "geloescht")
+
+
+# --- Nachfragen aus dem Backoffice -----------------------------------------
+
+@app.get("/admin/stand")
+async def admin_stand(request: Request, seit: int = 0, art: str = "",
+                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    """Was sich seit `seit` getan hat. Klein gehalten – die Antwort geht alle
+    paar Sekunden über die Leitung."""
+    antwort = JSONResponse(unterschriften.stand(seit, art))
+    antwort.headers["Cache-Control"] = "no-store"
+    return antwort
 
 
 # --- Unterschriften: Tablet und Verwaltung ---------------------------------

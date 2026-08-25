@@ -379,6 +379,54 @@ try:
     pruefe('id="meldung"' in seite,
            "eine Warnung dagegen schon – sie erklaert etwas")
 
+    print("Das Backoffice fragt nach, statt neu zu laden")
+    status, ort, _ = anfrage("GET", "/admin/stand")
+    pruefe(status == 200, "der Zustand laedt fuer Angemeldete")
+
+    _, _, funk = anfrage("GET", "/admin/funk")
+    pruefe("admin_stand.js" in funk, "das Skript haengt an der Seite")
+    marke_jetzt = int(re.search(r'data-marke="(\d+)"', funk).group(1))
+    pruefe("data-unterschrift=" in funk,
+           "die Zellen tragen eine Kennung, damit das Skript sie wiederfindet")
+
+    import json as _json
+    _, _, roh = anfrage("GET", "/admin/stand?seit=%d&art=material" % marke_jetzt)
+    zustand = _json.loads(roh)
+    pruefe(zustand["neu"] == [], "seit der eigenen Marke ist nichts Neues da")
+
+    # Etwas ausgeben, unterschreiben, und nachsehen, ob es ankommt.
+    anfrage("POST", "/admin/funk/ausgeben",
+            {"csrf": CSRF, "helfer_id": str(anna), "funke": "1"})
+    _, _, roh = anfrage("GET", "/admin/stand?seit=%d&art=material" % marke_jetzt)
+    zustand = _json.loads(roh)
+    pruefe(zustand["offen"] is not None,
+           "was auf dem Tablet steht, meldet der Zustand mit – dafuer ist die "
+           "Leiste oben da")
+    pruefe(zustand["offen"]["titel"] == "Material Ausgabe", "mit Titel")
+
+    _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
+    siebte = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
+    anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
+            {"id": str(siebte), "pfad": "M4,4L9,9", "name": "Anna Bergmann-Richtig"})
+
+    _, _, roh = anfrage("GET", "/admin/stand?seit=%d&art=material" % marke_jetzt)
+    zustand = _json.loads(roh)
+    pruefe(len(zustand["neu"]) == 1,
+           "die Unterschrift kommt als Aenderung an: " + str(zustand["neu"]))
+    pruefe(zustand["neu"][0]["art"] == "material"
+           and zustand["neu"][0]["richtung"] == "ausgabe",
+           "mit Art und Richtung – darueber findet das Skript die Zelle")
+    pruefe(zustand["offen"] is None, "und das Tablet steht wieder bereit")
+    pruefe(zustand["marke"] > marke_jetzt, "die Marke ist weitergerueckt")
+
+    _, _, roh = anfrage("GET", "/admin/stand?seit=%d" % zustand["marke"])
+    pruefe(_json.loads(roh)["neu"] == [],
+           "beim naechsten Mal ist dieselbe Aenderung nicht noch einmal dabei")
+
+    _, _, roh = anfrage("GET", "/admin/stand?seit=0&art=schluessel")
+    pruefe(all(e["art"] == "schluessel" for e in _json.loads(roh)["neu"]),
+           "nach Art gefiltert kommt nur, was die Seite auch anzeigen kann")
+
     print("Backoffice")
     _, _, seite = anfrage("GET", "/admin/unterschriften")
     # Drei: Schluessel, T-Shirt und Material. Die vierte Anforderung war zu
@@ -398,6 +446,36 @@ try:
     _, _, funk = anfrage("GET", "/admin/funk")
     pruefe("unterschrieben" in funk,
            "in der Liste ist zu sehen, wo eine Unterschrift vorliegt")
+
+    print("Jede Backoffice-Seite vertraegt die Grundvorlage")
+    # Der Zustand wird in _admin an ALLE Seiten gereicht. Ein Name, den eine
+    # Seite schon benutzt, waere dort keine stille Ueberdeckung, sondern ein
+    # Fehler - deshalb einmal alle durchklicken.
+    for pfad in ("/admin", "/admin/schichten", "/admin/band", "/admin/helfer",
+                 "/admin/aufgaben", "/admin/funk", "/admin/schluessel",
+                 "/admin/zeitplan", "/admin/monitor", "/admin/import",
+                 "/admin/unterschriften", "/admin/helfer/neu",
+                 "/admin/aufgabe/neu"):
+        status, _, _ = anfrage("GET", pfad)
+        pruefe(status == 200, pfad + " laedt")
+
+    print("Der Zustand ist nichts fuer Fremde")
+    keks_gemerkt = keks["wert"]
+    keks["wert"] = ""
+    status, ort, _ = anfrage("GET", "/admin/stand")
+    pruefe(status == 303 and ort.startswith("/admin/login"),
+           "ohne Anmeldung fuehrt er zur Anmeldeseite")
+    keks["wert"] = keks_gemerkt
+
+    print("Die Anmeldeseite vertraegt die Grundvorlage")
+    keks_gemerkt = keks["wert"]
+    keks["wert"] = ""
+    status, _, seite = anfrage("GET", "/admin/login")
+    pruefe(status == 200, "sie laedt")
+    pruefe("admin_stand.js" not in seite,
+           "ohne Anmeldung wird nicht nachgefragt")
+    pruefe("tabletleiste" not in seite, "und keine Leiste gezeigt")
+    keks["wert"] = keks_gemerkt
 
     print("Ohne Tablet-Link")
     anfrage("POST", "/admin/unterschriften/link",

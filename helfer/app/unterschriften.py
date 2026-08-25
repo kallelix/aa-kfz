@@ -322,6 +322,52 @@ def je_vorgang(art: str) -> dict[int, dict]:
         con.close()
 
 
+def stand(seit: int = 0, art: str = "") -> dict:
+    """Was sich seit `seit` getan hat – für das Nachfragen im Backoffice.
+
+    Bewusst nur die Änderungen und nicht der ganze Zustand: die Antwort geht
+    alle paar Sekunden über die Leitung und soll klein bleiben. `marke` ist
+    die höchste vergebene Nummer; sie kommt beim nächsten Mal als `seit`
+    zurück.
+
+    Kein WebSocket: der bräuchte einen Umbau am nginx, Wiederverbinden nach
+    jedem Netzzucken und trotzdem einen Abgleich für die verpassten
+    Nachrichten – also am Ende beides. Zwei Sekunden Verzögerung sind an einem
+    Ausgabetisch nicht wahrnehmbar.
+    """
+    bedingungen = ["unterschrieben_am IS NOT NULL", "id > ?"]
+    werte: list = [max(0, int(seit or 0))]
+    if art in ARTEN:
+        bedingungen.append("art = ?")
+        werte.append(art)
+
+    con = db.verbinden()
+    try:
+        marke = con.execute(
+            "SELECT COALESCE(MAX(id), 0) FROM unterschrift").fetchone()[0]
+        neue = [
+            {"art": z["art"], "vorgang_id": z["vorgang_id"],
+             "richtung": z["richtung"], "person": z["person"],
+             "wann": (z["unterschrieben_am"] or "")[:16]}
+            for z in con.execute(
+                "SELECT * FROM unterschrift WHERE " + " AND ".join(bedingungen)
+                + " ORDER BY id", werte)]
+
+        offen = con.execute(
+            "SELECT id, titel, person FROM unterschrift"
+            " WHERE unterschrieben_am IS NULL AND abgebrochen_am IS NULL"
+            " AND laeuft_ab_am > ? ORDER BY id DESC LIMIT 1",
+            (db.jetzt(),)).fetchone()
+    finally:
+        con.close()
+
+    return {
+        "marke": marke,
+        "neu": neue,
+        "offen": dict(offen) if offen else None,
+    }
+
+
 def zaehler() -> dict:
     con = db.verbinden()
     try:

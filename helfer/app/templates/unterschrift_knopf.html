@@ -1,24 +1,32 @@
 {# Der Zeilenknopf "Unterschrift anfordern" - in allen drei Listen derselbe.
 
-   Bewusst eine eigene Aktion und nicht in die Ausgabe eingebaut: die
+   Bewusst eine eigene Aktion und nicht nur in die Ausgabe eingebaut: die
    Uebergabe darf nicht an der Unterschrift haengen. Hakt das Tablet, geht die
-   Ausgabe trotzdem durch, und der Knopf steht immer noch da. #}
+   Ausgabe trotzdem durch, und der Knopf steht immer noch da, um sie
+   nachzuholen.
+
+   data-unterschrift traegt Art, Vorgang und Richtung. Darueber findet
+   admin_stand.js die Zelle wieder und tauscht den Knopf gegen die Marke, ohne
+   dass jemand neu laden muss - und ohne dass Suche und Bildlauf verlorengehen. #}
 
 {% macro knopf(art, vorgang_id, richtung, weiter, csrf, tablet,
                vorhanden=None) %}
-  {% if vorhanden %}
-    <span class="marke marke-voll"
-          title="unterschrieben {{ vorhanden.unterschrieben_am[:16] }}">
-      unterschrieben</span>
-  {% elif tablet %}
-    <form method="post" action="/admin/unterschrift/anfordern">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="art" value="{{ art }}">
-      <input type="hidden" name="vorgang_id" value="{{ vorgang_id }}">
-      <input type="hidden" name="richtung" value="{{ richtung }}">
-      <input type="hidden" name="weiter" value="{{ weiter }}">
-      <button type="submit" class="knopf-winzig"
-              title="Vorgang aufs Tablet stellen">Unterschrift</button>
-    </form>
-  {% endif %}
+  <span class="unterschrift-feld"
+        data-unterschrift="{{ art }}-{{ vorgang_id }}-{{ richtung }}">
+    {%- if vorhanden %}
+      <span class="marke marke-voll"
+            title="unterschrieben {{ vorhanden.unterschrieben_am[:16] }}">
+        unterschrieben</span>
+    {%- elif tablet %}
+      <form method="post" action="/admin/unterschrift/anfordern">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="art" value="{{ art }}">
+        <input type="hidden" name="vorgang_id" value="{{ vorgang_id }}">
+        <input type="hidden" name="richtung" value="{{ richtung }}">
+        <input type="hidden" name="weiter" value="{{ weiter }}">
+        <button type="submit" class="knopf-winzig"
+                title="Vorgang aufs Tablet stellen">Unterschrift</button>
+      </form>
+    {%- endif %}
+  </span>
 {% endmacro %}
