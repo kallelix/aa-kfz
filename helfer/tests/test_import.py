@@ -221,6 +221,20 @@ try:
     pruefe(leute["Team1"]["tshirt"] == "3XL", "'XXXL' wird zu 3XL")
     pruefe(leute["Team2"]["tshirt"] == "M", "'Shirt Gr.M' wird zu M")
 
+    # Rein rechnerisch, ohne Datei: die Groessenliste und ihre Schreibweisen
+    # stehen an einer Stelle, und beide muessen zusammenpassen. Wird eine
+    # Groesse ergaenzt, die keine Schreibweise kennt, laesst sie sich zwar
+    # auswaehlen, aber nichts aus den Daten faellt je darauf.
+    from app import normalisieren
+    ohne = [g for g in normalisieren.GROESSEN
+            if normalisieren.tshirt(g)[0] != g]
+    pruefe(not ohne,
+           "jede angebotene Groesse wird auch erkannt" +
+           (" – ausser " + ", ".join(ohne) if ohne else ""))
+    pruefe("5XL" in normalisieren.GROESSEN
+           and normalisieren.tshirt("XXXXXL")[0] == "5XL",
+           "5XL steht zur Wahl, auch als XXXXXL geschrieben")
+
     print("Groesse in der Verpflegungsspalte")
     pruefe(leute["Clara Groß"]["tshirt"] == "L", "wird als Groesse uebernommen")
     pruefe(leute["Clara Groß"]["veggie"] is None, "Verpflegung bleibt offen")

@@ -60,13 +60,14 @@ def veggie(roh: str | None) -> tuple[bool | None, bool]:
 
 # --- T-Shirt ---------------------------------------------------------------
 
-GROESSEN = ("XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL")
+GROESSEN = ("XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL")
 
 _SCHREIBWEISEN = {
     "XS": "XS", "S": "S", "M": "M", "L": "L", "XL": "XL",
     "XXL": "XXL", "2XL": "XXL",
     "XXXL": "3XL", "3XL": "3XL",
     "XXXXL": "4XL", "4XL": "4XL",
+    "XXXXXL": "5XL", "5XL": "5XL",
 }
 
 

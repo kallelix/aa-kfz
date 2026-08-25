@@ -364,6 +364,7 @@ async def uebersicht(request: Request, hinweis: str = "",
     return templates.TemplateResponse(
         "admin_uebersicht.html",
         _admin(request, sitzung, hinweis=hinweis, zaehler=zaehler,
+               groessen=normalisieren.GROESSEN,
                luecken=luecken[:12], luecken_gesamt=len(luecken),
                konflikte=db.konflikte(), doppelt=db.doppelt_besetzt(),
                importe=db.importe()[:1], jetzt=db.jetzt_lokal()))

@@ -93,7 +93,7 @@
       <div>
         <h3>T-Shirts</h3>
         <ul class="strichliste">
-          {% for groesse in ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'] %}
+          {% for groesse in groessen %}
             {% if zaehler.tshirts.get(groesse) %}
               <li><span>{{ groesse }}</span><span>{{ zaehler.tshirts[groesse] }}</span></li>
             {% endif %}
