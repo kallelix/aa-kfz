@@ -172,6 +172,67 @@ def _kontext(request: Request, **extra) -> dict:
     return basis
 
 
+# --- Hauptnavigation -------------------------------------------------------
+
+# Die Reihenfolge folgt dem Ablauf: erst was waehrend der Veranstaltung
+# staendig gebraucht wird, dann die beiden Ausgabetische.
+#
+# Jeder Eintrag nennt neben seinem Ziel die Pfade, die er mitmarkiert. Das ist
+# noetig, weil die Einzelansichten in der Einzahl heissen - /admin/schicht/7
+# gehoert zu "Schichten", faengt aber nicht mit /admin/schichten an.
+HAUPTNAV = (
+    ("/admin", "Übersicht", ()),
+    ("/admin/band", "Zeitplan", ()),
+    ("/admin/aufgaben", "Aufgaben", ("/admin/aufgabe",)),
+    ("/admin/schichten", "Schichten", ("/admin/schicht",)),
+    ("/admin/helfer", "Helfer", ()),
+    ("/admin/funk", "Funken", ()),
+    ("/admin/schluessel", "Schlüssel", ()),
+)
+
+# Was man einmal einrichtet und danach selten anfasst - zusammengefasst hinter
+# einem Punkt, damit die Zeile darueber die sieben zeigt, in denen man
+# tatsaechlich arbeitet.
+UNTERNAV = (
+    ("/admin/einstellungen", "Einstellungen", ()),
+    ("/admin/monitor", "Monitor", ()),
+    ("/admin/import", "Import", ()),
+    ("/admin/unterschriften", "Unterschriften", ()),
+    ("/admin/zeitplan", "Zeitplan-Abruf", ("/admin/programm",)),
+)
+
+
+def _navigation(pfad: str) -> dict:
+    """Die Navigation mit dem Punkt der gerade offenen Seite markiert.
+
+    Es gewinnt der laengste passende Pfadanfang. Ein blosses „faengt damit an“
+    reichte nicht: /admin ist der Anfang von allem und waere sonst auf jeder
+    Seite hervorgehoben. So braucht die Uebersicht auch keine Sonderregel –
+    sie passt eben nur, solange nichts Genaueres passt.
+    """
+
+    def treffer(eintrag) -> int:
+        laenge = 0
+        for anfang in (eintrag[0],) + eintrag[2]:
+            if pfad == anfang or pfad.startswith(anfang + "/"):
+                laenge = max(laenge, len(anfang))
+        return laenge
+
+    laengster = max(treffer(eintrag) for eintrag in HAUPTNAV + UNTERNAV)
+
+    def punkte(eintraege) -> list:
+        gemacht = []
+        for ziel, name, weitere in eintraege:
+            eigen = treffer((ziel, name, weitere))
+            gemacht.append({"ziel": ziel, "name": name,
+                            "hier": eigen > 0 and eigen == laengster})
+        return gemacht
+
+    unten = punkte(UNTERNAV)
+    return {"hauptnav": punkte(HAUPTNAV), "unternav": unten,
+            "unternav_hier": any(punkt["hier"] for punkt in unten)}
+
+
 def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
     # Marke und Takt gehen an jede Backoffice-Seite: das Skript in der
     # Grundvorlage fragt damit nach, ob inzwischen jemand unterschrieben hat.
@@ -182,7 +243,8 @@ def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
     return _kontext(request, sitzung=sitzung,
                     csrf=auth.csrf_token(sitzung.token),
                     tabletstand=unterschriften.stand(),
-                    admin_takt=config.ADMIN_TAKT, **extra)
+                    admin_takt=config.ADMIN_TAKT,
+                    **_navigation(request.url.path), **extra)
 
 
 def _remote_ip(request: Request) -> str:

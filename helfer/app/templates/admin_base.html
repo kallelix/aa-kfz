@@ -27,19 +27,30 @@
     </header>
 
     {% if sitzung %}
-      <nav class="admin-nav">
-        <a href="/admin">Übersicht</a>
-        <a href="/admin/schichten">Schichten</a>
-        <a href="/admin/band">Band</a>
-        <a href="/admin/aufgaben">Aufgaben</a>
-        <a href="/admin/funk">Funk</a>
-        <a href="/admin/schluessel">Schlüssel</a>
-        <a href="/admin/unterschriften">Unterschriften</a>
-        <a href="/admin/einstellungen">Einstellungen</a>
-        <a href="/admin/helfer">Helfer</a>
-        <a href="/admin/zeitplan">Zeitplan</a>
-        <a href="/admin/monitor">Monitor</a>
-        <a href="/admin/import">Import</a>
+      <nav class="admin-nav" aria-label="Hauptnavigation">
+        {% for punkt in hauptnav %}
+          <a href="{{ punkt.ziel }}"
+             {% if punkt.hier %}class="ist-hier" aria-current="page"{% endif %}
+             >{{ punkt.name }}</a>
+        {% endfor %}
+
+        {# details/summary klappt ohne Skript auf und zu - admin_menue.js
+           schliesst das Menue nur wieder, wenn man daneben tippt oder Esc
+           drueckt. Ohne Skript bliebe es offen stehen, bis man den Punkt
+           erneut trifft. #}
+        <details class="nav-gruppe" data-menue>
+          <summary class="nav-gruppe-knopf{% if unternav_hier %} ist-hier{% endif %}">
+            Einstellungen
+            <span class="nav-pfeil" aria-hidden="true"></span>
+          </summary>
+          <div class="nav-klappe">
+            {% for punkt in unternav %}
+              <a href="{{ punkt.ziel }}"
+                 {% if punkt.hier %}class="ist-hier" aria-current="page"{% endif %}
+                 >{{ punkt.name }}</a>
+            {% endfor %}
+          </div>
+        </details>
       </nav>
     {% endif %}
 
@@ -103,6 +114,7 @@
   </div>
   {% if sitzung %}
     <script src="/static/admin_merken.js"></script>
+    <script src="/static/admin_menue.js"></script>
   {% endif %}
   {% if sitzung and admin_takt %}
     <script src="/static/admin_stand.js"

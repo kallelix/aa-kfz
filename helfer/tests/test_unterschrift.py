@@ -459,6 +459,40 @@ try:
         status, _, _ = anfrage("GET", pfad)
         pruefe(status == 200, pfad + " laedt")
 
+    print("Die Hauptnavigation")
+    _, _, seite = anfrage("GET", "/admin")
+    leiste = seite[seite.index("admin-nav"):seite.index("</nav>")]
+    namen = re.findall(r'<a href="/admin[^"]*"[^>]*>\s*([^<]+?)\s*</a>', leiste)
+    pruefe(namen == ["Übersicht", "Zeitplan", "Aufgaben", "Schichten", "Helfer",
+                     "Funken", "Schlüssel",
+                     "Einstellungen", "Monitor", "Import", "Unterschriften",
+                     "Zeitplan-Abruf"],
+           "steht in der vereinbarten Reihenfolge: " + ", ".join(namen))
+    pruefe("nav-gruppe" in leiste and "admin_menue.js" in seite,
+           "die hinteren fuenf stecken in einem Menue")
+
+    # Genau ein Punkt darf leuchten. /admin ist der Anfang von jedem Pfad und
+    # wuerde bei einem blossen "faengt damit an" ueberall mitleuchten.
+    print("Wo man gerade steht")
+    for pfad, erwartet, im_menue in (
+            ("/admin", "Übersicht", False),
+            ("/admin/band", "Zeitplan", False),
+            ("/admin/aufgabe/neu", "Aufgaben", False),
+            ("/admin/helfer/neu", "Helfer", False),
+            ("/admin/funk", "Funken", False),
+            ("/admin/monitor", "Monitor", True),
+            ("/admin/zeitplan", "Zeitplan-Abruf", True)):
+        _, _, seite = anfrage("GET", pfad)
+        leiste = seite[seite.index("admin-nav"):seite.index("</nav>")]
+        hier = [n.strip() for n in
+                re.findall(r'ist-hier[^>]*>\s*([^<]+?)\s*<', leiste)]
+        pruefe(erwartet in hier, pfad + " markiert " + erwartet)
+        pruefe(len(hier) == (2 if im_menue else 1),
+               "und sonst nichts: " + ", ".join(hier))
+        if im_menue:
+            pruefe("nav-gruppe-knopf ist-hier" in leiste,
+                   "das Menue selbst ist auch markiert")
+
     print("Der Zustand ist nichts fuer Fremde")
     keks_gemerkt = keks["wert"]
     keks["wert"] = ""

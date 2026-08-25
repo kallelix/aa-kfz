@@ -432,6 +432,81 @@ h2 {
 
 .admin-nav a:hover { text-decoration: underline; }
 
+/* Wo man gerade ist. Bisher sah die Zeile auf jeder Seite gleich aus - mit
+   einem zusammengefassten Menue geht das nicht mehr, sonst weiss man nicht,
+   dass die offene Seite dahinter steckt. */
+.admin-nav .ist-hier {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: .4rem;
+  text-decoration-color: var(--akzent);
+}
+
+/* --- Zusammengefasstes Menue in der Navigation ---------------------------- */
+
+.nav-gruppe { position: relative; }
+
+.nav-gruppe-knopf {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-weight: 600;
+  color: var(--akzent);
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-gruppe-knopf::-webkit-details-marker { display: none; }
+.nav-gruppe-knopf:hover { text-decoration: underline; }
+.nav-gruppe-knopf:focus-visible { outline: 3px solid var(--akzent); outline-offset: 3px; }
+
+.nav-pfeil {
+  flex: none;
+  width: .4rem;
+  height: .4rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-bottom: .18rem;
+  transition: transform .15s ease;
+}
+details[open] > .nav-gruppe-knopf .nav-pfeil {
+  transform: rotate(-135deg);
+  margin-bottom: 0;
+}
+@media (prefers-reduced-motion: reduce) { .nav-pfeil { transition: none; } }
+
+.nav-klappe {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + .7rem);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 13rem;
+  padding: .4rem;
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .14);
+}
+
+.nav-klappe a {
+  padding: .45rem .6rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.nav-klappe a:hover { background: var(--flaeche); text-decoration: none; }
+
+/* Im Menue traegt die offene Seite ihre Markierung als Flaeche - ein
+   Unterstrich unter einem Eintrag in einer Liste liest sich wie ein Trenner. */
+.nav-klappe a.ist-hier {
+  background: var(--flaeche);
+  text-decoration: none;
+  color: var(--text);
+}
+
 td .hilfe { display: block; margin-top: .2rem; }
 td form { margin: 0; }
 
@@ -444,6 +519,18 @@ td form { margin: 0; }
 }
 
 /* --- Schmale Schirme ------------------------------------------------------ */
+
+/* Das Menue legt sich hier nicht ueber die Seite, sondern schiebt sie nach
+   unten: eine Flaeche am rechten Rand muesste man ausrechnen, und Platz zum
+   Ueberlappen gibt es auf einem Telefon ohnehin nicht. */
+@media (max-width: 40rem) {
+  .nav-gruppe { width: 100%; }
+  .nav-klappe {
+    position: static;
+    margin-top: .5rem;
+    box-shadow: none;
+  }
+}
 
 /* Auf dem Telefon frisst der aeussere Rahmen nur Platz: die Seite IST der
    Inhalt, es gibt daneben nichts, wovon sie sich absetzen muesste. */
