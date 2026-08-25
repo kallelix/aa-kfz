@@ -61,6 +61,12 @@
   var offenerTag = "";
   var tagEndetUm = 0;
 
+  /* Ob der Ablauf im Tagesblick aufgeklappt ist. Das Auf- und Zuklappen macht
+   * der Browser selbst; gemerkt werden muss es hier, weil der Inhalt beim
+   * Auffrischen ausgetauscht wird und der Block sonst alle paar Sekunden
+   * wieder aufspränge. */
+  var ablaufOffen = true;
+
   function zweistellig(wert) {
     return (wert < 10 ? "0" : "") + wert;
   }
@@ -78,7 +84,21 @@
       zweistellig(jetzt.getHours()) + ":" + zweistellig(jetzt.getMinutes());
   }
 
+  /* Nach jedem Austausch des Inhalts: den Block wieder so stellen, wie er
+   * stand, und auf das naechste Klappen horchen. */
+  function ablaufHerrichten() {
+    var block = document.getElementById("ablauf");
+    if (!block) {
+      return;
+    }
+    block.open = ablaufOffen;
+    block.addEventListener("toggle", function () {
+      ablaufOffen = block.open;
+    });
+  }
+
   function standMerken() {
+    ablaufHerrichten();
     var raster = inhalt.querySelector("[data-jetzt]");
     if (!raster) {
       return;

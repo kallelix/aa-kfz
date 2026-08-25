@@ -27,10 +27,17 @@
   </p>
 
   {% if band %}
-    <section class="tafel tafel-tagband">
-      <h2>Ablauf</h2>
+    {# details/summary statt eines Schalters mit Skript: das Auf- und Zuklappen
+       kann der Browser selbst, auch ohne JavaScript. Das Skript merkt sich
+       nur, wie es zuletzt stand, und stellt es nach dem Auffrischen wieder
+       her - sonst spränge der Block alle paar Sekunden wieder auf. #}
+    <details class="tafel tafel-tagband" id="ablauf" open>
+      <summary class="tafel-klapp">
+        <span class="tafel-titel">Ablauf</span>
+        <span class="klapp-hinweis" aria-hidden="true"></span>
+      </summary>
       {{ bandmakro.zeichnen(band, 'monitor') }}
-    </section>
+    </details>
   {% endif %}
 
   <section class="tafel tafel-tagschichten">

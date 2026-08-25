@@ -341,6 +341,17 @@ try:
     pruefe(tagseite.count('class="detail" data-detail=') == 1,
            "mit ihrer Langfassung")
 
+    print("Der Ablauf laesst sich zuklappen")
+    pruefe('<details class="tafel tafel-tagband" id="ablauf" open>' in tagseite,
+           "der Ablauf ist ein details-Block und steht offen")
+    pruefe('class="tafel-klapp"' in tagseite,
+           "mit einer Zeile zum Antippen")
+    pruefe("<h2>Ablauf</h2>" not in tagseite,
+           "und keiner festen Ueberschrift mehr")
+    _, _, _, live = anfrage("GET", "/monitor/" + TOKEN + "/inhalt")
+    pruefe('id="ablauf"' not in live,
+           "in der Jetzt-Ansicht gibt es ihn nicht - dort steht kein Band")
+
     print("Band im Tagesblick")
     pruefe("band-gitter" in tagseite, "der Tagesblick zeigt das Band")
     pruefe('data-schicht="' + str(sonntag) + '"' in tagseite.split("band-gitter")[1].split("</section>")[0],

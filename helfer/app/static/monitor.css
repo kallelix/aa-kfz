@@ -827,3 +827,49 @@ body.tagesblick .tafel-tagprogramm {
   font-size: 1.15em;
   color: var(--limette);
 }
+
+/* --- Aufklappbarer Ablauf ------------------------------------------------- */
+
+/* Die Zeile zum Antippen ist so hoch wie die Ueberschrift plus Rand, damit sie
+   sich mit dem Daumen ohne Zielen trifft. Das Dreieck des Browsers ist weg -
+   es ist auf jedem Geraet anders gross und passt zu keiner Schriftgroesse. */
+.tafel-klapp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  padding: .15rem 0 .5rem;
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tafel-klapp::-webkit-details-marker { display: none; }
+.tafel-klapp:focus-visible { outline: 3px solid var(--limette); outline-offset: 2px; }
+
+.tafel-titel {
+  font-size: 1.25em;
+  font-weight: 700;
+  color: var(--limette);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* Ein eigener Pfeil, der sich beim Aufklappen dreht. */
+.klapp-hinweis {
+  flex: none;
+  width: .85em;
+  height: .85em;
+  border-right: .16em solid var(--limette);
+  border-bottom: .16em solid var(--limette);
+  transform: rotate(45deg);
+  transform-origin: center;
+  margin-right: .3rem;
+  transition: transform .15s ease;
+}
+details[open] > .tafel-klapp .klapp-hinweis { transform: rotate(-135deg); }
+@media (prefers-reduced-motion: reduce) {
+  .klapp-hinweis { transition: none; }
+}
+
+/* Zugeklappt soll die Tafel nur so hoch sein wie ihre Zeile. */
+.tafel-tagband:not([open]) { padding-bottom: .3rem; }
