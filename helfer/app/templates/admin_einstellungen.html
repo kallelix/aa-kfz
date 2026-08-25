@@ -1,0 +1,83 @@
+{% extends "admin_base.html" %}
+{% block titel %}Einstellungen{% endblock %}
+{% block ueberschrift %}Einstellungen{% endblock %}
+
+{% block inhalt %}
+  <section class="kasten">
+    <h2>Vorbelegung der Materialausgabe</h2>
+    <p>Womit das Ausgabeformular unter <a href="/admin/funk">Funk</a> gefüllt
+      ist, wenn es aufgeht. Ändern kann man die Mengen dort weiterhin bei jeder
+      Ausgabe – hier steht nur, was ohne Zutun dasteht.</p>
+    <p class="hilfe">Wenn sich am Ausgabetisch herausstellt, dass jeder auch
+      ein Headset bekommt, spart das bei jeder Übergabe einen Handgriff.</p>
+
+    <form method="post" action="/admin/einstellungen">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="mengen">
+        {% for stueck in material %}
+          <span class="menge">
+            <label for="v-{{ stueck }}">{{ material_text[stueck] }}</label>
+            <input type="number" id="v-{{ stueck }}" name="{{ stueck }}"
+                   min="0" max="{{ hoechstwert }}" step="1"
+                   value="{{ vorgaben[stueck] }}">
+          </span>
+        {% endfor %}
+      </div>
+      <p class="hilfe">0 heißt: steht im Formular auf 0 und wird nicht
+        ausgegeben, solange niemand die Zahl hochsetzt. Mehr als
+        {{ hoechstwert }} ist keine Vorbelegung mehr, sondern ein Tippfehler –
+        deshalb ist dort Schluss.</p>
+      <button type="submit" class="knopf">Speichern</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Was in der Konfiguration steht</h2>
+    <p class="hilfe">Diese Werte kommen aus der <code>.env</code> auf dem
+      Server und lassen sich hier nicht ändern – eine Änderung dort wirkt erst
+      nach einem Neustart des Dienstes. Sie stehen hier, damit man nicht im
+      Dateisystem nachsehen muss, warum sich etwas so verhält.</p>
+
+    {% if jetzt_fest %}
+      <p class="hinweis hinweis-warnung" role="alert">
+        <strong>Die Uhr ist gestellt.</strong> Monitor und Dashboard gehen
+        nicht nach der echten Zeit, sondern nach dem Wert unten. Das ist für
+        Durchsichten gedacht – im Betrieb muss <code>JETZT_FEST</code> leer
+        sein, sonst zeigt der Monitor eine erfundene Uhrzeit, und niemandem
+        fällt es auf, weil ja eine Uhr zu sehen ist.
+      </p>
+    {% endif %}
+
+    <div class="tabelle-huelle">
+      <table>
+        <thead>
+          <tr><th scope="col">Was</th><th scope="col">Wert</th>
+            <th scope="col">Variable</th></tr>
+        </thead>
+        <tbody>
+          {% for was, wert, name in aus_der_env %}
+            <tr>
+              <td>{{ was }}</td>
+              <td><strong>{{ wert }}</strong></td>
+              <td class="gedaempft pruefsumme">{{ name }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Wo sonst noch etwas eingestellt wird</h2>
+    <ul class="hinweisliste">
+      <li><a href="/admin/monitor">Monitor</a> – Link für den Bildschirm im
+        Zelt, erzeugen und widerrufen</li>
+      <li><a href="/admin/unterschriften">Unterschriften</a> – Link für das
+        Tablet am Ausgabetisch</li>
+      <li><a href="/admin/zeitplan">Zeitplan</a> – Abruf von den Websites der
+        Rennserien, von Hand auslösen</li>
+      <li><a href="/admin/import">Import</a> – Schichten und Helfer aus dem
+        bisherigen Registrierungstool</li>
+    </ul>
+  </section>
+{% endblock %}

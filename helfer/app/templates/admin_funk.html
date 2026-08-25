@@ -60,12 +60,13 @@
               <label for="m-{{ stueck }}">{{ material_text[stueck] }}</label>
               <input type="number" id="m-{{ stueck }}" name="{{ stueck }}"
                      min="0" max="99" step="1"
-                     value="{% if stueck == 'funke' %}1{% else %}0{% endif %}">
+                     value="{{ vorgaben[stueck] }}">
             </span>
           {% endfor %}
         </div>
-        <p class="hilfe">Das Funkgerät ist mit 1 vorbelegt, der Rest mit 0.
-          Was auf 0 steht, wird nicht ausgegeben.</p>
+        <p class="hilfe">Was auf 0 steht, wird nicht ausgegeben. Die
+          Vorbelegung lässt sich unter
+          <a href="/admin/einstellungen">Einstellungen</a> ändern.</p>
       </div>
 
       <div class="feld">

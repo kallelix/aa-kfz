@@ -1146,6 +1146,45 @@ MATERIAL_TEXT = {"funke": "Funkgerät", "headset": "Headset",
                  "ersatzakku": "Ersatzakku"}
 
 
+# Womit das Ausgabeformular vorbelegt ist, wenn nichts eingestellt wurde.
+# Ein Funkgerät ist der Normalfall, der Rest die Ausnahme.
+MATERIAL_VORGABE = {"funke": 1, "headset": 0, "ersatzakku": 0}
+
+# Höher als das ist keine Vorbelegung mehr, sondern ein Tippfehler.
+MATERIAL_VORGABE_MAX = 20
+
+
+def material_vorgaben() -> dict[str, int]:
+    """Die Vorbelegung des Ausgabeformulars.
+
+    Steht in der Einstellungstabelle und nicht in der .env: das ist ein Wert,
+    den die Orga im laufenden Betrieb ändern will, wenn sich herausstellt,
+    dass jeder auch ein Headset bekommt. Ein Neustart des Dienstes dafür wäre
+    unverhältnismäßig.
+    """
+    ergebnis = {}
+    for stueck in MATERIAL:
+        roh = einstellung("vorgabe_" + stueck)
+        try:
+            wert = int(roh)
+        except (TypeError, ValueError):
+            wert = MATERIAL_VORGABE[stueck]
+        ergebnis[stueck] = min(max(0, wert), MATERIAL_VORGABE_MAX)
+    return ergebnis
+
+
+def material_vorgaben_setzen(werte: dict) -> dict[str, int]:
+    """Speichert die Vorbelegung und gibt zurück, was tatsächlich gilt."""
+    for stueck in MATERIAL:
+        try:
+            wert = int(str(werte.get(stueck, "")).strip())
+        except (TypeError, ValueError):
+            continue
+        einstellung_setzen("vorgabe_" + stueck,
+                           str(min(max(0, wert), MATERIAL_VORGABE_MAX)))
+    return material_vorgaben()
+
+
 def ausleihen(helfer_id: int, mengen: dict, datum: str | None = None,
               bemerkung: str = "", kuerzel: str = "") -> int | None:
     def menge(stueck):

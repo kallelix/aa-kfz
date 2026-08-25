@@ -234,6 +234,56 @@ try:
     pruefe(person["tshirt"] == "XL" and person["veggie"] == 0, "die Werte stimmen")
 
     # --- 2. Funkgeräte -----------------------------------------------------
+    print("Einstellungen: Vorbelegung der Materialausgabe")
+    status, _, seite = anfrage("GET", "/admin/einstellungen")
+    pruefe(status == 200, "die Seite laedt")
+    vorgaben = dict(re.findall(r'id="v-(\w+)"[^>]*value="(\d+)"', seite))
+    pruefe(vorgaben == {"funke": "1", "headset": "0", "ersatzakku": "0"},
+           "ohne Einstellung gilt: ein Funkgeraet, sonst nichts: " + str(vorgaben))
+
+    _, _, funk = anfrage("GET", "/admin/funk")
+    im_formular = dict(re.findall(
+        r'id="m-(\w+)"[\s\S]{0,140}?value="(\d+)"', funk))
+    pruefe(im_formular == vorgaben,
+           "und genau das steht im Ausgabeformular: " + str(im_formular))
+
+    status, ort, _ = anfrage("POST", "/admin/einstellungen",
+                             {"csrf": CSRF, "funke": "1", "headset": "1",
+                              "ersatzakku": "2"})
+    pruefe("hinweis=gespeichert" in ort, "speichern meldet Erfolg")
+    _, _, funk = anfrage("GET", "/admin/funk")
+    im_formular = dict(re.findall(
+        r'id="m-(\w+)"[\s\S]{0,140}?value="(\d+)"', funk))
+    pruefe(im_formular == {"funke": "1", "headset": "1", "ersatzakku": "2"},
+           "das Ausgabeformular folgt: " + str(im_formular))
+
+    print("Einstellungen: was nicht durchgeht")
+    anfrage("POST", "/admin/einstellungen",
+            {"csrf": CSRF, "funke": "-5", "headset": "999",
+             "ersatzakku": "quatsch"})
+    _, _, seite = anfrage("GET", "/admin/einstellungen")
+    vorgaben = dict(re.findall(r'id="v-(\w+)"[^>]*value="(\d+)"', seite))
+    pruefe(vorgaben["funke"] == "0", "eine negative Zahl wird auf 0 geklemmt")
+    pruefe(vorgaben["headset"] == "20",
+           "eine unsinnig grosse auf den Hoechstwert: " + vorgaben["headset"])
+    pruefe(vorgaben["ersatzakku"] == "2",
+           "und was keine Zahl ist, laesst den alten Wert stehen")
+
+    status, _, _ = anfrage("POST", "/admin/einstellungen",
+                           {"csrf": "falsch", "funke": "9"})
+    pruefe(status == 400, "ohne CSRF-Token wird nichts gespeichert")
+
+    # Fuer den Rest der Pruefungen wieder auf die Vorgabe zurueck.
+    anfrage("POST", "/admin/einstellungen",
+            {"csrf": CSRF, "funke": "1", "headset": "0", "ersatzakku": "0"})
+
+    print("Einstellungen: was aus der .env kommt")
+    _, _, seite = anfrage("GET", "/admin/einstellungen")
+    pruefe("TAGE" in seite and "MONITOR_VORSCHAU" in seite,
+           "die Werte aus der Konfiguration stehen zum Nachsehen dabei")
+    pruefe("nach einem Neustart" in seite,
+           "mit dem Hinweis, dass eine Aenderung dort erst dann wirkt")
+
     print("Funk: ausgeben")
     status, _, seite = anfrage("GET", "/admin/funk")
     pruefe(status == 200 and "Noch nichts ausgegeben" in seite,

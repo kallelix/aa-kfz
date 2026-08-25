@@ -454,8 +454,8 @@ try:
     for pfad in ("/admin", "/admin/schichten", "/admin/band", "/admin/helfer",
                  "/admin/aufgaben", "/admin/funk", "/admin/schluessel",
                  "/admin/zeitplan", "/admin/monitor", "/admin/import",
-                 "/admin/unterschriften", "/admin/helfer/neu",
-                 "/admin/aufgabe/neu"):
+                 "/admin/unterschriften", "/admin/einstellungen",
+                 "/admin/helfer/neu", "/admin/aufgabe/neu"):
         status, _, _ = anfrage("GET", pfad)
         pruefe(status == 200, pfad + " laedt")
 

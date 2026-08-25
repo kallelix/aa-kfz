@@ -983,6 +983,7 @@ async def funk(request: Request, hinweis: str = "", offen: str = "",
                material=db.MATERIAL, material_text=db.MATERIAL_TEXT,
                helfer=db.helfer_liste(), tage=db.monitor_tage(),
                heute=db.jetzt_lokal().strftime("%Y-%m-%d"),
+               vorgaben=db.material_vorgaben(),
                unterschrieben=unterschriften.je_vorgang("material"),
                tablet=bool(db.tablet_token())))
 
@@ -1096,6 +1097,70 @@ async def schluessel_weg(request: Request, schluessel_id: int,
         return Response("Ungültiger CSRF-Token", status_code=400)
     db.schluessel_loeschen(schluessel_id)
     return _zurueck("/admin/schluessel", "geloescht")
+
+
+# --- Einstellungen ---------------------------------------------------------
+
+def _einstellungsseite(request: Request, sitzung, hinweis: str = ""):
+    """Die Seite zeigt zweierlei: was sich hier ändern lässt, und was in der
+    .env steht. Das Zweite ist nur zum Nachsehen – wer wissen will, warum der
+    Monitor alle 60 Sekunden neu lädt, soll es nicht im Dateisystem suchen
+    müssen."""
+    aus_der_env = [
+        ("Veranstaltungstage", ", ".join(t.isoformat() for t in config.TAGE),
+         "TAGE"),
+        ("Zeitzone", config.ZEITZONE, "ZEITZONE"),
+        ("Gestellte Uhr", config.JETZT_FEST or "aus (echte Uhr)", "JETZT_FEST"),
+        ("Monitor: Auffrischen", str(config.MONITOR_INTERVALL) + " s",
+         "MONITOR_INTERVALL"),
+        ("Monitor: Vorschau", str(config.MONITOR_VORSCHAU) + " min",
+         "MONITOR_VORSCHAU"),
+        ("Monitor: Warnung ab", str(config.MONITOR_WARNUNG) + " fehlenden",
+         "MONITOR_WARNUNG"),
+        ("Monitor: Overlay schließt", str(config.MONITOR_OVERLAY_SEKUNDEN) + " s",
+         "MONITOR_OVERLAY_SEKUNDEN"),
+        ("Monitor: Tagesblick endet",
+         str(config.MONITOR_TAGESBLICK_SEKUNDEN) + " s",
+         "MONITOR_TAGESBLICK_SEKUNDEN"),
+        ("Zeitplan: Abruf um", "%02d:00 Uhr" % (config.ZEITPLAN_STUNDE % 24)
+         if 0 <= config.ZEITPLAN_STUNDE <= 23 else "aus", "ZEITPLAN_STUNDE"),
+        ("Zeitplan: Serien",
+         ", ".join(s["titel"] for s in config.serien()) or "keine",
+         "ZEITPLAN_SERIEN"),
+        ("Unterschrift: verfällt nach",
+         str(config.UNTERSCHRIFT_MINUTEN) + " min", "UNTERSCHRIFT_MINUTEN"),
+        ("Unterschrift: Nachfrist",
+         str(config.UNTERSCHRIFT_NACHFRIST) + " min", "UNTERSCHRIFT_NACHFRIST"),
+        ("Tablet: fragt nach alle", str(config.UNTERSCHRIFT_TAKT) + " s",
+         "UNTERSCHRIFT_TAKT"),
+        ("Backoffice: fragt nach alle", str(config.ADMIN_TAKT) + " s"
+         if config.ADMIN_TAKT else "aus", "ADMIN_TAKT"),
+    ]
+    return templates.TemplateResponse(
+        "admin_einstellungen.html",
+        _admin(request, sitzung, hinweis=hinweis,
+               vorgaben=db.material_vorgaben(),
+               material=db.MATERIAL, material_text=db.MATERIAL_TEXT,
+               hoechstwert=db.MATERIAL_VORGABE_MAX,
+               aus_der_env=aus_der_env,
+               jetzt_fest=bool(config.JETZT_FEST)))
+
+
+@app.get("/admin/einstellungen")
+async def einstellungen(request: Request, hinweis: str = "",
+                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    return _einstellungsseite(request, sitzung, hinweis)
+
+
+@app.post("/admin/einstellungen")
+async def einstellungen_speichern(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.material_vorgaben_setzen({s: daten.get(s) for s in db.MATERIAL})
+    return _zurueck("/admin/einstellungen", "gespeichert")
 
 
 # --- Nachfragen aus dem Backoffice -----------------------------------------
