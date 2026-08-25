@@ -207,3 +207,75 @@ CREATE TABLE IF NOT EXISTS aufgabe (
 );
 
 CREATE INDEX IF NOT EXISTS idx_aufgabe_tag ON aufgabe (datum, beginn);
+
+-- Ausleihe von Material: Funkgeraet, Headset, Ersatzakku.
+--
+-- Ein Schichtbezug ist ausdruecklich nicht noetig - wer ein Funkgeraet holt,
+-- steht nicht zwingend auf einer Schicht. Deshalb ist schicht_id optional.
+--
+-- Ausgegebene und zurueckgegebene Stueckzahlen stehen nebeneinander, statt
+-- eine Ausleihe nur ganz oder gar nicht zurueckzunehmen: wer das Funkgeraet
+-- bringt und den Ersatzakku behaelt, ist der Normalfall und kein Sonderfall.
+CREATE TABLE IF NOT EXISTS ausleihe (
+    id            INTEGER PRIMARY KEY,
+    helfer_id     INTEGER NOT NULL REFERENCES helfer (id) ON DELETE CASCADE,
+    schicht_id    INTEGER REFERENCES schicht (id) ON DELETE SET NULL,
+
+    funke         INTEGER NOT NULL DEFAULT 0 CHECK (funke >= 0),
+    headset       INTEGER NOT NULL DEFAULT 0 CHECK (headset >= 0),
+    ersatzakku    INTEGER NOT NULL DEFAULT 0 CHECK (ersatzakku >= 0),
+
+    funke_zurueck      INTEGER NOT NULL DEFAULT 0 CHECK (funke_zurueck >= 0),
+    headset_zurueck    INTEGER NOT NULL DEFAULT 0 CHECK (headset_zurueck >= 0),
+    ersatzakku_zurueck INTEGER NOT NULL DEFAULT 0 CHECK (ersatzakku_zurueck >= 0),
+
+    bemerkung     TEXT NOT NULL DEFAULT '',
+    ausgegeben_am TEXT NOT NULL,
+    ausgegeben_von TEXT NOT NULL DEFAULT '',
+    zurueck_am    TEXT,
+    zurueck_von   TEXT NOT NULL DEFAULT '',
+
+    -- Nichts auszugeben waere kein Vorgang.
+    CHECK (funke + headset + ersatzakku > 0),
+    -- Mehr zurueck als raus kann nicht sein.
+    CHECK (funke_zurueck <= funke),
+    CHECK (headset_zurueck <= headset),
+    CHECK (ersatzakku_zurueck <= ersatzakku)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ausleihe_offen ON ausleihe (zurueck_am);
+
+-- Der Fahrzeugstamm. Baut sich beim Ausgeben von Schluesseln nebenbei auf:
+-- wer ein Kennzeichen eintippt, das es noch nicht gibt, legt es damit an.
+-- Beim naechsten Mal steht der Name schon da.
+CREATE TABLE IF NOT EXISTS fahrzeug (
+    id            INTEGER PRIMARY KEY,
+    kennzeichen   TEXT NOT NULL,
+    -- Nur Buchstaben und Ziffern, gross. Verhindert, dass "IL-A 123" und
+    -- "ILA123" zwei Wagen werden.
+    kennzeichen_norm TEXT NOT NULL UNIQUE,
+    vorname       TEXT NOT NULL DEFAULT '',
+    nachname      TEXT NOT NULL DEFAULT '',
+    bemerkung     TEXT NOT NULL DEFAULT '',
+    angelegt_am   TEXT NOT NULL,
+    geaendert_am  TEXT
+);
+
+-- Ausgabe und Ruecknahme eines Fahrzeugschluessels.
+CREATE TABLE IF NOT EXISTS schluessel (
+    id            INTEGER PRIMARY KEY,
+    fahrzeug_id   INTEGER NOT NULL REFERENCES fahrzeug (id) ON DELETE CASCADE,
+
+    -- Wer den Schluessel hat. Kann von der Person im Fahrzeugstamm
+    -- abweichen: das Shuttle faehrt nicht immer derselbe.
+    vorname       TEXT NOT NULL DEFAULT '',
+    nachname      TEXT NOT NULL DEFAULT '',
+
+    bemerkung     TEXT NOT NULL DEFAULT '',
+    ausgegeben_am TEXT NOT NULL,
+    ausgegeben_von TEXT NOT NULL DEFAULT '',
+    zurueck_am    TEXT,
+    zurueck_von   TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_schluessel_offen ON schluessel (zurueck_am);

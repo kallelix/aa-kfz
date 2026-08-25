@@ -25,6 +25,13 @@ NACHTRAEGLICHE_SPALTEN: list[tuple[str, str, str]] = [
     ("programm", "notiz", "notiz TEXT NOT NULL DEFAULT ''"),
     # Versionszaehler fuer den Konfliktschutz, siehe aufgabe.version.
     ("programm", "version", "version INTEGER NOT NULL DEFAULT 1"),
+    # T-Shirt-Ausgabe. Die ausgegebene Größe steht getrennt von der
+    # angekündigten: an der Ausgabe stellt sich oft heraus, dass es doch eine
+    # Nummer größer sein muss, und beide Angaben sind für die Nachbestellung
+    # etwas wert.
+    ("helfer", "tshirt_ausgegeben_am", "tshirt_ausgegeben_am TEXT"),
+    ("helfer", "tshirt_ausgegeben", "tshirt_ausgegeben TEXT"),
+    ("helfer", "tshirt_kuerzel", "tshirt_kuerzel TEXT NOT NULL DEFAULT ''"),
 ]
 
 
@@ -931,5 +938,390 @@ def programm_freigeben(programm_id: int) -> bool:
                 "UPDATE programm SET von_hand = 0, geaendert_am = ?"
                 " WHERE id = ?", (jetzt(), programm_id))
         return zeiger.rowcount > 0
+    finally:
+        con.close()
+
+
+# --- T-Shirt-Ausgabe -------------------------------------------------------
+
+def tshirt_ausgeben(helfer_id: int, groesse: str, kuerzel: str = "") -> bool:
+    """Vermerkt die Ausgabe. `groesse` ist die TATSÄCHLICH ausgegebene – an
+    der Ausgabe stellt sich oft heraus, dass es doch eine Nummer größer sein
+    muss. Die angekündigte bleibt daneben stehen; beide zusammen sind für die
+    Nachbestellung mehr wert als eine allein."""
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute(
+                "UPDATE helfer SET tshirt_ausgegeben_am = ?,"
+                " tshirt_ausgegeben = ?, tshirt_kuerzel = ?, geaendert_am = ?"
+                " WHERE id = ?",
+                (jetzt(), groesse or None, kuerzel, jetzt(), helfer_id))
+        return zeiger.rowcount > 0
+    finally:
+        con.close()
+
+
+def tshirt_zuruecknehmen(helfer_id: int) -> bool:
+    """Für den Fall, dass jemand versehentlich abgehakt wurde."""
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute(
+                "UPDATE helfer SET tshirt_ausgegeben_am = NULL,"
+                " tshirt_ausgegeben = NULL, tshirt_kuerzel = '',"
+                " geaendert_am = ? WHERE id = ?", (jetzt(), helfer_id))
+        return zeiger.rowcount > 0
+    finally:
+        con.close()
+
+
+def tshirt_zaehler() -> dict:
+    con = verbinden()
+    try:
+        def eine(sql):
+            return con.execute(sql).fetchone()[0]
+
+        return {
+            "ausgegeben": eine("SELECT COUNT(*) FROM helfer"
+                               " WHERE tshirt_ausgegeben_am IS NOT NULL"),
+            "offen": eine("SELECT COUNT(*) FROM helfer"
+                          " WHERE tshirt_ausgegeben_am IS NULL"),
+            "je_groesse": {z["g"]: z["n"] for z in con.execute(
+                "SELECT tshirt_ausgegeben AS g, COUNT(*) AS n FROM helfer"
+                " WHERE tshirt_ausgegeben IS NOT NULL"
+                " GROUP BY tshirt_ausgegeben")},
+            # Wo die ausgegebene von der angekündigten Größe abweicht – das
+            # ist die Zahl, die bei der nächsten Bestellung zählt.
+            "abweichend": eine(
+                "SELECT COUNT(*) FROM helfer WHERE tshirt_ausgegeben IS NOT NULL"
+                " AND tshirt IS NOT NULL AND tshirt_ausgegeben <> tshirt"),
+        }
+    finally:
+        con.close()
+
+
+def helfer_von_hand(daten: dict) -> tuple[int | None, str]:
+    """Legt einen Helfer von Hand an. Gibt (id, Meldung) zurück.
+
+    Für alle, die nicht im Registrierungstool stehen: Leute, die spontan
+    mithelfen, auf keiner Schicht auftauchen und trotzdem ein T-Shirt oder ein
+    Funkgerät bekommen.
+    """
+    name = normalisieren.text(daten.get("name"))
+    if not name:
+        return None, "ohne-namen"
+
+    con = verbinden()
+    try:
+        merkmal = normalisieren.schluessel(name, daten.get("email", ""))
+        vorhanden = con.execute(
+            "SELECT id FROM helfer WHERE schluessel = ?", (merkmal,)).fetchone()
+        if vorhanden is not None:
+            # Nicht stillschweigend ein zweites Mal anlegen – der Schlüssel
+            # ist eindeutig, das gäbe einen Fehler statt einer Erklärung.
+            return int(vorhanden["id"]), "gibt-es-schon"
+        with con:
+            nummer, _ = helfer_anlegen(con, daten)
+        return nummer, "angelegt"
+    finally:
+        con.close()
+
+
+def helfer_aendern(helfer_id: int, daten: dict) -> bool:
+    con = verbinden()
+    try:
+        name = normalisieren.text(daten.get("name"))
+        if not name:
+            return False
+        with con:
+            zeiger = con.execute(
+                "UPDATE helfer SET name = ?, email = ?, telefon = ?,"
+                " veggie = ?, tshirt = ?, tshirt_roh = ?, bemerkung = ?,"
+                " schluessel = ?, geaendert_am = ? WHERE id = ?",
+                (name, normalisieren.text(daten.get("email")),
+                 normalisieren.text(daten.get("telefon")),
+                 daten.get("veggie"), daten.get("tshirt"),
+                 normalisieren.text(daten.get("tshirt_roh")),
+                 normalisieren.text(daten.get("bemerkung")),
+                 normalisieren.schluessel(name, daten.get("email", "")),
+                 jetzt(), helfer_id))
+        return zeiger.rowcount > 0
+    except sqlite3.IntegrityError:
+        # Name und Mailadresse zusammen gibt es schon ein zweites Mal.
+        return False
+    finally:
+        con.close()
+
+
+# --- Materialausleihe ------------------------------------------------------
+
+MATERIAL = ("funke", "headset", "ersatzakku")
+MATERIAL_TEXT = {"funke": "Funkgerät", "headset": "Headset",
+                 "ersatzakku": "Ersatzakku"}
+
+
+def ausleihen(helfer_id: int, mengen: dict, schicht_id: int | None = None,
+              bemerkung: str = "", kuerzel: str = "") -> int | None:
+    def menge(stueck):
+        try:
+            return max(0, int(mengen.get(stueck, 0) or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    if sum(menge(s) for s in MATERIAL) <= 0:
+        return None
+
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute(
+                "INSERT INTO ausleihe (helfer_id, schicht_id, funke, headset,"
+                " ersatzakku, bemerkung, ausgegeben_am, ausgegeben_von)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (helfer_id, schicht_id, *[menge(s) for s in MATERIAL],
+                 normalisieren.text(bemerkung), jetzt(), kuerzel))
+        return int(zeiger.lastrowid)
+    finally:
+        con.close()
+
+
+def ausleihe_zurueck(ausleihe_id: int, mengen: dict | None = None,
+                     kuerzel: str = "") -> bool:
+    """Ohne `mengen` kommt alles zurück. Mit `mengen` nur ein Teil – wer das
+    Funkgerät bringt und den Ersatzakku behält, ist der Normalfall und kein
+    Sonderfall, für den man erst etwas erfinden müsste."""
+    con = verbinden()
+    try:
+        with con:
+            zeile = con.execute("SELECT * FROM ausleihe WHERE id = ?",
+                                (ausleihe_id,)).fetchone()
+            if zeile is None:
+                return False
+
+            neu = {}
+            for stueck in MATERIAL:
+                if mengen is None:
+                    neu[stueck] = zeile[stueck]
+                else:
+                    try:
+                        wert = int(mengen.get(stueck, 0) or 0)
+                    except (TypeError, ValueError):
+                        wert = 0
+                    neu[stueck] = min(max(0, wert), zeile[stueck])
+
+            vollstaendig = all(neu[s] >= zeile[s] for s in MATERIAL)
+            con.execute(
+                "UPDATE ausleihe SET funke_zurueck = ?, headset_zurueck = ?,"
+                " ersatzakku_zurueck = ?, zurueck_am = ?, zurueck_von = ?"
+                " WHERE id = ?",
+                (*[neu[s] for s in MATERIAL],
+                 jetzt() if vollstaendig else None,
+                 kuerzel if vollstaendig else zeile["zurueck_von"],
+                 ausleihe_id))
+        return True
+    finally:
+        con.close()
+
+
+def ausleihe_loeschen(ausleihe_id: int) -> bool:
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute("DELETE FROM ausleihe WHERE id = ?",
+                                 (ausleihe_id,))
+        return zeiger.rowcount > 0
+    finally:
+        con.close()
+
+
+def ausleihen_liste(nur_offen: bool = False) -> list[sqlite3.Row]:
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT a.*, h.name, h.email, h.telefon,"
+            " s.liste AS schicht_liste, s.beginn AS schicht_beginn,"
+            " (a.funke - a.funke_zurueck) AS funke_offen,"
+            " (a.headset - a.headset_zurueck) AS headset_offen,"
+            " (a.ersatzakku - a.ersatzakku_zurueck) AS ersatzakku_offen,"
+            " suchtext(h.name, s.liste, a.bemerkung) AS suche"
+            " FROM ausleihe a"
+            " JOIN helfer h ON h.id = a.helfer_id"
+            " LEFT JOIN schicht s ON s.id = a.schicht_id" +
+            (" WHERE a.zurueck_am IS NULL" if nur_offen else "") +
+            " ORDER BY a.zurueck_am IS NOT NULL, a.ausgegeben_am DESC"
+        ).fetchall()
+    finally:
+        con.close()
+
+
+def material_zaehler() -> dict:
+    """Was insgesamt herausging und was davon noch draußen ist."""
+    con = verbinden()
+    try:
+        teile = []
+        for stueck in MATERIAL:
+            teile.append("COALESCE(SUM(" + stueck + "), 0) AS " + stueck + "_raus")
+            teile.append("COALESCE(SUM(" + stueck + " - " + stueck +
+                         "_zurueck), 0) AS " + stueck + "_offen")
+        zeile = con.execute("SELECT " + ", ".join(teile) +
+                            " FROM ausleihe").fetchone()
+        return {s: {"raus": zeile[s + "_raus"], "offen": zeile[s + "_offen"]}
+                for s in MATERIAL}
+    finally:
+        con.close()
+
+
+# --- Fahrzeuge und Schlüssel -----------------------------------------------
+
+def fahrzeug_sichern(kennzeichen: str, vorname: str = "", nachname: str = "",
+                     bemerkung: str = "") -> tuple[int | None, bool]:
+    """Legt das Fahrzeug an oder ergänzt es. Gibt (id, neu) zurück.
+
+    Der Stamm baut sich damit nebenbei auf: wer ein Kennzeichen eintippt, das
+    es noch nicht gibt, legt es an, und beim nächsten Mal steht der Name schon
+    da. Leere Felder werden ergänzt, gefüllte bleiben stehen – eine spätere
+    Ausgabe ohne Namen soll den vorhandenen nicht löschen.
+    """
+    norm = normalisieren.kennzeichen(kennzeichen)
+    if not norm:
+        return None, False
+
+    con = verbinden()
+    try:
+        with con:
+            vorhanden = con.execute(
+                "SELECT * FROM fahrzeug WHERE kennzeichen_norm = ?",
+                (norm,)).fetchone()
+            if vorhanden is None:
+                zeiger = con.execute(
+                    "INSERT INTO fahrzeug (kennzeichen, kennzeichen_norm,"
+                    " vorname, nachname, bemerkung, angelegt_am)"
+                    " VALUES (?, ?, ?, ?, ?, ?)",
+                    (normalisieren.kennzeichen_anzeige(kennzeichen), norm,
+                     normalisieren.text(vorname), normalisieren.text(nachname),
+                     normalisieren.text(bemerkung), jetzt()))
+                return int(zeiger.lastrowid), True
+
+            aenderungen, werte = [], []
+            for spalte, wert in (("vorname", vorname), ("nachname", nachname),
+                                 ("bemerkung", bemerkung)):
+                sauber = normalisieren.text(wert)
+                if sauber and not vorhanden[spalte]:
+                    aenderungen.append(spalte + " = ?")
+                    werte.append(sauber)
+            if aenderungen:
+                con.execute(
+                    "UPDATE fahrzeug SET " + ", ".join(aenderungen) +
+                    ", geaendert_am = ? WHERE id = ?",
+                    (*werte, jetzt(), vorhanden["id"]))
+            return int(vorhanden["id"]), False
+    finally:
+        con.close()
+
+
+def fahrzeuge() -> list[sqlite3.Row]:
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT f.*,"
+            " (SELECT COUNT(*) FROM schluessel s WHERE s.fahrzeug_id = f.id"
+            "  AND s.zurueck_am IS NULL) AS draussen,"
+            " (SELECT COUNT(*) FROM schluessel s WHERE s.fahrzeug_id = f.id)"
+            "  AS ausgaben"
+            " FROM fahrzeug f ORDER BY f.kennzeichen COLLATE NOCASE").fetchall()
+    finally:
+        con.close()
+
+
+def fahrzeug_suchen(kennzeichen: str) -> sqlite3.Row | None:
+    norm = normalisieren.kennzeichen(kennzeichen)
+    if not norm:
+        return None
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM fahrzeug WHERE kennzeichen_norm = ?",
+                           (norm,)).fetchone()
+    finally:
+        con.close()
+
+
+def schluessel_ausgeben(fahrzeug_id: int, vorname: str, nachname: str,
+                        bemerkung: str = "", kuerzel: str = "") -> int:
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute(
+                "INSERT INTO schluessel (fahrzeug_id, vorname, nachname,"
+                " bemerkung, ausgegeben_am, ausgegeben_von)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (fahrzeug_id, normalisieren.text(vorname),
+                 normalisieren.text(nachname), normalisieren.text(bemerkung),
+                 jetzt(), kuerzel))
+        return int(zeiger.lastrowid)
+    finally:
+        con.close()
+
+
+def schluessel_zurueck(schluessel_id: int, kuerzel: str = "") -> bool:
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute(
+                "UPDATE schluessel SET zurueck_am = ?, zurueck_von = ?"
+                " WHERE id = ? AND zurueck_am IS NULL",
+                (jetzt(), kuerzel, schluessel_id))
+        return zeiger.rowcount > 0
+    finally:
+        con.close()
+
+
+def schluessel_loeschen(schluessel_id: int) -> bool:
+    con = verbinden()
+    try:
+        with con:
+            zeiger = con.execute("DELETE FROM schluessel WHERE id = ?",
+                                 (schluessel_id,))
+        return zeiger.rowcount > 0
+    finally:
+        con.close()
+
+
+def schluessel_liste(nur_offen: bool = False) -> list[sqlite3.Row]:
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT s.*, f.kennzeichen, f.kennzeichen_norm,"
+            " f.vorname AS halter_vorname, f.nachname AS halter_nachname,"
+            " suchtext(f.kennzeichen, f.kennzeichen_norm, s.vorname,"
+            "          s.nachname, s.bemerkung) AS suche"
+            " FROM schluessel s JOIN fahrzeug f ON f.id = s.fahrzeug_id" +
+            (" WHERE s.zurueck_am IS NULL" if nur_offen else "") +
+            " ORDER BY s.zurueck_am IS NOT NULL, s.ausgegeben_am DESC"
+        ).fetchall()
+    finally:
+        con.close()
+
+
+def namen_vorschlaege() -> list[str]:
+    """Helfernamen für die Vorschlagsliste bei der Schlüsselausgabe.
+
+    Die vom Shuttle zuerst: dort werden die meisten Schlüssel gebraucht. Alle
+    anderen danach – ein Schlüssel kann auch an jemand anderen gehen, und eine
+    Liste, die das ausschließt, wäre im entscheidenden Moment im Weg.
+    """
+    con = verbinden()
+    try:
+        shuttle = [z["name"] for z in con.execute(
+            "SELECT DISTINCT h.name FROM helfer h"
+            " JOIN einteilung e ON e.helfer_id = h.id"
+            " JOIN schicht s ON s.id = e.schicht_id"
+            " WHERE s.liste LIKE '%Shuttle%'"
+            " ORDER BY h.name COLLATE NOCASE")]
+        gesehen = set(shuttle)
+        rest = [z["name"] for z in con.execute(
+            "SELECT name FROM helfer ORDER BY name COLLATE NOCASE")
+            if z["name"] not in gesehen]
+        return shuttle + rest
     finally:
         con.close()

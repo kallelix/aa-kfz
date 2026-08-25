@@ -1,0 +1,211 @@
+{% extends "admin_base.html" %}
+{% block titel %}Schlüssel{% endblock %}
+{% block ueberschrift %}KFZ-Schlüssel{% endblock %}
+
+{% block inhalt %}
+  {% set draussen = schluessel | selectattr('zurueck_am', 'none') | list | length %}
+  <section class="zaehler">
+    <div class="zaehler-kachel {% if draussen %}zaehler-voll{% endif %}">
+      <p class="zaehler-titel">Draußen</p>
+      <p class="zaehler-zahl">{{ draussen }}</p>
+      <p class="zaehler-detail">Schlüssel nicht zurück</p>
+    </div>
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Vorgänge</p>
+      <p class="zaehler-zahl">{{ schluessel | length }}</p>
+      <p class="zaehler-detail">insgesamt erfasst</p>
+    </div>
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Fahrzeuge</p>
+      <p class="zaehler-zahl">{{ fahrzeuge | length }}</p>
+      <p class="zaehler-detail">im Stamm</p>
+    </div>
+  </section>
+
+  <section class="kasten">
+    <h2>Schlüssel ausgeben</h2>
+    <form method="post" action="/admin/schluessel/ausgeben">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+
+      <div class="feld">
+        <label for="kennzeichen">Kennzeichen <span class="pflicht">*</span></label>
+        <input type="text" id="kennzeichen" name="kennzeichen" required
+               maxlength="20" class="kennzeichen-feld" list="v-kennzeichen"
+               autocomplete="off" autofocus placeholder="IL-A 123">
+        <datalist id="v-kennzeichen">
+          {% for f in fahrzeuge %}
+            <option value="{{ f.kennzeichen }}">
+              {{- f.vorname }} {{ f.nachname }}</option>
+          {% endfor %}
+        </datalist>
+        <p class="hilfe">Bindestriche und Leerzeichen sind egal – „IL-A 123“
+          und „ila123“ sind derselbe Wagen. Ein Kennzeichen, das es noch nicht
+          gibt, kommt damit in den Stamm; beim nächsten Mal steht der Name
+          schon da.</p>
+      </div>
+
+      <div class="paar">
+        <div class="feld">
+          <label for="vorname">Vorname</label>
+          <input type="text" id="vorname" name="vorname" maxlength="120"
+                 list="v-namen" autocomplete="off">
+        </div>
+        <div class="feld">
+          <label for="nachname">Name</label>
+          <input type="text" id="nachname" name="nachname" maxlength="120"
+                 list="v-namen" autocomplete="off">
+        </div>
+      </div>
+      <datalist id="v-namen">
+        {% for n in namen %}<option value="{{ n }}">{% endfor %}
+      </datalist>
+      <p class="hilfe">Die Vorschläge sind die erfassten Helfer, die vom
+        Shuttle zuerst. Wer nicht dabei ist, wird einfach getippt – ein
+        Schlüssel kann an jeden gehen.</p>
+
+      <div class="feld">
+        <label for="bemerkung">Bemerkung <span class="optional">optional</span></label>
+        <input type="text" id="bemerkung" name="bemerkung" maxlength="200">
+      </div>
+
+      <button type="submit" class="knopf">Ausgeben</button>
+    </form>
+  </section>
+
+  <form method="get" action="/admin/schluessel" class="filter">
+    <div>
+      <label for="f-offen">Nur was noch draußen ist</label>
+      <input type="checkbox" id="f-offen" name="offen" value="1"
+             {% if nur_offen %}checked{% endif %}>
+    </div>
+    <div class="filter-knoepfe">
+      <button type="submit" class="knopf">Anzeigen</button>
+      {% if nur_offen %}<a class="knopf-schlicht" href="/admin/schluessel">alle zeigen</a>{% endif %}
+    </div>
+  </form>
+
+  {% if not schluessel %}
+    <p class="leer">
+      {% if nur_offen %}Alle Schlüssel sind zurück.
+      {% else %}Noch kein Schlüssel ausgegeben.{% endif %}
+    </p>
+  {% else %}
+    <div class="sperre-suche">
+      <label for="suche">Kennzeichen oder Name</label>
+      <div class="sperre-suche-zeile">
+        <input type="search" id="suche" autocomplete="off" spellcheck="false"
+               placeholder="z. B. ila123">
+        <a class="knopf-schlicht weg" id="zuruecksetzen" href="#">zurücksetzen</a>
+      </div>
+      <p class="hilfe">Auch beim Suchen sind Trennzeichen egal.</p>
+    </div>
+
+    <p class="trefferzahl" id="trefferzahl">{{ schluessel|length }} Vorgänge</p>
+
+    <div class="tabelle-huelle">
+      <table data-liste data-sortspalte="0" data-einheit="Vorgang"
+             data-einheit-mehrzahl="Vorgänge">
+        <thead>
+          <tr>
+            <th scope="col" aria-sort="ascending">
+              <button type="button" class="sortknopf" data-spalte="0">
+                Kennzeichen <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col" aria-sort="none">
+              <button type="button" class="sortknopf" data-spalte="1">
+                Wer <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col" aria-sort="none">
+              <button type="button" class="sortknopf" data-spalte="2">
+                Ausgegeben <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col">Zurück</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in schluessel %}
+            <tr data-suche="{{ s.suche }}"
+                {% if not s.zurueck_am %}class="ist-draussen"{% endif %}>
+              <td class="kennzeichen-feld">{{ s.kennzeichen }}</td>
+              <td>
+                {{ s.vorname }} {{ s.nachname }}
+                {%- if s.bemerkung %}<br><span class="gedaempft">{{ s.bemerkung }}</span>{% endif %}
+              </td>
+              <td class="gedaempft nowrap" data-wert="{{ s.ausgegeben_am }}">
+                {{ s.ausgegeben_am[:16] }}
+                {%- if s.ausgegeben_von %}<br>{{ s.ausgegeben_von }}{% endif %}
+              </td>
+              <td>
+                {% if s.zurueck_am %}
+                  <span class="marke marke-voll">zurück</span><br>
+                  <span class="gedaempft">{{ s.zurueck_am[:16] }}
+                    {%- if s.zurueck_von %} · {{ s.zurueck_von }}{% endif %}</span>
+                {% else %}
+                  <span class="marke marke-luecke">draußen</span>
+                {% endif %}
+              </td>
+              <td class="rechts">
+                <div class="zeilenaktionen">
+                  {% if not s.zurueck_am %}
+                    <form method="post" action="/admin/schluessel/{{ s.id }}/zurueck">
+                      <input type="hidden" name="csrf" value="{{ csrf }}">
+                      <input type="hidden" name="offen" value="{{ '1' if nur_offen else '' }}">
+                      <button type="submit" class="knopf-winzig">zurück</button>
+                    </form>
+                  {% endif %}
+                  <form method="post" action="/admin/schluessel/{{ s.id }}/loeschen">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <button type="submit" class="knopf-winzig">löschen</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="leer weg" id="nichts-gefunden">Kein Treffer.</p>
+  {% endif %}
+
+  {% if fahrzeuge %}
+    <section>
+      <h2>Fahrzeugstamm ({{ fahrzeuge | length }})</h2>
+      <p class="hilfe">Baut sich beim Ausgeben von selbst auf. Ein Fahrzeug
+        landet hier, sobald sein Kennzeichen zum ersten Mal getippt wurde.</p>
+      <div class="tabelle-huelle">
+        <table>
+          <thead>
+            <tr><th scope="col">Kennzeichen</th><th scope="col">Halter</th>
+              <th scope="col" class="rechts">Ausgaben</th>
+              <th scope="col">Status</th></tr>
+          </thead>
+          <tbody>
+            {% for f in fahrzeuge %}
+              <tr>
+                <td class="kennzeichen-feld">{{ f.kennzeichen }}</td>
+                <td>
+                  {%- if f.vorname or f.nachname %}{{ f.vorname }} {{ f.nachname }}
+                  {%- else %}<span class="gedaempft">–</span>{% endif %}
+                </td>
+                <td class="rechts">{{ f.ausgaben }}</td>
+                <td>
+                  {% if f.draussen %}
+                    <span class="marke marke-luecke">Schlüssel draußen</span>
+                  {% else %}
+                    <span class="gedaempft">–</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}
+
+{% block skript %}<script src="/static/liste.js"></script>{% endblock %}

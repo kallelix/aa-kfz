@@ -1,0 +1,80 @@
+{% extends "admin_base.html" %}
+{% block titel %}{{ 'Helfer ändern' if person else 'Helfer hinzufügen' }}{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}{{ 'Helfer ändern' if person else 'Helfer hinzufügen' }}{% endblock %}
+
+{% block inhalt %}
+  {% if not person %}
+    <p class="hilfe">Für alle, die nicht aus dem Registrierungstool kommen:
+      Leute, die spontan mithelfen, auf keiner Schicht stehen und trotzdem ein
+      T-Shirt oder ein Funkgerät bekommen.</p>
+  {% endif %}
+
+  <form method="post"
+        action="{{ '/admin/helfer/' ~ person.id ~ '/aendern' if person
+                   else '/admin/helfer/neu' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="feld {% if fehler.name %}feld-fehler{% endif %}">
+      <label for="name">Name <span class="pflicht">*</span></label>
+      <input type="text" id="name" name="name" maxlength="120" required
+             value="{{ werte.name }}" autofocus>
+      <p class="hilfe">So, wie die Person angesprochen wird. Aus dem Import
+        stehen hier auch Kurzformen wie „Krelli“ – das ist in Ordnung.</p>
+      {% if fehler.name %}<p class="fehler">{{ fehler.name }}</p>{% endif %}
+    </div>
+
+    <div class="paar">
+      <div class="feld">
+        <label for="email">E-Mail <span class="optional">optional</span></label>
+        <input type="email" id="email" name="email" maxlength="200"
+               value="{{ werte.email }}">
+      </div>
+      <div class="feld">
+        <label for="telefon">Telefon <span class="optional">optional</span></label>
+        <input type="text" id="telefon" name="telefon" maxlength="60"
+               value="{{ werte.telefon }}">
+      </div>
+    </div>
+
+    <div class="paar">
+      <div class="feld">
+        <label for="tshirt">T-Shirt-Größe <span class="optional">optional</span></label>
+        <select id="tshirt" name="tshirt">
+          <option value="">– unbekannt –</option>
+          {% for g in groessen %}
+            <option value="{{ g }}" {% if g == werte.tshirt %}selected{% endif %}>{{ g }}</option>
+          {% endfor %}
+        </select>
+        <p class="hilfe">Die angekündigte Größe. Was bei der Ausgabe
+          tatsächlich herausgeht, wird dort festgehalten.</p>
+      </div>
+      <div class="feld">
+        <label for="veggie">Verpflegung <span class="optional">optional</span></label>
+        <select id="veggie" name="veggie">
+          <option value="" {% if not werte.veggie %}selected{% endif %}>– nicht angegeben –</option>
+          <option value="nein" {% if werte.veggie == 'nein' %}selected{% endif %}>Fleisch</option>
+          <option value="ja" {% if werte.veggie == 'ja' %}selected{% endif %}>vegetarisch</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="feld">
+      <label for="bemerkung">Bemerkung <span class="optional">optional</span></label>
+      <textarea id="bemerkung" name="bemerkung" rows="2" maxlength="2000">{{ werte.bemerkung }}</textarea>
+    </div>
+
+    <div class="knopfreihe">
+      <button type="submit" class="knopf">Speichern</button>
+      <a class="knopf-schlicht"
+         href="{{ '/admin/helfer/' ~ person.id if person else '/admin/helfer' }}">Abbrechen</a>
+    </div>
+  </form>
+
+  {% if person and fehler %}
+    <p class="hilfe"><a href="/admin/helfer/{{ person.id }}">Zur vorhandenen
+      Person</a></p>
+  {% endif %}
+
+  <p class="zurueck-zeile"><a href="/admin/helfer">Zurück zur Helferliste</a></p>
+{% endblock %}

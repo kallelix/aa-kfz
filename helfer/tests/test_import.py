@@ -330,8 +330,10 @@ try:
 
     print("Helferliste und Detail")
     status, _, seite = anfrage("GET", "/admin/helfer")
-    pruefe(status == 200 and seite.count("<tr data-suche=") == 6,
-           "sechs Helfer stehen drauf")
+    # Nach der Zeilennummer suchen, nicht nach dem data-Attribut: das steht
+    # inzwischen hinter einem id= und die Zaehlung ginge lautlos auf null.
+    pruefe(status == 200 and seite.count('<tr id="helfer-') == 6,
+           "sechs Helfer stehen drauf: " + str(seite.count('<tr id="helfer-')))
     pruefe("oehl" in seite, "der Suchtext loest Umlaute auf")
 
     status, _, seite = anfrage("GET", "/admin/helfer/%d" % anna_id)

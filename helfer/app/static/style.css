@@ -969,3 +969,60 @@ a.band-balken { cursor: pointer; }
 .band-strich-rechts { transform: translateX(-100%); }
 .band-jetzt-links { transform: none; }
 .band-jetzt-rechts { transform: translateX(-100%); }
+
+/* --- Materialausgabe ------------------------------------------------------ */
+
+/* Zeilenaktionen in der Helferliste: Groesse waehlen und ausgeben in einem
+   Zug, ohne die Zeile zu verlassen. */
+.ausgabe, .ausgabe-fertig {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.ausgabe select { padding: .15rem .3rem; font-size: .8rem; }
+.ausgabe-fertig form { margin: 0; }
+
+tr.ist-ausgegeben td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
+
+/* Wenn die ausgegebene Groesse von der angekuendigten abweicht - die Zahl,
+   die bei der naechsten Bestellung zaehlt. */
+.marke-abweichung { border-color: #d29200; color: #8a6100; }
+
+/* Mengenfelder fuer das Material: schmal, damit drei nebeneinander passen. */
+.mengen {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.menge { display: flex; flex-direction: column; gap: .2rem; }
+.menge input { width: 4.5rem; }
+.menge label { font-size: .78rem; color: var(--gedaempft); }
+
+.zeilenaktionen { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+.zeilenaktionen form { margin: 0; }
+
+/* Ein Stueck Material in der Uebersichtszeile. */
+.stueck {
+  display: inline-block;
+  padding: .1rem .45rem;
+  border-radius: 4px;
+  border: 1px solid var(--rand);
+  font-size: .8rem;
+  white-space: nowrap;
+}
+.stueck-offen { border-color: var(--fehler); color: var(--fehler); font-weight: 600; }
+
+.kennzeichen-feld { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+                    text-transform: uppercase; letter-spacing: .06em; }
+
+tr.ist-draussen td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
+
+/* Teilrueckgabe steckt aufgeklappt in der Zeile - der haeufige Fall ist ein
+   Klick, der seltene braucht ein Formular und soll es nicht verstellen. */
+.teilrueckgabe summary { cursor: pointer; list-style: none; display: inline-block; }
+.teilrueckgabe summary::-webkit-details-marker { display: none; }
+.teilrueckgabe[open] { display: block; margin-top: .4rem; }
+.teilrueckgabe[open] > form { margin-top: .4rem; }

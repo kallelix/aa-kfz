@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import (auth, band, config, csv_import, db, eintraege,
-               worker, zeitplan)
+               normalisieren, worker, zeitplan)
 
 BASIS = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASIS / "templates"))
@@ -369,12 +369,13 @@ async def austragen(request: Request, einteilung_id: int,
 # --- Helfer ----------------------------------------------------------------
 
 @app.get("/admin/helfer")
-async def helfer_liste(request: Request, hinweis: str = "",
+async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",
                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     return templates.TemplateResponse(
         "admin_helfer.html",
         _admin(request, sitzung, hinweis=hinweis, helfer=db.helfer_liste(),
-               zaehler=db.zaehler()))
+               zaehler=db.zaehler(), tshirt=db.tshirt_zaehler(),
+               groessen=normalisieren.GROESSEN, suche=suche))
 
 
 @app.get("/admin/helfer/{helfer_id}")
@@ -785,6 +786,295 @@ async def band_ansicht(request: Request, tag: str = "",
         "admin_band.html",
         _admin(request, sitzung, hinweis="", tage=tage, gewaehlt=gewaehlt,
                stand=stand, band=_band(gewaehlt, jetzt) if gewaehlt else None))
+
+
+# --- T-Shirt-Ausgabe und Helfer von Hand -----------------------------------
+
+def _helfer_zurueck(request: Request, helfer_id: int, hinweis: str):
+    """Zurück in die Liste, an dieselbe Zeile und mit demselben Suchbegriff.
+
+    Ohne das landet man nach jedem Haken wieder oben in einer ungefilterten
+    Liste von hundert Namen – bei einer Ausgabe, bei der Leute Schlange
+    stehen, ist das der Unterschied zwischen benutzbar und nicht.
+    """
+    return _zurueck("/admin/helfer", hinweis,
+                    suche=str(request.query_params.get("suche") or ""),
+                    sprung="helfer-" + str(helfer_id))
+
+
+@app.post("/admin/helfer/{helfer_id}/tshirt")
+async def tshirt_ausgeben(request: Request, helfer_id: int,
+                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    if db.helfer_laden(helfer_id) is None:
+        return _zurueck("/admin/helfer", "unbekannt")
+
+    groesse = str(daten.get("groesse") or "").strip()
+    if groesse and groesse not in normalisieren.GROESSEN:
+        return _zurueck("/admin/helfer", "groesse",
+                        suche=str(daten.get("suche") or ""),
+                        sprung="helfer-" + str(helfer_id))
+
+    db.tshirt_ausgeben(helfer_id, groesse, sitzung.kuerzel)
+    return _zurueck("/admin/helfer", "tshirt",
+                    suche=str(daten.get("suche") or ""),
+                    sprung="helfer-" + str(helfer_id))
+
+
+@app.post("/admin/helfer/{helfer_id}/tshirt/zurueck")
+async def tshirt_zurueck(request: Request, helfer_id: int,
+                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.tshirt_zuruecknehmen(helfer_id)
+    return _zurueck("/admin/helfer", "tshirt-zurueck",
+                    suche=str(daten.get("suche") or ""),
+                    sprung="helfer-" + str(helfer_id))
+
+
+def _helferformular(request: Request, sitzung, werte, fehler, person=None):
+    return templates.TemplateResponse(
+        "admin_helfer_form.html",
+        _admin(request, sitzung, hinweis="", werte=werte, fehler=fehler,
+               person=person, groessen=normalisieren.GROESSEN))
+
+
+def _helfer_werte(daten) -> dict:
+    return {
+        "name": normalisieren.text(daten.get("name")),
+        "email": normalisieren.text(daten.get("email")),
+        "telefon": normalisieren.text(daten.get("telefon")),
+        "veggie": str(daten.get("veggie") or ""),
+        "tshirt": str(daten.get("tshirt") or ""),
+        "bemerkung": (daten.get("bemerkung") or "").strip(),
+    }
+
+
+def _helfer_daten(werte: dict) -> dict:
+    return {
+        "name": werte["name"], "email": werte["email"],
+        "telefon": werte["telefon"],
+        "veggie": {"ja": 1, "nein": 0}.get(werte["veggie"]),
+        "tshirt": werte["tshirt"] if werte["tshirt"] in normalisieren.GROESSEN
+                  else None,
+        "tshirt_roh": werte["tshirt"],
+        "bemerkung": werte["bemerkung"],
+    }
+
+
+@app.get("/admin/helfer/neu")
+async def helfer_neu(request: Request,
+                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    leer = {"name": "", "email": "", "telefon": "", "veggie": "",
+            "tshirt": "", "bemerkung": ""}
+    return _helferformular(request, sitzung, leer, {})
+
+
+@app.post("/admin/helfer/neu")
+async def helfer_anlegen_von_hand(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    werte = _helfer_werte(daten)
+    if not werte["name"]:
+        return _helferformular(request, sitzung, werte,
+                               {"name": "Ohne Namen geht es nicht."})
+
+    nummer, meldung = db.helfer_von_hand(_helfer_daten(werte))
+    if meldung == "gibt-es-schon":
+        return _helferformular(
+            request, sitzung, werte,
+            {"name": "Diese Person steht schon in der Liste – gleicher Name "
+                     "und gleiche Mailadresse."}, person=db.helfer_laden(nummer))
+    return _zurueck("/admin/helfer", "angelegt", sprung="helfer-" + str(nummer))
+
+
+@app.get("/admin/helfer/{helfer_id}/aendern")
+async def helfer_formular(request: Request, helfer_id: int,
+                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    person = db.helfer_laden(helfer_id)
+    if person is None:
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+    werte = {"name": person["name"], "email": person["email"],
+             "telefon": person["telefon"],
+             "veggie": {1: "ja", 0: "nein"}.get(person["veggie"], ""),
+             "tshirt": person["tshirt"] or "",
+             "bemerkung": person["bemerkung"]}
+    return _helferformular(request, sitzung, werte, {}, person=person)
+
+
+@app.post("/admin/helfer/{helfer_id}/aendern")
+async def helfer_sichern(request: Request, helfer_id: int,
+                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    person = db.helfer_laden(helfer_id)
+    if person is None:
+        return templates.TemplateResponse("admin_fehlt.html",
+                                          _kontext(request), status_code=404)
+
+    werte = _helfer_werte(daten)
+    if not werte["name"]:
+        return _helferformular(request, sitzung, werte,
+                               {"name": "Ohne Namen geht es nicht."}, person)
+    if not db.helfer_aendern(helfer_id, _helfer_daten(werte)):
+        return _helferformular(
+            request, sitzung, werte,
+            {"name": "So heißt schon jemand anderes mit derselben "
+                     "Mailadresse."}, person)
+    return _zurueck("/admin/helfer/" + str(helfer_id), "gespeichert")
+
+
+# --- Funkgeräte und Material -----------------------------------------------
+
+def _person_aus_formular(daten, sitzung) -> tuple[int | None, str]:
+    """Ermittelt die Person: entweder eine vorhandene aus der Auswahl oder
+    eine neue aus dem Textfeld daneben.
+
+    Zwei Wege statt eines Namensfeldes mit Vorschlägen, weil Namen hier nicht
+    eindeutig sind – "Thomas" gibt es mehrfach. Getippt heißt deshalb immer
+    neu, ausgewählt immer die eine gemeinte Person.
+    """
+    neuer_name = normalisieren.text(daten.get("neuer_name"))
+    if neuer_name:
+        nummer, _ = db.helfer_von_hand({"name": neuer_name})
+        return nummer, "neu"
+    try:
+        nummer = int(str(daten.get("helfer_id") or ""))
+    except ValueError:
+        return None, "keiner"
+    return (nummer, "vorhanden") if db.helfer_laden(nummer) else (None, "keiner")
+
+
+@app.get("/admin/funk")
+async def funk(request: Request, hinweis: str = "", offen: str = "",
+               sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    return templates.TemplateResponse(
+        "admin_funk.html",
+        _admin(request, sitzung, hinweis=hinweis,
+               ausleihen=db.ausleihen_liste(nur_offen=bool(offen)),
+               nur_offen=bool(offen), zaehler=db.material_zaehler(),
+               material=db.MATERIAL, material_text=db.MATERIAL_TEXT,
+               helfer=db.helfer_liste(),
+               schichten=db.schichten()))
+
+
+@app.post("/admin/funk/ausgeben")
+async def funk_ausgeben(request: Request,
+                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    helfer_id, woher = _person_aus_formular(daten, sitzung)
+    if helfer_id is None:
+        return _zurueck("/admin/funk", "keiner")
+
+    try:
+        schicht_id = int(str(daten.get("schicht_id") or ""))
+    except ValueError:
+        schicht_id = None
+    if schicht_id is not None and db.schicht_laden(schicht_id) is None:
+        schicht_id = None
+
+    mengen = {stueck: daten.get(stueck) for stueck in db.MATERIAL}
+    nummer = db.ausleihen(helfer_id, mengen, schicht_id,
+                          str(daten.get("bemerkung") or ""), sitzung.kuerzel)
+    if nummer is None:
+        return _zurueck("/admin/funk", "nichts")
+    return _zurueck("/admin/funk", "neu-angelegt" if woher == "neu" else "ausgegeben")
+
+
+@app.post("/admin/ausleihe/{ausleihe_id}/zurueck")
+async def ausleihe_zurueck(request: Request, ausleihe_id: int,
+                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    # Ohne Mengen im Formular kommt alles zurück – der häufige Fall braucht
+    # einen Klick, der seltene ein Formular.
+    mengen = None
+    if str(daten.get("teilweise") or ""):
+        mengen = {stueck: daten.get(stueck) for stueck in db.MATERIAL}
+    db.ausleihe_zurueck(ausleihe_id, mengen, sitzung.kuerzel)
+    return _zurueck("/admin/funk", "zurueck",
+                    offen=str(daten.get("offen") or ""))
+
+
+@app.post("/admin/ausleihe/{ausleihe_id}/loeschen")
+async def ausleihe_weg(request: Request, ausleihe_id: int,
+                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.ausleihe_loeschen(ausleihe_id)
+    return _zurueck("/admin/funk", "geloescht")
+
+
+# --- KFZ-Schlüssel ---------------------------------------------------------
+
+@app.get("/admin/schluessel")
+async def schluessel(request: Request, hinweis: str = "", offen: str = "",
+                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    return templates.TemplateResponse(
+        "admin_schluessel.html",
+        _admin(request, sitzung, hinweis=hinweis,
+               schluessel=db.schluessel_liste(nur_offen=bool(offen)),
+               nur_offen=bool(offen), fahrzeuge=db.fahrzeuge(),
+               namen=db.namen_vorschlaege()))
+
+
+@app.post("/admin/schluessel/ausgeben")
+async def schluessel_ausgeben(request: Request,
+                              sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    kennzeichen = str(daten.get("kennzeichen") or "")
+    if not normalisieren.kennzeichen(kennzeichen):
+        return _zurueck("/admin/schluessel", "kein-kennzeichen")
+
+    vorname = str(daten.get("vorname") or "")
+    nachname = str(daten.get("nachname") or "")
+    fahrzeug_id, neu = db.fahrzeug_sichern(kennzeichen, vorname, nachname)
+    if fahrzeug_id is None:
+        return _zurueck("/admin/schluessel", "kein-kennzeichen")
+
+    db.schluessel_ausgeben(fahrzeug_id, vorname, nachname,
+                           str(daten.get("bemerkung") or ""), sitzung.kuerzel)
+    return _zurueck("/admin/schluessel",
+                    "fahrzeug-neu" if neu else "schluessel-raus")
+
+
+@app.post("/admin/schluessel/{schluessel_id}/zurueck")
+async def schluessel_zurueck(request: Request, schluessel_id: int,
+                             sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.schluessel_zurueck(schluessel_id, sitzung.kuerzel)
+    return _zurueck("/admin/schluessel", "zurueck",
+                    offen=str(daten.get("offen") or ""))
+
+
+@app.post("/admin/schluessel/{schluessel_id}/loeschen")
+async def schluessel_weg(request: Request, schluessel_id: int,
+                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.schluessel_loeschen(schluessel_id)
+    return _zurueck("/admin/schluessel", "geloescht")
 
 
 # --- Import ----------------------------------------------------------------

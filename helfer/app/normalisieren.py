@@ -163,3 +163,21 @@ def suchtext(*teile: str) -> str:
     zerlegt = unicodedata.normalize("NFKD", ersetzt)
     return re.sub(r"\s+", " ",
                   "".join(z for z in zerlegt if not unicodedata.combining(z))).strip()
+
+
+# --- Kennzeichen -----------------------------------------------------------
+
+def kennzeichen(roh: str | None) -> str:
+    """Kennzeichen auf Buchstaben und Ziffern eindampfen, in Großschrift.
+
+    "il-a 123", "IL A 123" und "ila123" ergeben alle "ILA123". Dieselbe Regel
+    wie in der Kennzeichen-App: bei der Schlüsselausgabe tippt niemand
+    Bindestriche mit, und derselbe Wagen soll nicht zweimal im Stamm landen,
+    weil einmal ein Leerzeichen mehr drin war.
+    """
+    return "".join(z for z in text(roh) if z.isalnum()).upper()
+
+
+def kennzeichen_anzeige(roh: str | None) -> str:
+    """Was der Mensch getippt hat, nur aufgeräumt – Trennzeichen bleiben."""
+    return text(roh).upper()

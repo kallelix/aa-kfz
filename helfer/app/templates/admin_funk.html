@@ -1,0 +1,213 @@
+{% extends "admin_base.html" %}
+{% block titel %}Funk{% endblock %}
+{% block ueberschrift %}Funkgeräte und Material{% endblock %}
+
+{% block inhalt %}
+  <section class="zaehler">
+    {% for stueck in material %}
+      <div class="zaehler-kachel {% if zaehler[stueck].offen %}zaehler-voll{% endif %}">
+        <p class="zaehler-titel">{{ material_text[stueck] }}</p>
+        <p class="zaehler-zahl">{{ zaehler[stueck].offen }}</p>
+        <p class="zaehler-detail">draußen von {{ zaehler[stueck].raus }} ausgegeben</p>
+      </div>
+    {% endfor %}
+  </section>
+
+  <section class="kasten">
+    <h2>Ausgeben</h2>
+    <form method="post" action="/admin/funk/ausgeben">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+
+      <div class="feld">
+        <label for="helfer_id">An wen</label>
+        <select id="helfer_id" name="helfer_id">
+          <option value="">– bitte wählen –</option>
+          {% for h in helfer %}
+            <option value="{{ h.id }}">{{ h.name }}{% if h.email %} – {{ h.email }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="feld">
+        <label for="neuer_name">… oder neue Person</label>
+        <input type="text" id="neuer_name" name="neuer_name" maxlength="120"
+               autocomplete="off" placeholder="Name eintippen">
+        <p class="hilfe">Wer hier steht, wird angelegt und bekommt das
+          Material – für alle, die auf keiner Schicht stehen. Die Auswahl
+          darüber wird dann nicht beachtet.</p>
+      </div>
+
+      <div class="feld">
+        <label for="schicht_id">Schicht <span class="optional">optional</span></label>
+        <select id="schicht_id" name="schicht_id">
+          <option value="">– ohne Schichtbezug –</option>
+          {% for s in schichten %}
+            <option value="{{ s.id }}">{{ s.datum | tag }} {{ s.beginn[11:] }}–{{ s.ende[11:] }} · {{ s.liste }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="feld">
+        <label>Material</label>
+        <div class="mengen">
+          {% for stueck in material %}
+            <span class="menge">
+              <label for="m-{{ stueck }}">{{ material_text[stueck] }}</label>
+              <input type="number" id="m-{{ stueck }}" name="{{ stueck }}"
+                     min="0" max="99" step="1"
+                     value="{% if stueck == 'funke' %}1{% else %}0{% endif %}">
+            </span>
+          {% endfor %}
+        </div>
+        <p class="hilfe">Das Funkgerät ist mit 1 vorbelegt, der Rest mit 0.
+          Was auf 0 steht, wird nicht ausgegeben.</p>
+      </div>
+
+      <div class="feld">
+        <label for="bemerkung">Bemerkung <span class="optional">optional</span></label>
+        <input type="text" id="bemerkung" name="bemerkung" maxlength="200">
+      </div>
+
+      <button type="submit" class="knopf">Ausgeben</button>
+    </form>
+  </section>
+
+  <form method="get" action="/admin/funk" class="filter">
+    <div>
+      <label for="f-offen">Nur was noch draußen ist</label>
+      <input type="checkbox" id="f-offen" name="offen" value="1"
+             {% if nur_offen %}checked{% endif %}>
+    </div>
+    <div class="filter-knoepfe">
+      <button type="submit" class="knopf">Anzeigen</button>
+      {% if nur_offen %}<a class="knopf-schlicht" href="/admin/funk">alle zeigen</a>{% endif %}
+    </div>
+  </form>
+
+  {% if not ausleihen %}
+    <p class="leer">
+      {% if nur_offen %}Es ist nichts mehr draußen.
+      {% else %}Noch nichts ausgegeben.{% endif %}
+    </p>
+  {% else %}
+    <div class="sperre-suche">
+      <label for="suche">Name, Schicht oder Bemerkung</label>
+      <div class="sperre-suche-zeile">
+        <input type="search" id="suche" autocomplete="off" spellcheck="false"
+               placeholder="z. B. Tibbe">
+        <a class="knopf-schlicht weg" id="zuruecksetzen" href="#">zurücksetzen</a>
+      </div>
+    </div>
+
+    <p class="trefferzahl" id="trefferzahl">{{ ausleihen|length }} Vorgänge</p>
+
+    <div class="tabelle-huelle">
+      <table data-liste data-sortspalte="0" data-einheit="Vorgang"
+             data-einheit-mehrzahl="Vorgänge">
+        <thead>
+          <tr>
+            <th scope="col" aria-sort="ascending">
+              <button type="button" class="sortknopf" data-spalte="0">
+                Wer <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col">Material</th>
+            <th scope="col" aria-sort="none">
+              <button type="button" class="sortknopf" data-spalte="2">
+                Schicht <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col" aria-sort="none">
+              <button type="button" class="sortknopf" data-spalte="3">
+                Ausgegeben <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col">Zurück</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in ausleihen %}
+            <tr data-suche="{{ a.suche }}"
+                {% if not a.zurueck_am %}class="ist-draussen"{% endif %}>
+              <td>
+                {{ a.name }}
+                {% if a.bemerkung %}<br><span class="gedaempft">{{ a.bemerkung }}</span>{% endif %}
+              </td>
+              <td>
+                {% for stueck in material %}
+                  {% if a[stueck] %}
+                    <span class="stueck {% if a[stueck ~ '_offen'] %}stueck-offen{% endif %}">
+                      {{ a[stueck] }}× {{ material_text[stueck] }}
+                      {%- if a[stueck ~ '_zurueck'] %} ({{ a[stueck ~ '_zurueck'] }} zurück){% endif %}
+                    </span>
+                  {% endif %}
+                {% endfor %}
+              </td>
+              <td data-wert="{{ a.schicht_beginn or '' }}">
+                {% if a.schicht_liste %}
+                  {{ a.schicht_liste }}<br>
+                  <span class="gedaempft">{{ a.schicht_beginn | zeitpunkt }}</span>
+                {% else %}
+                  <span class="gedaempft">ohne</span>
+                {% endif %}
+              </td>
+              <td class="gedaempft nowrap" data-wert="{{ a.ausgegeben_am }}">
+                {{ a.ausgegeben_am[:16] }}
+                {%- if a.ausgegeben_von %}<br>{{ a.ausgegeben_von }}{% endif %}
+              </td>
+              <td>
+                {% if a.zurueck_am %}
+                  <span class="marke marke-voll">vollständig</span><br>
+                  <span class="gedaempft">{{ a.zurueck_am[:16] }}</span>
+                {% else %}
+                  <span class="marke marke-luecke">draußen</span>
+                {% endif %}
+              </td>
+              <td class="rechts">
+                <div class="zeilenaktionen">
+                  {% if not a.zurueck_am %}
+                    <form method="post" action="/admin/ausleihe/{{ a.id }}/zurueck">
+                      <input type="hidden" name="csrf" value="{{ csrf }}">
+                      <input type="hidden" name="offen" value="{{ '1' if nur_offen else '' }}">
+                      <button type="submit" class="knopf-winzig">alles zurück</button>
+                    </form>
+                    <details class="teilrueckgabe">
+                      <summary class="knopf-winzig">nur teilweise</summary>
+                      <form method="post" action="/admin/ausleihe/{{ a.id }}/zurueck">
+                        <input type="hidden" name="csrf" value="{{ csrf }}">
+                        <input type="hidden" name="teilweise" value="1">
+                        <input type="hidden" name="offen" value="{{ '1' if nur_offen else '' }}">
+                        <div class="mengen">
+                          {% for stueck in material %}
+                            {% if a[stueck] %}
+                              <span class="menge">
+                                <label for="z-{{ a.id }}-{{ stueck }}">{{ material_text[stueck] }}
+                                  (von {{ a[stueck] }})</label>
+                                <input type="number" id="z-{{ a.id }}-{{ stueck }}"
+                                       name="{{ stueck }}" min="0" max="{{ a[stueck] }}"
+                                       value="{{ a[stueck ~ '_zurueck'] }}">
+                              </span>
+                            {% endif %}
+                          {% endfor %}
+                        </div>
+                        <button type="submit" class="knopf-winzig">übernehmen</button>
+                      </form>
+                    </details>
+                  {% endif %}
+                  <form method="post" action="/admin/ausleihe/{{ a.id }}/loeschen">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <button type="submit" class="knopf-winzig">löschen</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="leer weg" id="nichts-gefunden">Kein Treffer.</p>
+  {% endif %}
+{% endblock %}
+
+{% block skript %}<script src="/static/liste.js"></script>{% endblock %}

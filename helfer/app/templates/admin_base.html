@@ -32,6 +32,8 @@
         <a href="/admin/schichten">Schichten</a>
         <a href="/admin/band">Band</a>
         <a href="/admin/aufgaben">Aufgaben</a>
+        <a href="/admin/funk">Funk</a>
+        <a href="/admin/schluessel">Schlüssel</a>
         <a href="/admin/helfer">Helfer</a>
         <a href="/admin/zeitplan">Zeitplan</a>
         <a href="/admin/monitor">Monitor</a>
@@ -52,9 +54,21 @@
       'geloescht': 'Gelöscht.',
       'status': 'Status geändert.',
       'freigegeben': 'Der Punkt folgt wieder der Website.',
+      'tshirt': 'T-Shirt als ausgegeben vermerkt.',
+      'tshirt-zurueck': 'Die Ausgabe wurde zurückgenommen.',
+      'groesse': 'Diese Größe gibt es nicht.',
+      'ausgegeben': 'Material ausgegeben.',
+      'neu-angelegt': 'Material ausgegeben – die Person war noch nicht erfasst und wurde angelegt.',
+      'nichts': 'Es war nichts zum Ausgeben angekreuzt.',
+      'zurueck': 'Als zurück vermerkt.',
+      'schluessel-raus': 'Schlüssel ausgegeben.',
+      'fahrzeug-neu': 'Schlüssel ausgegeben – das Fahrzeug war neu und steht jetzt im Stamm.',
+      'kein-kennzeichen': 'Ohne Kennzeichen geht es nicht.',
     } %}
     {% if hinweis %}
-      <p class="hinweis {{ 'hinweis-warnung' if hinweis in ('schon-drin', 'keiner', 'unbekannt', 'widerrufen') else 'hinweis-ok' }}"
+      <p class="hinweis {{ 'hinweis-warnung' if hinweis in ('schon-drin', 'keiner', 'unbekannt', 'widerrufen',
+                            'groesse', 'nichts', 'kein-kennzeichen',
+                            'tshirt-zurueck', 'geloescht') else 'hinweis-ok' }}"
          role="status">{{ meldungen.get(hinweis, hinweis) }}</p>
     {% endif %}
 
