@@ -295,7 +295,7 @@ try:
         pruefe('class="arbeit-liste"' in seite, "die Liste hat ihre eigene Spalte")
         pruefe(seite.index("arbeit-formular") < seite.index("arbeit-liste"),
                "Formular zuerst, Liste daneben")
-        pruefe("admin_klapp.js" in seite, "das Klappskript haengt an der Seite")
+        pruefe("admin_merken.js" in seite, "das Merkskript haengt an der Seite")
 
     print("Funk: ausgeben")
     status, _, seite = anfrage("GET", "/admin/funk")
@@ -452,6 +452,45 @@ try:
 
     _, _, seite = anfrage("GET", "/admin/schluessel?offen=1")
     pruefe(seite.count('class="ist-draussen"') == 1, "einer ist noch draußen")
+
+    print("Umschalter: alles oder nur was draußen ist")
+    for pfad, merkname, spalte in (
+            ("/admin/funk", "funk-offen", "ausleihe"),
+            ("/admin/schluessel", "schluessel-offen", "schluessel")):
+        gesamt = zeilen("SELECT COUNT(*) FROM " + spalte)[0][0]
+        draussen = zeilen("SELECT COUNT(*) FROM " + spalte
+                          + " WHERE zurueck_am IS NULL")[0][0]
+
+        for anhang, erwartet_aktiv, erwartete_zeilen in (
+                ("", "Alle", gesamt), ("?offen=1", "Noch draußen", draussen)):
+            _, _, seite = anfrage("GET", pfad + anhang)
+            pruefe('data-merken-filter="' + merkname + '"' in seite,
+                   pfad + anhang + ": der Umschalter wird gemerkt")
+            pruefe("f-offen" not in seite,
+                   "das alte Häkchen mit Anzeigen-Knopf ist weg")
+
+            # Beide Zahlen stehen immer dran - auch auf der gefilterten Seite,
+            # sonst waere "Alle" so gross wie die gerade sichtbare Liste.
+            zahlen = re.findall(r'umschalter-zahl">(\d+)<', seite)
+            pruefe(zahlen == [str(gesamt), str(draussen)],
+                   "beide Zahlen stimmen: %s statt %s"
+                   % (zahlen, [gesamt, draussen]))
+
+            aktiv = re.search(r'umschalter-teil ist-aktiv[^"]*"'
+                              r'[\s\S]{0,200}?>\s*([^<]+?)\s*<span', seite)
+            pruefe(aktiv is not None and aktiv.group(1) == erwartet_aktiv,
+                   "die gewählte Seite ist hervorgehoben: "
+                   + (aktiv.group(1) if aktiv else "keine"))
+            pruefe(seite.count('<tr data-suche=') == erwartete_zeilen,
+                   "und es stehen %d Zeilen da" % erwartete_zeilen)
+
+    # Die Kacheln zaehlen den Bestand, nicht die Anzeige.
+    _, _, seite = anfrage("GET", "/admin/schluessel?offen=1")
+    kacheln = re.findall(r'zaehler-zahl">(\d+)<', seite)
+    gesamt = zeilen("SELECT COUNT(*) FROM schluessel")[0][0]
+    pruefe(kacheln[1] == str(gesamt),
+           "die Kachel 'Vorgänge' zeigt auch mit Filter den ganzen Bestand: "
+           + str(kacheln))
 
     print("Schlüssel: Suche ist trennzeichentolerant")
     _, _, seite = anfrage("GET", "/admin/schluessel")

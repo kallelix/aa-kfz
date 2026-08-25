@@ -4,16 +4,18 @@
 {% block ueberschrift %}KFZ-Schlüssel{% endblock %}
 
 {% block inhalt %}
-  {% set draussen = schluessel | selectattr('zurueck_am', 'none') | list | length %}
+  {# anzahl_offen und anzahl_alle statt der angezeigten Liste: die zaehlte mit
+     aktivem Filter nur, was gerade zu sehen ist - "insgesamt erfasst" haette
+     dann die Zahl der offenen gezeigt. #}
   <section class="zaehler">
-    <div class="zaehler-kachel {% if draussen %}zaehler-voll{% endif %}">
+    <div class="zaehler-kachel {% if anzahl_offen %}zaehler-voll{% endif %}">
       <p class="zaehler-titel">Draußen</p>
-      <p class="zaehler-zahl">{{ draussen }}</p>
+      <p class="zaehler-zahl">{{ anzahl_offen }}</p>
       <p class="zaehler-detail">Schlüssel nicht zurück</p>
     </div>
     <div class="zaehler-kachel">
       <p class="zaehler-titel">Vorgänge</p>
-      <p class="zaehler-zahl">{{ schluessel | length }}</p>
+      <p class="zaehler-zahl">{{ anzahl_alle }}</p>
       <p class="zaehler-detail">insgesamt erfasst</p>
     </div>
     <div class="zaehler-kachel">
@@ -74,17 +76,18 @@
   </details>
 
   <div class="arbeit-liste">
-  <form method="get" action="/admin/schluessel" class="filter">
-    <div>
-      <label for="f-offen">Nur was noch draußen ist</label>
-      <input type="checkbox" id="f-offen" name="offen" value="1"
-             {% if nur_offen %}checked{% endif %}>
-    </div>
-    <div class="filter-knoepfe">
-      <button type="submit" class="knopf">Anzeigen</button>
-      {% if nur_offen %}<a class="knopf-schlicht" href="/admin/schluessel">alle zeigen</a>{% endif %}
-    </div>
-  </form>
+  <nav class="umschalter" data-merken-filter="schluessel-offen"
+       aria-label="Anzeige">
+    <a class="umschalter-teil {% if not nur_offen %}ist-aktiv{% endif %}"
+       href="/admin/schluessel" data-wert="0"
+       {% if not nur_offen %}aria-current="true"{% endif %}>
+      Alle <span class="umschalter-zahl">{{ anzahl_alle }}</span></a>
+    <a class="umschalter-teil {% if nur_offen %}ist-aktiv{% endif %}
+              {% if anzahl_offen %}hat-offene{% endif %}"
+       href="/admin/schluessel?offen=1" data-wert="1"
+       {% if nur_offen %}aria-current="true"{% endif %}>
+      Noch draußen <span class="umschalter-zahl">{{ anzahl_offen }}</span></a>
+  </nav>
 
   {% if not schluessel %}
     <p class="leer">

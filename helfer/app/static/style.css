@@ -1171,3 +1171,75 @@ main > p:not(.trefferzahl):not(.knopfreihe):not(.balken),
 /* Die Kacheln sollen sich nicht ueber die volle Breite strecken - vier Stueck
    auf 1900 Pixel waeren je 460 Pixel breit fuer eine zweistellige Zahl. */
 .zaehler { max-width: 74rem; }
+
+/* --- Felder bleiben in ihrer Spalte --------------------------------------- */
+
+/* Ein <select> misst sich am laengsten Eintrag - "Anna Berg - anna@example.org"
+   sprengt damit die 22 rem der Formularspalte. Es bekommt deshalb die Breite
+   des Feldes vorgeschrieben und schneidet lange Eintraege ab.
+
+   min-width: 0 an der Spalte selbst ist noetig, weil ein Rasterfeld sonst
+   nicht unter die Mindestbreite seines Inhalts schrumpft - die Spalte wuerde
+   also mitwachsen, statt das Feld zu begrenzen. */
+.arbeit-formular { min-width: 0; }
+
+.feld select,
+.feld input[type="text"],
+.feld input[type="email"],
+.feld input[type="search"],
+.feld input[type="number"],
+.feld input[type="date"],
+.feld input[type="time"],
+.feld textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.feld select { text-overflow: ellipsis; }
+
+/* Die Mengenfelder bleiben schmal - drei nebeneinander. */
+.mengen .menge input { width: 4.5rem; }
+
+/* --- Umschalter statt Haekchen und Knopf ---------------------------------- */
+
+/* Ein Haekchen mit einem "Anzeigen"-Knopf daneben sind zwei Handgriffe fuer
+   eine Frage mit zwei Antworten. Der Umschalter ist einer - und zeigt
+   nebenbei, wie viel hinter jeder Seite steckt. */
+.umschalter {
+  display: inline-flex;
+  border: 1px solid var(--rand);
+  border-radius: 999px;
+  background: var(--grund);
+  padding: .15rem;
+  gap: .15rem;
+}
+
+.umschalter-teil {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .3rem .8rem;
+  border-radius: 999px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--gedaempft);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.umschalter-teil:hover { color: var(--text); background: var(--flaeche); }
+
+.umschalter-teil.ist-aktiv {
+  background: var(--akzent);
+  color: #fff;
+}
+.umschalter-teil.ist-aktiv:hover { background: var(--akzent); color: #fff; }
+
+.umschalter-zahl {
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  opacity: .8;
+}
+
+/* Die Zahl der offenen Vorgaenge ist die, auf die es ankommt. */
+.umschalter-teil.hat-offene .umschalter-zahl { color: var(--fehler); font-weight: 700; }
+.umschalter-teil.ist-aktiv.hat-offene .umschalter-zahl { color: #fff; }

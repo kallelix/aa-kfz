@@ -975,10 +975,16 @@ def _person_aus_formular(daten, sitzung) -> tuple[int | None, str]:
 @app.get("/admin/funk")
 async def funk(request: Request, hinweis: str = "", offen: str = "",
                sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    # Einmal alles holen und in Python trennen: der Umschalter zeigt beide
+    # Zahlen, und zwei Abfragen fuer ein paar Dutzend Zeilen waeren Aufwand
+    # ohne Gegenwert.
+    alle = db.ausleihen_liste()
+    noch_draussen = [z for z in alle if not z["zurueck_am"]]
     return templates.TemplateResponse(
         "admin_funk.html",
         _admin(request, sitzung, hinweis=hinweis,
-               ausleihen=db.ausleihen_liste(nur_offen=bool(offen)),
+               ausleihen=noch_draussen if offen else alle,
+               anzahl_alle=len(alle), anzahl_offen=len(noch_draussen),
                nur_offen=bool(offen), zaehler=db.material_zaehler(),
                material=db.MATERIAL, material_text=db.MATERIAL_TEXT,
                helfer=db.helfer_liste(), tage=db.monitor_tage(),
@@ -1042,10 +1048,13 @@ async def ausleihe_weg(request: Request, ausleihe_id: int,
 @app.get("/admin/schluessel")
 async def schluessel(request: Request, hinweis: str = "", offen: str = "",
                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    alle = db.schluessel_liste()
+    noch_draussen = [z for z in alle if not z["zurueck_am"]]
     return templates.TemplateResponse(
         "admin_schluessel.html",
         _admin(request, sitzung, hinweis=hinweis,
-               schluessel=db.schluessel_liste(nur_offen=bool(offen)),
+               schluessel=noch_draussen if offen else alle,
+               anzahl_alle=len(alle), anzahl_offen=len(noch_draussen),
                nur_offen=bool(offen), fahrzeuge=db.fahrzeuge(),
                namen=db.namen_vorschlaege(),
                unterschrieben=unterschriften.je_vorgang("schluessel"),

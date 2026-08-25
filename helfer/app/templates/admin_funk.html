@@ -87,17 +87,21 @@
   </details>
 
   <div class="arbeit-liste">
-  <form method="get" action="/admin/funk" class="filter">
-    <div>
-      <label for="f-offen">Nur was noch draußen ist</label>
-      <input type="checkbox" id="f-offen" name="offen" value="1"
-             {% if nur_offen %}checked{% endif %}>
-    </div>
-    <div class="filter-knoepfe">
-      <button type="submit" class="knopf">Anzeigen</button>
-      {% if nur_offen %}<a class="knopf-schlicht" href="/admin/funk">alle zeigen</a>{% endif %}
-    </div>
-  </form>
+  {# Ein Umschalter statt Haekchen und Knopf: eine Frage mit zwei Antworten
+     braucht einen Handgriff, nicht zwei. Die Wahl wird gemerkt (siehe
+     admin_merken.js) - wer den ganzen Tag Rueckgaben annimmt, soll das nicht
+     nach jedem Seitenwechsel neu einstellen. #}
+  <nav class="umschalter" data-merken-filter="funk-offen" aria-label="Anzeige">
+    <a class="umschalter-teil {% if not nur_offen %}ist-aktiv{% endif %}"
+       href="/admin/funk" data-wert="0"
+       {% if not nur_offen %}aria-current="true"{% endif %}>
+      Alle <span class="umschalter-zahl">{{ anzahl_alle }}</span></a>
+    <a class="umschalter-teil {% if nur_offen %}ist-aktiv{% endif %}
+              {% if anzahl_offen %}hat-offene{% endif %}"
+       href="/admin/funk?offen=1" data-wert="1"
+       {% if nur_offen %}aria-current="true"{% endif %}>
+      Noch draußen <span class="umschalter-zahl">{{ anzahl_offen }}</span></a>
+  </nav>
 
   {% if not ausleihen %}
     <p class="leer">
