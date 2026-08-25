@@ -1087,3 +1087,59 @@ tr.ist-draussen td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
 @media (prefers-reduced-motion: reduce) {
   .frisch { animation: none; }
 }
+
+/* --- Ausgabe und Ruecknahme nebeneinander --------------------------------- */
+
+/* Untereinander muesste man fuer jede Ruecknahme am ganzen Ausgabeformular
+   vorbeiscrollen. Ab einer Breite, in der beides nebeneinander passt, steht es
+   nebeneinander; darunter bleibt es gestapelt und das Formular laesst sich
+   zuklappen. */
+.arbeitsflaeche { display: block; }
+
+@media (min-width: 82rem) {
+  .arbeitsflaeche {
+    display: grid;
+    grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+  /* Das Formular bleibt stehen, waehrend die Liste rollt. */
+  .arbeit-formular { position: sticky; top: 1rem; }
+  .arbeit-liste { min-width: 0; }
+}
+
+/* Ein Kasten, der sich zuklappen laesst. */
+.kasten-klapp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  cursor: pointer;
+  list-style: none;
+  padding: .1rem 0;
+}
+.kasten-klapp::-webkit-details-marker { display: none; }
+.kasten-klapp:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+
+.kasten-titel { font-size: 1.05rem; font-weight: 600; }
+
+.klapp-pfeil {
+  flex: none;
+  width: .55rem;
+  height: .55rem;
+  border-right: 2px solid var(--gedaempft);
+  border-bottom: 2px solid var(--gedaempft);
+  transform: rotate(45deg);
+  margin-right: .2rem;
+  transition: transform .15s ease;
+}
+details[open] > .kasten-klapp .klapp-pfeil { transform: rotate(-135deg); }
+@media (prefers-reduced-motion: reduce) { .klapp-pfeil { transition: none; } }
+
+details.kasten:not([open]) { padding-bottom: .7rem; }
+
+.fahrzeugstamm {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--rand);
+  padding-top: .8rem;
+}

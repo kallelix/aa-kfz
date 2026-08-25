@@ -14,8 +14,16 @@
     {% endfor %}
   </section>
 
-  <section class="kasten">
-    <h2>Ausgeben</h2>
+  {# Formular und Liste nebeneinander, sobald der Bildschirm es hergibt.
+     Untereinander muesste man fuer jede Ruecknahme am ganzen Ausgabeformular
+     vorbeiscrollen - und an einem Tisch, an dem abwechselnd ausgegeben und
+     zurueckgenommen wird, ist das der haeufigste Handgriff ueberhaupt. #}
+  <div class="arbeitsflaeche">
+  <details class="kasten arbeit-formular" data-merken="funk-ausgabe" open>
+    <summary class="kasten-klapp">
+      <span class="kasten-titel">Ausgeben</span>
+      <span class="klapp-pfeil" aria-hidden="true"></span>
+    </summary>
     <form method="post" action="/admin/funk/ausgeben">
       <input type="hidden" name="csrf" value="{{ csrf }}">
 
@@ -76,8 +84,9 @@
 
       <button type="submit" class="knopf">Ausgeben</button>
     </form>
-  </section>
+  </details>
 
+  <div class="arbeit-liste">
   <form method="get" action="/admin/funk" class="filter">
     <div>
       <label for="f-offen">Nur was noch draußen ist</label>
@@ -216,6 +225,8 @@
     </div>
     <p class="leer weg" id="nichts-gefunden">Kein Treffer.</p>
   {% endif %}
+  </div>
+  </div>
 {% endblock %}
 
 {% block skript %}<script src="/static/liste.js"></script>{% endblock %}

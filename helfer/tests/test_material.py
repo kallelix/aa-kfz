@@ -284,6 +284,19 @@ try:
     pruefe("nach einem Neustart" in seite,
            "mit dem Hinweis, dass eine Aenderung dort erst dann wirkt")
 
+    print("Ausgabe und Ruecknahme nebeneinander")
+    for pfad, name in (("/admin/funk", "funk-ausgabe"),
+                       ("/admin/schluessel", "schluessel-ausgabe")):
+        _, _, seite = anfrage("GET", pfad)
+        pruefe('class="arbeitsflaeche"' in seite,
+               pfad + ": Formular und Liste stehen in einer Flaeche")
+        pruefe('data-merken="' + name + '"' in seite,
+               "das Formular laesst sich zuklappen und wird gemerkt")
+        pruefe('class="arbeit-liste"' in seite, "die Liste hat ihre eigene Spalte")
+        pruefe(seite.index("arbeit-formular") < seite.index("arbeit-liste"),
+               "Formular zuerst, Liste daneben")
+        pruefe("admin_klapp.js" in seite, "das Klappskript haengt an der Seite")
+
     print("Funk: ausgeben")
     status, _, seite = anfrage("GET", "/admin/funk")
     pruefe(status == 200 and "Noch nichts ausgegeben" in seite,
@@ -406,6 +419,13 @@ try:
     pruefe("hinweis=kein-kennzeichen" in ort,
            "ein Kennzeichen ohne Buchstaben und Ziffern wird abgewiesen")
     pruefe(len(zeilen("SELECT id FROM fahrzeug")) == 1, "und legt nichts an")
+
+    print("Der Fahrzeugstamm steht unter der Flaeche")
+    _, _, seite = anfrage("GET", "/admin/schluessel")
+    pruefe(seite.index("arbeitsflaeche") < seite.index("fahrzeugstamm"),
+           "nicht in der Spalte neben dem Formular")
+    pruefe('data-merken="fahrzeugstamm"' in seite,
+           "und laesst sich ebenfalls zuklappen")
 
     print("Schlüssel: Namensvorschläge")
     _, _, seite = anfrage("GET", "/admin/schluessel")

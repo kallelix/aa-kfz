@@ -23,8 +23,14 @@
     </div>
   </section>
 
-  <section class="kasten">
-    <h2>Schlüssel ausgeben</h2>
+  {# Wie beim Funk: nebeneinander, damit die Ruecknahme nicht hinter dem
+     Ausgabeformular liegt. #}
+  <div class="arbeitsflaeche">
+  <details class="kasten arbeit-formular" data-merken="schluessel-ausgabe" open>
+    <summary class="kasten-klapp">
+      <span class="kasten-titel">Schlüssel ausgeben</span>
+      <span class="klapp-pfeil" aria-hidden="true"></span>
+    </summary>
     <form method="post" action="/admin/schluessel/ausgeben">
       <input type="hidden" name="csrf" value="{{ csrf }}">
 
@@ -65,8 +71,9 @@
 
       <button type="submit" class="knopf">Ausgeben</button>
     </form>
-  </section>
+  </details>
 
+  <div class="arbeit-liste">
   <form method="get" action="/admin/schluessel" class="filter">
     <div>
       <label for="f-offen">Nur was noch draußen ist</label>
@@ -172,10 +179,15 @@
     </div>
     <p class="leer weg" id="nichts-gefunden">Kein Treffer.</p>
   {% endif %}
+  </div>{# arbeit-liste #}
+  </div>{# arbeitsflaeche #}
 
   {% if fahrzeuge %}
-    <section>
-      <h2>Fahrzeugstamm ({{ fahrzeuge | length }})</h2>
+    <details class="fahrzeugstamm" data-merken="fahrzeugstamm">
+      <summary class="kasten-klapp">
+        <span class="kasten-titel">Fahrzeugstamm ({{ fahrzeuge | length }})</span>
+        <span class="klapp-pfeil" aria-hidden="true"></span>
+      </summary>
       <p class="hilfe">Baut sich beim Ausgeben von selbst auf. Ein Fahrzeug
         landet hier, sobald sein Kennzeichen zum ersten Mal getippt wurde.</p>
       <div class="tabelle-huelle">
@@ -206,7 +218,7 @@
           </tbody>
         </table>
       </div>
-    </section>
+    </details>
   {% endif %}
 {% endblock %}
 
