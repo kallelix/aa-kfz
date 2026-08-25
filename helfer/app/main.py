@@ -1154,6 +1154,12 @@ async def tablet_zeichnen(request: Request, token: str):
 
     ergebnis = unterschriften.zeichnen(nummer, str(daten.get("pfad") or ""),
                                        str(daten.get("name") or ""))
+    # Kein Hinweis beim Erfolg: die Rückkehr in den Wartezustand mit dem
+    # grünen Haken IST die Bestätigung. Eine Meldung darüber bliebe in der
+    # Adresse stehen und schöbe von da an bei jeder weiteren Unterschrift die
+    # Knöpfe nach unten aus dem Bild.
+    if ergebnis == "ok":
+        return RedirectResponse("/unterschrift/" + token, status_code=303)
     return _zurueck("/unterschrift/" + token, ergebnis)
 
 

@@ -19,16 +19,17 @@
     <p class="veranstaltung">{{ veranstaltung }} · Übergabe</p>
   </header>
 
+  {# Nur Meldungen, die etwas erklaeren. Fuer den Erfolg gibt es keine: der
+     gruene Haken im Wartezustand sagt dasselbe und kostet keine Hoehe. #}
   {% set meldungen = {
-    'ok': 'Danke. Die Unterschrift ist gespeichert.',
     'leer': 'Da war noch nichts gezeichnet.',
     'weg': 'Dieser Vorgang steht nicht mehr an.',
     'zu-spaet': 'Die Anforderung ist abgelaufen. Bitte am Tisch neu anfordern.',
     'abgebrochen': 'Abgebrochen.',
   } %}
-  {% if hinweis %}
-    <p class="meldung {{ 'meldung-gut' if hinweis == 'ok' else 'meldung-warnung' }}"
-       role="status">{{ meldungen.get(hinweis, hinweis) }}</p>
+  {% if hinweis in meldungen %}
+    <p class="meldung meldung-warnung" id="meldung" role="status">
+      {{ meldungen[hinweis] }}</p>
   {% endif %}
 
   <main id="inhalt">

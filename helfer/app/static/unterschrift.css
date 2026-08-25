@@ -21,10 +21,19 @@
 
 * { box-sizing: border-box; }
 
-html, body {
+html { height: 100%; }
+
+/* Der ganze Bildschirm ist eine Spalte: Kopf, gegebenenfalls eine Meldung,
+   darunter der Vorgang. Der Vorgang bekommt den Rest und verteilt ihn selbst
+   - so stehen die Knoepfe immer unten im Bild und rutschen nicht aus ihm
+   heraus, egal wie hoch das Tablet ist oder wie lang der Wortlaut wird. */
+body {
   margin: 0;
   padding: 0;
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background: var(--grund);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -34,6 +43,8 @@ html, body {
      verschieben. */
   overscroll-behavior: none;
 }
+
+#inhalt { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 .kopf {
   display: flex;
@@ -96,7 +107,16 @@ html, body {
 
 /* --- Ein Vorgang ---------------------------------------------------------- */
 
-.vorgang { padding: 1.2rem 1.2rem 2rem; max-width: 46rem; margin: 0 auto; }
+.vorgang {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 1rem 1.2rem 1.2rem;
+  max-width: 46rem;
+  width: 100%;
+  margin: 0 auto;
+}
 
 .vorgang-art {
   margin: 0;
@@ -123,13 +143,17 @@ html, body {
   color: var(--gedaempft);
 }
 
-/* Der Rahmen traegt die Grundlinie, damit klar ist, wo man ansetzt. */
+/* Der Rahmen traegt die Grundlinie, damit klar ist, wo man ansetzt.
+   Er nimmt sich, was uebrig bleibt, statt eine feste Hoehe zu beanspruchen -
+   auf einem flachen Bildschirm schrumpft er, statt die Knoepfe zu
+   verdraengen. */
 .feldrahmen {
   position: relative;
+  flex: 1;
+  min-height: 7rem;
   background: var(--flaeche);
   border: 2px solid var(--rand);
   border-radius: 10px;
-  height: min(38vh, 16rem);
 }
 .flaeche {
   display: block;
@@ -212,3 +236,24 @@ html, body {
   font-weight: 600;
 }
 .namensfeld:focus { outline: 3px solid var(--limette); outline-offset: 1px; }
+
+/* Das Formular ist selbst wieder eine Spalte, damit die Zeichenflaeche
+   dazwischen wachsen kann. */
+#zeichenformular {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hinweistext { flex: none; }
+.knopfreihe { flex: none; }
+
+/* Auf sehr flachen Bildschirmen zuerst das Beiwerk kuerzen, nicht die
+   Zeichenflaeche. */
+@media (max-height: 600px) {
+  .vorgang-wortlaut { font-size: 1.1em; padding: .5rem .7rem; margin-bottom: .7rem; }
+  .namensfeld { font-size: 1.1em; padding: .6rem .7rem; margin-bottom: .7rem; }
+  .hinweistext { font-size: .78em; margin: .5rem 0 .6rem; }
+  .abbrechen { margin-top: .8rem; }
+}

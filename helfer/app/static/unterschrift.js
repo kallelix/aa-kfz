@@ -27,6 +27,30 @@
   }
 
   var inhalt = document.getElementById("inhalt");
+  var meldung = document.getElementById("meldung");
+
+  /* Eine Meldung kommt als Parameter in der Adresse an und bliebe dort
+   * stehen: bei jeder weiteren Übergabe schöbe sie die Knöpfe ein Stück
+   * weiter nach unten aus dem Bild. Sie verschwindet deshalb nach ein paar
+   * Sekunden, und die Adresse wird gleich mit aufgeräumt - sonst wäre sie
+   * nach dem nächsten Neuladen wieder da. */
+  if (meldung) {
+    setTimeout(function () {
+      meldung.parentNode.removeChild(meldung);
+      meldung = null;
+    }, 8000);
+  }
+  if (window.history && window.history.replaceState
+      && window.location.search) {
+    window.history.replaceState(null, "", window.location.pathname);
+  }
+
+  function meldungWeg() {
+    if (meldung && meldung.parentNode) {
+      meldung.parentNode.removeChild(meldung);
+      meldung = null;
+    }
+  }
 
   /* Welcher Vorgang gerade angezeigt wird, und ob jemand dabei ist. */
   var gezeigt = null;
@@ -200,6 +224,8 @@
         if (neu === gezeigt) {
           return;
         }
+        /* Sobald etwas Neues ansteht, ist die alte Meldung erledigt. */
+        meldungWeg();
         inhalt.innerHTML = text;
         uebernehmen();
       })

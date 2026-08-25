@@ -238,7 +238,9 @@ try:
     status, ort, _ = anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
                              {"id": str(zweite), "pfad": "M10,10L20,30L40,15",
                               "name": "Anna Berg"})
-    pruefe("hinweis=ok" in ort, "meldet Erfolg")
+    pruefe(ort.endswith("/unterschrift/" + TOKEN),
+           "kehrt ohne Meldung zurueck – der gruene Haken im Wartezustand "
+           "sagt dasselbe und bliebe nicht in der Adresse stehen: " + ort)
     beleg = zeilen("SELECT * FROM unterschrift WHERE id = ?", zweite)[0]
     pruefe(beleg["bild"] == "M10,10L20,30L40,15", "der Pfad steht drin")
     pruefe(bool(beleg["unterschrieben_am"]), "mit Zeitpunkt")
@@ -294,7 +296,7 @@ try:
            "abhandengekommener Link nichts anrichten")
     status, ort, _ = anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
                              {"id": str(dritte), "pfad": "M1,1L2,2"})
-    pruefe("hinweis=ok" in ort,
+    pruefe(ort.endswith("/unterschrift/" + TOKEN),
            "innerhalb der Nachfrist wird sie trotzdem angenommen – wer beim "
            "Ablaufen gerade zeichnet, soll nicht von vorn anfangen")
 
@@ -317,7 +319,7 @@ try:
     fuenfte = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
     status, ort, _ = anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
                              {"id": str(fuenfte), "pfad": "M5,5L9,9"})
-    pruefe("hinweis=ok" in ort, "wird angenommen")
+    pruefe(ort.endswith("/unterschrift/" + TOKEN), "wird angenommen")
 
     print("Ein korrigierter Name landet im Bestand")
     unterschriften.abbrechen()
@@ -363,6 +365,19 @@ try:
     pruefe(float(flach[2]) / float(flach[3]) <= 4.01,
            "eine sehr flache Unterschrift wird nicht bis zur Unkenntlichkeit "
            "gestreckt: " + str(flach))
+
+    print("Keine Erfolgsmeldung, die stehen bleibt")
+    _, _, seite = anfrage("GET", "/unterschrift/" + TOKEN)
+    pruefe("meldung-gut" not in seite,
+           "nach dem Unterschreiben steht keine gruene Leiste da – sie bliebe "
+           "in der Adresse und schoebe die Knoepfe aus dem Bild")
+    pruefe("bereit-zeichen" in seite, "der Haken im Wartezustand sagt dasselbe")
+    _, _, seite = anfrage("GET", "/unterschrift/" + TOKEN + "?hinweis=ok")
+    pruefe("meldung" not in seite.split("<main")[0],
+           "auch von Hand angehaengt kommt sie nicht zurueck")
+    _, _, seite = anfrage("GET", "/unterschrift/" + TOKEN + "?hinweis=weg")
+    pruefe('id="meldung"' in seite,
+           "eine Warnung dagegen schon – sie erklaert etwas")
 
     print("Backoffice")
     _, _, seite = anfrage("GET", "/admin/unterschriften")
