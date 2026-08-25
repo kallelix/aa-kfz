@@ -597,23 +597,53 @@ das Backoffice zwei CSV-Dateien hochgeladen werden.
 Anders als die Schwester-Apps startet diese nicht leer und wartet auf Anträge –
 sie braucht erst ihren Datenbestand:
 
-1. **Beide CSV-Dateien** aus dem bisherigen Registrierungstool exportieren:
-   *Offene Posten* und *Vergebene Posten*.
-2. Im Backoffice unter **Import** beide zusammen hochladen. Einzeln geht
-   nicht: eine Zeile ist ein Platz, nicht eine Schicht – eine voll besetzte
-   Schicht steht nur in *Vergebene*, eine leere nur in *Offene*. Erst beide
-   zusammen ergeben den richtigen Bedarf.
-3. Den Bericht durchsehen. Übersprungene Zeilen sind **nicht** in der
+1. **Die beiden Listen** aus dem bisherigen Registrierungstool holen –
+   *Offene Posten* und *Vergebene Posten*. Zwei Wege, siehe unten: abrufen
+   oder hochladen. Einzeln geht keiner von beiden: eine Zeile ist ein Platz,
+   nicht eine Schicht – eine voll besetzte Schicht steht nur in *Vergebene*,
+   eine leere nur in *Offene*. Erst beide zusammen ergeben den richtigen
+   Bedarf.
+2. Den Bericht durchsehen. Übersprungene Zeilen sind **nicht** in der
    Datenbank gelandet, die Hinweise darunter schon – dort stehen
    Mehrfachbelegungen und uneindeutige Angaben, die jemand anschauen sollte.
-4. Unter **Zeitplan** einmal *Jetzt abrufen* drücken. Ab dann läuft der Abruf
-   täglich von selbst.
-5. Unter **Monitor** den Link erzeugen und auf den Bildschirmrechner
-   übertragen.
+3. Unter **Einstellungen › Zeitplan-Abruf** einmal *Jetzt abrufen* drücken.
+   Ab dann läuft der Abruf täglich von selbst.
+4. Unter **Einstellungen › Monitor** den Link erzeugen und auf den
+   Bildschirmrechner übertragen.
 
 Der Import lässt sich beliebig wiederholen: er rechnet den Bedarf neu aus und
 ersetzt nur seine eigenen Einteilungen. Was im Dashboard von Hand eingetragen
 wurde, bleibt stehen.
+
+#### Abrufen statt hochladen
+
+Stehen die drei Adressen in der Konfiguration, holt sich der Import beide
+Listen selbst – ein Knopf unter **Einstellungen › Import** statt Herunterladen
+und Hochladen:
+
+```
+IMPORT_LOGIN_URL=https://www.helferliste.online/home.php?i=…
+IMPORT_URL_VERGEBEN=https://www.helferliste.online/helfer.php?vid=…&t=…&download_csv=1
+IMPORT_URL_OFFEN=https://www.helferliste.online/helfer.php?vid=…&t=…&download_csv=2
+```
+
+Der Login-Link ist nötig, weil der Token in den beiden CSV-Adressen allein
+nicht genügt: ohne Sitzung antwortet der Dienst mit **HTTP 200 und der
+Anmeldeseite** statt mit der Datei. Der Abruf meldet sich deshalb jedes Mal
+neu an – der Link ist mehrfach verwendbar. Anzufordern ist er beim Dienst
+unter *„Ich benötige einen Login-Link“*. Kommt die Anmeldeseite trotzdem,
+sagt das die Fehlermeldung im Backoffice; dann ist ein neuer Link fällig.
+
+> **Alle drei Adressen sind Geheimnisse.** Der Login-Link ist der Sache nach
+> ein Passwort: wer ihn hat, sieht die ganze Helferliste samt Adressen und
+> Telefonnummern. Sie gehören nur in die `.env` (Rechte `600`, dem
+> Dienstbenutzer gehörend), nie ins Repository und nie in eine Fehlermeldung
+> nach außen. Die Anwendung schreibt sie deshalb weder in eine Meldung noch
+> in den Importvermerk – dort steht nur „Helferliste (Abruf)“, nicht der
+> Dateiname des Dienstes, der den Token enthält.
+
+Ohne die drei Adressen bleibt es beim Hochladen der beiden Dateien; die
+Importseite sagt dann, was fehlt.
 
 ### Der Monitor-Link
 
@@ -653,7 +683,7 @@ Wie in Abschnitt 4, zusätzlich:
 - [ ] `TAGE` nennt die richtigen drei Renntage im richtigen Jahr
 - [ ] Uhr des Containers geht richtig (`timedatectl`) – sie steht auf dem
       Monitor
-- [ ] Import beider CSV-Dateien gelaufen, Bericht durchgesehen
+- [ ] Import beider Listen gelaufen (Abruf oder Hochladen), Bericht durchgesehen
 - [ ] Zeitplan-Abruf einmal von Hand ausgelöst, beide Serien melden Erfolg
 - [ ] Der Abruf hat die **allgemeine** DHC-Tabelle erwischt, nicht die von
       Willingen – im Bericht steht, unter welcher Überschrift er gelesen hat

@@ -20,10 +20,13 @@ alle Einteilungen mit quelle='import'. Von Hand Eingetragenes bleibt stehen.
 from __future__ import annotations
 
 import csv
+import http.cookiejar
 import io
+import urllib.error
+import urllib.request
 from collections import Counter, defaultdict
 
-from . import db, normalisieren
+from . import config, db, normalisieren
 
 SPALTEN_OFFEN = ("Liste", "Datum", "Zeit")
 SPALTEN_VERGEBEN = ("Name", "Liste", "Datum", "Zeit")
@@ -282,3 +285,89 @@ def bericht_als_text(bericht: dict) -> str:
         for eintrag in eintraege:
             zeilen.append(art + ": " + eintrag)
     return "\n".join(zeilen)
+
+
+# --- Abruf statt Hochladen --------------------------------------------------
+
+# Die drei Adressen in der Konfiguration enthalten persoenliche Zugangstoken.
+# Deshalb steht hier nirgends eine Adresse in einer Meldung, in einem
+# Protokoll oder im Importvermerk - eine Fehlermeldung wandert schnell in
+# einen Chat, und der Token gaebe die ganze Helferliste preis. Gemeldet wird
+# nur, WELCHE der drei nicht ging, nie wie sie lautet.
+
+ABRUF_ZEITSPERRE = 30
+ABRUF_MAX_BYTES = 10 * 1024 * 1024
+
+# Was im Importvermerk steht. Die Datei heisst beim Dienst
+# "statistik_<token>.csv" - dieser Name darf nirgends hin.
+ABRUF_NAME = "Helferliste (Abruf)"
+
+
+def _oeffner():
+    """Ein eigener Keksbehaelter je Abruf. Die Sitzung soll nicht laenger
+    leben als der Vorgang und sich nicht mit einem zweiten mischen."""
+    return urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+
+def _seite_holen(oeffner, url: str, bezeichnung: str) -> tuple[bytes, str]:
+    if not url.lower().startswith("https://"):
+        raise Fehler(bezeichnung + ": nur https ist erlaubt.")
+
+    anfrage = urllib.request.Request(url, headers={
+        "User-Agent": "Abfahrt-Helferdashboard/1.0 (+Vereinsintern)",
+        "Accept": "text/csv,text/html;q=0.9,*/*;q=0.8",
+        "Accept-Language": "de-DE,de;q=0.9",
+    })
+    try:
+        with oeffner.open(anfrage, timeout=ABRUF_ZEITSPERRE) as antwort:
+            # Auch nach einer Weiterleitung darf es nichts anderes als https
+            # sein, sonst liesse sich der Abruf samt Sitzungskeks umlenken.
+            if not antwort.geturl().lower().startswith("https://"):
+                raise Fehler(bezeichnung + ": die Adresse leitet auf etwas "
+                             "anderes als https um.")
+            rohdaten = antwort.read(ABRUF_MAX_BYTES + 1)
+            if len(rohdaten) > ABRUF_MAX_BYTES:
+                raise Fehler(bezeichnung + ": die Antwort ist größer als "
+                             + str(ABRUF_MAX_BYTES // 1024 // 1024) + " MB.")
+            typ = (antwort.headers.get_content_type() or "").lower()
+    except urllib.error.HTTPError as fehler:
+        raise Fehler(bezeichnung + ": der Dienst antwortet mit HTTP "
+                     + str(fehler.code) + ".") from fehler
+    except urllib.error.URLError as fehler:
+        raise Fehler(bezeichnung + ": nicht erreichbar – "
+                     + str(fehler.reason) + ".") from fehler
+    except TimeoutError as fehler:
+        raise Fehler(bezeichnung + ": keine Antwort binnen "
+                     + str(ABRUF_ZEITSPERRE) + " Sekunden.") from fehler
+    return rohdaten, typ
+
+
+def _csv_holen(oeffner, url: str, bezeichnung: str) -> bytes:
+    rohdaten, typ = _seite_holen(oeffner, url, bezeichnung)
+    # Ohne gueltige Sitzung antwortet der Dienst mit HTTP 200 und der
+    # Anmeldeseite statt der Datei. Das faellt sonst erst beim Einlesen auf,
+    # und zwar als "Spalte Datum fehlt" - eine Meldung, mit der niemand
+    # etwas anfangen kann.
+    if typ.startswith("text/html") or rohdaten.lstrip()[:9].lower() == b"<!doctype":
+        raise Fehler(bezeichnung + ": der Dienst schickt eine Webseite statt "
+                     "einer CSV-Datei. Meist ist der Login-Link abgelaufen – "
+                     "einen neuen anfordern und in der Konfiguration "
+                     "eintragen.")
+    return rohdaten
+
+
+def abrufen(kuerzel: str = "") -> dict:
+    """Holt beide Listen beim Dienst und importiert sie wie hochgeladene."""
+    if not config.IMPORT_ABRUF_MOEGLICH:
+        raise Fehler("Für den Abruf fehlen die Adressen in der "
+                     "Konfiguration (IMPORT_LOGIN_URL, IMPORT_URL_VERGEBEN, "
+                     "IMPORT_URL_OFFEN).")
+
+    oeffner = _oeffner()
+    # Erst anmelden: die Sitzung steckt danach im Keksbehaelter des Oeffners.
+    _seite_holen(oeffner, config.IMPORT_LOGIN_URL, "Anmeldung")
+    vergeben = _csv_holen(oeffner, config.IMPORT_URL_VERGEBEN,
+                          "Vergebene Posten")
+    offen = _csv_holen(oeffner, config.IMPORT_URL_OFFEN, "Offene Posten")
+    return importieren(offen, vergeben, ABRUF_NAME, kuerzel)

@@ -171,6 +171,31 @@ def serie(schluessel: str) -> dict | None:
 ZEITPLAN_STUNDE = _zahl("ZEITPLAN_STUNDE", 4)
 
 
+# --- Abruf der Helferliste --------------------------------------------------
+
+# Statt die beiden CSV-Dateien von Hand herunterzuladen und hochzuladen, holt
+# sie der Abruf selbst.
+#
+# Alle drei Adressen enthalten persoenliche Zugangstoken und gehoeren
+# ausschliesslich in die .env - das Repo ist oeffentlich. Der Login-Link ist
+# der Sache nach ein Passwort: wer ihn hat, sieht die ganze Helferliste samt
+# Adressen und Telefonnummern.
+#
+# Der Login-Link ist noetig, weil der Token in den CSV-Adressen allein nicht
+# genuegt: ohne Sitzung liefert der Dienst die Anmeldeseite statt der Datei.
+# Er laesst sich mehrfach verwenden, der Abruf meldet sich also jedes Mal neu
+# an, statt eine Sitzung aufzubewahren, die ohnehin ablaufen wuerde.
+IMPORT_LOGIN_URL = os.environ.get("IMPORT_LOGIN_URL", "").strip()
+IMPORT_URL_VERGEBEN = os.environ.get("IMPORT_URL_VERGEBEN", "").strip()
+IMPORT_URL_OFFEN = os.environ.get("IMPORT_URL_OFFEN", "").strip()
+
+# Der Abruf steht nur bereit, wenn alle drei da sind. Zwei von dreien ergaeben
+# einen halben Bedarf - denselben Grund hat der Import, beide Dateien zu
+# verlangen.
+IMPORT_ABRUF_MOEGLICH = bool(IMPORT_LOGIN_URL and IMPORT_URL_VERGEBEN
+                             and IMPORT_URL_OFFEN)
+
+
 # --- Monitor ---------------------------------------------------------------
 
 # Wie oft die Monitoransicht neu lädt (Sekunden).

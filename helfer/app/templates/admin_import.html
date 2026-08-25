@@ -65,6 +65,29 @@
     {% endif %}
   {% endif %}
 
+  <section class="kasten">
+    <h2>Direkt von der Helferliste holen</h2>
+    {% if abruf_moeglich %}
+      <p>Holt beide Listen selbst beim Dienst – kein Herunterladen und
+        Hochladen. Danach passiert genau dasselbe wie bei hochgeladenen
+        Dateien: derselbe Bedarf, derselbe Bericht, dieselbe
+        Wiederholbarkeit.</p>
+      <form method="post" action="/admin/import/abrufen">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="knopf">Jetzt abrufen</button>
+      </form>
+      <p class="hilfe">Kann einen Moment dauern – es sind drei Aufrufe beim
+        Dienst: anmelden, vergebene Posten, offene Posten.</p>
+    {% else %}
+      <p class="hilfe">Dafür fehlen die drei Adressen in der Konfiguration:
+        <code>IMPORT_LOGIN_URL</code>, <code>IMPORT_URL_VERGEBEN</code> und
+        <code>IMPORT_URL_OFFEN</code>. Sie enthalten persönliche Zugangstoken
+        und gehören ausschließlich in die <code>.env</code> auf dem Server –
+        wer den Login-Link hat, sieht die ganze Helferliste samt Adressen und
+        Telefonnummern. Solange sie fehlen, geht der Weg über die Dateien.</p>
+    {% endif %}
+  </section>
+
   <section>
     <h2>Dateien hochladen</h2>
     <form method="post" action="/admin/import" enctype="multipart/form-data"

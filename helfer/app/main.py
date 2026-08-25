@@ -1403,6 +1403,7 @@ async def import_formular(request: Request, hinweis: str = "",
     return templates.TemplateResponse(
         "admin_import.html",
         _admin(request, sitzung, hinweis=hinweis, bericht=None, fehler="",
+               abruf_moeglich=config.IMPORT_ABRUF_MOEGLICH,
                laeufe=db.importe()))
 
 
@@ -1417,7 +1418,8 @@ async def import_ausfuehren(request: Request,
         return templates.TemplateResponse(
             "admin_import.html",
             _admin(request, sitzung, hinweis="", bericht=bericht,
-                   fehler=fehler, laeufe=db.importe()), status_code=code)
+                   fehler=fehler, abruf_moeglich=config.IMPORT_ABRUF_MOEGLICH,
+                   laeufe=db.importe()), status_code=code)
 
     offen = daten.get("offen")
     vergeben = daten.get("vergeben")
@@ -1434,6 +1436,35 @@ async def import_ausfuehren(request: Request,
     try:
         bericht = csv_import.importieren(offen_roh, vergeben_roh, namen,
                                          sitzung.kuerzel)
+    except csv_import.Fehler as fehler:
+        return seite(str(fehler), code=400)
+
+    return seite(bericht=bericht)
+
+
+@app.post("/admin/import/abrufen")
+async def import_abrufen(request: Request,
+                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    """Holt beide Listen beim Dienst, statt sie hochladen zu lassen.
+
+    Es ist derselbe Import: nur die Herkunft der beiden Dateien ist eine
+    andere, gepruefte und geschrieben wird danach genau dasselbe.
+    """
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    def seite(fehler="", bericht=None, code=200):
+        return templates.TemplateResponse(
+            "admin_import.html",
+            _admin(request, sitzung, hinweis="", bericht=bericht,
+                   fehler=fehler, abruf_moeglich=config.IMPORT_ABRUF_MOEGLICH,
+                   laeufe=db.importe()), status_code=code)
+
+    # urllib blockiert; im Thread bleibt die Anwendung derweil ansprechbar -
+    # wie beim Zeitplan-Abruf.
+    try:
+        bericht = await asyncio.to_thread(csv_import.abrufen, sitzung.kuerzel)
     except csv_import.Fehler as fehler:
         return seite(str(fehler), code=400)
 
