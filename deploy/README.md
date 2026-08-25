@@ -592,6 +592,41 @@ Die Rate-Limit-Zone und der `map`-Block heißen wieder **anders** als in den
 beiden anderen Dateien. `client_max_body_size` steht hier auf 2 MB, weil über
 das Backoffice zwei CSV-Dateien hochgeladen werden.
 
+#### Kompression
+
+Diese Anwendung fragt im Takt nach – der Monitor alle 30 Sekunden, das Tablet
+alle 2, jeder Backoffice-Reiter alle 3. Ohne Kompression sind das über drei
+Veranstaltungstage rund 330 MB, mit rund 200 MB. Der `gzip`-Block steht
+deshalb in `nginx-helfer.conf`; nachgemessen über `proxy_pass`:
+
+| | ohne | mit |
+|---|---|---|
+| Monitor-Abruf | 15 971 B | 2 280 B |
+| Tablet-Abruf | 1 605 B | 705 B |
+| `style.css` | 39 397 B | 10 967 B |
+| Vereinswappen (SVG) | 46 200 B | 18 056 B |
+| Zustandsabruf Backoffice (84 B) | – | bleibt unkomprimiert |
+
+Drei Dinge, die dabei leicht schiefgehen:
+
+- **`text/html` gehört nicht in `gzip_types`.** nginx komprimiert es ohnehin
+  immer; es zu nennen quittiert es mit einer Warnung. Damit sind die beiden
+  Poll-Antworten schon abgedeckt – beide sind HTML-Fragmente.
+- **`text/javascript` muss mit in die Liste**, nicht nur
+  `application/javascript`. Hinter `proxy_pass` kommt der Typ von der
+  Anwendung, und Starlette liefert die Skripte unter dem ersten Namen aus.
+- **`gzip_min_length` hochsetzen.** Bei der Vorgabe von 20 Byte würde der
+  84 Byte kleine Zustandsabruf des Backoffice komprimiert und dabei größer.
+
+Steht in `/etc/nginx/nginx.conf` schon ein globales `gzip on;` – bei Debian
+und Ubuntu üblich –, gilt das für alle drei Anwendungen; die Angaben in der
+Datei überschreiben es dann nur für diesen Server-Block.
+
+Ein zweiter Hebel liegt daneben und kostet eine Zeile: **HTTP/2**. Die
+Abrufe sind winzig, ihre Kopfzeilen mit Keks und User-Agent aber gut 400 Byte
+– bei 50 000 Abrufen am Tag ist das die eigentliche Rechnung. HTTP/2
+komprimiert sie mit und bringt noch einmal etwa ein Drittel.
+
 ### Erste Inbetriebnahme
 
 Anders als die Schwester-Apps startet diese nicht leer und wartet auf Anträge –
