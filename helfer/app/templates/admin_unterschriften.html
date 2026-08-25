@@ -114,12 +114,19 @@
                 <td>{{ u.person or '–' }}</td>
                 <td>
                   {# Inline-SVG, kein data:-URI – den wiese die CSP ab. #}
-                  <svg class="unterschriftbild" viewBox="0 0 600 200"
+                  <svg class="unterschriftbild"
+                       viewBox="{{ u.bild | ausschnitt }}"
                        preserveAspectRatio="xMidYMid meet" role="img"
                        aria-label="Unterschrift von {{ u.person }}">
+                    {# non-scaling-stroke: der Ausschnitt haengt jetzt an
+                       der Groesse der Unterschrift, die Strichstaerke soll
+                       das nicht mitmachen - sonst waere eine kleine
+                       Unterschrift ein fetter Klecks und eine grosse ein
+                       Haarstrich. #}
                     <path d="{{ u.bild }}" fill="none" stroke="#13160f"
-                          stroke-width="2.5" stroke-linecap="round"
-                          stroke-linejoin="round"/>
+                          stroke-width="1.6" stroke-linecap="round"
+                          stroke-linejoin="round"
+                          vector-effect="non-scaling-stroke"/>
                   </svg>
                 </td>
                 <td class="gedaempft pruefsumme">{{ u.pruefsumme[:16] }}…</td>

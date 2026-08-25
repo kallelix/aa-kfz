@@ -91,6 +91,7 @@ templates.env.filters["uhr"] = _uhr
 templates.env.filters["tag"] = _tag
 templates.env.filters["spanne"] = _spanne
 templates.env.filters["programmzeit"] = _programmzeit
+templates.env.filters["ausschnitt"] = unterschriften.ausschnitt
 
 
 # --- Start -----------------------------------------------------------------
@@ -854,6 +855,7 @@ async def tshirt_ausgeben(request: Request, helfer_id: int,
                         sprung="helfer-" + str(helfer_id))
 
     db.tshirt_ausgeben(helfer_id, groesse, sitzung.kuerzel)
+    _unterschrift_dazu("tshirt", helfer_id, "ausgabe", sitzung.kuerzel)
     return _zurueck("/admin/helfer", "tshirt",
                     suche=str(daten.get("suche") or ""),
                     sprung="helfer-" + str(helfer_id))
@@ -994,6 +996,7 @@ async def funk_ausgeben(request: Request,
                           str(daten.get("bemerkung") or ""), sitzung.kuerzel)
     if nummer is None:
         return _zurueck("/admin/funk", "nichts")
+    _unterschrift_dazu("material", nummer, "ausgabe", sitzung.kuerzel)
     return _zurueck("/admin/funk", "neu-angelegt" if woher == "neu" else "ausgegeben")
 
 
@@ -1009,6 +1012,7 @@ async def ausleihe_zurueck(request: Request, ausleihe_id: int,
     if str(daten.get("teilweise") or ""):
         mengen = {stueck: daten.get(stueck) for stueck in db.MATERIAL}
     db.ausleihe_zurueck(ausleihe_id, mengen, sitzung.kuerzel)
+    _unterschrift_dazu("material", ausleihe_id, "rueckgabe", sitzung.kuerzel)
     return _zurueck("/admin/funk", "zurueck",
                     offen=str(daten.get("offen") or ""))
 
@@ -1054,8 +1058,10 @@ async def schluessel_ausgeben(request: Request,
     if fahrzeug_id is None:
         return _zurueck("/admin/schluessel", "kein-kennzeichen")
 
-    db.schluessel_ausgeben(fahrzeug_id, name,
-                           str(daten.get("bemerkung") or ""), sitzung.kuerzel)
+    nummer = db.schluessel_ausgeben(fahrzeug_id, name,
+                                    str(daten.get("bemerkung") or ""),
+                                    sitzung.kuerzel)
+    _unterschrift_dazu("schluessel", nummer, "ausgabe", sitzung.kuerzel)
     return _zurueck("/admin/schluessel",
                     "fahrzeug-neu" if neu else "schluessel-raus")
 
@@ -1066,7 +1072,9 @@ async def schluessel_zurueck(request: Request, schluessel_id: int,
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
-    db.schluessel_zurueck(schluessel_id, sitzung.kuerzel)
+    if db.schluessel_zurueck(schluessel_id, sitzung.kuerzel):
+        _unterschrift_dazu("schluessel", schluessel_id, "rueckgabe",
+                           sitzung.kuerzel)
     return _zurueck("/admin/schluessel", "zurueck",
                     offen=str(daten.get("offen") or ""))
 
@@ -1082,6 +1090,20 @@ async def schluessel_weg(request: Request, schluessel_id: int,
 
 
 # --- Unterschriften: Tablet und Verwaltung ---------------------------------
+
+def _unterschrift_dazu(art: str, vorgang_id: int, richtung: str,
+                       kuerzel: str = "") -> None:
+    """Stellt den eben abgeschlossenen Vorgang gleich aufs Tablet.
+
+    Absichtlich ohne Rückmeldung und ohne Umweg über einen zweiten Klick: an
+    einem Ausgabetisch nach jeder Übergabe erst zu scrollen und einen Knopf zu
+    suchen, hält die Schlange auf. Gibt es kein Tablet, passiert nichts – die
+    Übergabe ist ohnehin schon gespeichert.
+    """
+    if not db.tablet_token():
+        return
+    unterschriften.anfordern(art, vorgang_id, richtung, kuerzel)
+
 
 def _tablet_token_stimmt(uebermittelt: str) -> bool:
     hinterlegt = db.tablet_token()
@@ -1130,7 +1152,8 @@ async def tablet_zeichnen(request: Request, token: str):
     except ValueError:
         return _zurueck("/unterschrift/" + token, "weg")
 
-    ergebnis = unterschriften.zeichnen(nummer, str(daten.get("pfad") or ""))
+    ergebnis = unterschriften.zeichnen(nummer, str(daten.get("pfad") or ""),
+                                       str(daten.get("name") or ""))
     return _zurueck("/unterschrift/" + token, ergebnis)
 
 

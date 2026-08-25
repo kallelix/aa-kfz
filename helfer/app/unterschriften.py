@@ -32,7 +32,7 @@ import hashlib
 import re
 from datetime import datetime, timedelta
 
-from . import config, db
+from . import config, db, normalisieren
 
 ARTEN = ("tshirt", "material", "schluessel")
 RICHTUNGEN = ("ausgabe", "rueckgabe")
@@ -45,6 +45,9 @@ _PFAD = re.compile(r"^[ML0-9 .,\-]+$")
 
 # Mehr als das zeichnet niemand mit dem Finger.
 MAX_PFAD = 60_000
+
+# Für den Ausschnitt: alle Zahlen aus einem Pfad herausholen.
+_ZAHL = re.compile(r"-?\d+(?:\.\d+)?")
 
 
 def wortlaut(art: str, vorgang_id: int, richtung: str) -> tuple[str, str, str]:
@@ -61,14 +64,28 @@ def wortlaut(art: str, vorgang_id: int, richtung: str) -> tuple[str, str, str]:
         for zeile in db.ausleihen_liste():
             if zeile["id"] != vorgang_id:
                 continue
+            # Bei der Rücknahme zählt, was zurückkam, nicht was einmal
+            # rausging: wer das Funkgerät bringt und den Akku behält, soll
+            # nicht quittieren, alles abgegeben zu haben.
+            spalte = (lambda s: s + "_zurueck") if richtung == "rueckgabe" \
+                else (lambda s: s)
             teile = []
             for stueck in db.MATERIAL:
-                if zeile[stueck]:
-                    teile.append(str(zeile[stueck]) + "× "
-                                 + db.MATERIAL_TEXT[stueck])
+                menge = zeile[spalte(stueck)]
+                if menge:
+                    teile.append(str(menge) + "× " + db.MATERIAL_TEXT[stueck])
             text = ", ".join(teile) or "nichts"
-            if zeile["datum"]:
+            if richtung == "ausgabe" and zeile["datum"]:
                 text += " – für " + zeile["datum"]
+            if richtung == "rueckgabe":
+                offen_teile = []
+                for stueck in db.MATERIAL:
+                    rest = zeile[stueck] - zeile[stueck + "_zurueck"]
+                    if rest:
+                        offen_teile.append(str(rest) + "× "
+                                           + db.MATERIAL_TEXT[stueck])
+                if offen_teile:
+                    text += " (noch draußen: " + ", ".join(offen_teile) + ")"
             return ("Material " + RICHTUNG_TEXT[richtung], text, zeile["name"])
         return "", "", ""
 
@@ -172,13 +189,37 @@ def pfad_pruefen(roh: str) -> str:
     return wert
 
 
-def zeichnen(unterschrift_id: int, pfad: str) -> str:
-    """Nimmt die Unterschrift entgegen. 'ok', 'leer', 'weg' oder 'zu-spaet'."""
+def namen_uebernehmen(art: str, vorgang_id: int, name: str) -> bool:
+    """Schreibt einen am Tablet korrigierten Namen in den Bestand zurück.
+
+    Die importierten Namen sind stellenweise unbrauchbar – "Krelli",
+    "Pössneck1", "hüttner m". Wer gerade unterschreibt, ist die einzige
+    Person, die es besser weiß, und der einzige Moment, in dem sie gefragt
+    werden kann, ohne dass jemand extra hinterherlaufen muss.
+    """
+    if art == "tshirt":
+        return db.helfer_umbenennen(vorgang_id, name)
+    if art == "material":
+        zeile = db.ausleihe_laden(vorgang_id)
+        return db.helfer_umbenennen(zeile["helfer_id"], name) if zeile else False
+    if art == "schluessel":
+        return db.schluessel_umbenennen(vorgang_id, name)
+    return False
+
+
+def zeichnen(unterschrift_id: int, pfad: str, name: str = "") -> str:
+    """Nimmt die Unterschrift entgegen. 'ok', 'leer', 'weg' oder 'zu-spaet'.
+
+    `name` ist der am Tablet bestätigte oder korrigierte Name. Er landet im
+    Beleg und, falls er sich geändert hat, auch im Bestand.
+    """
     sauber = pfad_pruefen(pfad)
     if not sauber:
         return "leer"
 
     jetzt = db.jetzt_lokal()
+    nachtragen = None
+
     con = db.verbinden()
     try:
         with con:
@@ -200,17 +241,59 @@ def zeichnen(unterschrift_id: int, pfad: str) -> str:
             if jetzt > grenze:
                 return "zu-spaet"
 
+            person = normalisieren.text(name) or zeile["person"]
             zeitpunkt = db.jetzt()
             pruefsumme = hashlib.sha256(
-                (zeile["wortlaut"] + "|" + sauber + "|" + zeitpunkt)
-                .encode("utf-8")).hexdigest()
+                (zeile["wortlaut"] + "|" + person + "|" + sauber + "|"
+                 + zeitpunkt).encode("utf-8")).hexdigest()
             con.execute(
                 "UPDATE unterschrift SET unterschrieben_am = ?, bild = ?,"
-                " pruefsumme = ? WHERE id = ?",
-                (zeitpunkt, sauber, pruefsumme, unterschrift_id))
-        return "ok"
+                " person = ?, pruefsumme = ? WHERE id = ?",
+                (zeitpunkt, sauber, person, pruefsumme, unterschrift_id))
+
+            if person != zeile["person"]:
+                nachtragen = (zeile["art"], zeile["vorgang_id"], person)
     finally:
         con.close()
+
+    # Erst nach der Transaktion: das Umbenennen fasst andere Tabellen an und
+    # gehört nicht in dieselbe Klammer wie der Beleg.
+    if nachtragen:
+        namen_uebernehmen(*nachtragen)
+    return "ok"
+
+
+def ausschnitt(pfad: str, rand: float = 8.0) -> str:
+    """Die viewBox für einen gespeicherten Pfad.
+
+    Ein festes Seitenverhältnis ginge nicht: gezeichnet wird auf der
+    Canvasfläche des Tablets, und wie groß die ist, weiß niemand vorher. Der
+    Ausschnitt wird deshalb aus dem Pfad selbst bestimmt – dann sitzt die
+    Unterschrift mittig und füllt die Vorschau, statt verrutscht am Rand zu
+    kleben.
+    """
+    werte = [float(z) for z in _ZAHL.findall(pfad or "")]
+    if len(werte) < 4:
+        return "0 0 100 40"
+
+    xs, ys = werte[0::2], werte[1::2]
+    links, rechts = min(xs) - rand, max(xs) + rand
+    oben, unten = min(ys) - rand, max(ys) + rand
+    breite = max(1.0, rechts - links)
+    hoehe = max(1.0, unten - oben)
+
+    # Sehr flache oder sehr schmale Unterschriften nicht bis zur
+    # Unkenntlichkeit strecken: der Ausschnitt bekommt ein Mindestverhältnis.
+    if breite / hoehe > 4:
+        fehlt = breite / 4 - hoehe
+        oben -= fehlt / 2
+        hoehe = breite / 4
+    elif hoehe / breite > 1.5:
+        fehlt = hoehe * 1.5 - breite
+        links -= fehlt / 2
+        breite = hoehe * 1.5
+
+    return "%.1f %.1f %.1f %.1f" % (links, oben, breite, hoehe)
 
 
 def liste(grenze: int = 100) -> list[dict]:

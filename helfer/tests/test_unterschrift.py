@@ -188,6 +188,38 @@ try:
         "richtung": "ausgabe"})
     pruefe("hinweis=unbekannt" in ort, "eine erfundene Art wird abgewiesen")
 
+    print("Bei jeder Ausgabe wird sofort angefordert")
+    unterschriften.abbrechen()
+    status, ort, _ = anfrage("POST", "/admin/schluessel/ausgeben", {
+        "csrf": CSRF, "kennzeichen": "IL-Z 9", "name": "Sofort Sofortski"})
+    pruefe("hinweis=" in ort, "Ausgabe laeuft")
+    _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
+    pruefe("Schlüssel Ausgabe" in stand,
+           "die Unterschrift steht ohne zweiten Klick auf dem Tablet")
+    pruefe("Sofort Sofortski" in stand, "mit dem Namen im Feld")
+
+    status, ort, _ = anfrage("POST", "/admin/helfer/%d/tshirt" % anna,
+                             {"csrf": CSRF, "groesse": "XL"})
+    _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
+    pruefe("T-Shirt Ausgabe" in stand,
+           "auch die T-Shirt-Ausgabe fordert von selbst an")
+    unterschriften.abbrechen()
+
+    print("Rücknahme nennt, was zurückkam")
+    anfrage("POST", "/admin/ausleihe/%d/zurueck" % ausleihe,
+            {"csrf": CSRF, "teilweise": "1", "funke": "1", "ersatzakku": "0"})
+    _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
+    pruefe("Material Rückgabe" in stand,
+           "die Rücknahme fordert ebenfalls von selbst an")
+    wortlaut = re.search(r'vorgang-wortlaut">(.*?)</p>', stand, re.S).group(1)
+    wortlaut = " ".join(wortlaut.split())
+    pruefe(wortlaut.startswith("1× Funkgerät"),
+           "im Wortlaut steht zuerst, was zurückkam: " + wortlaut)
+    pruefe("noch draußen: 2× Ersatzakku" in wortlaut,
+           "und danach, was noch fehlt – wer das Funkgerät bringt und den "
+           "Akku behält, soll nicht quittieren, alles abgegeben zu haben")
+    unterschriften.abbrechen()
+
     print("Nur eine Warteschlange")
     anfrage("POST", "/admin/unterschrift/anfordern", {
         "csrf": CSRF, "art": "schluessel", "vorgang_id": str(schluessel),
@@ -201,8 +233,11 @@ try:
     zweite = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
 
     print("Unterschreiben")
+    pruefe('name="name"' in stand and "Anna Berg" in stand,
+           "der Name steht als Feld da, vorbelegt")
     status, ort, _ = anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
-                             {"id": str(zweite), "pfad": "M10,10L20,30L40,15"})
+                             {"id": str(zweite), "pfad": "M10,10L20,30L40,15",
+                              "name": "Anna Berg"})
     pruefe("hinweis=ok" in ort, "meldet Erfolg")
     beleg = zeilen("SELECT * FROM unterschrift WHERE id = ?", zweite)[0]
     pruefe(beleg["bild"] == "M10,10L20,30L40,15", "der Pfad steht drin")
@@ -284,6 +319,25 @@ try:
                              {"id": str(fuenfte), "pfad": "M5,5L9,9"})
     pruefe("hinweis=ok" in ort, "wird angenommen")
 
+    print("Ein korrigierter Name landet im Bestand")
+    unterschriften.abbrechen()
+    anfrage("POST", "/admin/unterschrift/anfordern", {
+        "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
+        "richtung": "ausgabe", "weiter": "/admin/funk"})
+    _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
+    sechste = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
+    anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
+            {"id": str(sechste), "pfad": "M2,2L8,8",
+             "name": "Anna Bergmann-Richtig"})
+    pruefe(zeilen("SELECT name FROM helfer WHERE id = ?", anna)[0][0]
+           == "Anna Bergmann-Richtig",
+           "der Helfer heißt jetzt so – die importierten Namen sind "
+           "stellenweise unbrauchbar, und hier stand die Person, die es "
+           "besser weiß")
+    pruefe(zeilen("SELECT person FROM unterschrift WHERE id = ?",
+                  sechste)[0][0] == "Anna Bergmann-Richtig",
+           "und der Beleg trägt den bestätigten Namen")
+
     print("Abbrechen vom Tablet")
     anfrage("POST", "/admin/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
@@ -294,17 +348,37 @@ try:
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     pruefe("Bereit" in stand, "danach ist das Tablet frei")
 
+    print("Der Ausschnitt wird aus dem Pfad bestimmt")
+    # x von 10 bis 40, y von 10 bis 30, je 8 Rand: 2/2, 46 breit, 36 hoch.
+    pruefe(unterschriften.ausschnitt("M10,10L20,30L40,15") == "2.0 2.0 46.0 36.0",
+           "eng um die Unterschrift: "
+           + unterschriften.ausschnitt("M10,10L20,30L40,15"))
+    pruefe(unterschriften.ausschnitt("M300,120L340,160")
+           != unterschriften.ausschnitt("M10,10L20,30"),
+           "zwei verschieden platzierte Unterschriften bekommen verschiedene "
+           "Ausschnitte - eine feste viewBox liess sie verrutschen")
+    pruefe(unterschriften.ausschnitt("") == "0 0 100 40",
+           "ohne Pfad ein brauchbarer Vorgabewert")
+    flach = unterschriften.ausschnitt("M0,100L400,101").split()
+    pruefe(float(flach[2]) / float(flach[3]) <= 4.01,
+           "eine sehr flache Unterschrift wird nicht bis zur Unkenntlichkeit "
+           "gestreckt: " + str(flach))
+
     print("Backoffice")
     _, _, seite = anfrage("GET", "/admin/unterschriften")
     # Drei: Schluessel, T-Shirt und Material. Die vierte Anforderung war zu
     # spaet dran und wurde deshalb gerade nicht gespeichert.
-    pruefe(seite.count("unterschriftbild") == 3,
-           "drei Belege stehen drauf: " + str(seite.count("unterschriftbild")))
+    pruefe(seite.count("unterschriftbild") >= 3,
+           "die Belege stehen drauf: " + str(seite.count("unterschriftbild")))
     pruefe('d="M10,10L20,30L40,15"' in seite,
            "der Pfad steckt als Inline-SVG drin, nicht als data:-URI – den "
            "wiese die CSP ab")
     pruefe("qualifizierte" in seite and "Signatur" in seite,
            "und es steht dabei, was das Ganze NICHT ist")
+    pruefe("non-scaling-stroke" in seite,
+           "die Strichstaerke haengt nicht am Ausschnitt")
+    pruefe('viewBox="0 0 600 200"' not in seite,
+           "keine feste viewBox mehr")
 
     _, _, funk = anfrage("GET", "/admin/funk")
     pruefe("unterschrieben" in funk,

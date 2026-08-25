@@ -195,3 +195,20 @@ html, body {
   cursor: pointer;
   padding: .5rem;
 }
+
+
+/* Der Name steht als Feld da und nicht nur als Text - die importierten Namen
+   sind stellenweise unbrauchbar, und hier steht die einzige Person, die es
+   besser weiss. */
+.namensfeld {
+  width: 100%;
+  padding: .8rem .9rem;
+  margin: 0 0 1.2rem;
+  border: 2px solid var(--rand);
+  border-radius: 10px;
+  background: var(--flaeche);
+  font: inherit;
+  font-size: 1.3em;
+  font-weight: 600;
+}
+.namensfeld:focus { outline: 3px solid var(--limette); outline-offset: 1px; }

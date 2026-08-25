@@ -1076,6 +1076,69 @@ def helfer_aendern(helfer_id: int, daten: dict) -> bool:
         con.close()
 
 
+def helfer_umbenennen(helfer_id: int, name: str) -> bool:
+    """Nur den Namen ändern – für die Korrektur am Tablet.
+
+    Der Erkennungsschlüssel hängt am Namen und muss mitwandern, sonst entsteht
+    beim nächsten Import ein zweiter Datensatz für dieselbe Person. Gibt es
+    Name und Mailadresse zusammen schon, bleibt alles, wie es war: dann sind
+    es zwei Menschen, nicht einer mit zwei Namen.
+    """
+    sauber = normalisieren.text(name)
+    if not sauber:
+        return False
+    con = verbinden()
+    try:
+        vorhanden = con.execute("SELECT * FROM helfer WHERE id = ?",
+                                (helfer_id,)).fetchone()
+        if vorhanden is None or vorhanden["name"] == sauber:
+            return False
+        with con:
+            con.execute(
+                "UPDATE helfer SET name = ?, schluessel = ?, geaendert_am = ?"
+                " WHERE id = ?",
+                (sauber, normalisieren.schluessel(sauber, vorhanden["email"]),
+                 jetzt(), helfer_id))
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        con.close()
+
+
+def ausleihe_laden(ausleihe_id: int) -> sqlite3.Row | None:
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM ausleihe WHERE id = ?",
+                           (ausleihe_id,)).fetchone()
+    finally:
+        con.close()
+
+
+def schluessel_umbenennen(schluessel_id: int, name: str) -> bool:
+    """Der Name am Schlüsselvorgang – und im Fahrzeugstamm, falls dort noch
+    keiner steht."""
+    sauber = normalisieren.text(name)
+    if not sauber:
+        return False
+    con = verbinden()
+    try:
+        with con:
+            zeile = con.execute("SELECT * FROM schluessel WHERE id = ?",
+                                (schluessel_id,)).fetchone()
+            if zeile is None:
+                return False
+            con.execute("UPDATE schluessel SET name = ? WHERE id = ?",
+                        (sauber, schluessel_id))
+            con.execute(
+                "UPDATE fahrzeug SET name = ?, geaendert_am = ?"
+                " WHERE id = ? AND TRIM(name) = ''",
+                (sauber, jetzt(), zeile["fahrzeug_id"]))
+        return True
+    finally:
+        con.close()
+
+
 # --- Materialausleihe ------------------------------------------------------
 
 MATERIAL = ("funke", "headset", "ersatzakku")

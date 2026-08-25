@@ -15,14 +15,22 @@
 {% else %}
   <div class="vorgang" data-vorgang="{{ offen.id }}">
     <p class="vorgang-art">{{ offen.titel }}</p>
-    {% if offen.person %}
-      <p class="vorgang-person">{{ offen.person }}</p>
-    {% endif %}
     <p class="vorgang-wortlaut">{{ offen.wortlaut }}</p>
 
     <form method="post" action="/unterschrift/{{ token }}/zeichnen"
           id="zeichenformular">
       <input type="hidden" name="id" value="{{ offen.id }}">
+
+      {# Der Name steht als Feld da, nicht als Text: aus dem Import kommen
+         Namen wie "Krelli" oder "Poessneck1", und wer gerade unterschreibt,
+         ist die einzige Person, die es besser weiss. #}
+      <p class="feldtitel">
+        <label for="name">Dein Name{% if not offen.person %} (bitte eintragen){% else %} – bitte prüfen{% endif %}</label>
+      </p>
+      <input type="text" id="name" name="name" class="namensfeld"
+             maxlength="200" required autocomplete="name"
+             value="{{ offen.person }}"
+             placeholder="Vor- und Nachname">
       {# Das Skript füllt das Feld beim Absenden mit dem gezeichneten Pfad. #}
       <input type="hidden" name="pfad" id="pfad" value="">
 
