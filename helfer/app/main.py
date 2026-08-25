@@ -1171,6 +1171,19 @@ async def schluessel_weg(request: Request, schluessel_id: int,
     return _zurueck("/admin/schluessel", "geloescht")
 
 
+@app.post("/admin/fahrzeug/{fahrzeug_id}/loeschen")
+async def fahrzeug_weg(request: Request, fahrzeug_id: int,
+                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    ausgang = db.fahrzeug_loeschen(fahrzeug_id)
+    return _zurueck("/admin/schluessel",
+                    {"weg": "fahrzeug-weg",
+                     "hat-vorgaenge": "fahrzeug-hat-vorgaenge"}.get(
+                         ausgang, "unbekannt"))
+
+
 # --- Einstellungen ---------------------------------------------------------
 
 def _einstellungsseite(request: Request, sitzung, hinweis: str = ""):

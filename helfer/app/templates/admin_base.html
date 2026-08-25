@@ -98,11 +98,16 @@
       'angefordert': 'Steht auf dem Tablet.',
       'abgebrochen': 'Die Anforderung ist zurückgenommen.',
       'kein-tablet': 'Es gibt keinen Tablet-Link – erst einen erzeugen.',
+      'fahrzeug-weg': 'Fahrzeug aus dem Stamm genommen.',
+      'fahrzeug-hat-vorgaenge': 'An diesem Fahrzeug hängen noch Vorgänge. '
+                                'Erst die löschen, sonst ginge die '
+                                'Ausgabehistorie mit verloren.',
 
     } %}
     {% if hinweis %}
       <p class="hinweis {{ 'hinweis-warnung' if hinweis in ('schon-drin', 'keiner', 'unbekannt', 'widerrufen',
                             'groesse', 'nichts', 'kein-kennzeichen',
+                            'fahrzeug-hat-vorgaenge',
                             'tshirt-zurueck', 'geloescht', 'abgebrochen',
                             'kein-tablet') else 'hinweis-ok' }}"
          role="status">{{ meldungen.get(hinweis, hinweis) }}</p>

@@ -1354,6 +1354,38 @@ def fahrzeuge() -> list[sqlite3.Row]:
         con.close()
 
 
+def fahrzeug_loeschen(fahrzeug_id: int) -> str:
+    """Nimmt ein Fahrzeug aus dem Stamm. Gibt zurueck, was daraus wurde.
+
+    Nur, solange kein Vorgang daran haengt. schluessel.fahrzeug_id ist mit
+    ON DELETE CASCADE verknuepft und die Fremdschluessel sind eingeschaltet:
+    ein Loeschen risse also die ganze Ausgabehistorie des Wagens mit, und die
+    Unterschriften dazu blieben als Verweise ins Leere stehen - die haengen
+    ueber art und vorgang_id daran, ohne Fremdschluessel, der sie
+    mitraeumte.
+
+    Der Stamm baut sich von selbst auf; zu loeschen gibt es hier vor allem
+    Vertipper, und an denen haengt in aller Regel nichts. Wo doch, ist erst
+    der Vorgang zu loeschen - das ist eine bewusste Entscheidung mehr, aber
+    keine, die still Daten verliert.
+    """
+    con = verbinden()
+    try:
+        with con:
+            zeile = con.execute(
+                "SELECT (SELECT COUNT(*) FROM schluessel s"
+                "  WHERE s.fahrzeug_id = f.id) AS vorgaenge"
+                " FROM fahrzeug f WHERE f.id = ?", (fahrzeug_id,)).fetchone()
+            if zeile is None:
+                return "unbekannt"
+            if zeile["vorgaenge"]:
+                return "hat-vorgaenge"
+            con.execute("DELETE FROM fahrzeug WHERE id = ?", (fahrzeug_id,))
+        return "weg"
+    finally:
+        con.close()
+
+
 def fahrzeug_suchen(kennzeichen: str) -> sqlite3.Row | None:
     norm = normalisieren.kennzeichen(kennzeichen)
     if not norm:

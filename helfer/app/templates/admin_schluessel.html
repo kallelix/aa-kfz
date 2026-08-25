@@ -190,7 +190,8 @@
           <thead>
             <tr><th scope="col">Kennzeichen</th><th scope="col">Halter</th>
               <th scope="col" class="rechts">Ausgaben</th>
-              <th scope="col">Status</th></tr>
+              <th scope="col">Status</th>
+              <th scope="col"></th></tr>
           </thead>
           <tbody>
             {% for f in fahrzeuge %}
@@ -206,6 +207,19 @@
                     <span class="marke marke-luecke">Schlüssel draußen</span>
                   {% else %}
                     <span class="gedaempft">–</span>
+                  {% endif %}
+                </td>
+                <td class="rechts">
+                  {# Nur, solange nichts daran haengt: ein Fahrzeug zu loeschen
+                     naehme seine Vorgaenge mit. Wo welche sind, sagt die
+                     Spalte "Ausgaben" daneben, was zu tun ist. #}
+                  {% if f.ausgaben %}
+                    <span class="gedaempft">hat Vorgänge</span>
+                  {% else %}
+                    <form method="post" action="/admin/fahrzeug/{{ f.id }}/loeschen">
+                      <input type="hidden" name="csrf" value="{{ csrf }}">
+                      <button type="submit" class="knopf-winzig">löschen</button>
+                    </form>
                   {% endif %}
                 </td>
               </tr>

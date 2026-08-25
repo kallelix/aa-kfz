@@ -522,6 +522,49 @@ try:
     pruefe("hinweis=geloescht" in ort and
            len(zeilen("SELECT id FROM ausleihe")) == 1, "Ausleihe weg")
 
+    print("Fahrzeug aus dem Stamm nehmen")
+    # schluessel.fahrzeug_id haengt mit ON DELETE CASCADE daran. Loeschte man
+    # ein Fahrzeug mit Vorgaengen, waere die ganze Ausgabehistorie still weg -
+    # und die Unterschriften dazu zeigten ins Leere.
+    mit = zeilen("SELECT f.id FROM fahrzeug f WHERE EXISTS"
+                 " (SELECT 1 FROM schluessel s WHERE s.fahrzeug_id = f.id)")[0][0]
+    vorher = len(zeilen("SELECT id FROM schluessel"))
+    status, ort, _ = anfrage("POST", "/admin/fahrzeug/%d/loeschen" % mit,
+                             {"csrf": CSRF})
+    pruefe("hinweis=fahrzeug-hat-vorgaenge" in ort,
+           "mit Vorgaengen wird abgelehnt")
+    pruefe(len(zeilen("SELECT id FROM fahrzeug WHERE id = ?", mit)) == 1
+           and len(zeilen("SELECT id FROM schluessel")) == vorher,
+           "und nichts ist verschwunden – weder Fahrzeug noch Vorgang")
+
+    # Der Fall, um den es geht: ein Vertipper. Er kommt beim Ausgeben in den
+    # Stamm; wird der Vorgang geloescht, bleibt das Fahrzeug allein zurueck.
+    anfrage("POST", "/admin/schluessel/ausgeben",
+            {"csrf": CSRF, "kennzeichen": "IL-ZZ 999", "name": "Vertippt",
+             "bemerkung": ""})
+    tipp = zeilen("SELECT id FROM fahrzeug WHERE kennzeichen_norm = 'ILZZ999'")[0][0]
+    falsch = zeilen("SELECT id FROM schluessel WHERE fahrzeug_id = ?", tipp)[0][0]
+    anfrage("POST", "/admin/schluessel/%d/loeschen" % falsch, {"csrf": CSRF})
+    pruefe(not zeilen("SELECT id FROM schluessel WHERE fahrzeug_id = ?", tipp),
+           "der falsche Vorgang ist weg, das Fahrzeug steht noch da")
+
+    status, ort, _ = anfrage("POST", "/admin/fahrzeug/%d/loeschen" % tipp,
+                             {"csrf": CSRF})
+    pruefe("hinweis=fahrzeug-weg" in ort
+           and not zeilen("SELECT id FROM fahrzeug WHERE id = ?", tipp),
+           "ohne Vorgaenge geht es")
+
+    status, ort, _ = anfrage("POST", "/admin/fahrzeug/999999/loeschen",
+                             {"csrf": CSRF})
+    pruefe("hinweis=unbekannt" in ort, "ein Fahrzeug, das es nicht gibt")
+    status, _, _ = anfrage("POST", "/admin/fahrzeug/%d/loeschen" % mit,
+                           {"csrf": "falsch"})
+    pruefe(status == 400, "ohne Token geht gar nichts")
+
+    _, _, seite = anfrage("GET", "/admin/schluessel")
+    pruefe("hat Vorgänge" in seite,
+           "in der Liste steht statt des Knopfes, warum es nicht geht")
+
 finally:
     prozess.terminate()
     try:
