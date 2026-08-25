@@ -34,8 +34,7 @@
                autocomplete="off" autofocus placeholder="IL-A 123">
         <datalist id="v-kennzeichen">
           {% for f in fahrzeuge %}
-            <option value="{{ f.kennzeichen }}">
-              {{- f.vorname }} {{ f.nachname }}</option>
+            <option value="{{ f.kennzeichen }}">{{ f.name }}</option>
           {% endfor %}
         </datalist>
         <p class="hilfe">Bindestriche und Leerzeichen sind egal – „IL-A 123“
@@ -44,24 +43,19 @@
           schon da.</p>
       </div>
 
-      <div class="paar">
-        <div class="feld">
-          <label for="vorname">Vorname</label>
-          <input type="text" id="vorname" name="vorname" maxlength="120"
-                 list="v-namen" autocomplete="off">
-        </div>
-        <div class="feld">
-          <label for="nachname">Name</label>
-          <input type="text" id="nachname" name="nachname" maxlength="120"
-                 list="v-namen" autocomplete="off">
-        </div>
+      <div class="feld">
+        <label for="name">Wer bekommt ihn</label>
+        <input type="text" id="name" name="name" maxlength="200"
+               list="v-namen" autocomplete="off"
+               placeholder="Name, so wie er gerufen wird">
+        <datalist id="v-namen">
+          {% for n in namen %}<option value="{{ n }}">{% endfor %}
+        </datalist>
+        <p class="hilfe">Ein Feld, nicht Vor- und Nachname getrennt: die
+          Bestandsdaten geben die Trennung nicht her. Die Vorschläge sind die
+          erfassten Helfer, die vom Shuttle zuerst – wer nicht dabei ist, wird
+          einfach getippt, ein Schlüssel kann an jeden gehen.</p>
       </div>
-      <datalist id="v-namen">
-        {% for n in namen %}<option value="{{ n }}">{% endfor %}
-      </datalist>
-      <p class="hilfe">Die Vorschläge sind die erfassten Helfer, die vom
-        Shuttle zuerst. Wer nicht dabei ist, wird einfach getippt – ein
-        Schlüssel kann an jeden gehen.</p>
 
       <div class="feld">
         <label for="bemerkung">Bemerkung <span class="optional">optional</span></label>
@@ -132,7 +126,8 @@
                 {% if not s.zurueck_am %}class="ist-draussen"{% endif %}>
               <td class="kennzeichen-feld">{{ s.kennzeichen }}</td>
               <td>
-                {{ s.vorname }} {{ s.nachname }}
+                {%- if s.name %}{{ s.name }}
+                {%- else %}<span class="gedaempft">ohne Namen</span>{% endif %}
                 {%- if s.bemerkung %}<br><span class="gedaempft">{{ s.bemerkung }}</span>{% endif %}
               </td>
               <td class="gedaempft nowrap" data-wert="{{ s.ausgegeben_am }}">
@@ -188,7 +183,7 @@
               <tr>
                 <td class="kennzeichen-feld">{{ f.kennzeichen }}</td>
                 <td>
-                  {%- if f.vorname or f.nachname %}{{ f.vorname }} {{ f.nachname }}
+                  {%- if f.name %}{{ f.name }}
                   {%- else %}<span class="gedaempft">–</span>{% endif %}
                 </td>
                 <td class="rechts">{{ f.ausgaben }}</td>

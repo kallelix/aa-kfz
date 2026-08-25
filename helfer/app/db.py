@@ -1061,7 +1061,7 @@ MATERIAL_TEXT = {"funke": "Funkgerät", "headset": "Headset",
                  "ersatzakku": "Ersatzakku"}
 
 
-def ausleihen(helfer_id: int, mengen: dict, schicht_id: int | None = None,
+def ausleihen(helfer_id: int, mengen: dict, datum: str | None = None,
               bemerkung: str = "", kuerzel: str = "") -> int | None:
     def menge(stueck):
         try:
@@ -1076,10 +1076,10 @@ def ausleihen(helfer_id: int, mengen: dict, schicht_id: int | None = None,
     try:
         with con:
             zeiger = con.execute(
-                "INSERT INTO ausleihe (helfer_id, schicht_id, funke, headset,"
+                "INSERT INTO ausleihe (helfer_id, datum, funke, headset,"
                 " ersatzakku, bemerkung, ausgegeben_am, ausgegeben_von)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (helfer_id, schicht_id, *[menge(s) for s in MATERIAL],
+                (helfer_id, datum or None, *[menge(s) for s in MATERIAL],
                  normalisieren.text(bemerkung), jetzt(), kuerzel))
         return int(zeiger.lastrowid)
     finally:
@@ -1140,14 +1140,12 @@ def ausleihen_liste(nur_offen: bool = False) -> list[sqlite3.Row]:
     try:
         return con.execute(
             "SELECT a.*, h.name, h.email, h.telefon,"
-            " s.liste AS schicht_liste, s.beginn AS schicht_beginn,"
             " (a.funke - a.funke_zurueck) AS funke_offen,"
             " (a.headset - a.headset_zurueck) AS headset_offen,"
             " (a.ersatzakku - a.ersatzakku_zurueck) AS ersatzakku_offen,"
-            " suchtext(h.name, s.liste, a.bemerkung) AS suche"
+            " suchtext(h.name, a.bemerkung) AS suche"
             " FROM ausleihe a"
-            " JOIN helfer h ON h.id = a.helfer_id"
-            " LEFT JOIN schicht s ON s.id = a.schicht_id" +
+            " JOIN helfer h ON h.id = a.helfer_id" +
             (" WHERE a.zurueck_am IS NULL" if nur_offen else "") +
             " ORDER BY a.zurueck_am IS NOT NULL, a.ausgegeben_am DESC"
         ).fetchall()
@@ -1174,7 +1172,7 @@ def material_zaehler() -> dict:
 
 # --- Fahrzeuge und Schlüssel -----------------------------------------------
 
-def fahrzeug_sichern(kennzeichen: str, vorname: str = "", nachname: str = "",
+def fahrzeug_sichern(kennzeichen: str, name: str = "",
                      bemerkung: str = "") -> tuple[int | None, bool]:
     """Legt das Fahrzeug an oder ergänzt es. Gibt (id, neu) zurück.
 
@@ -1196,16 +1194,14 @@ def fahrzeug_sichern(kennzeichen: str, vorname: str = "", nachname: str = "",
             if vorhanden is None:
                 zeiger = con.execute(
                     "INSERT INTO fahrzeug (kennzeichen, kennzeichen_norm,"
-                    " vorname, nachname, bemerkung, angelegt_am)"
-                    " VALUES (?, ?, ?, ?, ?, ?)",
+                    " name, bemerkung, angelegt_am) VALUES (?, ?, ?, ?, ?)",
                     (normalisieren.kennzeichen_anzeige(kennzeichen), norm,
-                     normalisieren.text(vorname), normalisieren.text(nachname),
-                     normalisieren.text(bemerkung), jetzt()))
+                     normalisieren.text(name), normalisieren.text(bemerkung),
+                     jetzt()))
                 return int(zeiger.lastrowid), True
 
             aenderungen, werte = [], []
-            for spalte, wert in (("vorname", vorname), ("nachname", nachname),
-                                 ("bemerkung", bemerkung)):
+            for spalte, wert in (("name", name), ("bemerkung", bemerkung)):
                 sauber = normalisieren.text(wert)
                 if sauber and not vorhanden[spalte]:
                     aenderungen.append(spalte + " = ?")
@@ -1246,18 +1242,16 @@ def fahrzeug_suchen(kennzeichen: str) -> sqlite3.Row | None:
         con.close()
 
 
-def schluessel_ausgeben(fahrzeug_id: int, vorname: str, nachname: str,
-                        bemerkung: str = "", kuerzel: str = "") -> int:
+def schluessel_ausgeben(fahrzeug_id: int, name: str, bemerkung: str = "",
+                        kuerzel: str = "") -> int:
     con = verbinden()
     try:
         with con:
             zeiger = con.execute(
-                "INSERT INTO schluessel (fahrzeug_id, vorname, nachname,"
-                " bemerkung, ausgegeben_am, ausgegeben_von)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (fahrzeug_id, normalisieren.text(vorname),
-                 normalisieren.text(nachname), normalisieren.text(bemerkung),
-                 jetzt(), kuerzel))
+                "INSERT INTO schluessel (fahrzeug_id, name, bemerkung,"
+                " ausgegeben_am, ausgegeben_von) VALUES (?, ?, ?, ?, ?)",
+                (fahrzeug_id, normalisieren.text(name),
+                 normalisieren.text(bemerkung), jetzt(), kuerzel))
         return int(zeiger.lastrowid)
     finally:
         con.close()
@@ -1292,9 +1286,9 @@ def schluessel_liste(nur_offen: bool = False) -> list[sqlite3.Row]:
     try:
         return con.execute(
             "SELECT s.*, f.kennzeichen, f.kennzeichen_norm,"
-            " f.vorname AS halter_vorname, f.nachname AS halter_nachname,"
-            " suchtext(f.kennzeichen, f.kennzeichen_norm, s.vorname,"
-            "          s.nachname, s.bemerkung) AS suche"
+            " f.name AS halter,"
+            " suchtext(f.kennzeichen, f.kennzeichen_norm, s.name,"
+            "          s.bemerkung) AS suche"
             " FROM schluessel s JOIN fahrzeug f ON f.id = s.fahrzeug_id" +
             (" WHERE s.zurueck_am IS NULL" if nur_offen else "") +
             " ORDER BY s.zurueck_am IS NOT NULL, s.ausgegeben_am DESC"

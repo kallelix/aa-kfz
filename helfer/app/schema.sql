@@ -210,16 +210,17 @@ CREATE INDEX IF NOT EXISTS idx_aufgabe_tag ON aufgabe (datum, beginn);
 
 -- Ausleihe von Material: Funkgeraet, Headset, Ersatzakku.
 --
--- Ein Schichtbezug ist ausdruecklich nicht noetig - wer ein Funkgeraet holt,
--- steht nicht zwingend auf einer Schicht. Deshalb ist schicht_id optional.
---
 -- Ausgegebene und zurueckgegebene Stueckzahlen stehen nebeneinander, statt
 -- eine Ausleihe nur ganz oder gar nicht zurueckzunehmen: wer das Funkgeraet
 -- bringt und den Ersatzakku behaelt, ist der Normalfall und kein Sonderfall.
 CREATE TABLE IF NOT EXISTS ausleihe (
     id            INTEGER PRIMARY KEY,
     helfer_id     INTEGER NOT NULL REFERENCES helfer (id) ON DELETE CASCADE,
-    schicht_id    INTEGER REFERENCES schicht (id) ON DELETE SET NULL,
+
+    -- Der Tag, fuer den ausgegeben wurde. Kein Schichtbezug: ein Funkgeraet
+    -- wird fuer einen Tag geholt, nicht fuer eine einzelne Schicht, und wer
+    -- es holt, steht oft auf mehreren. Optional bleibt es trotzdem.
+    datum         TEXT,
 
     funke         INTEGER NOT NULL DEFAULT 0 CHECK (funke >= 0),
     headset       INTEGER NOT NULL DEFAULT 0 CHECK (headset >= 0),
@@ -254,8 +255,12 @@ CREATE TABLE IF NOT EXISTS fahrzeug (
     -- Nur Buchstaben und Ziffern, gross. Verhindert, dass "IL-A 123" und
     -- "ILA123" zwei Wagen werden.
     kennzeichen_norm TEXT NOT NULL UNIQUE,
-    vorname       TEXT NOT NULL DEFAULT '',
-    nachname      TEXT NOT NULL DEFAULT '',
+
+    -- EIN Namensfeld, nicht Vorname und Nachname getrennt. Die Bestandsdaten
+    -- geben die Trennung nicht her: dort stehen "Krelli", "Poessneck1" und
+    -- "huettner m". Zwei Felder zu verlangen hiesse, an der Ausgabe eine
+    -- Ordnung zu erzwingen, die es nicht gibt.
+    name          TEXT NOT NULL DEFAULT '',
     bemerkung     TEXT NOT NULL DEFAULT '',
     angelegt_am   TEXT NOT NULL,
     geaendert_am  TEXT
@@ -268,8 +273,7 @@ CREATE TABLE IF NOT EXISTS schluessel (
 
     -- Wer den Schluessel hat. Kann von der Person im Fahrzeugstamm
     -- abweichen: das Shuttle faehrt nicht immer derselbe.
-    vorname       TEXT NOT NULL DEFAULT '',
-    nachname      TEXT NOT NULL DEFAULT '',
+    name          TEXT NOT NULL DEFAULT '',
 
     bemerkung     TEXT NOT NULL DEFAULT '',
     ausgegeben_am TEXT NOT NULL,

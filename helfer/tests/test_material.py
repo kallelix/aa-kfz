@@ -198,6 +198,10 @@ try:
            and person["tshirt_ausgegeben"] is None, "alles wieder offen")
 
     print("Helfer von Hand anlegen")
+    status, _, seite = anfrage("GET", "/admin/helfer/neu")
+    pruefe(status == 200 and "Helfer hinzufügen" in seite,
+           "/admin/helfer/neu oeffnet das Formular und wird nicht von "
+           "/admin/helfer/{id} als Zahl gelesen")
     status, ort, _ = anfrage("POST", "/admin/helfer/neu", {
         "csrf": CSRF, "name": "Spontan Spontanski", "tshirt": "L",
         "veggie": "ja", "email": "spontan@example.org", "telefon": "0170 1"})
@@ -236,15 +240,26 @@ try:
            "die leere Seite sagt das auch")
 
     status, ort, _ = anfrage("POST", "/admin/funk/ausgeben", {
-        "csrf": CSRF, "helfer_id": str(anna), "schicht_id": str(schicht_id),
+        "csrf": CSRF, "helfer_id": str(anna), "datum": "2026-08-29",
         "funke": "1", "headset": "1", "ersatzakku": "2",
         "bemerkung": "Shuttle Nord"})
     pruefe("hinweis=ausgegeben" in ort, "meldet Erfolg")
     vorgang = zeilen("SELECT * FROM ausleihe")[0]
     pruefe((vorgang["funke"], vorgang["headset"], vorgang["ersatzakku"])
            == (1, 1, 2), "die Mengen stimmen")
-    pruefe(vorgang["schicht_id"] == schicht_id, "mit Schichtbezug")
+    pruefe(vorgang["datum"] == "2026-08-29",
+           "mit Tagesbezug – ein Funkgerät wird für einen Tag geholt, nicht "
+           "für eine einzelne Schicht")
     pruefe(vorgang["ausgegeben_von"] == "KK", "und mit Kürzel")
+
+    status, ort, _ = anfrage("POST", "/admin/funk/ausgeben", {
+        "csrf": CSRF, "helfer_id": str(bert), "datum": "morgen", "funke": "1"})
+    pruefe("hinweis=ausgegeben" in ort, "ein unlesbarer Tag hält nichts auf")
+    pruefe(zeilen("SELECT datum FROM ausleihe ORDER BY id")[1][0] is None,
+           "er wird verworfen statt in die Datenbank gereicht")
+    anfrage("POST", "/admin/ausleihe/%d/loeschen"
+            % zeilen("SELECT id FROM ausleihe ORDER BY id")[1][0],
+            {"csrf": CSRF})
 
     print("Funk: ohne Schicht und für jemand Neues")
     status, ort, _ = anfrage("POST", "/admin/funk/ausgeben",
@@ -255,8 +270,8 @@ try:
     neu = zeilen("SELECT * FROM helfer WHERE name = 'Ganz Neu'")
     pruefe(len(neu) == 1, "die Person steht jetzt in der Helferliste")
     ohne = zeilen("SELECT * FROM ausleihe WHERE helfer_id = ?", neu[0]["id"])[0]
-    pruefe(ohne["schicht_id"] is None,
-           "ein Schichtbezug ist ausdrücklich nicht nötig")
+    pruefe(ohne["datum"] is None,
+           "ein Tagesbezug ist ausdrücklich nicht nötig")
 
     status, ort, _ = anfrage("POST", "/admin/funk/ausgeben",
                              {"csrf": CSRF, "helfer_id": str(anna),
@@ -313,8 +328,8 @@ try:
     # --- 3. KFZ-Schlüssel --------------------------------------------------
     print("Schlüssel: Stamm baut sich auf")
     status, ort, _ = anfrage("POST", "/admin/schluessel/ausgeben", {
-        "csrf": CSRF, "kennzeichen": "il-x 999", "vorname": "Maik",
-        "nachname": "Tibbe", "bemerkung": "Shuttle 1"})
+        "csrf": CSRF, "kennzeichen": "il-x 999", "name": "Maik Tibbe",
+        "bemerkung": "Shuttle 1"})
     pruefe("hinweis=fahrzeug-neu" in ort,
            "das erste Mal legt das Fahrzeug an und sagt es")
     wagen = zeilen("SELECT * FROM fahrzeug")
@@ -322,18 +337,17 @@ try:
     pruefe(wagen[0]["kennzeichen_norm"] == "ILX999", "normalisiert gespeichert")
     pruefe(wagen[0]["kennzeichen"] == "IL-X 999",
            "die Schreibweise bleibt für die Anzeige erhalten")
-    pruefe(wagen[0]["vorname"] == "Maik", "der Halter ist gemerkt")
+    pruefe(wagen[0]["name"] == "Maik Tibbe", "der Halter ist gemerkt")
 
     status, ort, _ = anfrage("POST", "/admin/schluessel/ausgeben", {
-        "csrf": CSRF, "kennzeichen": "ILX999", "vorname": "Anna",
-        "nachname": "Berg"})
+        "csrf": CSRF, "kennzeichen": "ILX999", "name": "Anna Berg"})
     pruefe("hinweis=schluessel-raus" in ort,
            "anders getippt ist derselbe Wagen, kein neuer")
     pruefe(len(zeilen("SELECT id FROM fahrzeug")) == 1, "der Stamm bleibt bei einem")
-    pruefe(zeilen("SELECT vorname FROM fahrzeug")[0][0] == "Maik",
+    pruefe(zeilen("SELECT name FROM fahrzeug")[0][0] == "Maik Tibbe",
            "und der einmal gemerkte Halter wird nicht überschrieben")
     pruefe(len(zeilen("SELECT id FROM schluessel")) == 2, "zwei Ausgaben")
-    pruefe(zeilen("SELECT vorname FROM schluessel ORDER BY id")[1][0] == "Anna",
+    pruefe(zeilen("SELECT name FROM schluessel ORDER BY id")[1][0] == "Anna Berg",
            "die zweite Ausgabe steht auf Anna – wer den Schlüssel hat, kann "
            "vom Halter abweichen")
 

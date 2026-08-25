@@ -378,6 +378,40 @@ async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",
                groessen=normalisieren.GROESSEN, suche=suche))
 
 
+# ACHTUNG, Reihenfolge: /admin/helfer/neu muss VOR
+# /admin/helfer/{helfer_id} stehen. Starlette nimmt die erste Route, die
+# passt – steht die parametrisierte vorn, landet "neu" als Wert in
+# helfer_id und die Anfrage scheitert an der Zahlenprüfung.
+@app.get("/admin/helfer/neu")
+async def helfer_neu(request: Request,
+                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    leer = {"name": "", "email": "", "telefon": "", "veggie": "",
+            "tshirt": "", "bemerkung": ""}
+    return _helferformular(request, sitzung, leer, {})
+
+
+@app.post("/admin/helfer/neu")
+async def helfer_anlegen_von_hand(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return Response("Ungültiger CSRF-Token", status_code=400)
+
+    werte = _helfer_werte(daten)
+    if not werte["name"]:
+        return _helferformular(request, sitzung, werte,
+                               {"name": "Ohne Namen geht es nicht."})
+
+    nummer, meldung = db.helfer_von_hand(_helfer_daten(werte))
+    if meldung == "gibt-es-schon":
+        return _helferformular(
+            request, sitzung, werte,
+            {"name": "Diese Person steht schon in der Liste – gleicher Name "
+                     "und gleiche Mailadresse."}, person=db.helfer_laden(nummer))
+    return _zurueck("/admin/helfer", "angelegt", sprung="helfer-" + str(nummer))
+
+
 @app.get("/admin/helfer/{helfer_id}")
 async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -865,36 +899,6 @@ def _helfer_daten(werte: dict) -> dict:
     }
 
 
-@app.get("/admin/helfer/neu")
-async def helfer_neu(request: Request,
-                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
-    leer = {"name": "", "email": "", "telefon": "", "veggie": "",
-            "tshirt": "", "bemerkung": ""}
-    return _helferformular(request, sitzung, leer, {})
-
-
-@app.post("/admin/helfer/neu")
-async def helfer_anlegen_von_hand(
-        request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
-    daten = await request.form()
-    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
-        return Response("Ungültiger CSRF-Token", status_code=400)
-
-    werte = _helfer_werte(daten)
-    if not werte["name"]:
-        return _helferformular(request, sitzung, werte,
-                               {"name": "Ohne Namen geht es nicht."})
-
-    nummer, meldung = db.helfer_von_hand(_helfer_daten(werte))
-    if meldung == "gibt-es-schon":
-        return _helferformular(
-            request, sitzung, werte,
-            {"name": "Diese Person steht schon in der Liste – gleicher Name "
-                     "und gleiche Mailadresse."}, person=db.helfer_laden(nummer))
-    return _zurueck("/admin/helfer", "angelegt", sprung="helfer-" + str(nummer))
-
-
 @app.get("/admin/helfer/{helfer_id}/aendern")
 async def helfer_formular(request: Request, helfer_id: int,
                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -964,8 +968,8 @@ async def funk(request: Request, hinweis: str = "", offen: str = "",
                ausleihen=db.ausleihen_liste(nur_offen=bool(offen)),
                nur_offen=bool(offen), zaehler=db.material_zaehler(),
                material=db.MATERIAL, material_text=db.MATERIAL_TEXT,
-               helfer=db.helfer_liste(),
-               schichten=db.schichten()))
+               helfer=db.helfer_liste(), tage=db.monitor_tage(),
+               heute=db.jetzt_lokal().strftime("%Y-%m-%d")))
 
 
 @app.post("/admin/funk/ausgeben")
@@ -979,15 +983,10 @@ async def funk_ausgeben(request: Request,
     if helfer_id is None:
         return _zurueck("/admin/funk", "keiner")
 
-    try:
-        schicht_id = int(str(daten.get("schicht_id") or ""))
-    except ValueError:
-        schicht_id = None
-    if schicht_id is not None and db.schicht_laden(schicht_id) is None:
-        schicht_id = None
+    datum = _tag_pruefen(str(daten.get("datum") or ""))
 
     mengen = {stueck: daten.get(stueck) for stueck in db.MATERIAL}
-    nummer = db.ausleihen(helfer_id, mengen, schicht_id,
+    nummer = db.ausleihen(helfer_id, mengen, datum,
                           str(daten.get("bemerkung") or ""), sitzung.kuerzel)
     if nummer is None:
         return _zurueck("/admin/funk", "nichts")
@@ -1044,13 +1043,12 @@ async def schluessel_ausgeben(request: Request,
     if not normalisieren.kennzeichen(kennzeichen):
         return _zurueck("/admin/schluessel", "kein-kennzeichen")
 
-    vorname = str(daten.get("vorname") or "")
-    nachname = str(daten.get("nachname") or "")
-    fahrzeug_id, neu = db.fahrzeug_sichern(kennzeichen, vorname, nachname)
+    name = str(daten.get("name") or "")
+    fahrzeug_id, neu = db.fahrzeug_sichern(kennzeichen, name)
     if fahrzeug_id is None:
         return _zurueck("/admin/schluessel", "kein-kennzeichen")
 
-    db.schluessel_ausgeben(fahrzeug_id, vorname, nachname,
+    db.schluessel_ausgeben(fahrzeug_id, name,
                            str(daten.get("bemerkung") or ""), sitzung.kuerzel)
     return _zurueck("/admin/schluessel",
                     "fahrzeug-neu" if neu else "schluessel-raus")

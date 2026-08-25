@@ -38,13 +38,17 @@
       </div>
 
       <div class="feld">
-        <label for="schicht_id">Schicht <span class="optional">optional</span></label>
-        <select id="schicht_id" name="schicht_id">
-          <option value="">– ohne Schichtbezug –</option>
-          {% for s in schichten %}
-            <option value="{{ s.id }}">{{ s.datum | tag }} {{ s.beginn[11:] }}–{{ s.ende[11:] }} · {{ s.liste }}</option>
+        <label for="datum">Für welchen Tag <span class="optional">optional</span></label>
+        <select id="datum" name="datum">
+          <option value="">– ohne Tagesbezug –</option>
+          {% for t in tage %}
+            <option value="{{ t.datum }}"
+                    {% if t.datum == heute %}selected{% endif %}>{{ t.lang }}</option>
           {% endfor %}
         </select>
+        <p class="hilfe">Ein Funkgerät wird für einen Tag geholt, nicht für
+          eine einzelne Schicht – wer es holt, steht oft auf mehreren. Der
+          heutige Tag ist vorbelegt.</p>
       </div>
 
       <div class="feld">
@@ -91,7 +95,7 @@
     </p>
   {% else %}
     <div class="sperre-suche">
-      <label for="suche">Name, Schicht oder Bemerkung</label>
+      <label for="suche">Name oder Bemerkung</label>
       <div class="sperre-suche-zeile">
         <input type="search" id="suche" autocomplete="off" spellcheck="false"
                placeholder="z. B. Tibbe">
@@ -114,7 +118,7 @@
             <th scope="col">Material</th>
             <th scope="col" aria-sort="none">
               <button type="button" class="sortknopf" data-spalte="2">
-                Schicht <span class="sortpfeil" aria-hidden="true"></span>
+                Für <span class="sortpfeil" aria-hidden="true"></span>
               </button>
             </th>
             <th scope="col" aria-sort="none">
@@ -144,13 +148,9 @@
                   {% endif %}
                 {% endfor %}
               </td>
-              <td data-wert="{{ a.schicht_beginn or '' }}">
-                {% if a.schicht_liste %}
-                  {{ a.schicht_liste }}<br>
-                  <span class="gedaempft">{{ a.schicht_beginn | zeitpunkt }}</span>
-                {% else %}
-                  <span class="gedaempft">ohne</span>
-                {% endif %}
+              <td class="nowrap" data-wert="{{ a.datum or '' }}">
+                {% if a.datum %}{{ a.datum | tag }}
+                {% else %}<span class="gedaempft">ohne Tag</span>{% endif %}
               </td>
               <td class="gedaempft nowrap" data-wert="{{ a.ausgegeben_am }}">
                 {{ a.ausgegeben_am[:16] }}
