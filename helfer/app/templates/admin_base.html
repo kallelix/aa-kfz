@@ -108,7 +108,7 @@
          role="status">{{ meldungen.get(hinweis, hinweis) }}</p>
     {% endif %}
 
-    <main>
+    <main class="{% block hauptklasse %}{% endblock %}">
       {% block inhalt %}{% endblock %}
     </main>
   </div>

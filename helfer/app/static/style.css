@@ -179,6 +179,14 @@ footer {
    ueber 1800 Pixel Breite liest niemand mehr. */
 .huelle-breit { max-width: min(118rem, 100%); }
 
+/* Ein Formular gehoert nicht ueber die ganze Breite gezogen - ein Feld fuer
+   eine Telefonnummer wird davon nicht besser. Aber der Rahmen darum soll
+   stehenbleiben: bisher schrumpfte die ganze Seite auf 40 rem, also sprangen
+   Kopfzeile und Navigation beim Klick aus einer breiten Liste heraus mit.
+   Jetzt bleibt der Rahmen, wo er ist, und nur die Spalte darunter ist
+   schmal. */
+main.spalte-schmal { max-width: 52rem; }
+
 .admin-kopf {
   display: flex;
   flex-wrap: wrap;
