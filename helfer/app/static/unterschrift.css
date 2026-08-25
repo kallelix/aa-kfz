@@ -111,6 +111,8 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  justify-content: safe center;
   min-height: 0;
   padding: 1rem 1.2rem 1.2rem;
   max-width: 46rem;
@@ -128,8 +130,8 @@ body {
 }
 .vorgang-person { margin: .1rem 0 0; font-size: 1.9em; font-weight: 700; }
 .vorgang-wortlaut {
-  margin: .3rem 0 1.2rem;
-  font-size: 1.35em;
+  margin: .3rem 0 .9rem;
+  font-size: 1.12em;
   padding: .7rem .9rem;
   background: var(--flaeche);
   border: 1px solid var(--rand);
@@ -147,10 +149,15 @@ body {
    Er nimmt sich, was uebrig bleibt, statt eine feste Hoehe zu beanspruchen -
    auf einem flachen Bildschirm schrumpft er, statt die Knoepfe zu
    verdraengen. */
+/* Eine feste Hoehe statt "nimm, was uebrig ist". Ein Feld, das sich nach dem
+   Bildschirm richtet, war auf einem hohen Tablet fast 600 Pixel gross - die
+   gedachte Linie sass dann ganz unten am Rand, und zum Unterschreiben braucht
+   es das nicht. Die Sparfassungen weiter unten setzen sie herab, wenn die
+   Hoehe knapp wird. */
 .feldrahmen {
   position: relative;
-  flex: 1;
-  min-height: 7rem;
+  flex: 0 0 auto;
+  height: 11rem;
   background: var(--flaeche);
   border: 2px solid var(--rand);
   border-radius: 10px;
@@ -234,13 +241,13 @@ body {
    besser weiss. */
 .namensfeld {
   width: 100%;
-  padding: .8rem .9rem;
-  margin: 0 0 1.2rem;
+  padding: .6rem .8rem;
+  margin: 0 0 .8rem;
   border: 2px solid var(--rand);
   border-radius: 10px;
   background: var(--flaeche);
   font: inherit;
-  font-size: 1.3em;
+  font-size: 1.1em;
   font-weight: 600;
 }
 .namensfeld:focus { outline: 3px solid var(--limette); outline-offset: 1px; }
@@ -248,7 +255,7 @@ body {
 /* Das Formular ist selbst wieder eine Spalte, damit die Zeichenflaeche
    dazwischen wachsen kann. */
 #zeichenformular {
-  flex: 1;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -260,10 +267,11 @@ body {
 /* Auf sehr flachen Bildschirmen zuerst das Beiwerk kuerzen, nicht die
    Zeichenflaeche. */
 @media (max-height: 800px) {
-  .vorgang-wortlaut { font-size: 1.1em; padding: .5rem .7rem; margin-bottom: .7rem; }
-  .namensfeld { font-size: 1.1em; padding: .6rem .7rem; margin-bottom: .7rem; }
+  .vorgang-wortlaut { font-size: 1em; padding: .45rem .7rem; margin-bottom: .6rem; }
+  .namensfeld { font-size: 1em; padding: .5rem .7rem; margin-bottom: .6rem; }
   .hinweistext { font-size: .78em; margin: .5rem 0 .6rem; }
   .abbrechen { margin-top: .8rem; }
+  .feldrahmen { height: 9rem; }
 }
 
 /* Noch flacher - ein auf Fensterhoehe gestauchter Browser. Jetzt darf auch
@@ -274,7 +282,8 @@ body {
 @media (max-height: 620px) {
   .kopf { padding: .3rem 1rem; }
   .vereinslogo { width: 2.1rem; height: 2.1rem; }
-  .feldrahmen { min-height: 5rem; }
+  .feldrahmen { height: 6.5rem; }
+  .grundlinie { bottom: 1.5rem; }
   .vorgang { padding: .5rem 1.2rem .7rem; }
   .abbrechen { margin-top: .5rem; }
 }
