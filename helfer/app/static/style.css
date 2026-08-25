@@ -817,14 +817,14 @@ tr.entfallen td:last-child { text-decoration: none; }
 
    Heisst nicht .marke - so heisst in allen drei Apps schon die
    Status-Plakette. */
+/* Ohne Kachel: das Wappen hat eine fast schwarze Kontur, die auf hellem
+   Grund von selbst traegt - die weissen Flaechen sind die Fuellung des
+   Schilds und duerfen mit dem Papier verschmelzen. Im dunklen Modus
+   uebernehmen umgekehrt die weissen Flaechen die Form. */
 .vereinslogo {
   width: 3.25rem;
   height: 3.25rem;
   flex: none;
-  padding: .3rem;
-  box-sizing: border-box;
-  background: #13160f;
-  border-radius: 12px;
 }
 
 .kopf-marke {
