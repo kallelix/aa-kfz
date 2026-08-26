@@ -295,6 +295,31 @@ pruefe(bericht["zeilen_vergeben"] == 1 and bericht["zeilen_offen"] == 0,
 pruefe(zeilen("SELECT erfolg FROM import_lauf ORDER BY id DESC LIMIT 1")[0][0] == 1,
        "und steht als geglueckt drin")
 
+print("Eine gestellte Uhr haelt die Automatik an")
+# Sonst traegt jeder Lauf denselben Zeitstempel und liesse sich vom vorigen
+# nicht unterscheiden - und eine Vorfuehrung fragte fremde Server ab.
+from app import main as hauptmodul  # noqa: E402
+
+gemerkt = config.JETZT_FEST
+config.JETZT_FEST = ""
+pruefe(hauptmodul._abruf_takt() == config.IMPORT_TAKT_MINUTEN,
+       "mit echter Uhr gilt der eingestellte Takt: "
+       + str(hauptmodul._abruf_takt()))
+config.JETZT_FEST = "2026-08-29T10:30:00"
+pruefe(hauptmodul._abruf_takt() == 0,
+       "mit gestellter Uhr verspricht die Importseite keinen Takt")
+config.JETZT_FEST = gemerkt
+
+# Die Schleifen selbst haengen an derselben Bedingung. Sie laufen zu lassen,
+# nur um zuzusehen, dauerte Minuten - hier reicht, dass der Start sie
+# ueberhaupt daran knuepft.
+quelle = (WURZEL / "app" / "main.py").read_text(encoding="utf-8")
+pruefe("von_selbst = not config.JETZT_FEST" in quelle,
+       "der Start knuepft die Schleifen an die Uhr")
+for muster in ("if von_selbst and config.serien()",
+               "if von_selbst and config.IMPORT_ABRUF_MOEGLICH"):
+    pruefe(muster in quelle, "und zwar beide: " + muster)
+
 print("Der Takt")
 pruefe(config.IMPORT_TAKT_MINUTEN >= 5 or config.IMPORT_TAKT_MINUTEN == 0,
        "unter fuenf Minuten laesst sich der Takt nicht stellen: "

@@ -78,7 +78,12 @@
       </form>
       <p class="hilfe">Kann einen Moment dauern – es sind drei Aufrufe beim
         Dienst: anmelden, vergebene Posten, offene Posten.</p>
-      {% if abruf_takt > 0 %}
+      {% if uhr_steht %}
+        <p class="hilfe">Von selbst läuft gerade nichts: <code>JETZT_FEST</code>
+          steht in der Konfiguration, die Uhr also still. Jeder Lauf trüge
+          denselben Zeitstempel, und eine Vorführung soll keine fremden Server
+          abfragen. Der Knopf hier geht.</p>
+      {% elif abruf_takt > 0 %}
         <p class="hilfe">Läuft auch von selbst, alle {{ abruf_takt }} Minuten.
           Ein selbsttätiger Lauf übernimmt allerdings nichts, was nach einem
           Ausfall aussieht – etwa eine Ausfuhr, die auf einmal halb so viele

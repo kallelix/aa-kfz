@@ -131,18 +131,32 @@ async def lifespan(app: FastAPI):
 
     stop = asyncio.Event()
     aufgaben = []
-    if config.serien() and 0 <= config.ZEITPLAN_STUNDE <= 23:
+
+    # Eine gestellte Uhr heisst: das hier ist keine laufende Veranstaltung,
+    # sondern eine Vorfuehrung oder ein Probelauf. Nichts davon soll von
+    # selbst fremde Server abfragen - und die Vermerke waeren ohnehin
+    # unbrauchbar, weil jeder Lauf denselben Zeitstempel traegt und sich vom
+    # vorigen nicht unterscheiden laesst. Von Hand geht im Backoffice beides
+    # weiter: wer den Knopf drueckt, weiss, was er tut.
+    von_selbst = not config.JETZT_FEST
+    if not von_selbst:
+        protokoll.info(
+            "JETZT_FEST ist gesetzt - kein Zeitplan-Abruf und kein "
+            "Helferabgleich von selbst. Von Hand geht beides."
+        )
+
+    if von_selbst and config.serien() and 0 <= config.ZEITPLAN_STUNDE <= 23:
         aufgaben.append(asyncio.create_task(worker.schleife(stop)))
-    else:
+    elif von_selbst:
         protokoll.info(
             "Kein automatischer Zeitplan-Abruf - im Backoffice geht er von Hand."
         )
 
-    if config.IMPORT_ABRUF_MOEGLICH and config.IMPORT_TAKT_MINUTEN > 0:
+    if von_selbst and config.IMPORT_ABRUF_MOEGLICH             and config.IMPORT_TAKT_MINUTEN > 0:
         protokoll.info("Helferabgleich alle %d Minuten",
                        config.IMPORT_TAKT_MINUTEN)
         aufgaben.append(asyncio.create_task(worker.import_schleife(stop)))
-    else:
+    elif von_selbst:
         protokoll.info(
             "Kein selbsttaetiger Helferabgleich - im Backoffice geht er von Hand."
         )
@@ -1420,6 +1434,12 @@ async def unterschrift_abbrechen(
 
 # --- Import ----------------------------------------------------------------
 
+def _abruf_takt() -> int:
+    """Wie oft von selbst abgeglichen wird. 0 heisst: gar nicht."""
+    if config.JETZT_FEST:
+        return 0
+    return config.IMPORT_TAKT_MINUTEN
+
 @app.get("/admin/import")
 async def import_formular(request: Request, hinweis: str = "",
                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -1427,7 +1447,7 @@ async def import_formular(request: Request, hinweis: str = "",
         "admin_import.html",
         _admin(request, sitzung, hinweis=hinweis, bericht=None, fehler="",
                abruf_moeglich=config.IMPORT_ABRUF_MOEGLICH,
-               abruf_takt=config.IMPORT_TAKT_MINUTEN,
+               abruf_takt=_abruf_takt(), uhr_steht=bool(config.JETZT_FEST),
                letzter=db.letzter_import(nur_geglueckt=False),
                laeufe=db.importe()))
 
@@ -1444,7 +1464,7 @@ async def import_ausfuehren(request: Request,
             "admin_import.html",
             _admin(request, sitzung, hinweis="", bericht=bericht,
                    fehler=fehler, abruf_moeglich=config.IMPORT_ABRUF_MOEGLICH,
-                   abruf_takt=config.IMPORT_TAKT_MINUTEN,
+                   abruf_takt=_abruf_takt(), uhr_steht=bool(config.JETZT_FEST),
                    letzter=db.letzter_import(nur_geglueckt=False),
                    laeufe=db.importe()), status_code=code)
 
@@ -1486,7 +1506,7 @@ async def import_abrufen(request: Request,
             "admin_import.html",
             _admin(request, sitzung, hinweis="", bericht=bericht,
                    fehler=fehler, abruf_moeglich=config.IMPORT_ABRUF_MOEGLICH,
-                   abruf_takt=config.IMPORT_TAKT_MINUTEN,
+                   abruf_takt=_abruf_takt(), uhr_steht=bool(config.JETZT_FEST),
                    letzter=db.letzter_import(nur_geglueckt=False),
                    laeufe=db.importe()), status_code=code)
 
