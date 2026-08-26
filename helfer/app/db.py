@@ -32,6 +32,10 @@ NACHTRAEGLICHE_SPALTEN: list[tuple[str, str, str]] = [
     ("helfer", "tshirt_ausgegeben_am", "tshirt_ausgegeben_am TEXT"),
     ("helfer", "tshirt_ausgegeben", "tshirt_ausgegeben TEXT"),
     ("helfer", "tshirt_kuerzel", "tshirt_kuerzel TEXT NOT NULL DEFAULT ''"),
+    # Kam mit dem selbsttaetigen Abgleich dazu. Vorher wurden nur geglueckte
+    # Laeufe vermerkt - bei einem Lauf, dem niemand zusieht, muss auch das
+    # Scheitern sichtbar sein, sonst veraltet der Bestand still.
+    ("import_lauf", "erfolg", "erfolg INTEGER NOT NULL DEFAULT 1"),
 ]
 
 
@@ -511,14 +515,26 @@ def letzter_erfolg(serie: str) -> sqlite3.Row | None:
 
 
 def import_vermerken(art: str, datei: str, zeilen: int, bericht: str,
-                     kuerzel: str = "") -> None:
+                     kuerzel: str = "", erfolg: bool = True) -> None:
     con = verbinden()
     try:
         with con:
             con.execute(
                 "INSERT INTO import_lauf (art, datei, zeilen, bericht, kuerzel,"
-                " gelaufen_am) VALUES (?, ?, ?, ?, ?, ?)",
-                (art, datei, zeilen, bericht, kuerzel, jetzt()))
+                " erfolg, gelaufen_am) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (art, datei, zeilen, bericht, kuerzel,
+                 1 if erfolg else 0, jetzt()))
+    finally:
+        con.close()
+
+
+def letzter_import(nur_geglueckt: bool = True) -> sqlite3.Row | None:
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT * FROM import_lauf"
+            + (" WHERE erfolg = 1" if nur_geglueckt else "")
+            + " ORDER BY id DESC LIMIT 1").fetchone()
     finally:
         con.close()
 

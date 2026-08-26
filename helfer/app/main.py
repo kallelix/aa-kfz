@@ -130,19 +130,28 @@ async def lifespan(app: FastAPI):
             )
 
     stop = asyncio.Event()
-    aufgabe = None
+    aufgaben = []
     if config.serien() and 0 <= config.ZEITPLAN_STUNDE <= 23:
-        aufgabe = asyncio.create_task(worker.schleife(stop))
+        aufgaben.append(asyncio.create_task(worker.schleife(stop)))
     else:
         protokoll.info(
             "Kein automatischer Zeitplan-Abruf - im Backoffice geht er von Hand."
+        )
+
+    if config.IMPORT_ABRUF_MOEGLICH and config.IMPORT_TAKT_MINUTEN > 0:
+        protokoll.info("Helferabgleich alle %d Minuten",
+                       config.IMPORT_TAKT_MINUTEN)
+        aufgaben.append(asyncio.create_task(worker.import_schleife(stop)))
+    else:
+        protokoll.info(
+            "Kein selbsttaetiger Helferabgleich - im Backoffice geht er von Hand."
         )
 
     try:
         yield
     finally:
         stop.set()
-        if aufgabe is not None:
+        for aufgabe in aufgaben:
             try:
                 await asyncio.wait_for(aufgabe, timeout=5)
             except (asyncio.TimeoutError, asyncio.CancelledError):
@@ -1418,6 +1427,8 @@ async def import_formular(request: Request, hinweis: str = "",
         "admin_import.html",
         _admin(request, sitzung, hinweis=hinweis, bericht=None, fehler="",
                abruf_moeglich=config.IMPORT_ABRUF_MOEGLICH,
+               abruf_takt=config.IMPORT_TAKT_MINUTEN,
+               letzter=db.letzter_import(nur_geglueckt=False),
                laeufe=db.importe()))
 
 
@@ -1433,6 +1444,8 @@ async def import_ausfuehren(request: Request,
             "admin_import.html",
             _admin(request, sitzung, hinweis="", bericht=bericht,
                    fehler=fehler, abruf_moeglich=config.IMPORT_ABRUF_MOEGLICH,
+                   abruf_takt=config.IMPORT_TAKT_MINUTEN,
+                   letzter=db.letzter_import(nur_geglueckt=False),
                    laeufe=db.importe()), status_code=code)
 
     offen = daten.get("offen")
@@ -1473,6 +1486,8 @@ async def import_abrufen(request: Request,
             "admin_import.html",
             _admin(request, sitzung, hinweis="", bericht=bericht,
                    fehler=fehler, abruf_moeglich=config.IMPORT_ABRUF_MOEGLICH,
+                   abruf_takt=config.IMPORT_TAKT_MINUTEN,
+                   letzter=db.letzter_import(nur_geglueckt=False),
                    laeufe=db.importe()), status_code=code)
 
     # urllib blockiert; im Thread bleibt die Anwendung derweil ansprechbar -

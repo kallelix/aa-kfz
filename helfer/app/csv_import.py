@@ -357,17 +357,69 @@ def _csv_holen(oeffner, url: str, bezeichnung: str) -> bytes:
     return rohdaten
 
 
-def abrufen(kuerzel: str = "") -> dict:
-    """Holt beide Listen beim Dienst und importiert sie wie hochgeladene."""
+# Ein selbsttaetiger Lauf uebernimmt hoechstens diesen Schwund gegenueber dem
+# letzten geglueckten. Darunter bricht er ab, statt zu schreiben.
+ABRUF_MINDESTANTEIL = 0.5
+
+
+def _plausibel(zeilen_neu: int, bezeichnung: str = "") -> None:
+    """Wirft, wenn der Abruf zu wenig geliefert hat, um ihn ungesehen zu
+    uebernehmen.
+
+    Der Grund: eine Ausfuhr mit nur Kopfzeilen ist technisch tadellos. Sie
+    laeuft ohne Fehler durch, setzt den Bedarf jeder Schicht auf null und
+    loescht alle Einteilungen aus dem Import. Wer den Knopf drueckt, sieht
+    "0 Zeilen" im Bericht und stutzt; einem Lauf um vier Uhr morgens sieht
+    niemand zu.
+    """
+    if zeilen_neu <= 0:
+        raise Fehler("Der Abruf hat keine einzige Zeile geliefert. "
+                     "Übernommen wird das nicht – im Backoffice von Hand "
+                     "nachsehen.")
+
+    vorher = db.letzter_import()
+    if vorher is None or not vorher["zeilen"]:
+        return
+    if zeilen_neu < vorher["zeilen"] * ABRUF_MINDESTANTEIL:
+        raise Fehler(
+            "Der Abruf hat %d Zeilen geliefert, zuletzt waren es %d. "
+            "So viel weniger wird nicht ungesehen übernommen – im "
+            "Backoffice von Hand nachsehen und dort abrufen."
+            % (zeilen_neu, vorher["zeilen"]))
+
+
+def abrufen(kuerzel: str = "", automatisch: bool = False) -> dict:
+    """Holt beide Listen beim Dienst und importiert sie wie hochgeladene.
+
+    automatisch=True fuegt die Plausibilitaetspruefung hinzu und vermerkt
+    auch das Scheitern. Von Hand bleibt es dabei, dass der Bericht auf dem
+    Bildschirm die Pruefung ist - wer hinschaut, darf auch einen Bestand mit
+    drei Zeilen uebernehmen.
+    """
     if not config.IMPORT_ABRUF_MOEGLICH:
         raise Fehler("Für den Abruf fehlen die Adressen in der "
                      "Konfiguration (IMPORT_LOGIN_URL, IMPORT_URL_VERGEBEN, "
                      "IMPORT_URL_OFFEN).")
 
-    oeffner = _oeffner()
-    # Erst anmelden: die Sitzung steckt danach im Keksbehaelter des Oeffners.
-    _seite_holen(oeffner, config.IMPORT_LOGIN_URL, "Anmeldung")
-    vergeben = _csv_holen(oeffner, config.IMPORT_URL_VERGEBEN,
-                          "Vergebene Posten")
-    offen = _csv_holen(oeffner, config.IMPORT_URL_OFFEN, "Offene Posten")
-    return importieren(offen, vergeben, ABRUF_NAME, kuerzel)
+    try:
+        oeffner = _oeffner()
+        # Erst anmelden: die Sitzung steckt danach im Keksbehaelter des
+        # Oeffners.
+        _seite_holen(oeffner, config.IMPORT_LOGIN_URL, "Anmeldung")
+        vergeben = _csv_holen(oeffner, config.IMPORT_URL_VERGEBEN,
+                              "Vergebene Posten")
+        offen = _csv_holen(oeffner, config.IMPORT_URL_OFFEN, "Offene Posten")
+
+        if automatisch:
+            vorschau = pruefen(offen, vergeben)
+            _plausibel(vorschau["zeilen_offen"] + vorschau["zeilen_vergeben"])
+
+        return importieren(offen, vergeben, ABRUF_NAME, kuerzel)
+    except Fehler as fehler:
+        if automatisch:
+            # Ein Lauf, dem niemand zusieht, muss sein Scheitern hinterlassen -
+            # sonst steht im Backoffice nur ein alter geglueckter Lauf und
+            # nichts sagt, dass seither nichts mehr ankommt.
+            db.import_vermerken("schichten", ABRUF_NAME, 0, str(fehler),
+                                kuerzel, erfolg=False)
+        raise

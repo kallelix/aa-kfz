@@ -680,6 +680,33 @@ sagt das die Fehlermeldung im Backoffice; dann ist ein neuer Link fällig.
 Ohne die drei Adressen bleibt es beim Hochladen der beiden Dateien; die
 Importseite sagt dann, was fehlt.
 
+**Von selbst, im Takt.** Stehen die Adressen, gleicht der Dienst zusätzlich
+alle `IMPORT_TAKT_MINUTEN` Minuten ab (Vorgabe 60, `0` schaltet es ab, unter 5
+wird auf 5 angehoben). Der erste Lauf kommt nach dem ersten Abstand, nicht
+beim Hochfahren – der Start soll nicht an einem fremden Server hängen. Jeder
+Lauf sind drei Aufrufe dort; stündlich also 72 am Tag.
+
+Ein selbsttätiger Lauf ist vorsichtiger als der Knopf:
+
+- **Keine Zeile** oder **weniger als die Hälfte des letzten geglückten Laufs**
+  wird nicht übernommen. Der Grund ist eine Ausfuhr, die nur aus Kopfzeilen
+  besteht: technisch tadellos, läuft ohne Fehler durch – und setzt den Bedarf
+  jeder Schicht auf null und löscht alle Einteilungen aus dem Import. Wer den
+  Knopf drückt, sieht „0 Zeilen“ im Bericht und stutzt; einem Lauf um vier Uhr
+  morgens sieht niemand zu. Von Hand geht derselbe Abruf durch – wer hinschaut,
+  darf auch einen kleinen Bestand übernehmen.
+- **Gescheiterte Läufe hinterlassen einen Vermerk.** Unter *Import* steht dann
+  eine Warnung mit dem Grund, und die Liste der Läufe zeigt „gescheitert“ statt
+  „übernommen“. Ohne das stünde dort nur ein alter geglückter Lauf, und nichts
+  sagte, dass seither nichts mehr ankommt – der häufigste Fall dafür ist ein
+  abgelaufener Login-Link.
+
+Was der Dienst dabei tut, steht auch im Journal:
+
+```bash
+journalctl -u abfahrt-helfer -g Helferabgleich --no-pager | tail -20
+```
+
 ### Der Monitor-Link
 
 Er steht in der Datenbank, nicht in der Konfiguration – ein Neustart ändert ihn

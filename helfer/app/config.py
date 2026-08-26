@@ -195,6 +195,19 @@ IMPORT_URL_OFFEN = os.environ.get("IMPORT_URL_OFFEN", "").strip()
 IMPORT_ABRUF_MOEGLICH = bool(IMPORT_LOGIN_URL and IMPORT_URL_VERGEBEN
                              and IMPORT_URL_OFFEN)
 
+# Abstand zwischen zwei selbsttaetigen Abgleichen, in Minuten. 0 oder weniger
+# schaltet sie ab; von Hand geht es dann immer noch.
+#
+# Nicht zu knapp waehlen: jeder Lauf sind drei Aufrufe bei einem fremden
+# Dienst - anmelden, vergebene Posten, offene Posten. Stuendlich sind das 72
+# am Tag, das faellt dort nicht auf. Alle fuenf Minuten waeren es 864.
+IMPORT_TAKT_MINUTEN = _zahl("IMPORT_TAKT_MINUTEN", 60)
+
+# Untergrenze, damit ein Vertipper in der .env den fremden Dienst nicht
+# ueberrennt.
+if 0 < IMPORT_TAKT_MINUTEN < 5:
+    IMPORT_TAKT_MINUTEN = 5
+
 
 # --- Monitor ---------------------------------------------------------------
 

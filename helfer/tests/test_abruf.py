@@ -231,6 +231,75 @@ pruefe(staende[2] == 2,
        "nach zwei geglueckten und vier gescheiterten Laeufen stehen zwei "
        "Vermerke da")
 
+print("Selbsttaetig: was nach einem Ausfall aussieht, wird nicht uebernommen")
+# Eine Ausfuhr mit nur Kopfzeilen ist technisch tadellos - sie laeuft ohne
+# Fehler durch, setzt aber jeden Bedarf auf null und loescht alle
+# Einteilungen aus dem Import. Von Hand sieht man "0 Zeilen" im Bericht,
+# einem Lauf um vier Uhr morgens sieht niemand zu.
+ENDE = (chr(13) + chr(10)).encode()
+NUR_KOPF_VERGEBEN = b"Name,Zusatz1,Zusatz2,Liste,Datum,Zeit,Aufgabe,Email,Phone" + ENDE
+NUR_KOPF_OFFEN = b"Liste,Datum,Zeit,Aufgabe" + ENDE
+
+stand = (zeilen("SELECT COUNT(*) FROM schicht")[0][0],
+         zeilen("SELECT COUNT(*) FROM einteilung")[0][0],
+         zeilen("SELECT SUM(bedarf) FROM schicht")[0][0])
+stellen(antworten=[
+    ("home.php", Antwort(b"<html>Dashboard</html>", "text/html")),
+    ("download_csv=1", Antwort(NUR_KOPF_VERGEBEN)),
+    ("download_csv=2", Antwort(NUR_KOPF_OFFEN)),
+])
+try:
+    csv_import.abrufen("automatisch", automatisch=True)
+    pruefe(False, "eine leere Ausfuhr haette abgelehnt werden muessen")
+except csv_import.Fehler as f:
+    pruefe("keine einzige Zeile" in str(f),
+           "die leere Ausfuhr wird abgelehnt: " + str(f)[:60])
+pruefe((zeilen("SELECT COUNT(*) FROM schicht")[0][0],
+        zeilen("SELECT COUNT(*) FROM einteilung")[0][0],
+        zeilen("SELECT SUM(bedarf) FROM schicht")[0][0]) == stand,
+       "und der Bestand steht unveraendert da: " + str(stand))
+
+# Dasselbe eine Stufe milder: die Haelfte fehlt.
+HALB_VERGEBEN = (
+    b"Name,Zusatz1,Zusatz2,Liste,Datum,Zeit,Aufgabe,Email,Phone" + ENDE
+    + "Anna Berg,Damen M,,Streckenposten,28.08.2026,10:00 - 18:00,,anna@example.org,".encode()
+    + ENDE)
+stellen(antworten=[
+    ("home.php", Antwort(b"<html>Dashboard</html>", "text/html")),
+    ("download_csv=1", Antwort(HALB_VERGEBEN)),
+    ("download_csv=2", Antwort(NUR_KOPF_OFFEN)),
+])
+try:
+    csv_import.abrufen("automatisch", automatisch=True)
+    pruefe(False, "der Schwund haette auffallen muessen")
+except csv_import.Fehler as f:
+    pruefe("zuletzt waren es" in str(f),
+           "starker Schwund wird abgelehnt: " + str(f)[:80])
+
+print("Gescheiterte Laeufe hinterlassen einen Vermerk")
+letzter = zeilen("SELECT * FROM import_lauf ORDER BY id DESC LIMIT 1")[0]
+pruefe(letzter["erfolg"] == 0, "als gescheitert vermerkt")
+pruefe("zuletzt waren es" in letzter["bericht"],
+       "mit dem Grund: " + letzter["bericht"][:60])
+pruefe(letzter["kuerzel"] == "automatisch", "und wer es war")
+
+print("Von Hand fragt niemand nach")
+stellen(antworten=[
+    ("home.php", Antwort(b"<html>Dashboard</html>", "text/html")),
+    ("download_csv=1", Antwort(HALB_VERGEBEN)),
+    ("download_csv=2", Antwort(NUR_KOPF_OFFEN)),
+])
+bericht = csv_import.abrufen("KK")
+pruefe(bericht["zeilen_vergeben"] == 1 and bericht["zeilen_offen"] == 0,
+       "derselbe Abruf geht von Hand durch - wer hinschaut, darf das")
+pruefe(zeilen("SELECT erfolg FROM import_lauf ORDER BY id DESC LIMIT 1")[0][0] == 1,
+       "und steht als geglueckt drin")
+
+print("Der Takt")
+pruefe(config.IMPORT_TAKT_MINUTEN >= 5 or config.IMPORT_TAKT_MINUTEN == 0,
+       "unter fuenf Minuten laesst sich der Takt nicht stellen: "
+       + str(config.IMPORT_TAKT_MINUTEN))
+
 print()
 if fehler:
     print("FEHLGESCHLAGEN (" + str(len(fehler)) + "):")
