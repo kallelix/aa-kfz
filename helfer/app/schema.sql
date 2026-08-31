@@ -21,8 +21,12 @@ CREATE TABLE IF NOT EXISTS helfer (
     -- Normalisierte Größe und daneben, was die Person wirklich eingetippt
     -- hat. "Damen L" ist beim Bestellen eine Information, die "L" allein
     -- nicht mehr hergibt.
-    tshirt        TEXT CHECK (tshirt IS NULL OR tshirt IN
-                              ('XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL')),
+    -- Bewusst OHNE CHECK auf die erlaubten Groessen. Die Liste steht in
+    -- normalisieren.GROESSEN, und jeder Schreibweg prueft dagegen. Hier
+    -- waere sie ein zweites Mal hinterlegt - an einer Stelle, die SQLite
+    -- nicht aendern kann: eine Groesse dazuzunehmen hiesse, die Tabelle
+    -- neu zu bauen. Genau das ist mit 5XL passiert.
+    tshirt        TEXT,
     tshirt_roh    TEXT NOT NULL DEFAULT '',
 
     bemerkung     TEXT NOT NULL DEFAULT '',

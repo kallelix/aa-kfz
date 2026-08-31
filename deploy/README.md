@@ -707,6 +707,32 @@ Was der Dienst dabei tut, steht auch im Journal:
 journalctl -u abfahrt-helfer -g Helferabgleich --no-pager | tail -20
 ```
 
+### Helferdaten ausführen
+
+Unter **Helfer** steht neben *Helfer hinzufügen* ein Knopf **Als CSV**. Die
+Datei enthält eine Zeile je Helfer mit Name, Kontakt, Verpflegung, beiden
+T-Shirt-Größen (angekündigt und tatsächlich ausgegeben, samt Zeitpunkt und
+Kürzel), der Zahl der Schichten und der Bemerkung.
+
+Trennzeichen ist `CSV_TRENNER` (Vorgabe `;`, was deutsches Excel erwartet),
+und der Datei geht ein BOM voran – ohne das zeigt Excel unter Windows
+Umlaute als Buchstabensalat.
+
+Zwei Dinge dazu:
+
+- **Die Suche der Liste filtert nicht mit.** Sie läuft im Browser über das,
+  was schon auf der Seite steht; die Datei enthält immer alle. Ein Ausschnitt
+  lässt sich in der Tabellenkalkulation ohnehin leichter ziehen.
+- **Es sind Personendaten** – Namen, Mailadressen, Telefonnummern. Der Abruf
+  verlangt eine Anmeldung und wird mit `Cache-Control: no-store` ausgeliefert.
+  Was danach mit der Datei geschieht, liegt außerhalb der Anwendung; sie
+  gehört nach der Veranstaltung gelöscht wie der Rest.
+
+Neben `Größe angekündigt` steht `Größe wie eingetippt`. Das ist Absicht: aus
+dem Registrierungstool kommen Werte wie „Damen L“ oder „Large“ – die erste
+Spalte ist leer, wenn sich daraus keine eindeutige Größe lesen lässt, die
+zweite zeigt dann, was dastand.
+
 ### Der Monitor-Link
 
 Er steht in der Datenbank, nicht in der Konfiguration – ein Neustart ändert ihn

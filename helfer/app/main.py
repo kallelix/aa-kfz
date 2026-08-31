@@ -11,7 +11,9 @@ macht der Reverse Proxy davor; gestartet wird mit `python -m app`.
 from __future__ import annotations
 
 import asyncio
+import csv
 import hmac
+import io
 import logging
 from contextlib import asynccontextmanager
 from datetime import date, datetime
@@ -474,6 +476,70 @@ async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",
                groessen=normalisieren.GROESSEN, suche=suche,
                unterschrieben=unterschriften.je_vorgang("tshirt"),
                tablet=bool(db.tablet_token())))
+
+
+# --- Ausfuhr ---------------------------------------------------------------
+
+# (Spalte in der Datei, wie sie ueberschrieben ist)
+HELFER_SPALTEN = (
+    "Name", "E-Mail", "Telefon", "Verpflegung",
+    "Größe angekündigt", "Größe wie eingetippt",
+    "T-Shirt ausgegeben", "ausgegeben am", "ausgegeben von",
+    "Schichten", "Bemerkung", "angelegt am",
+)
+
+
+def _helfer_zeile(person) -> list:
+    """Eine Zeile der Ausfuhr.
+
+    Beide Groessen stehen nebeneinander: „Damen L“ ist beim Bestellen eine
+    Information, die „L“ allein nicht hergibt - und was tatsaechlich
+    herausgegeben wurde, kann davon abweichen.
+    """
+    return [
+        person["name"],
+        person["email"],
+        person["telefon"],
+        {1: "vegetarisch", 0: "Fleisch"}.get(person["veggie"], ""),
+        person["tshirt"] or "",
+        person["tshirt_roh"] or "",
+        person["tshirt_ausgegeben"] or "",
+        (person["tshirt_ausgegeben_am"] or "")[:16],
+        person["tshirt_kuerzel"] or "",
+        person["schichten"],
+        person["bemerkung"],
+        (person["angelegt_am"] or "")[:16],
+    ]
+
+
+@app.get("/admin/helfer/export.csv")
+async def helfer_ausfuhr(
+        request: Request,
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    """Alle Helfer als Datei - fuer die T-Shirt-Bestellung, eine Kontaktliste
+    oder das Archiv nach der Veranstaltung.
+
+    Ohne die Suche der Liste: die sitzt im Browser und filtert nur, was schon
+    da ist. Ein Ausschnitt liesse sich in der Tabellenkalkulation ohnehin
+    leichter ziehen als hier vorher festlegen.
+    """
+    puffer = io.StringIO(newline="")
+    schreiber = csv.writer(puffer, delimiter=config.CSV_TRENNER,
+                           quoting=csv.QUOTE_MINIMAL, lineterminator=chr(13) + chr(10))
+    schreiber.writerow(HELFER_SPALTEN)
+    for person in db.helfer_liste():
+        schreiber.writerow(_helfer_zeile(person))
+
+    # BOM voran, sonst zeigt Excel unter Windows Umlaute als Buchstabensalat.
+    inhalt = ("﻿" + puffer.getvalue()).encode("utf-8")
+    name = "helfer-" + db.jetzt_lokal().strftime("%Y-%m-%d") + ".csv"
+    return Response(
+        content=inhalt,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="' + name + '"',
+                 # Personendaten gehoeren in keinen Zwischenspeicher.
+                 "Cache-Control": "no-store"},
+    )
 
 
 # ACHTUNG, Reihenfolge: /admin/helfer/neu muss VOR

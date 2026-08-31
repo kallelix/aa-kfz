@@ -39,6 +39,10 @@
 
   <p class="knopfreihe">
     <a class="knopf" href="/admin/helfer/neu">Helfer hinzufügen</a>
+    {% if helfer %}
+      <a class="knopf-schlicht" href="/admin/helfer/export.csv"
+         download>Als CSV</a>
+    {% endif %}
     <span class="hilfe">Für alle, die nicht im Registrierungstool stehen und
       trotzdem ein T-Shirt oder ein Funkgerät bekommen.</span>
   </p>

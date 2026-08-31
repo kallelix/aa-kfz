@@ -236,7 +236,7 @@ früh echte Daten in der App stehen und sich die Ansichten daran prüfen lassen.
 | 6 | Zeitplan-Abruf mit Tabellenwahl, Wochentag-Zuordnung, Bericht | 3 h |
 | 7 | Programm-Band mit Schichten darunter | 3 h |
 | 8 | Monitor-Ansicht mit Token-Link und Selbstaktualisierung | 2,5 h |
-| 9 | CSV-Export | 0,5 h |
+| 9 | CSV-Export der Helferdaten | 0,5 h |
 | 10 | Deployment: dritte Unit, dritter nginx-Block, drittes Backup | 1 h |
 | 11 | Timetable abschalten | 0,5 h |
 

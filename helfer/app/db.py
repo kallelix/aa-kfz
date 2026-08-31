@@ -86,6 +86,73 @@ def verbinden() -> sqlite3.Connection:
     return con
 
 
+def _klammerspanne(sql: str, anfang: int) -> int:
+    """Ende der Klammer, die bei `anfang` aufgeht - Position hinter dem `)`."""
+    tiefe = 0
+    for stelle in range(anfang, len(sql)):
+        if sql[stelle] == "(":
+            tiefe += 1
+        elif sql[stelle] == ")":
+            tiefe -= 1
+            if tiefe == 0:
+                return stelle + 1
+    return -1
+
+
+# Die Groessenliste stand einmal doppelt: in normalisieren.GROESSEN und als
+# CHECK auf helfer.tshirt. Als 5XL dazukam, nahm das Auswahlfeld sie an und
+# die Datenbank wies sie ab - eine CHECK-Klausel laesst sich in SQLite nicht
+# aendern, nur die ganze Tabelle neu bauen.
+#
+# Sie faellt deshalb weg. Geprueft wird auf dem Weg dorthin: der Import laesst
+# nur durch, was normalisieren.tshirt() kennt, und die Formulare vergleichen
+# in _helfer_daten() gegen GROESSEN.
+_ALTE_GROESSENPRUEFUNG = "CHECK (tshirt IS NULL OR tshirt IN"
+
+
+def _groessenpruefung_loesen() -> list[str]:
+    """Baut helfer einmalig ohne die CHECK-Klausel auf tshirt neu."""
+    con = verbinden()
+    try:
+        zeile = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='helfer'"
+        ).fetchone()
+        if zeile is None or _ALTE_GROESSENPRUEFUNG not in (zeile["sql"] or ""):
+            return []
+
+        alt = zeile["sql"]
+        anfang = alt.index(_ALTE_GROESSENPRUEFUNG)
+        ende = _klammerspanne(alt, alt.index("(", anfang))
+        if ende < 0:
+            return []
+        # Der neue Bauplan ist der alte ohne die Klausel - so bleiben alle
+        # Spalten erhalten, auch die, die spaeter dazugekommen sind.
+        neu = (alt[:anfang] + alt[ende:]).replace(
+            "CREATE TABLE IF NOT EXISTS helfer", "CREATE TABLE helfer_neu", 1
+        ).replace("CREATE TABLE helfer ", "CREATE TABLE helfer_neu ", 1)
+        if "helfer_neu" not in neu:
+            return []
+
+        # Das dokumentierte Vorgehen: ohne Fremdschluessel, sonst raeumte das
+        # DROP ueber ON DELETE CASCADE alle Einteilungen und Ausleihen mit ab.
+        con.execute("PRAGMA foreign_keys = OFF")
+        con.execute("BEGIN")
+        con.execute(neu)
+        con.execute("INSERT INTO helfer_neu SELECT * FROM helfer")
+        con.execute("DROP TABLE helfer")
+        con.execute("ALTER TABLE helfer_neu RENAME TO helfer")
+        con.execute("COMMIT")
+        verletzt = con.execute("PRAGMA foreign_key_check").fetchall()
+        con.execute("PRAGMA foreign_keys = ON")
+        if verletzt:
+            raise RuntimeError(
+                "Nach dem Umbau von helfer zeigen Verweise ins Leere: "
+                + str(verletzt[:3]))
+        return ["helfer.tshirt ohne Groessenpruefung neu gebaut"]
+    finally:
+        con.close()
+
+
 def init() -> list[str]:
     """Legt das Schema an und trägt fehlende Spalten nach. Gibt zurück, was
     nachgetragen wurde – der Start schreibt das ins Protokoll."""
@@ -103,6 +170,9 @@ def init() -> list[str]:
                     nachgetragen.append(tabelle + "." + spalte)
     finally:
         con.close()
+    # Erst danach: der Umbau kopiert die Tabelle samt der Spalten, die eben
+    # nachgetragen wurden.
+    nachgetragen += _groessenpruefung_loesen()
     return nachgetragen
 
 

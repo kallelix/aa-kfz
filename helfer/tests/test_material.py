@@ -233,6 +233,42 @@ try:
     person = zeilen("SELECT * FROM helfer WHERE id = ?", spontan)[0]
     pruefe(person["tshirt"] == "XL" and person["veggie"] == 0, "die Werte stimmen")
 
+    # Jede angebotene Groesse muss auch ankommen. 5XL stand eine Weile im
+    # Auswahlfeld, waehrend eine CHECK-Klausel in der Tabelle nur bis 4XL
+    # ging - wer sie waehlte, bekam einen Fehler statt einer Speicherung.
+    print("Jede Groesse aus dem Auswahlfeld kommt auch an")
+    for groesse in ("XS", "4XL", "5XL"):
+        status, ort, _ = anfrage("POST", "/admin/helfer/%d/aendern" % spontan, {
+            "csrf": CSRF, "name": "Spontan Spontanski", "tshirt": groesse,
+            "email": "spontan@example.org", "veggie": "nein"})
+        gespeichert = zeilen("SELECT tshirt FROM helfer WHERE id = ?",
+                             spontan)[0][0]
+        pruefe("hinweis=gespeichert" in ort and gespeichert == groesse,
+               groesse + " kommt in der Datenbank an")
+    anfrage("POST", "/admin/helfer/%d/aendern" % spontan, {
+        "csrf": CSRF, "name": "Spontan Spontanski", "tshirt": "XL",
+        "email": "spontan@example.org", "veggie": "nein"})
+
+    print("Helfer als CSV")
+    status, ort, _ = anfrage("GET", "/admin/helfer/export.csv")
+    kopf = None
+    zeilen_csv = None
+    pruefe(status == 200, "die Datei kommt")
+    _, _, roh = anfrage("GET", "/admin/helfer/export.csv")
+    # anfrage() gibt Text zurueck - das reicht, um Inhalt und Trenner zu
+    # pruefen; die Bytes selbst prueft der Aufruf gegen den Server unten.
+    zeilen_csv = [z for z in roh.splitlines() if z.strip()]
+    kopf = zeilen_csv[0].lstrip("﻿").split(";")
+    pruefe(kopf[:4] == ["Name", "E-Mail", "Telefon", "Verpflegung"],
+           "die Spalten stehen dran: " + ", ".join(kopf[:4]))
+    pruefe("Größe angekündigt" in kopf and "T-Shirt ausgegeben" in kopf,
+           "beide Groessen nebeneinander - angekuendigt und ausgegeben")
+    pruefe(len(zeilen_csv) - 1 == len(zeilen("SELECT id FROM helfer")),
+           "eine Zeile je Helfer: %d" % (len(zeilen_csv) - 1))
+    pruefe(zeilen_csv[0].startswith("﻿"),
+           "mit BOM voran, sonst zeigt Excel Umlautsalat")
+    pruefe(any("Anna Berg" in z for z in zeilen_csv), "die Leute stehen drin")
+
     # --- 2. Funkgeräte -----------------------------------------------------
     print("Einstellungen: Vorbelegung der Materialausgabe")
     status, _, seite = anfrage("GET", "/admin/einstellungen")
