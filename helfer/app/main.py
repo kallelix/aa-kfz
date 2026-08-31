@@ -480,21 +480,23 @@ async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",
 
 # --- Ausfuhr ---------------------------------------------------------------
 
-# (Spalte in der Datei, wie sie ueberschrieben ist)
+# Nur Stammdaten - was eine Person ausmacht, nicht was ihr ausgehaendigt
+# wurde. Eine Uebergabe ist ein Vorgang mit eigenem Zeitpunkt und eigenem
+# Kuerzel; sie in dieselbe Zeile zu ziehen vermischt zwei Dinge, und sobald
+# es je Person mehr als eine gibt, passt sie ohnehin nicht mehr hinein.
 HELFER_SPALTEN = (
     "Name", "E-Mail", "Telefon", "Verpflegung",
     "Größe angekündigt", "Größe wie eingetippt",
-    "T-Shirt ausgegeben", "ausgegeben am", "ausgegeben von",
     "Schichten", "Bemerkung", "angelegt am",
 )
 
 
 def _helfer_zeile(person) -> list:
-    """Eine Zeile der Ausfuhr.
+    """Eine Zeile der Ausfuhr - genau eine je Person.
 
     Beide Groessen stehen nebeneinander: „Damen L“ ist beim Bestellen eine
-    Information, die „L“ allein nicht hergibt - und was tatsaechlich
-    herausgegeben wurde, kann davon abweichen.
+    Information, die „L“ allein nicht mehr hergibt. Was tatsaechlich
+    herausgegeben wurde, steht hier bewusst nicht.
     """
     return [
         person["name"],
@@ -503,9 +505,6 @@ def _helfer_zeile(person) -> list:
         {1: "vegetarisch", 0: "Fleisch"}.get(person["veggie"], ""),
         person["tshirt"] or "",
         person["tshirt_roh"] or "",
-        person["tshirt_ausgegeben"] or "",
-        (person["tshirt_ausgegeben_am"] or "")[:16],
-        person["tshirt_kuerzel"] or "",
         person["schichten"],
         person["bemerkung"],
         (person["angelegt_am"] or "")[:16],

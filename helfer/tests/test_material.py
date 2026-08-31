@@ -261,8 +261,13 @@ try:
     kopf = zeilen_csv[0].lstrip("﻿").split(";")
     pruefe(kopf[:4] == ["Name", "E-Mail", "Telefon", "Verpflegung"],
            "die Spalten stehen dran: " + ", ".join(kopf[:4]))
-    pruefe("Größe angekündigt" in kopf and "T-Shirt ausgegeben" in kopf,
-           "beide Groessen nebeneinander - angekuendigt und ausgegeben")
+    pruefe("Größe angekündigt" in kopf and "Größe wie eingetippt" in kopf,
+           "die angekuendigte Groesse und der Rohwert daneben")
+    # Diese Sicht sind Stammdaten. Eine Uebergabe ist ein eigener Vorgang mit
+    # Zeitpunkt und Kuerzel und gehoert nicht in die Personenzeile.
+    for spalte in ("T-Shirt ausgegeben", "ausgegeben am", "ausgegeben von"):
+        pruefe(spalte not in kopf, "keine Uebergabe in der Zeile: " + spalte)
+    pruefe(len(set(kopf)) == len(kopf), "keine Spalte doppelt")
     pruefe(len(zeilen_csv) - 1 == len(zeilen("SELECT id FROM helfer")),
            "eine Zeile je Helfer: %d" % (len(zeilen_csv) - 1))
     pruefe(zeilen_csv[0].startswith("﻿"),
