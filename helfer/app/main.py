@@ -480,13 +480,16 @@ async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",
 
 # --- Ausfuhr ---------------------------------------------------------------
 
-# Nur Stammdaten - was eine Person ausmacht, nicht was ihr ausgehaendigt
-# wurde. Eine Uebergabe ist ein Vorgang mit eigenem Zeitpunkt und eigenem
-# Kuerzel; sie in dieselbe Zeile zu ziehen vermischt zwei Dinge, und sobald
-# es je Person mehr als eine gibt, passt sie ohnehin nicht mehr hinein.
+# Die T-Shirt-Ausgabe gehoert hier hinein, Funk und Schluessel nicht - und
+# der Unterschied liegt nicht am Geschmack, sondern an der Form der Daten:
+# das T-Shirt haengt als EIN Feld an der Person, es gibt hoechstens eine
+# Ausgabe je Helfer. Funkgeraete und Schluessel sind eigene Vorgaenge, davon
+# beliebig viele je Person; sie hier anzuhaengen hiesse, die Zeile zu
+# vervielfachen. Dafuer braeuchte es eigene Ausfuhren.
 HELFER_SPALTEN = (
     "Name", "E-Mail", "Telefon", "Verpflegung",
     "Größe angekündigt", "Größe wie eingetippt",
+    "T-Shirt ausgegeben", "ausgegeben am", "ausgegeben von",
     "Schichten", "Bemerkung", "angelegt am",
 )
 
@@ -494,9 +497,10 @@ HELFER_SPALTEN = (
 def _helfer_zeile(person) -> list:
     """Eine Zeile der Ausfuhr - genau eine je Person.
 
-    Beide Groessen stehen nebeneinander: „Damen L“ ist beim Bestellen eine
-    Information, die „L“ allein nicht mehr hergibt. Was tatsaechlich
-    herausgegeben wurde, steht hier bewusst nicht.
+    Drei Groessenangaben nebeneinander, und jede sagt etwas anderes:
+    „Damen L“ ist beim Bestellen eine Information, die „L“ allein nicht mehr
+    hergibt - und was am Tisch tatsaechlich herausging, kann von beidem
+    abweichen.
     """
     return [
         person["name"],
@@ -505,6 +509,9 @@ def _helfer_zeile(person) -> list:
         {1: "vegetarisch", 0: "Fleisch"}.get(person["veggie"], ""),
         person["tshirt"] or "",
         person["tshirt_roh"] or "",
+        person["tshirt_ausgegeben"] or "",
+        (person["tshirt_ausgegeben_am"] or "")[:16],
+        person["tshirt_kuerzel"] or "",
         person["schichten"],
         person["bemerkung"],
         (person["angelegt_am"] or "")[:16],

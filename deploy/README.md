@@ -710,15 +710,15 @@ journalctl -u abfahrt-helfer -g Helferabgleich --no-pager | tail -20
 ### Helferdaten ausführen
 
 Unter **Helfer** steht neben *Helfer hinzufügen* ein Knopf **Als CSV**. Die
-Datei enthält **eine Zeile je Helfer** mit Name, Kontakt, Verpflegung, der
-angekündigten T-Shirt-Größe samt Rohwert, der Zahl der Schichten und der
-Bemerkung.
+Datei enthält **eine Zeile je Helfer** mit Name, Kontakt, Verpflegung, den
+T-Shirt-Größen (angekündigt, Rohwert, tatsächlich ausgegeben samt Zeitpunkt
+und Kürzel), der Zahl der Schichten und der Bemerkung.
 
-Es sind **Stammdaten**: was ausgehändigt wurde – T-Shirt, Funkgerät,
-Schlüssel – steht bewusst nicht darin. Eine Übergabe ist ein Vorgang mit
-eigenem Zeitpunkt und eigenem Kürzel; sie in die Personenzeile zu ziehen
-vermischt zwei Dinge, und sobald es je Person mehr als eine gibt, passt sie
-ohnehin nicht mehr hinein.
+**Funkgeräte und Schlüssel stehen nicht darin**, die T-Shirt-Ausgabe schon.
+Der Unterschied liegt an der Form der Daten: das T-Shirt hängt als *ein* Feld
+an der Person, es gibt höchstens eine Ausgabe je Helfer. Funk und Schlüssel
+sind eigene Vorgänge, davon beliebig viele je Person – sie hier anzuhängen
+hieße, die Zeile zu vervielfachen. Dafür bräuchte es eigene Ausfuhren.
 
 Trennzeichen ist `CSV_TRENNER` (Vorgabe `;`, was deutsches Excel erwartet),
 und der Datei geht ein BOM voran – ohne das zeigt Excel unter Windows

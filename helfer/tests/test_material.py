@@ -261,18 +261,31 @@ try:
     kopf = zeilen_csv[0].lstrip("﻿").split(";")
     pruefe(kopf[:4] == ["Name", "E-Mail", "Telefon", "Verpflegung"],
            "die Spalten stehen dran: " + ", ".join(kopf[:4]))
-    pruefe("Größe angekündigt" in kopf and "Größe wie eingetippt" in kopf,
-           "die angekuendigte Groesse und der Rohwert daneben")
-    # Diese Sicht sind Stammdaten. Eine Uebergabe ist ein eigener Vorgang mit
-    # Zeitpunkt und Kuerzel und gehoert nicht in die Personenzeile.
-    for spalte in ("T-Shirt ausgegeben", "ausgegeben am", "ausgegeben von"):
-        pruefe(spalte not in kopf, "keine Uebergabe in der Zeile: " + spalte)
+    for spalte in ("Größe angekündigt", "Größe wie eingetippt",
+                   "T-Shirt ausgegeben", "ausgegeben am", "ausgegeben von"):
+        pruefe(spalte in kopf, "steht dabei: " + spalte)
     pruefe(len(set(kopf)) == len(kopf), "keine Spalte doppelt")
+
+    # Die T-Shirt-Ausgabe passt in die Personenzeile, weil es hoechstens eine
+    # je Helfer gibt. Funk und Schluessel sind eigene Vorgaenge, davon
+    # beliebig viele - die wuerden die Zeile vervielfachen.
+    for spalte in ("Funkgerät", "Headset", "Ersatzakku", "Kennzeichen"):
+        pruefe(spalte not in kopf, "nicht in dieser Sicht: " + spalte)
     pruefe(len(zeilen_csv) - 1 == len(zeilen("SELECT id FROM helfer")),
            "eine Zeile je Helfer: %d" % (len(zeilen_csv) - 1))
     pruefe(zeilen_csv[0].startswith("﻿"),
            "mit BOM voran, sonst zeigt Excel Umlautsalat")
     pruefe(any("Anna Berg" in z for z in zeilen_csv), "die Leute stehen drin")
+
+    # Anna hat oben ein XL bekommen, angekuendigt war M. Genau fuer diesen
+    # Fall stehen beide Spalten nebeneinander.
+    annas = [z.split(";") for z in zeilen_csv if z.startswith("Anna Berg")][0]
+    pruefe(annas[kopf.index("Größe angekündigt")] == "M"
+           and annas[kopf.index("T-Shirt ausgegeben")] == "XL",
+           "angekuendigt M, ausgegeben XL - beides steht da: "
+           + str(annas[4:9]))
+    pruefe(annas[kopf.index("ausgegeben von")] == "KK",
+           "mit dem Kuerzel dessen, der es ausgegeben hat")
 
     # --- 2. Funkgeräte -----------------------------------------------------
     print("Einstellungen: Vorbelegung der Materialausgabe")
