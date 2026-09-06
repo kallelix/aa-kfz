@@ -15,50 +15,81 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def _load_dotenv(pfad: Path) -> None:
-    """Minimaler .env-Loader für die lokale Entwicklung. Im Betrieb setzt
-    systemd die Variablen selbst; bereits gesetzte gewinnen."""
+def _werte_lesen(pfad: Path) -> dict[str, str]:
+    """Minimaler .env-Leser. Gibt die Werte zurück, statt sie in os.environ
+    zu schieben.
+
+    Der Unterschied ist der Kern der Zusammenführung: die drei Anwendungen
+    laufen jetzt in EINEM Prozess und benutzen mit Absicht dieselben Namen –
+    DB_PATH, APP_SECRET_KEY, ADMIN_PASSWORD_HASH. In os.environ gäbe es davon
+    nur einen Satz, und es gewänne, wer zuerst lädt. Jede Anwendung hält ihre
+    Werte deshalb für sich.
+    """
+    werte: dict[str, str] = {}
     if not pfad.exists():
-        return
+        return werte
     for zeile in pfad.read_text(encoding="utf-8").splitlines():
         zeile = zeile.strip()
         if not zeile or zeile.startswith("#") or "=" not in zeile:
             continue
         name, _, wert = zeile.partition("=")
-        os.environ.setdefault(name.strip(), wert.strip().strip('"').strip("'"))
+        werte[name.strip()] = wert.strip().strip('"').strip("'")
+    return werte
 
 
-_load_dotenv(BASE_DIR / ".env")
+# Welche Datei gilt. Im Betrieb zeigt HELFER_ENV auf /etc/abfahrt/…,
+# lokal liegt sie neben der Anwendung.
+_DATEI = Path(os.environ.get("HELFER_ENV", "") or (BASE_DIR / ".env"))
+_WERTE = _werte_lesen(_DATEI)
+
+
+def _env(name: str, vorgabe=None):
+    """Erst die Prozessumgebung, dann die eigene Datei.
+
+    Dieselbe Reihenfolge wie vorher, als der Lader os.environ.setdefault
+    benutzte: ein ausdrücklich gesetzter Wert gewinnt. Daran hängen die
+    Tests, die ihre Wegwerf-Datenbank über die Umgebung setzen – gäbe die
+    Datei den Ausschlag, liefen sie gegen die echte.
+
+    Der Preis: eine global gesetzte Variable gilt für alle drei Anwendungen.
+    Deshalb setzt die Unit im Betrieb nur BIND und die drei Zeiger
+    KENNZEICHEN_ENV, PRESSE_ENV und HELFER_ENV – alles andere steht in den
+    Dateien, auf die sie zeigen.
+    """
+    aus_umgebung = os.environ.get(name)
+    if aus_umgebung is not None:
+        return aus_umgebung
+    return _WERTE.get(name, vorgabe)
 
 
 def _flag(name: str, default: str = "1") -> bool:
-    return os.environ.get(name, default).strip().lower() not in ("0", "false", "nein", "")
+    return _env(name, default).strip().lower() not in ("0", "false", "nein", "")
 
 
 def _zahl(name: str, default: int) -> int:
     try:
-        return int(os.environ.get(name, str(default)).strip())
+        return int(_env(name, str(default)).strip())
     except ValueError:
         return default
 
 
 # --- Betrieb ---------------------------------------------------------------
 
-BIND = os.environ.get("BIND", "127.0.0.1:8082")
+BIND = _env("BIND", "127.0.0.1:8082")
 
 # Von welchen Adressen X-Forwarded-For und X-Forwarded-Proto geglaubt werden.
 # Liegt der Reverse Proxy auf einem anderen Host, MUSS hier dessen IP stehen.
-FORWARDED_ALLOW_IPS = os.environ.get("FORWARDED_ALLOW_IPS", "127.0.0.1").strip()
+FORWARDED_ALLOW_IPS = _env("FORWARDED_ALLOW_IPS", "127.0.0.1").strip()
 
-DB_PATH = Path(os.environ.get("DB_PATH", str(BASE_DIR / "data" / "helfer.db")))
+DB_PATH = Path(_env("DB_PATH", str(BASE_DIR / "data" / "helfer.db")))
 if not DB_PATH.is_absolute():
     DB_PATH = BASE_DIR / DB_PATH
 
-BASIS_PFAD = "/" + os.environ.get("BASIS_PFAD", "/").strip("/")
+BASIS_PFAD = "/" + _env("BASIS_PFAD", "/").strip("/")
 
 # Öffentliche Adresse, z. B. https://helfer.example.de. Wird für den
 # Monitor-Link gebraucht; leer heißt: aus der Anfrage ableiten.
-BASIS_URL = os.environ.get("BASIS_URL", "").strip().rstrip("/")
+BASIS_URL = _env("BASIS_URL", "").strip().rstrip("/")
 
 
 def bind_adresse() -> tuple[str, int]:
@@ -75,12 +106,12 @@ def nur_localhost() -> bool:
 
 # --- Veranstaltung ---------------------------------------------------------
 
-VERANSTALTUNG = os.environ.get("VERANSTALTUNG", "Die absolute Abfahrt")
-ORT = os.environ.get("ORT", "Ilmenau")
+VERANSTALTUNG = _env("VERANSTALTUNG", "Die absolute Abfahrt")
+ORT = _env("ORT", "Ilmenau")
 
 # Die drei Renntage. Der Zeitplan-Abruf braucht sie, um Wochentage ("Freitag")
 # auf Daten abzubilden; Auf- und Abbauschichten liegen davor und danach.
-TAGE_ROH = os.environ.get("TAGE", "2026-08-28,2026-08-29,2026-08-30")
+TAGE_ROH = _env("TAGE", "2026-08-28,2026-08-29,2026-08-30")
 
 
 def _tage() -> list[date]:
@@ -116,7 +147,7 @@ def tag_zu_datum(wochentag: str) -> date | None:
 # Welche Serien abgerufen werden. Je Schlüssel gibt es drei weitere Variablen,
 # siehe unten. Leer heißt: kein Abruf.
 ZEITPLAN_SERIEN = [t.strip() for t in
-                   os.environ.get("ZEITPLAN_SERIEN", "dhc,kids").split(",")
+                   _env("ZEITPLAN_SERIEN", "dhc,kids").split(",")
                    if t.strip()]
 
 # Voreinstellungen für die beiden Serien, die 2026 in Ilmenau fahren. Alles
@@ -146,12 +177,12 @@ def serien() -> list[dict]:
         praefix = "ZEITPLAN_" + schluessel.upper() + "_"
         eintrag = {
             "schluessel": schluessel,
-            "titel": os.environ.get(praefix + "TITEL",
+            "titel": _env(praefix + "TITEL",
                                     vorgabe.get("titel", schluessel)),
-            "url": os.environ.get(praefix + "URL", vorgabe.get("url", "")).strip(),
-            "abschnitt": os.environ.get(praefix + "ABSCHNITT",
+            "url": _env(praefix + "URL", vorgabe.get("url", "")).strip(),
+            "abschnitt": _env(praefix + "ABSCHNITT",
                                         vorgabe.get("abschnitt", "allgemein")),
-            "farbe": os.environ.get(praefix + "FARBE",
+            "farbe": _env(praefix + "FARBE",
                                     vorgabe.get("farbe", "#95bf0b")),
         }
         if eintrag["url"]:
@@ -185,9 +216,9 @@ ZEITPLAN_STUNDE = _zahl("ZEITPLAN_STUNDE", 4)
 # genuegt: ohne Sitzung liefert der Dienst die Anmeldeseite statt der Datei.
 # Er laesst sich mehrfach verwenden, der Abruf meldet sich also jedes Mal neu
 # an, statt eine Sitzung aufzubewahren, die ohnehin ablaufen wuerde.
-IMPORT_LOGIN_URL = os.environ.get("IMPORT_LOGIN_URL", "").strip()
-IMPORT_URL_VERGEBEN = os.environ.get("IMPORT_URL_VERGEBEN", "").strip()
-IMPORT_URL_OFFEN = os.environ.get("IMPORT_URL_OFFEN", "").strip()
+IMPORT_LOGIN_URL = _env("IMPORT_LOGIN_URL", "").strip()
+IMPORT_URL_VERGEBEN = _env("IMPORT_URL_VERGEBEN", "").strip()
+IMPORT_URL_OFFEN = _env("IMPORT_URL_OFFEN", "").strip()
 
 # Der Abruf steht nur bereit, wenn alle drei da sind. Zwei von dreien ergaeben
 # einen halben Bedarf - denselben Grund hat der Import, beide Dateien zu
@@ -253,7 +284,7 @@ UNTERSCHRIFT_TAKT = _zahl("UNTERSCHRIFT_TAKT", 2)
 # Was den Helfern am Tablet über die Aufbewahrung gesagt wird. Eine
 # Unterschrift ist ein personenbezogenes Datum – sie braucht einen Zweck und
 # eine Frist, und beides gehört dorthin, wo unterschrieben wird.
-UNTERSCHRIFT_AUFBEWAHRUNG = os.environ.get(
+UNTERSCHRIFT_AUFBEWAHRUNG = _env(
     "UNTERSCHRIFT_AUFBEWAHRUNG",
     "Die Unterschrift belegt nur die Übergabe und wird nach der "
     "Veranstaltung gelöscht.").strip()
@@ -264,32 +295,32 @@ UNTERSCHRIFT_AUFBEWAHRUNG = os.environ.get(
 ADMIN_TAKT = _zahl("ADMIN_TAKT", 3)
 
 # Feste Zeitzone – der Monitor steht in Ilmenau, egal wo der Server läuft.
-ZEITZONE = os.environ.get("ZEITZONE", "Europe/Berlin").strip() or "Europe/Berlin"
+ZEITZONE = _env("ZEITZONE", "Europe/Berlin").strip() or "Europe/Berlin"
 
 # Erlaubt, die Uhr für Durchsichten zu verstellen: ISO-Zeitpunkt statt "jetzt".
 # Leer heißt: echte Uhr. Im Betrieb bleibt das leer.
-JETZT_FEST = os.environ.get("JETZT_FEST", "").strip()
+JETZT_FEST = _env("JETZT_FEST", "").strip()
 
 
 # --- Ansprechpartner -------------------------------------------------------
 
-KONTAKT_NAME = os.environ.get("KONTAKT_NAME", "Orga-Team Absolute Abfahrt")
-KONTAKT_MAIL = os.environ.get("KONTAKT_MAIL", "")
-KONTAKT_TELEFON = os.environ.get("KONTAKT_TELEFON", "")
+KONTAKT_NAME = _env("KONTAKT_NAME", "Orga-Team Absolute Abfahrt")
+KONTAKT_MAIL = _env("KONTAKT_MAIL", "")
+KONTAKT_TELEFON = _env("KONTAKT_TELEFON", "")
 
 # --- Backoffice / Anmeldung ------------------------------------------------
 
 import secrets as _secrets  # noqa: E402  (bewusst erst hier, nur für den Fallback)
 
-ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "").strip()
+ADMIN_PASSWORD_HASH = _env("ADMIN_PASSWORD_HASH", "").strip()
 
-APP_SECRET_KEY = os.environ.get("APP_SECRET_KEY", "").strip()
+APP_SECRET_KEY = _env("APP_SECRET_KEY", "").strip()
 SECRET_KEY_FLUECHTIG = not APP_SECRET_KEY
 if SECRET_KEY_FLUECHTIG:
     APP_SECRET_KEY = _secrets.token_urlsafe(32)
 
 SESSION_STUNDEN = _zahl("SESSION_STUNDEN", 12)
-COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "auto").strip().lower()
+COOKIE_SECURE = _env("COOKIE_SECURE", "auto").strip().lower()
 LOGIN_VERSUCHE = _zahl("LOGIN_VERSUCHE", 5)
 LOGIN_FENSTER_SEKUNDEN = _zahl("LOGIN_FENSTER_SEKUNDEN", 60)
 
@@ -297,9 +328,9 @@ KUERZEL_ABFRAGEN = _flag("KUERZEL_ABFRAGEN")
 
 # --- Sonstiges -------------------------------------------------------------
 
-CSV_TRENNER = os.environ.get("CSV_TRENNER", ";")[:1] or ";"
+CSV_TRENNER = _env("CSV_TRENNER", ";")[:1] or ";"
 
-LOGO_DATEI = os.environ.get("LOGO_DATEI", "").strip()
+LOGO_DATEI = _env("LOGO_DATEI", "").strip()
 if LOGO_DATEI and ("/" in LOGO_DATEI or "\\" in LOGO_DATEI):
     LOGO_DATEI = ""
 
