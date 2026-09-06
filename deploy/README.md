@@ -1,37 +1,65 @@
 # Deployment
 
-Drei Anwendungen aus einem Repository, je ein **LXC-Container**
-(Debian/Ubuntu), davor ein **nginx auf einem anderen Host** mit öffentlicher IP,
-der HTTPS terminiert.
+**Eine Anwendung, ein Dienst, ein Container.** Darin laufen die drei Programme
+– Kennzeichen, Presse, Helfer – in einem Prozess; welcher antwortet,
+entscheidet der Hostname.
 
-- Abschnitte 1 bis 6: **Kennzeichen-App** unter `kennzeichen.example.de`
-- Abschnitt 7: **Presse-Akkreditierung** unter `presse.example.de`
-- Abschnitt 8: **Helfer-Dashboard** unter `helfer.example.de`
-
-Der Aufbau ist für alle drei gleich; die Abschnitte 7 und 8 nennen nur die
-Unterschiede. Das Helfer-Dashboard hat davon die meisten – es ist die einzige
-der drei, die **von sich aus nach draußen telefoniert** und einen Teil ihrer
-Oberfläche **ohne Anmeldung** ausliefert.
+Ein **LXC-Container** (Debian/Ubuntu), davor ein **nginx auf einem anderen
+Host** mit öffentlicher IP, der HTTPS terminiert.
 
 ```text
-Internet ──HTTPS──▶ nginx (10.0.0.10)  ──HTTP──▶ LXC (10.0.0.42:8080)
-                    Zertifikat              nur von 10.0.0.10 erreichbar
-                    Rate Limit
+Internet ──HTTPS──▶ nginx (10.0.0.10) ──HTTP──▶ LXC (10.0.0.42:8080)
+                    Zertifikate                 nur von 10.0.0.10 erreichbar
+                    Rate Limit                         │
+                                                       └──HTTPS──▶ ixsdownhillcup.com
+                                                                   kidscup.bike
+                                                                   helferliste.online
 ```
 
-Die beiden IPs sind Platzhalter. Sie kommen an drei Stellen vor und müssen
-zusammenpassen:
+Vier Adressen zeigen auf denselben Dienst:
+
+| Adresse | was dort liegt |
+| --- | --- |
+| `kennzeichen.example.de` | Antragsformular, öffentlich |
+| `presse.example.de` | Akkreditierung, öffentlich |
+| `helfer.example.de` | Monitor und Unterschriften-Tablet, per Token |
+| `admin.example.de` | **alle drei Backoffices**, eine Anmeldung |
+
+Die öffentlichen Adressen stehen auf Plakaten, in Mails und in QR-Codes –
+deshalb wird nach Hostname verteilt und nicht nach Pfad. Das Backoffice liegt
+umgekehrt unter einer Adresse, weil dieselben paar Leute alle drei betreuen:
+`admin.example.de/kennzeichen/…`, `/presse/…`, `/helfer/…`.
+
+Die beiden IPs oben sind Platzhalter. Sie kommen an drei Stellen vor und
+müssen zusammenpassen:
 
 | Wert | Wo eintragen |
 | --- | --- |
-| IP des Containers | `BIND` in der env, `upstream abfahrt` in der nginx-Config |
-| IP des nginx | `FORWARDED_ALLOW_IPS` in der env, Firewall-Regel im Container |
+| IP des Containers | `BIND` in `dienst.env`, `upstream abfahrt` in der nginx-Config |
+| IP des nginx | `FORWARDED_ALLOW_IPS` in `dienst.env`, Firewall-Regel im Container |
 
 `FORWARDED_ALLOW_IPS` falsch zu setzen ist der Fehler mit den unangenehmsten
 Folgen: dann steht bei jedem Antrag die IP des nginx als Absender, und das
 Login-Rate-Limit zählt alle Fehlversuche auf einen Topf – ein Tippfehler beim
-Passwort sperrt die ganze Orga für eine Minute aus. Die App warnt beim Start,
-wenn sie nicht auf localhost lauscht und der Wert trotzdem `127.0.0.1` ist.
+Passwort sperrt die ganze Orga für eine Minute aus.
+
+**Drei Dinge, die nur wegen des Helfer-Teils gelten** und die erst im Betrieb
+auffallen, wenn man sie beim Aufsetzen übersieht:
+
+1. **Ausgehende Verbindungen.** Der Dienst holt den Zeitplan von den Websites
+   der Rennserien und die Helferlisten beim Registrierungstool. Der Container
+   braucht Egress auf Port 443 und `ca-certificates`. Fehlt eines von beidem,
+   bleibt der letzte Stand stehen und das Backoffice zeigt den Fehler.
+2. **Ein Teil ist öffentlich.** Monitor und Tablet laufen ohne Anmeldung,
+   geschützt nur durch einen langen Token im Pfad. Der optionale
+   Basic-Auth-Riegel vor dem Backoffice darf **nicht** auf
+   `helfer.example.de` ausgedehnt werden – der Bildschirm im Zelt kann kein
+   Passwort eingeben.
+3. **Die Content-Security-Policy braucht `connect-src 'self'`.** Monitor und
+   Tablet holen sich ihren Inhalt per `fetch`. Ohne die Direktive fällt das
+   auf `default-src 'none'` zurück und wird geblockt: der Monitor bliebe
+   stumm auf dem ersten Stand stehen, und das Tablet bekäme nie mit, dass
+   etwas ansteht.
 
 ---
 
@@ -72,38 +100,65 @@ also nicht an. Die Datenbank liegt ohnehin unter `/var/lib/abfahrt`.
 
 ### Konfiguration
 
-```bash
-install -o root -g root -m 600 deploy/kennzeichen.env.example /etc/abfahrt/kennzeichen.env
+Vier Dateien: eine gemeinsame und je Anwendung eine.
 
-# Passwort-Hash und Session-Schlüssel erzeugen und eintragen
+```bash
+install -o root -g root -m 600 deploy/dienst.env.example      /etc/abfahrt/dienst.env
+install -o root -g root -m 600 deploy/kennzeichen.env.example /etc/abfahrt/kennzeichen.env
+install -o root -g root -m 600 deploy/presse.env.example      /etc/abfahrt/presse.env
+install -o root -g root -m 600 deploy/helfer.env.example      /etc/abfahrt/helfer.env
+
+# Passwort-Hash und Session-Schluessel - EINMAL, sie gelten fuer alle drei
 /opt/abfahrt/.venv/bin/python -m kern.passwort
 /opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
 
-editor /etc/abfahrt/kennzeichen.env
+editor /etc/abfahrt/dienst.env
 ```
 
-Mindestens setzen: `BIND`, `FORWARDED_ALLOW_IPS`, `ADMIN_PASSWORD_HASH`,
-`APP_SECRET_KEY`, `SMTP_PASS`.
+In **`dienst.env`** steht, was für alle gilt: `BIND`,
+`FORWARDED_ALLOW_IPS`, die vier `HOST_…`, `ADMIN_PASSWORD_HASH`,
+`APP_SECRET_KEY` und die drei Zeiger `KENNZEICHEN_ENV`, `PRESSE_ENV`,
+`HELFER_ENV`.
 
-Die Datei gehört **root und ist 0600**. systemd liest sie, bevor es die Rechte
-auf den Benutzer `abfahrt` fallen lässt – der Dienst selbst braucht keinen
-Zugriff darauf.
+In den **drei anderen** steht, was sich unterscheidet – vor allem `DB_PATH`,
+dazu `BASIS_URL`, die Mailkonfiguration (Kennzeichen und Presse) und beim
+Helfer der Abruf der Helferliste.
+
+> `ADMIN_PASSWORD_HASH` und `APP_SECRET_KEY` gehören **nur** in `dienst.env`.
+> Die Umgebung schlägt die Datei, also gälten sie ohnehin für alle drei –
+> aber genau daran hängt, dass eine Anmeldung alle drei Bereiche öffnet.
+> Stünden dort verschiedene Schlüssel, läge zwar ein Keks im Browser, seine
+> Unterschrift passte im nächsten Bereich aber nicht.
+
+Alle vier gehören **root und sind 0600**. systemd liest `dienst.env`, bevor
+es die Rechte auf den Benutzer `abfahrt` fallen lässt; die drei anderen liest
+der Dienst selbst – deshalb müssen sie für ihn lesbar sein:
+
+```bash
+chgrp abfahrt /etc/abfahrt/kennzeichen.env /etc/abfahrt/presse.env /etc/abfahrt/helfer.env
+chmod 640     /etc/abfahrt/kennzeichen.env /etc/abfahrt/presse.env /etc/abfahrt/helfer.env
+```
 
 ### Dienst
 
 ```bash
-install -m 644 deploy/kennzeichen.service /etc/systemd/system/kennzeichen.service
+install -m 644 deploy/dienst.service /etc/systemd/system/abfahrt.service
 systemctl daemon-reload
-systemctl enable --now kennzeichen
-systemctl status kennzeichen
-journalctl -u kennzeichen -f
+systemctl enable --now abfahrt
+systemctl status abfahrt
+journalctl -u abfahrt -f
 ```
+
+Im Protokoll muss **dreimal `starte Bereich …`** stehen – Kennzeichen,
+Presse, Helfer. Fehlt einer, hat seine `.env` oder sein `DB_PATH` nicht
+gepasst. Die Datenbanken legt der Dienst beim ersten Start selbst an.
 
 Prüfen, dass wirklich nur der gewünschte Port offen ist:
 
 ```bash
 ss -lntp
-curl -sS -o /dev/null -w '%{http_code}\n' http://10.0.0.42:8080/
+curl -sS -o /dev/null -w '%{http_code}
+' -H 'Host: kennzeichen.example.de'      http://10.0.0.42:8080/
 ```
 
 ### Firewall
@@ -131,27 +186,32 @@ Internet nicht antwortet – das gehört auf die Prüfliste unten.
 ## 2. Auf dem nginx-Host
 
 ```bash
-install -m 644 deploy/abfahrt-proxy.conf /etc/nginx/snippets/abfahrt-proxy.conf
-install -m 644 deploy/nginx-kennzeichen.conf \
-    /etc/nginx/sites-available/kennzeichen.example.de
-ln -s ../sites-available/kennzeichen.example.de /etc/nginx/sites-enabled/
+install -m 644 deploy/dienst-proxy.conf /etc/nginx/snippets/abfahrt-dienst-proxy.conf
+install -m 644 deploy/nginx-dienst.conf /etc/nginx/sites-available/abfahrt
+ln -s ../sites-available/abfahrt /etc/nginx/sites-enabled/
 
-# IP des Containers in der Datei anpassen, dann:
+# Die vier Adressen und die IP des Containers in der Datei anpassen, dann:
 nginx -t
 ```
 
-### DNS und Zertifikat
+Eine Datei für alle vier Adressen. Der Proxy-Schnipsel reicht `Host` durch –
+**daran** entscheidet der Dienst, welcher Bereich antwortet. Ohne die Zeile
+bekäme er den Namen des Upstreams zu sehen und fände gar keinen.
 
-1. A-Record (und ggf. AAAA) für `kennzeichen.example.de` auf die öffentliche IP
-   des nginx
-2. Zertifikat holen:
+### DNS und Zertifikate
+
+1. A-Record (und ggf. AAAA) für alle vier Namen auf die öffentliche IP des
+   nginx: `kennzeichen`, `presse`, `helfer`, `admin`.
+2. Zertifikate holen – zwei Server-Blöcke, also zwei Zertifikate:
 
 ```bash
-certbot --nginx -d kennzeichen.example.de
+certbot --nginx -d kennzeichen.example.de -d presse.example.de -d helfer.example.de
+certbot --nginx -d admin.example.de
 ```
 
 Falls schon ein Wildcard-Zertifikat für `*.example.de` vorliegt, stattdessen
-dessen Pfade in der Config eintragen und certbot überspringen.
+dessen Pfade in der Config eintragen und certbot überspringen – dann genügt
+eines für alle vier.
 
 ```bash
 systemctl reload nginx
@@ -161,9 +221,9 @@ systemctl reload nginx
 
 ## 3. Sicherung
 
-Das Skript liegt bereits im Klon und ist ausführbar. Es läuft als `abfahrt`,
-liest die Datenbank und schreibt nach `/var/backups/abfahrt` – beides gehört
-diesem Benutzer.
+Ein Lauf für alle drei Datenbanken. Ohne `DB_PATH` sichert das Skript
+**jede** `.db` in `/var/lib/abfahrt` – vorher waren das drei Cron-Einträge in
+drei Containern.
 
 ```bash
 crontab -u abfahrt -e
@@ -173,23 +233,15 @@ crontab -u abfahrt -e
 15 3 * * * /opt/abfahrt/deploy/backup.sh >> /var/log/abfahrt-backup.log 2>&1
 ```
 
-Das Skript nutzt `sqlite3 ".backup"` statt `cp`. Die Datenbank läuft im
+Das Skript nutzt `sqlite3 ".backup"` statt `cp`. Die Datenbanken laufen im
 WAL-Modus; ein blosses Kopieren der `.db` erwischt die noch nicht
 eingearbeiteten Änderungen aus der `-wal`-Datei nicht. Anschliessend prüft es
-die Kopie mit `PRAGMA integrity_check` – eine kaputte Sicherung fällt sonst erst
-auf, wenn man sie braucht. Sicherungen älter als 30 Tage werden gelöscht.
+jede Kopie mit `PRAGMA integrity_check` – eine kaputte Sicherung fällt sonst
+erst auf, wenn man sie braucht. Sicherungen älter als 30 Tage werden gelöscht.
 
-**Der Dateiname folgt der Datenbank**: `antraege.db` wird zu
-`antraege-2026-08-25.db`, `presse.db` zu `presse-2026-08-25.db`, `helfer.db` zu
-`helfer-2026-08-25.db`. Bis zum Hinzukommen der dritten Anwendung hieß jede
-Sicherung `antraege-`, auch die der Presse-App – drei gleich benannte Dateien
-auseinanderzuhalten wäre genau dann schwierig geworden, wenn es eilt. Wer
-schon einen Presse-Container betreibt, findet dort noch Dateien mit dem alten
-Namen; das Skript räumt sie mit auf, sobald sie alt genug sind.
-
-Einmal von Hand laufen lassen und nachsehen, dass eine Datei entsteht.
-
-Und: einmal eine Rücksicherung geprobt haben, bevor es darauf ankommt.
+> Die Sicherungen enthalten Personendaten. Nach der Veranstaltung gehören sie
+> mit gelöscht, siehe Abschnitt 7 – sonst war der Löschlauf auf der Datenbank
+> umsonst.
 
 ---
 
@@ -198,32 +250,48 @@ Und: einmal eine Rücksicherung geprobt haben, bevor es darauf ankommt.
 Vom eigenen Rechner aus, nicht vom Server:
 
 ```bash
-# erreichbar und verschlüsselt
-curl -sS -o /dev/null -w '%{http_code}\n' https://kennzeichen.example.de/
+# Alle vier erreichbar und verschluesselt
+for n in kennzeichen presse helfer admin; do
+    printf '%-12s ' "$n"
+    curl -sS -o /dev/null -w '%{http_code}
+' "https://$n.example.de/"
+done
 
 # HTTP leitet weiter
-curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://kennzeichen.example.de/
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}
+' http://kennzeichen.example.de/
 
 # Der Container ist NICHT direkt erreichbar (muss scheitern)
 curl -sS --max-time 5 http://<oeffentliche-ip-des-containers>:8080/ || echo "gut so"
 
 # Backoffice verlangt Anmeldung
-curl -sS -o /dev/null -w '%{http_code}\n' https://kennzeichen.example.de/admin
+curl -sS -o /dev/null -w '%{http_code}
+' https://admin.example.de/helfer
+
+# Das Backoffice liegt NICHT auf den oeffentlichen Adressen (muss 404 sein)
+curl -sS -o /dev/null -w '%{http_code}
+' https://kennzeichen.example.de/kennzeichen
 ```
 
 Im Browser:
 
+- [ ] `journalctl -u abfahrt` zeigt beim Start **dreimal** `starte Bereich …`
 - [ ] Antrag absenden, Bestätigungsseite erscheint
-- [ ] Antrag steht im Backoffice
-- [ ] Anmeldung klappt, Abmelden klappt
-- [ ] Cookie hat `Secure` und `HttpOnly` (Entwicklertools → Anwendung → Cookies)
-- [ ] `journalctl -u kennzeichen` zeigt beim Antrag die **echte** Client-IP,
+- [ ] Presse-Anmeldung absenden, Bestätigungsseite erscheint
+- [ ] `admin.example.de` zeigt die Startseite mit drei Kacheln
+- [ ] **Eine** Anmeldung öffnet alle drei Bereiche
+- [ ] Abmelden in einem Bereich meldet aus allen dreien ab
+- [ ] Cookie hat `Secure`, `HttpOnly` und `Path=/`
+      (Entwicklertools → Anwendung → Cookies)
+- [ ] `journalctl -u abfahrt` zeigt beim Antrag die **echte** Client-IP,
       nicht `10.0.0.10`
 - [ ] Beim Start keine Warnung über `FORWARDED_ALLOW_IPS` oder fehlende
       Geheimnisse
-- [ ] Eingangsmail kommt an – zuerst an eine eigene Adresse, dann an Gmail, GMX
-      und Outlook (siehe Schritt 7 im Haupt-README)
+- [ ] Eingangsmail kommt an – zuerst an eine eigene Adresse, dann an Gmail,
+      GMX und Outlook
 - [ ] CSV-Export öffnet in Excel ohne Nachfrage und mit korrekten Umlauten
+- [ ] Monitor-Link erzeugt und auf dem Bildschirmrechner geprüft
+- [ ] Eine Sicherung von Hand angestoßen, **drei** Dateien im Zielordner
 
 ---
 
@@ -241,13 +309,13 @@ git pull
 .venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # 4. Neu starten und nachsehen
-systemctl restart kennzeichen
-systemctl status kennzeichen --no-pager
-journalctl -u kennzeichen -n 30 --no-pager
+systemctl restart abfahrt
+systemctl status abfahrt --no-pager
+journalctl -u abfahrt -n 30 --no-pager
 ```
 
 Dieselben vier Schritte gelten in jedem der drei Container, nur mit dem
-jeweiligen Dienstnamen: `kennzeichen`, `presse` oder `helfer`. Jeder Container
+Dienstnamen `abfahrt`. Der Container
 hat seinen eigenen Klon von `/opt/abfahrt` und wird einzeln aktualisiert – ein
 `git pull` im einen ändert am anderen nichts.
 
@@ -275,7 +343,7 @@ cd /opt/abfahrt
 git log --oneline -5          # Commit von vorher heraussuchen
 git checkout <commit>
 .venv/bin/pip install --no-cache-dir -r requirements.txt
-systemctl restart kennzeichen
+systemctl restart abfahrt
 ```
 
 Zurück auf die aktuelle Spitze geht es mit `git checkout main`.
@@ -284,11 +352,11 @@ Ist die **Datenbank** das Problem, hilft der Code-Rollback allein nicht – dann
 die Sicherung aus Schritt 1 zurückspielen:
 
 ```bash
-systemctl stop kennzeichen
+systemctl stop abfahrt
 cp /var/backups/abfahrt/antraege-JJJJ-MM-TT.db /var/lib/abfahrt/antraege.db
 rm -f /var/lib/abfahrt/antraege.db-wal /var/lib/abfahrt/antraege.db-shm
 chown abfahrt:abfahrt /var/lib/abfahrt/antraege.db
-systemctl start kennzeichen
+systemctl start abfahrt
 ```
 
 Die beiden `-wal`- und `-shm`-Dateien müssen weg: sie gehören zur alten
@@ -299,7 +367,7 @@ Datenbank und passen nicht zur zurückgespielten.
 Wenn jemand direkt auf dem Server etwas editiert hat, bricht `git pull` ab. Was
 lokal abweicht, zeigt `git status`. Entweder verwerfen (`git checkout -- <datei>`)
 oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt in
-`/etc/abfahrt/kennzeichen.env` und damit außerhalb des Repos.
+`/etc/abfahrt/` und damit außerhalb des Repos.
 
 ---
 
@@ -311,326 +379,25 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 | Anmeldung wirft einen zurück auf die Anmeldeseite | Cookie mit `Secure`, aber die Verbindung kam als HTTP an. `X-Forwarded-Proto` fehlt im Proxy. |
 | Alle Anträge haben dieselbe IP | `FORWARDED_ALLOW_IPS` zeigt nicht auf den nginx. |
 | Ein Fehlversuch sperrt alle aus | dasselbe. |
-| 502 vom nginx | Dienst läuft nicht oder Firewall blockt. `systemctl status kennzeichen`, dann vom nginx-Host `curl http://10.0.0.42:8080/`. |
+| 502 vom nginx | Dienst läuft nicht oder Firewall blockt. `systemctl status abfahrt`, dann vom nginx-Host `curl http://10.0.0.42:8080/`. |
 | Mails bleiben liegen | `SMTP_HOST`/`MAIL_FROM` fehlen, oder Zugangsdaten stimmen nicht. Der Fehler steht in der Detailansicht des Antrags und im Journal. |
 | 429 beim Absenden | Rate Limit im nginx. Bei geteilten NAT-Adressen `rate=` in der Config hochsetzen. |
-| Monitor zeigt dauerhaft die orange „Keine Verbindung"-Leiste, obwohl die Seite lädt | `connect-src 'self'` fehlt in der Content-Security-Policy. Die Seite selbst kommt durch, ihre Nachladeanfragen nicht. In der Browserkonsole steht die geblockte Anfrage. Siehe `nginx-helfer.conf`. |
+| Monitor zeigt dauerhaft die orange „Keine Verbindung"-Leiste, obwohl die Seite lädt | `connect-src 'self'` fehlt in der Content-Security-Policy. Die Seite selbst kommt durch, ihre Nachladeanfragen nicht. In der Browserkonsole steht die geblockte Anfrage. Siehe `nginx-dienst.conf`. |
 | Zeitplan-Abruf schlägt immer fehl | Der Container kommt nicht nach draußen (Egress auf 443 und DNS), oder `ca-certificates` fehlt. Der genaue Text steht im Backoffice unter *Einstellungen › Zeitplan-Abruf* bei den bisherigen Abrufen. |
 | Monitor zeigt eine Uhrzeit, die nicht stimmt | Entweder steht `JETZT_FEST` noch gesetzt (Warnung im Journal), oder die Containeruhr geht falsch – `timedatectl`. Die Uhr auf dem Bildschirm kommt vom Server, nicht vom Bildschirmrechner. |
 | Monitor zeigt nichts, obwohl Schichten erfasst sind | `TAGE` oder die Daten in den CSV-Dateien liegen in einem anderen Jahr als die Containeruhr. Im Backoffice unter *Schichten* steht, für welche Tage etwas erfasst ist. |
+| Eine Adresse zeigt den falschen Bereich | Der Host-Kopf kommt nicht durch. `proxy_set_header Host $host;` fehlt im Schnipsel, oder der Name steht nicht in `HOST_…`. Ohne Treffer landet alles beim Pfad-Rückfall. |
+| Anmeldung gilt nur in einem Bereich | `APP_SECRET_KEY` steht noch in einer der drei Anwendungs-Dateien und überschreibt dort den gemeinsamen. Er gehört nur nach `dienst.env`. |
+| Im Protokoll fehlt ein `starte Bereich …` | Die `.env` dieses Bereichs ist nicht lesbar oder ihr `DB_PATH` zeigt ins Leere. |
 
 ---
 
-## 7. Zweite Anwendung: Presse-Akkreditierung
+## 7. Was nur für einen Bereich gilt
 
-Eigener LXC-Container, eigene Adresse, eigene Datenbank – aber **dasselbe
-Repository**. Der Klon liegt auch dort unter `/opt/abfahrt`, der Dienst läuft
-aus dem Unterverzeichnis `presse/`.
+### Helfer: Daten hereinholen
 
-```text
-Internet ──HTTPS──▶ nginx (10.0.0.10) ──┬─▶ LXC kfz    (10.0.0.42:8080)
-                                        └─▶ LXC presse (10.0.0.43:8081)
-```
-
-Ein `git pull` je Container aktualisiert die jeweilige App; der gemeinsame Code
-bleibt automatisch in Sicht. Die Pfade sind absichtlich in beiden Containern
-gleich – nur `WorkingDirectory` unterscheidet sich.
-
-### Im Presse-Container
-
-```bash
-apt update
-apt install -y python3 python3-venv sqlite3 git
-
-adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin presse
-
-mkdir -p /var/lib/presse /etc/abfahrt /var/backups/presse
-chown presse:presse /var/lib/presse /var/backups/presse
-chmod 750 /var/lib/presse /var/backups/presse
-
-git clone https://github.com/kallelix/aa-kfz.git /opt/abfahrt
-cd /opt/abfahrt
-python3 -m venv .venv
-.venv/bin/pip install --no-cache-dir -r requirements.txt
-```
-
-`/opt/abfahrt` bleibt **root:root** – der Dienst liest seinen Code nur. Siehe
-Abschnitt 1, die Begründung gilt hier genauso.
-
-Die `requirements.txt` im Wurzelverzeichnis deckt beide Anwendungen ab; `segno`
-braucht nur die Kennzeichen-App und stört hier nicht.
-
-### Konfiguration
-
-```bash
-install -o root -g root -m 600 deploy/presse.env.example /etc/abfahrt/presse.env
-
-cd /opt/abfahrt/presse
-/opt/abfahrt/.venv/bin/python -m kern.passwort
-/opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
-
-editor /etc/abfahrt/presse.env
-```
-
-Mindestens setzen: `BIND`, `FORWARDED_ALLOW_IPS`, `ADMIN_PASSWORD_HASH`,
-`APP_SECRET_KEY`, `SMTP_PASS`, `KONTAKT_MAIL`.
-
-**Eigenes Passwort.** Beide Anwendungen haben getrennte Anmeldungen – eigene
-Adresse heißt eigene Cookie-Domain, ein gemeinsames Passwort brächte also
-nichts als ein zweites Geheimnis mit demselben Wert.
-
-### Dienst
-
-```bash
-install -m 644 deploy/presse.service /etc/systemd/system/presse.service
-systemctl daemon-reload
-systemctl enable --now presse
-systemctl status presse
-journalctl -u presse -f
-```
-
-### Firewall
-
-Wie in Abschnitt 1, nur mit dem anderen Port:
-
-```bash
-ufw default deny incoming
-ufw allow from 10.0.0.10 to any port 8081 proto tcp
-ufw allow from 10.0.0.0/24 to any port 22 proto tcp
-ufw enable
-```
-
-### Auf dem nginx-Host
-
-```bash
-install -m 644 deploy/presse-proxy.conf /etc/nginx/snippets/presse-proxy.conf
-install -m 644 deploy/nginx-presse.conf /etc/nginx/sites-available/presse.example.de
-ln -s ../sites-available/presse.example.de /etc/nginx/sites-enabled/
-
-# Adresse und Container-IP in der Datei anpassen, dann:
-nginx -t
-certbot --nginx -d presse.example.de
-systemctl reload nginx
-```
-
-Die Rate-Limit-Zonen und der `map`-Block heißen **anders** als in
-`nginx-kennzeichen.conf`. Gleiche Namen zweimal zu definieren ist ein
-Konfigurationsfehler, und `nginx -t` sagt das erst beim Einbinden.
-
-### Sicherung
-
-`backup.sh` ist nicht auf eine Datenbank festgelegt – Pfade kommen aus der
-Umgebung. Im Presse-Container:
-
-```bash
-crontab -u presse -e
-```
-
-```cron
-15 3 * * * DB_PATH=/var/lib/presse/presse.db BACKUP_DIR=/var/backups/presse /opt/abfahrt/deploy/backup.sh >> /var/log/presse-backup.log 2>&1
-```
-
-### Prüfliste
-
-Wie in Abschnitt 4, zusätzlich:
-
-- [ ] Anmeldung absenden, Bestätigungsmail kommt an – einmal je Variante
-      (Gebühr, Bilderspende, nicht kommerziell)
-- [ ] Die Mail nennt den richtigen Betrag und den richtigen Abholort
-- [ ] Abholliste: Suche filtert beim Tippen, Badge- und Gebühren-Häkchen wirken
-- [ ] `BILDER_ABGABE` gesetzt – sonst nennt die Erinnerungsmail keinen Weg
-- [ ] `BADGES_GESAMT` auf die Zahl der vorproduzierten Badges gesetzt
-
----
-
-## 8. Dritte Anwendung: Helfer-Dashboard
-
-Eigener LXC-Container, eigene Adresse, eigene Datenbank – wieder **dasselbe
-Repository**, Dienst aus dem Unterverzeichnis `helfer/`.
-
-```text
-Internet ──HTTPS──▶ nginx (10.0.0.10) ──┬─▶ LXC kfz    (10.0.0.42:8080)
-                                        ├─▶ LXC presse (10.0.0.43:8081)
-                                        └─▶ LXC helfer (10.0.0.44:8082)
-                                                  │
-                                                  └──HTTPS──▶ ixsdownhillcup.com
-                                                              kidscup.bike
-```
-
-**Drei Unterschiede zu den Schwester-Apps.** Sie stehen hier vorn, weil jeder
-von ihnen erst im Betrieb auffällt, wenn man ihn beim Aufsetzen übersieht:
-
-1. **Ausgehende Verbindungen.** Der Dienst holt einmal täglich den Zeitplan
-   von den Websites der Rennserien. Der Container braucht dafür Egress auf
-   Port 443 und `ca-certificates`. Fehlt eines von beidem, bleibt der letzte
-   erfolgreiche Stand stehen und das Backoffice zeigt den Fehler – der Dienst
-   läuft weiter, aber der Zeitplan veraltet still.
-2. **Ein Teil ist öffentlich.** Die Monitoransicht läuft ohne Anmeldung,
-   geschützt nur durch einen langen Token im Pfad. Der optionale
-   Basic-Auth-Riegel vor `/admin` darf **nicht** auf `/monitor/` ausgedehnt
-   werden – der Bildschirm im Zelt kann kein Passwort eingeben.
-3. **Die Content-Security-Policy braucht `connect-src 'self'`.** Die
-   Monitoransicht holt sich ihren Inhalt per `fetch` selbst, das
-   Unterschriften-Tablet ebenso. Ohne die Direktive fällt das auf
-   `default-src 'none'` zurück und wird geblockt: der Monitor bliebe stumm auf
-   dem ersten Stand stehen, und das Tablet bekäme nie mit, dass etwas
-   ansteht. `nginx-helfer.conf` hat sie als einzige der drei.
-
-Kein Mailversand – es gibt keine SMTP-Werte zu setzen.
-
-### Im Helfer-Container
-
-```bash
-apt update
-apt install -y python3 python3-venv sqlite3 git ca-certificates
-
-# Die Uhr des Containers erscheint auf dem Monitor. Sie sollte stimmen.
-timedatectl set-timezone Europe/Berlin
-timedatectl set-ntp true
-
-adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin helfer
-
-mkdir -p /var/lib/helfer /etc/abfahrt /var/backups/helfer
-chown helfer:helfer /var/lib/helfer /var/backups/helfer
-chmod 750 /var/lib/helfer /var/backups/helfer
-
-git clone https://github.com/kallelix/aa-kfz.git /opt/abfahrt
-cd /opt/abfahrt
-python3 -m venv .venv
-.venv/bin/pip install --no-cache-dir -r requirements.txt
-```
-
-`/opt/abfahrt` bleibt **root:root** – die Begründung aus Abschnitt 1 gilt
-unverändert.
-
-`ca-certificates` ist neu gegenüber den anderen beiden Containern: ohne die
-Wurzelzertifikate scheitert der Zeitplan-Abruf an der TLS-Prüfung. Der Fehler
-liest sich dann wie ein Netzproblem, ist aber keines.
-
-Die `requirements.txt` deckt alle drei Anwendungen ab. Neu darin ist `tzdata` –
-damit verhält sich die Zeitzone überall gleich, unabhängig davon, was das
-Betriebssystem mitbringt.
-
-### Konfiguration
-
-```bash
-install -o root -g root -m 600 deploy/helfer.env.example /etc/abfahrt/helfer.env
-
-cd /opt/abfahrt/helfer
-/opt/abfahrt/.venv/bin/python -m kern.passwort
-/opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
-
-editor /etc/abfahrt/helfer.env
-```
-
-Mindestens setzen: `BIND`, `FORWARDED_ALLOW_IPS`, `ADMIN_PASSWORD_HASH`,
-`APP_SECRET_KEY`, `BASIS_URL`, `TAGE`.
-
-**`JETZT_FEST` muss leer sein.** Die Variable stellt die Uhr auf einen festen
-Zeitpunkt, damit sich die Monitoransicht außerhalb der Veranstaltung anschauen
-lässt. Bleibt sie im Betrieb gesetzt, zeigt der Monitor eine erfundene Uhrzeit
-– und niemandem fällt es auf, weil ja eine Uhr zu sehen ist. Der Dienst
-schreibt beim Start eine Warnung ins Journal:
-
-```bash
-journalctl -u helfer | grep JETZT_FEST
-```
-
-**`TAGE` sind die drei Renntage.** Der Zeitplan-Abruf bildet damit die
-Wochentage aus den Tabellen der Rennserien auf Daten ab. Steht dort das falsche
-Jahr, landet das gesamte Programm auf falschen Tagen und der Monitor zeigt
-dauerhaft nichts an.
-
-### Dienst
-
-```bash
-install -m 644 deploy/helfer.service /etc/systemd/system/helfer.service
-systemctl daemon-reload
-systemctl enable --now helfer
-systemctl status helfer
-journalctl -u helfer -f
-```
-
-### Firewall
-
-Wie in Abschnitt 1, mit dem dritten Port – **und mit Egress**, den die anderen
-beiden Container nicht brauchen:
-
-```bash
-ufw default deny incoming
-ufw default allow outgoing          # fuer den Zeitplan-Abruf
-ufw allow from 10.0.0.10 to any port 8082 proto tcp
-ufw allow from 10.0.0.0/24 to any port 22 proto tcp
-ufw enable
-```
-
-Wer den ausgehenden Verkehr enger fassen will, braucht DNS und HTTPS:
-
-```bash
-ufw default deny outgoing
-ufw allow out 53
-ufw allow out 443/tcp
-```
-
-Auf feste Ziel-IPs sollte man es nicht einengen – beide Serien-Websites liegen
-hinter Adressen, die sich ohne Ankündigung ändern.
-
-### Auf dem nginx-Host
-
-```bash
-install -m 644 deploy/helfer-proxy.conf /etc/nginx/snippets/helfer-proxy.conf
-install -m 644 deploy/nginx-helfer.conf /etc/nginx/sites-available/helfer.example.de
-ln -s ../sites-available/helfer.example.de /etc/nginx/sites-enabled/
-
-# Adresse und Container-IP in der Datei anpassen, dann:
-nginx -t
-certbot --nginx -d helfer.example.de
-systemctl reload nginx
-```
-
-Die Rate-Limit-Zone und der `map`-Block heißen wieder **anders** als in den
-beiden anderen Dateien. `client_max_body_size` steht hier auf 2 MB, weil über
-das Backoffice zwei CSV-Dateien hochgeladen werden.
-
-#### Kompression
-
-Diese Anwendung fragt im Takt nach – der Monitor alle 30 Sekunden, das Tablet
-alle 2, jeder Backoffice-Reiter alle 3. Ohne Kompression sind das über drei
-Veranstaltungstage rund 330 MB, mit rund 200 MB. Der `gzip`-Block steht
-deshalb in `nginx-helfer.conf`; nachgemessen über `proxy_pass`:
-
-| | ohne | mit |
-|---|---|---|
-| Monitor-Abruf | 15 971 B | 2 280 B |
-| Tablet-Abruf | 1 605 B | 705 B |
-| `style.css` | 39 397 B | 10 967 B |
-| Vereinswappen (SVG) | 46 200 B | 18 056 B |
-| Zustandsabruf Backoffice (84 B) | – | bleibt unkomprimiert |
-
-Drei Dinge, die dabei leicht schiefgehen:
-
-- **`text/html` gehört nicht in `gzip_types`.** nginx komprimiert es ohnehin
-  immer; es zu nennen quittiert es mit einer Warnung. Damit sind die beiden
-  Poll-Antworten schon abgedeckt – beide sind HTML-Fragmente.
-- **`text/javascript` muss mit in die Liste**, nicht nur
-  `application/javascript`. Hinter `proxy_pass` kommt der Typ von der
-  Anwendung, und Starlette liefert die Skripte unter dem ersten Namen aus.
-- **`gzip_min_length` hochsetzen.** Bei der Vorgabe von 20 Byte würde der
-  84 Byte kleine Zustandsabruf des Backoffice komprimiert und dabei größer.
-
-Steht in `/etc/nginx/nginx.conf` schon ein globales `gzip on;` – bei Debian
-und Ubuntu üblich –, gilt das für alle drei Anwendungen; die Angaben in der
-Datei überschreiben es dann nur für diesen Server-Block.
-
-Ein zweiter Hebel liegt daneben und kostet eine Zeile: **HTTP/2**. Die
-Abrufe sind winzig, ihre Kopfzeilen mit Keks und User-Agent aber gut 400 Byte
-– bei 50 000 Abrufen am Tag ist das die eigentliche Rechnung. HTTP/2
-komprimiert sie mit und bringt noch einmal etwa ein Drittel.
-
-### Erste Inbetriebnahme
-
-Anders als die Schwester-Apps startet diese nicht leer und wartet auf Anträge –
-sie braucht erst ihren Datenbestand:
+Der Helfer-Bereich startet nicht leer und wartet auf Eingaben – er braucht
+erst seinen Datenbestand:
 
 1. **Die beiden Listen** aus dem bisherigen Registrierungstool holen –
    *Offene Posten* und *Vergebene Posten*. Zwei Wege, siehe unten: abrufen
@@ -707,7 +474,7 @@ Was der Dienst dabei tut, steht auch im Journal:
 journalctl -u abfahrt-helfer -g Helferabgleich --no-pager | tail -20
 ```
 
-### Helferdaten ausführen
+### Helfer: Daten ausführen
 
 Unter **Helfer** steht neben *Helfer hinzufügen* ein Knopf **Als CSV**. Die
 Datei enthält **eine Zeile je Helfer** mit Name, Kontakt, Verpflegung, den
@@ -739,7 +506,7 @@ dem Registrierungstool kommen Werte wie „Damen L“ oder „Large“ – die e
 Spalte ist leer, wenn sich daraus keine eindeutige Größe lesen lässt, die
 zweite zeigt dann, was dastand.
 
-### Der Monitor-Link
+### Helfer: der Monitor-Link
 
 Er steht in der Datenbank, nicht in der Konfiguration – ein Neustart ändert ihn
 also nicht, ein neuer `APP_SECRET_KEY` auch nicht. Wer ihn hat, sieht die
@@ -752,26 +519,17 @@ Verliert er sich oder war er an der falschen Stelle, im Backoffice unter
 Auf dem Bildschirmrechner: Browser im Vollbild (F11), Bildschirmschoner und
 Energiesparen aus. Die Seite hält sich selbst aktuell und braucht kein F5.
 
-### Sicherung
 
-Wie in Abschnitt 7, mit den Pfaden dieses Containers:
 
-```bash
-crontab -u helfer -e
-```
+> `helfer.db` ist die einzige der drei, die sich **nicht** aus dem
+> wiederherstellen lässt, was die Leute eingereicht haben: Schichten und
+> Helfer kommen zwar aus den Listen des Registrierungstools, jede Einteilung
+> von Hand aber nur von hier. Vor der Veranstaltung lohnt sich ein zweiter
+> Sicherungszeitpunkt am Abend.
 
-```cron
-15 3 * * * DB_PATH=/var/lib/helfer/helfer.db BACKUP_DIR=/var/backups/helfer /opt/abfahrt/deploy/backup.sh >> /var/log/helfer-backup.log 2>&1
-```
+### Prüfliste für den Helfer-Bereich
 
-Diese Datenbank ist die einzige der drei, die sich **nicht** aus den Anträgen
-der Leute wiederherstellen lässt: Schichten und Helfer kommen zwar aus den
-CSV-Dateien, jede Einteilung von Hand aber nur von hier. Vor der Veranstaltung
-lohnt sich ein zweiter Zeitpunkt am Abend.
-
-### Prüfliste
-
-Wie in Abschnitt 4, zusätzlich:
+Zusätzlich zu Abschnitt 4:
 
 - [ ] `JETZT_FEST` ist leer, im Journal steht keine Warnung dazu
 - [ ] `TAGE` nennt die richtigen drei Renntage im richtigen Jahr
@@ -788,7 +546,8 @@ Wie in Abschnitt 4, zusätzlich:
       stehen und die orange Leiste erscheint. Das ist zugleich die Probe
       darauf, dass `connect-src 'self'` sitzt – fehlt die Direktive, erscheint
       die Leiste sofort und dauerhaft
-- [ ] `/monitor/<token>` ist **ohne** Anmeldung erreichbar, `/admin` nicht
+- [ ] `helfer.example.de/monitor/<token>` ist **ohne** Anmeldung
+      erreichbar, `admin.example.de/helfer` nicht
 - [ ] Ein falscher Token gibt 404
 - [ ] Falls Unterschriften genutzt werden: Tablet-Link erzeugt, auf dem Tablet
       im Vollbild geöffnet, Bildschirmsperre aus. Eine Übergabe probeweise
@@ -798,7 +557,7 @@ Wie in Abschnitt 4, zusätzlich:
 
 ---
 
-## 9. Nach der Veranstaltung: Personendaten löschen
+## 8. Nach der Veranstaltung: Personendaten löschen
 
 Zwei Zusagen stehen im Programm und haben ein Datum:
 
@@ -812,9 +571,10 @@ nichts und zeigt nur, was verschwinden würde:
 
 ```bash
 cd /opt/abfahrt
-python3 deploy/daten-loeschen.py --art kennzeichen --db /var/lib/abfahrt/antraege.db
-python3 deploy/daten-loeschen.py --art presse      --db /var/lib/presse/presse.db
-python3 deploy/daten-loeschen.py --art helfer      --db /var/lib/helfer/helfer.db
+for a in kennzeichen presse helfer; do
+    case $a in kennzeichen) d=antraege;; *) d=$a;; esac
+    python3 deploy/daten-loeschen.py --art "$a" --db "/var/lib/abfahrt/$d.db"
+done
 ```
 
 Sieht die Aufstellung richtig aus, denselben Aufruf mit `--wirklich`. Der
@@ -842,141 +602,3 @@ Nicht vergessen, weil außerhalb der Datenbank:
 - **Der Login-Link zur Helferliste** in `IMPORT_LOGIN_URL`: er ist ein
   Passwort und gilt weiter. Beim Dienst widerrufen oder wenigstens aus der
   `.env` nehmen.
-
-## 10. Von drei Containern auf einen
-
-Nach der Veranstaltung zusammengeführt: **eine Anwendung, ein Dienst, ein
-Container.** Die drei Programme sind geblieben, was sie waren – sie laufen
-nur in einem Prozess.
-
-### Was sich ändert und was nicht
-
-| | vorher | jetzt |
-|---|---|---|
-| Container | drei (.42, .43, .44) | **einer** |
-| systemd-Unit | drei | **eine** (`dienst.service`) |
-| nginx-Datei | drei | **eine** (`nginx-dienst.conf`) |
-| Zertifikate | drei | zwei (öffentlich, admin) |
-| Sicherung | drei Läufe | **einer** über `/var/lib/abfahrt` |
-| Datenbanken | drei | drei, aber in einem Verzeichnis |
-| Öffentliche Adressen | drei | **unverändert drei** |
-| Backoffice | drei Adressen | **eine**, mit einer Anmeldung |
-
-**Die öffentlichen Adressen bleiben.** Sie stehen auf Plakaten, in Mails und
-in QR-Codes. Der Dienst entscheidet am Host-Kopf, welcher Bereich antwortet –
-deshalb reicht der Proxy-Schnipsel `Host` durch. Ohne die Zeile bekäme er den
-Namen des Upstreams zu sehen und fände gar keinen Bereich.
-
-**Das Backoffice zieht um.** Aus `kennzeichen.example.de/admin/…` wird
-`admin.example.de/kennzeichen/…`, entsprechend für Presse und Helfer. Eine
-Anmeldung gilt für alle drei: derselbe `APP_SECRET_KEY`, derselbe
-`ADMIN_PASSWORD_HASH`, der Keks auf Pfad `/`.
-
-**Die Datenbanken bleiben getrennt.** Zwei Tabellennamen kämen sich sonst in
-die Quere (`einstellung` in allen dreien, `mail_out` in zweien), und SQLite
-lässt je Datei nur einen Schreiber zu – ein längerer Helferimport würde sonst
-die Presse-Anmeldung ausbremsen. Sie liegen jetzt aber nebeneinander in
-`/var/lib/abfahrt`, das genügt für einen Sicherungslauf und einen
-`ReadWritePaths`-Eintrag.
-
-### Der Umzug
-
-Am besten auf dem Container, auf dem heute die Kennzeichen-App läuft – der
-hat den Klon schon unter `/opt/abfahrt`.
-
-```bash
-# 1. Alles anhalten
-systemctl stop abfahrt-kennzeichen abfahrt-presse abfahrt-helfer
-
-# 2. Die beiden anderen Datenbanken herüberholen (von deren Containern)
-install -d -o abfahrt -g abfahrt -m 750 /var/lib/abfahrt
-scp root@10.0.0.43:/var/lib/presse/presse.db  /var/lib/abfahrt/
-scp root@10.0.0.44:/var/lib/helfer/helfer.db  /var/lib/abfahrt/
-chown abfahrt:abfahrt /var/lib/abfahrt/*.db
-
-# 3. Deren Konfigurationen ebenso – sie werden weiterbenutzt
-scp root@10.0.0.43:/etc/abfahrt/presse.env /etc/abfahrt/
-scp root@10.0.0.44:/etc/abfahrt/helfer.env /etc/abfahrt/
-chmod 600 /etc/abfahrt/*.env
-
-# 4. In den drei Dateien DB_PATH auf das neue Verzeichnis zeigen lassen,
-#    und ADMIN_PASSWORD_HASH und APP_SECRET_KEY dort herausnehmen – die
-#    stehen jetzt gemeinsam in dienst.env.
-editor /etc/abfahrt/kennzeichen.env
-editor /etc/abfahrt/presse.env
-editor /etc/abfahrt/helfer.env
-
-# 5. Die gemeinsame Datei anlegen
-cd /opt/abfahrt && git pull
-install -o root -g root -m 600 deploy/dienst.env.example /etc/abfahrt/dienst.env
-/opt/abfahrt/.venv/bin/python -m kern.passwort
-/opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
-editor /etc/abfahrt/dienst.env
-
-# 6. Der neue Dienst
-install -m 644 deploy/dienst.service /etc/systemd/system/abfahrt.service
-systemctl daemon-reload
-systemctl disable --now abfahrt-kennzeichen abfahrt-presse abfahrt-helfer
-systemctl enable --now abfahrt
-systemctl status abfahrt
-```
-
-Im Protokoll muss dreimal `starte Bereich …` stehen – Kennzeichen, Presse,
-Helfer. Fehlt einer, hat seine Datenbank oder seine `.env` nicht gepasst.
-
-Dann der nginx-Host:
-
-```bash
-install -m 644 deploy/dienst-proxy.conf /etc/nginx/snippets/abfahrt-dienst-proxy.conf
-install -m 644 deploy/nginx-dienst.conf /etc/nginx/sites-available/abfahrt
-ln -sf ../sites-available/abfahrt /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/kennzeichen.example.de       /etc/nginx/sites-enabled/presse.example.de       /etc/nginx/sites-enabled/helfer.example.de
-
-# Adressen und Container-IP in der Datei anpassen, dann:
-nginx -t
-certbot --nginx -d admin.example.de
-systemctl reload nginx
-```
-
-Zuletzt der Sicherungsauftrag: ein Cron-Eintrag statt drei. `backup.sh` ohne
-`DB_PATH` sichert alle Datenbanken im Verzeichnis.
-
-```cron
-17 3 * * * BACKUP_DIR=/var/backups/abfahrt /opt/abfahrt/deploy/backup.sh
-```
-
-Läuft alles, können die beiden anderen Container weg – und mit ihnen die
-Dateien `kennzeichen.service`, `presse.service`, `helfer.service`,
-`nginx-kennzeichen.conf`, `nginx-presse.conf`, `nginx-helfer.conf` sowie die
-drei Proxy-Schnipsel. Sie stehen noch im Repo, solange der Umzug nicht
-gemacht ist.
-
-### Prüfliste
-
-- [ ] `systemctl status abfahrt` zeigt `active`, im Protokoll drei Bereiche
-- [ ] `kennzeichen.example.de` zeigt das Antragsformular
-- [ ] `presse.example.de` zeigt die Akkreditierung
-- [ ] `admin.example.de` zeigt die Startseite mit drei Kacheln
-- [ ] **Eine** Anmeldung öffnet alle drei Bereiche
-- [ ] `kennzeichen.example.de/kennzeichen` gibt 404 – das Backoffice liegt
-      nicht auf den öffentlichen Adressen
-- [ ] Eine Sicherung von Hand angestoßen, drei Dateien liegen im Zielordner
-- [ ] Die alten Zertifikate für die abgeschalteten Container abgeräumt
-
-## 11. Timetable ablösen
-
-Das Helfer-Dashboard ersetzt das bisherige `timetable`-Projekt vollständig.
-**Aus dessen Datenbank muss nichts übernommen werden** – der Aufgabenplan wird
-neu gepflegt, das Programm kommt aus dem Zeitplan-Abruf, Schichten und Helfer
-aus den beiden CSV-Dateien.
-
-Erst abschalten, wenn die Prüfliste aus Abschnitt 8 abgehakt ist:
-
-- [ ] Dienst des alten Projekts stoppen und aus dem Autostart nehmen
-- [ ] Dessen nginx-Block entfernen oder auf die neue Adresse umleiten
-- [ ] Eine letzte Sicherung der alten Datenbank wegheften und aufbewahren, bis
-      die Veranstaltung vorbei ist
-- [ ] Allen, die den alten Link gespeichert haben, die neue Adresse geben
-
-Die konkreten Pfade und Dienstnamen stehen hier bewusst nicht: das alte Projekt
-läuft nicht in diesem Aufbau, und geraten wäre schlimmer als nachgeschaut.
