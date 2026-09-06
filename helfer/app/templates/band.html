@@ -52,7 +52,7 @@
           {% if ziel == 'admin' %}
             <a class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
                style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
-               href="/admin/schicht/{{ b.id }}" title="{{ marke }}">{{ beschriftung }}</a>
+               href="/helfer/schicht/{{ b.id }}" title="{{ marke }}">{{ beschriftung }}</a>
           {% elif ziel == 'monitor' %}
             <button type="button"
                     class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
@@ -75,7 +75,7 @@
             {% if ziel == 'admin' %}
               <a class="band-balken band-aufgabe band-status-{{ b.status }}"
                  style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
-                 href="/admin/aufgabe/{{ b.id }}" title="{{ marke }}">{{ b.beschriftung }}</a>
+                 href="/helfer/aufgabe/{{ b.id }}" title="{{ marke }}">{{ b.beschriftung }}</a>
             {% else %}
               <span class="band-balken band-aufgabe band-status-{{ b.status }}"
                     style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"

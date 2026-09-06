@@ -20,13 +20,13 @@
     <p class="teilen-url"><a href="{{ offen_url }}">{{ offen_url }}</a></p>
 
     <div class="knopfreihe">
-      <form method="post" action="/admin/durchfahrt/link"
+      <form method="post" action="/kennzeichen/durchfahrt/link"
             onsubmit="return confirm('Neuen Link erzeugen? Der bisherige funktioniert danach nicht mehr.');">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="aktion" value="erzeugen">
         <button type="submit" class="knopf-schlicht">Neuen Link erzeugen</button>
       </form>
-      <form method="post" action="/admin/durchfahrt/link"
+      <form method="post" action="/kennzeichen/durchfahrt/link"
             onsubmit="return confirm('Link zurückziehen? Die Sperre kann die Liste dann nicht mehr öffnen.');">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="aktion" value="zuruecknehmen">
@@ -46,7 +46,7 @@
       Liste – kein Genehmigen, kein Löschen, keine Kontaktdaten.
     </p>
     <div class="knopfreihe">
-      <form method="post" action="/admin/durchfahrt/link">
+      <form method="post" action="/kennzeichen/durchfahrt/link">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="aktion" value="erzeugen">
         <button type="submit">Link erzeugen</button>

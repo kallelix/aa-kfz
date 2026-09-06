@@ -8,7 +8,7 @@
       <h2>Noch keine Daten</h2>
       <p>Es sind weder Schichten noch Helfer erfasst. Beides kommt aus den
         beiden CSV-Dateien des bisherigen Registrierungstools.</p>
-      <p><a class="knopf" href="/admin/import">Zum Import</a></p>
+      <p><a class="knopf" href="/helfer/import">Zum Import</a></p>
     </div>
   {% else %}
 
@@ -64,7 +64,7 @@
               <tr>
                 <td class="nowrap">{{ s.datum | tag }}</td>
                 <td class="zeit">{{ s | spanne }}</td>
-                <td><a href="/admin/schicht/{{ s.id }}">{{ s.liste }}</a></td>
+                <td><a href="/helfer/schicht/{{ s.id }}">{{ s.liste }}</a></td>
                 <td class="rechts"><span class="marke marke-luecke">{{ s.fehlt }}</span></td>
                 <td class="rechts">{{ s.besetzt }} / {{ s.bedarf }}</td>
               </tr>
@@ -73,7 +73,7 @@
         </table>
       </div>
       {% if luecken_gesamt > luecken | length %}
-        <p class="hilfe"><a href="/admin/schichten?luecken=1">Alle
+        <p class="hilfe"><a href="/helfer/schichten?luecken=1">Alle
           {{ luecken_gesamt }} Schichten mit Lücken ansehen</a></p>
       {% endif %}
     {% endif %}
@@ -115,10 +115,10 @@
             <tbody>
               {% for k in konflikte %}
                 <tr>
-                  <td><a href="/admin/helfer/{{ k.helfer_id }}">{{ k.name }}</a></td>
-                  <td><a href="/admin/schicht/{{ k.schicht_a }}">{{ k.liste_a }}</a>
+                  <td><a href="/helfer/helfer/{{ k.helfer_id }}">{{ k.name }}</a></td>
+                  <td><a href="/helfer/schicht/{{ k.schicht_a }}">{{ k.liste_a }}</a>
                     <span class="gedaempft nowrap">{{ k.beginn_a | zeitpunkt }}</span></td>
-                  <td><a href="/admin/schicht/{{ k.schicht_b }}">{{ k.liste_b }}</a>
+                  <td><a href="/helfer/schicht/{{ k.schicht_b }}">{{ k.liste_b }}</a>
                     <span class="gedaempft nowrap">{{ k.beginn_b | zeitpunkt }}</span></td>
                 </tr>
               {% endfor %}
@@ -136,9 +136,9 @@
             <tbody>
               {% for d in doppelt %}
                 <tr>
-                  <td><a href="/admin/helfer/{{ d.helfer_id }}">{{ d.name }}</a></td>
+                  <td><a href="/helfer/helfer/{{ d.helfer_id }}">{{ d.name }}</a></td>
                   <td class="gedaempft">{{ d.email }}</td>
-                  <td><a href="/admin/schicht/{{ d.schicht_id }}">{{ d.liste }}</a>
+                  <td><a href="/helfer/schicht/{{ d.schicht_id }}">{{ d.liste }}</a>
                     <span class="gedaempft nowrap">{{ d.beginn | zeitpunkt }}</span></td>
                   <td class="rechts nowrap">{{ d.anzahl }} Plätze</td>
                 </tr>
@@ -153,7 +153,7 @@
   {% if importe %}
     <p class="hilfe">Letzter Import: {{ importe[0].gelaufen_am }}
       {%- if importe[0].kuerzel %} durch {{ importe[0].kuerzel }}{% endif %}
-      ({{ importe[0].datei }}) · <a href="/admin/import">Import</a></p>
+      ({{ importe[0].datei }}) · <a href="/helfer/import">Import</a></p>
   {% endif %}
 
   {% endif %}

@@ -49,9 +49,9 @@
       <p class="hilfe">Angefordert {{ offen.angefordert_am[:16] }}
         {%- if offen.kuerzel %} durch {{ offen.kuerzel }}{% endif %},
         läuft ab {{ offen.laeuft_ab_am[:16] }}.</p>
-      <form method="post" action="/admin/unterschrift/abbrechen">
+      <form method="post" action="/helfer/unterschrift/abbrechen">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <input type="hidden" name="weiter" value="/admin/unterschriften">
+        <input type="hidden" name="weiter" value="/helfer/unterschriften">
         <button type="submit" class="knopf-schlicht">Anforderung zurücknehmen</button>
       </form>
     </section>
@@ -61,7 +61,7 @@
     <section class="kasten">
       <h2>Kein Tablet-Link vorhanden</h2>
       <p>Ohne Link kann nichts angefordert werden.</p>
-      <form method="post" action="/admin/unterschriften/link">
+      <form method="post" action="/helfer/unterschriften/link">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="aktion" value="neu">
         <button type="submit" class="knopf">Link erzeugen</button>
@@ -76,12 +76,12 @@
         Bildschirmsperre aus.</p>
       <div class="knopfreihe">
         <a class="knopf" href="{{ adresse }}">Ansicht öffnen</a>
-        <form method="post" action="/admin/unterschriften/link">
+        <form method="post" action="/helfer/unterschriften/link">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <input type="hidden" name="aktion" value="neu">
           <button type="submit" class="knopf-schlicht">Neuen Link erzeugen</button>
         </form>
-        <form method="post" action="/admin/unterschriften/link">
+        <form method="post" action="/helfer/unterschriften/link">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <input type="hidden" name="aktion" value="widerrufen">
           <button type="submit" class="knopf-gefahr">Widerrufen</button>

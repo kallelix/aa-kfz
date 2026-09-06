@@ -143,8 +143,8 @@ try:
         return ergebnis
 
     print("Ohne Anmeldung")
-    status, ort, _ = anfrage("GET", "/admin/durchfahrt")
-    pruefe(status == 303 and ort.startswith("/admin/login"),
+    status, ort, _ = anfrage("GET", "/kennzeichen/durchfahrt")
+    pruefe(status == 303 and ort.startswith("/kennzeichen/login"),
            "Durchfahrtsliste ohne Anmeldung fuehrt zur Anmeldeseite")
 
     LEUTE = [
@@ -160,17 +160,17 @@ try:
             "telefon": "030 111",
         })
 
-    anfrage("POST", "/admin/login", {"passwort": "test-passwort-123", "weiter": "/admin"})
+    anfrage("POST", "/kennzeichen/login", {"passwort": "test-passwort-123", "weiter": "/kennzeichen"})
 
-    _, _, detail = anfrage("GET", "/admin/antrag/1")
+    _, _, detail = anfrage("GET", "/kennzeichen/antrag/1")
     CSRF = re.search(r'name="csrf" value="([^"]+)"', detail).group(1)
 
-    anfrage("POST", "/admin/sammelaktion", {"csrf": CSRF, "ids": ["1", "2"], "zurueck": "/admin"})
-    anfrage("POST", "/admin/antrag/2/status", {"csrf": CSRF, "ziel": "ausgegeben"})
-    anfrage("POST", "/admin/antrag/4/ablehnen", {"csrf": CSRF, "begruendung": "Kein Platz."})
+    anfrage("POST", "/kennzeichen/sammelaktion", {"csrf": CSRF, "ids": ["1", "2"], "zurueck": "/kennzeichen"})
+    anfrage("POST", "/kennzeichen/antrag/2/status", {"csrf": CSRF, "ziel": "ausgegeben"})
+    anfrage("POST", "/kennzeichen/antrag/4/ablehnen", {"csrf": CSRF, "begruendung": "Kein Platz."})
 
     print("Nur Berechtigte")
-    status, _, seite = anfrage("GET", "/admin/durchfahrt")
+    status, _, seite = anfrage("GET", "/kennzeichen/durchfahrt")
     pruefe(status == 200, "Durchfahrtsliste laedt")
     pruefe("Berger" in seite, "genehmigter Antrag steht drauf")
     pruefe("Öztürk" in seite, "ausgegebener Antrag steht drauf")
@@ -221,7 +221,7 @@ try:
     pruefe('src="/static/durchfahrt.js"' in seite, "das Filterskript ist eingebunden")
     # Das Suchfeld darf in keinem Formular stecken: ein Druck auf Enter wuerde
     # sonst neu laden, und ohne Netz kaeme die Seite nicht wieder.
-    pruefe('action="/admin/durchfahrt"' not in seite and "?suche=" not in seite,
+    pruefe('action="/kennzeichen/durchfahrt"' not in seite and "?suche=" not in seite,
            "die Suche loest keine Anfrage aus")
     vor_suchfeld = seite[: seite.find('id="suche"')]
     pruefe(vor_suchfeld.count("<form") == vor_suchfeld.count("</form>"),
@@ -231,25 +231,25 @@ try:
     pruefe("<noscript>" in seite, "ohne JavaScript gibt es einen Hinweis")
 
     print("Reiter")
-    _, _, liste = anfrage("GET", "/admin")
-    pruefe('href="/admin/durchfahrt">Durchfahrtsliste' in liste,
+    _, _, liste = anfrage("GET", "/kennzeichen")
+    pruefe('href="/kennzeichen/durchfahrt">Durchfahrtsliste' in liste,
            "der Reiter steht im Backoffice")
 
     print("Offener Link: ohne Token kein Zugang")
     status, _, _ = anfrage("GET", "/durchfahrt/irgendwas")
     pruefe(status == 404, "solange kein Link erzeugt ist, gibt es keinen offenen Zugang")
 
-    _, _, seite = anfrage("GET", "/admin/durchfahrt")
+    _, _, seite = anfrage("GET", "/kennzeichen/durchfahrt")
     pruefe("Link erzeugen" in seite, "das Backoffice bietet an, einen zu erzeugen")
     pruefe('class="teilen-url"' not in seite, "und zeigt noch keinen Link")
 
     print("Offener Link: erzeugen")
-    status, _, _ = anfrage("POST", "/admin/durchfahrt/link",
+    status, _, _ = anfrage("POST", "/kennzeichen/durchfahrt/link",
                            {"csrf": "falsch", "aktion": "erzeugen"})
     pruefe(status == 400, "erzeugen ohne CSRF-Token -> 400")
     pruefe(anfrage("GET", "/durchfahrt/irgendwas")[0] == 404, "und es entstand keiner")
 
-    _, ort, _ = anfrage("POST", "/admin/durchfahrt/link", {"csrf": CSRF, "aktion": "erzeugen"})
+    _, ort, _ = anfrage("POST", "/kennzeichen/durchfahrt/link", {"csrf": CSRF, "aktion": "erzeugen"})
     _, _, seite = anfrage("GET", ort)
     treffer = re.search(r'class="teilen-url"[^>]*>.*?/durchfahrt/([A-Za-z0-9_-]+)', seite, re.S)
     pruefe(treffer is not None, "der Link steht jetzt im Backoffice")
@@ -268,7 +268,7 @@ try:
 
     print("Offener Link: verraet nichts weiter")
     for verboten, was in [
-        ("/admin", "kein Verweis ins Backoffice"),
+        ("/kennzeichen", "kein Verweis ins Backoffice"),
         ("Abmelden", "kein Abmelden-Knopf"),
         ("Telefonisch", "kein Reiter zur Telefonliste"),
         ("030 111", "keine Telefonnummern"),
@@ -281,50 +281,50 @@ try:
     pruefe("noindex" in offen, "noindex fuer Suchmaschinen")
 
     print("Offener Link: falsche Token")
-    for falsch in (token[:-1], token + "x", token.upper(), "", "../admin"):
+    for falsch in (token[:-1], token + "x", token.upper(), "", "../kennzeichen"):
         status, _, _ = anfrage("GET", "/durchfahrt/" + urllib.parse.quote(falsch, safe=""))
         pruefe(status in (404, 307), "falscher Token " + repr(falsch[:12]) + " -> " + str(status))
 
     print("Offener Link: erneuern macht den alten tot")
-    anfrage("POST", "/admin/durchfahrt/link", {"csrf": CSRF, "aktion": "erzeugen"})
-    _, _, seite = anfrage("GET", "/admin/durchfahrt")
+    anfrage("POST", "/kennzeichen/durchfahrt/link", {"csrf": CSRF, "aktion": "erzeugen"})
+    _, _, seite = anfrage("GET", "/kennzeichen/durchfahrt")
     neuer = re.search(r'class="teilen-url"[^>]*>.*?/durchfahrt/([A-Za-z0-9_-]+)', seite, re.S).group(1)
     pruefe(neuer != token, "der Token hat sich geaendert")
     pruefe(anfrage("GET", "/durchfahrt/" + token)[0] == 404, "der alte Link ist tot")
     pruefe(anfrage("GET", "/durchfahrt/" + neuer)[0] == 200, "der neue funktioniert")
 
     print("Offener Link: zuruecknehmen")
-    status, _, _ = anfrage("POST", "/admin/durchfahrt/link",
+    status, _, _ = anfrage("POST", "/kennzeichen/durchfahrt/link",
                            {"csrf": "falsch", "aktion": "zuruecknehmen"})
     pruefe(status == 400, "zuruecknehmen ohne CSRF-Token -> 400")
     pruefe(anfrage("GET", "/durchfahrt/" + neuer)[0] == 200, "der Link lebt noch")
 
-    _, ort, _ = anfrage("POST", "/admin/durchfahrt/link", {"csrf": CSRF, "aktion": "zuruecknehmen"})
+    _, ort, _ = anfrage("POST", "/kennzeichen/durchfahrt/link", {"csrf": CSRF, "aktion": "zuruecknehmen"})
     pruefe(anfrage("GET", "/durchfahrt/" + neuer)[0] == 404, "danach ist er tot")
     _, _, seite = anfrage("GET", ort)
     pruefe("Link zurückgezogen" in seite, "mit Rueckmeldung")
     pruefe("Link erzeugen" in seite, "und dem Angebot, einen neuen zu erzeugen")
 
     print("Offener Link braucht keine Anmeldung")
-    anfrage("POST", "/admin/durchfahrt/link", {"csrf": CSRF, "aktion": "erzeugen"})
-    _, _, seite = anfrage("GET", "/admin/durchfahrt")
+    anfrage("POST", "/kennzeichen/durchfahrt/link", {"csrf": CSRF, "aktion": "erzeugen"})
+    _, _, seite = anfrage("GET", "/kennzeichen/durchfahrt")
     letzter = re.search(r'class="teilen-url"[^>]*>.*?/durchfahrt/([A-Za-z0-9_-]+)', seite, re.S).group(1)
     keks["wert"] = ""
     status, _, ohne_anmeldung = anfrage("GET", "/durchfahrt/" + letzter)
     pruefe(status == 200 and "Berger" in ohne_anmeldung,
            "ohne Sitzungscookie erreichbar – genau darum geht es")
-    pruefe(anfrage("GET", "/admin/durchfahrt")[0] == 303,
+    pruefe(anfrage("GET", "/kennzeichen/durchfahrt")[0] == 303,
            "das Backoffice bleibt trotzdem zu")
-    anfrage("POST", "/admin/login", {"passwort": "test-passwort-123", "weiter": "/admin"})
+    anfrage("POST", "/kennzeichen/login", {"passwort": "test-passwort-123", "weiter": "/kennzeichen"})
     # Neue Sitzung, neuer CSRF-Token – der alte ist daran gebunden und jetzt wertlos.
-    _, _, detail = anfrage("GET", "/admin/antrag/1")
+    _, _, detail = anfrage("GET", "/kennzeichen/antrag/1")
     CSRF = re.search(r'name="csrf" value="([^"]+)"', detail).group(1)
-    anfrage("POST", "/admin/durchfahrt/link", {"csrf": CSRF, "aktion": "zuruecknehmen"})
+    anfrage("POST", "/kennzeichen/durchfahrt/link", {"csrf": CSRF, "aktion": "zuruecknehmen"})
 
     print("Leere Liste")
-    anfrage("POST", "/admin/antrag/1/status", {"csrf": CSRF, "ziel": "neu"})
-    anfrage("POST", "/admin/antrag/2/status", {"csrf": CSRF, "ziel": "neu"})
-    _, _, leer = anfrage("GET", "/admin/durchfahrt")
+    anfrage("POST", "/kennzeichen/antrag/1/status", {"csrf": CSRF, "ziel": "neu"})
+    anfrage("POST", "/kennzeichen/antrag/2/status", {"csrf": CSRF, "ziel": "neu"})
+    _, _, leer = anfrage("GET", "/kennzeichen/durchfahrt")
     pruefe("Noch ist niemand genehmigt" in leer, "leere Liste sagt es deutlich")
 
 finally:

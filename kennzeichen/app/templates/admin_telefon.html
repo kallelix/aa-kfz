@@ -32,8 +32,8 @@
         <tbody>
           {% for a in antraege %}
             <tr>
-              <td><a href="/admin/antrag/{{ a.id }}">{{ a.id }}</a></td>
-              <td><a href="/admin/antrag/{{ a.id }}">{{ a.nachname }}, {{ a.vorname }}</a></td>
+              <td><a href="/kennzeichen/antrag/{{ a.id }}">{{ a.id }}</a></td>
+              <td><a href="/kennzeichen/antrag/{{ a.id }}">{{ a.nachname }}, {{ a.vorname }}</a></td>
               <td class="nowrap">
                 <a href="tel:{{ a.telefon|replace(' ', '') }}">{{ a.telefon }}</a>
               </td>
@@ -42,10 +42,10 @@
               <td class="nowrap">{{ a.entscheidung_am|zeit }}</td>
               <td class="mehrzeilig">{{ a.begruendung or '—' }}</td>
               <td>
-                <form method="post" action="/admin/antrag/{{ a.id }}/telefoniert">
+                <form method="post" action="/kennzeichen/antrag/{{ a.id }}/telefoniert">
                   <input type="hidden" name="csrf" value="{{ csrf }}">
                   <input type="hidden" name="erledigt" value="1">
-                  <input type="hidden" name="zurueck" value="/admin/telefon">
+                  <input type="hidden" name="zurueck" value="/kennzeichen/telefon">
                   <button type="submit" class="knopf-schlicht">angerufen</button>
                 </form>
               </td>

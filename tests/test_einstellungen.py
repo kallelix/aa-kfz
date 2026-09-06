@@ -158,8 +158,8 @@ try:
               "email": "nina@example.org", "bemerkung": "Kommt Freitag"}
 
     print("Ohne Anmeldung")
-    status, ort, _ = anfrage("GET", "/admin/einstellungen")
-    pruefe(status == 303 and ort.startswith("/admin/login"),
+    status, ort, _ = anfrage("GET", "/kennzeichen/einstellungen")
+    pruefe(status == 303 and ort.startswith("/kennzeichen/login"),
            "Einstellungen ohne Anmeldung fuehren zur Anmeldeseite")
 
     print("Ohne gepflegte Adresse")
@@ -167,22 +167,22 @@ try:
     pruefe(mails("orga") == [], "ohne Adresse wird niemand benachrichtigt")
     pruefe(len(mails("eingang")) == 1, "die Eingangsbestaetigung kommt trotzdem")
 
-    anfrage("POST", "/admin/login", {"passwort": "test-passwort-123", "weiter": "/admin"})
-    _, _, seite = anfrage("GET", "/admin/einstellungen")
+    anfrage("POST", "/kennzeichen/login", {"passwort": "test-passwort-123", "weiter": "/kennzeichen"})
+    _, _, seite = anfrage("GET", "/kennzeichen/einstellungen")
     CSRF = re.search(r'name="csrf" value="([^"]+)"', seite).group(1)
     pruefe('name="benachrichtigung"' in seite, "das Feld ist da")
     pruefe('value=""' in seite, "und noch leer")
 
     print("Adresse pflegen")
-    status, _, text = anfrage("POST", "/admin/einstellungen",
+    status, _, text = anfrage("POST", "/kennzeichen/einstellungen",
                               {"csrf": CSRF, "benachrichtigung": "keine-adresse"})
     pruefe(status == 422 and "E-Mail-Adresse" in text, "Unfug wird abgewiesen")
 
-    status, _, _ = anfrage("POST", "/admin/einstellungen",
+    status, _, _ = anfrage("POST", "/kennzeichen/einstellungen",
                            {"csrf": "falsch", "benachrichtigung": "orga@example.org"})
     pruefe(status == 400, "ohne CSRF-Token -> 400")
 
-    status, ort, _ = anfrage("POST", "/admin/einstellungen",
+    status, ort, _ = anfrage("POST", "/kennzeichen/einstellungen",
                              {"csrf": CSRF, "benachrichtigung": "  Orga@Example.ORG  "})
     _, _, seite = anfrage("GET", ort)
     pruefe("ab sofort gemeldet" in seite, "Speichern meldet Erfolg")
@@ -199,13 +199,13 @@ try:
         pruefe(meldung["empfaenger"] == "orga@example.org", "an die gepflegte Adresse")
         pruefe("Otto Ohne" in meldung["betreff"], "Name im Betreff: " + meldung["betreff"])
         pruefe("KA-OO 2" in meldung["body"], "Kennzeichen im Text")
-        pruefe("/admin/antrag/2" in meldung["body"], "Verweis in die Detailansicht")
+        pruefe("/kennzeichen/antrag/2" in meldung["body"], "Verweis in die Detailansicht")
         pruefe(meldung["gesendet_am"] is None, "wird nicht im Request verschickt")
     pruefe(len(mails("eingang")) == 1,
            "Otto hat keine Mailadresse, bekommt also keine Bestaetigung")
 
     print("Abschalten")
-    status, ort, _ = anfrage("POST", "/admin/einstellungen",
+    status, ort, _ = anfrage("POST", "/kennzeichen/einstellungen",
                              {"csrf": CSRF, "benachrichtigung": ""})
     _, _, seite = anfrage("GET", ort)
     pruefe("niemand mehr" in seite, "Leeren meldet die Abschaltung")
@@ -214,8 +214,8 @@ try:
     pruefe(len(mails("orga")) == vorher, "danach wird nicht mehr benachrichtigt")
 
     print("Reiter")
-    _, _, liste = anfrage("GET", "/admin")
-    pruefe('href="/admin/einstellungen">Einstellungen' in liste,
+    _, _, liste = anfrage("GET", "/kennzeichen")
+    pruefe('href="/kennzeichen/einstellungen">Einstellungen' in liste,
            "der Reiter steht im Backoffice")
 
 finally:

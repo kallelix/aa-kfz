@@ -843,7 +843,127 @@ Nicht vergessen, weil außerhalb der Datenbank:
   Passwort und gilt weiter. Beim Dienst widerrufen oder wenigstens aus der
   `.env` nehmen.
 
-## 10. Timetable ablösen
+## 10. Von drei Containern auf einen
+
+Nach der Veranstaltung zusammengeführt: **eine Anwendung, ein Dienst, ein
+Container.** Die drei Programme sind geblieben, was sie waren – sie laufen
+nur in einem Prozess.
+
+### Was sich ändert und was nicht
+
+| | vorher | jetzt |
+|---|---|---|
+| Container | drei (.42, .43, .44) | **einer** |
+| systemd-Unit | drei | **eine** (`dienst.service`) |
+| nginx-Datei | drei | **eine** (`nginx-dienst.conf`) |
+| Zertifikate | drei | zwei (öffentlich, admin) |
+| Sicherung | drei Läufe | **einer** über `/var/lib/abfahrt` |
+| Datenbanken | drei | drei, aber in einem Verzeichnis |
+| Öffentliche Adressen | drei | **unverändert drei** |
+| Backoffice | drei Adressen | **eine**, mit einer Anmeldung |
+
+**Die öffentlichen Adressen bleiben.** Sie stehen auf Plakaten, in Mails und
+in QR-Codes. Der Dienst entscheidet am Host-Kopf, welcher Bereich antwortet –
+deshalb reicht der Proxy-Schnipsel `Host` durch. Ohne die Zeile bekäme er den
+Namen des Upstreams zu sehen und fände gar keinen Bereich.
+
+**Das Backoffice zieht um.** Aus `kennzeichen.example.de/admin/…` wird
+`admin.example.de/kennzeichen/…`, entsprechend für Presse und Helfer. Eine
+Anmeldung gilt für alle drei: derselbe `APP_SECRET_KEY`, derselbe
+`ADMIN_PASSWORD_HASH`, der Keks auf Pfad `/`.
+
+**Die Datenbanken bleiben getrennt.** Zwei Tabellennamen kämen sich sonst in
+die Quere (`einstellung` in allen dreien, `mail_out` in zweien), und SQLite
+lässt je Datei nur einen Schreiber zu – ein längerer Helferimport würde sonst
+die Presse-Anmeldung ausbremsen. Sie liegen jetzt aber nebeneinander in
+`/var/lib/abfahrt`, das genügt für einen Sicherungslauf und einen
+`ReadWritePaths`-Eintrag.
+
+### Der Umzug
+
+Am besten auf dem Container, auf dem heute die Kennzeichen-App läuft – der
+hat den Klon schon unter `/opt/abfahrt`.
+
+```bash
+# 1. Alles anhalten
+systemctl stop abfahrt-kennzeichen abfahrt-presse abfahrt-helfer
+
+# 2. Die beiden anderen Datenbanken herüberholen (von deren Containern)
+install -d -o abfahrt -g abfahrt -m 750 /var/lib/abfahrt
+scp root@10.0.0.43:/var/lib/presse/presse.db  /var/lib/abfahrt/
+scp root@10.0.0.44:/var/lib/helfer/helfer.db  /var/lib/abfahrt/
+chown abfahrt:abfahrt /var/lib/abfahrt/*.db
+
+# 3. Deren Konfigurationen ebenso – sie werden weiterbenutzt
+scp root@10.0.0.43:/etc/abfahrt/presse.env /etc/abfahrt/
+scp root@10.0.0.44:/etc/abfahrt/helfer.env /etc/abfahrt/
+chmod 600 /etc/abfahrt/*.env
+
+# 4. In den drei Dateien DB_PATH auf das neue Verzeichnis zeigen lassen,
+#    und ADMIN_PASSWORD_HASH und APP_SECRET_KEY dort herausnehmen – die
+#    stehen jetzt gemeinsam in dienst.env.
+editor /etc/abfahrt/kennzeichen.env
+editor /etc/abfahrt/presse.env
+editor /etc/abfahrt/helfer.env
+
+# 5. Die gemeinsame Datei anlegen
+cd /opt/abfahrt && git pull
+install -o root -g root -m 600 deploy/dienst.env.example /etc/abfahrt/dienst.env
+/opt/abfahrt/.venv/bin/python -m kern.passwort
+/opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
+editor /etc/abfahrt/dienst.env
+
+# 6. Der neue Dienst
+install -m 644 deploy/dienst.service /etc/systemd/system/abfahrt.service
+systemctl daemon-reload
+systemctl disable --now abfahrt-kennzeichen abfahrt-presse abfahrt-helfer
+systemctl enable --now abfahrt
+systemctl status abfahrt
+```
+
+Im Protokoll muss dreimal `starte Bereich …` stehen – Kennzeichen, Presse,
+Helfer. Fehlt einer, hat seine Datenbank oder seine `.env` nicht gepasst.
+
+Dann der nginx-Host:
+
+```bash
+install -m 644 deploy/dienst-proxy.conf /etc/nginx/snippets/abfahrt-dienst-proxy.conf
+install -m 644 deploy/nginx-dienst.conf /etc/nginx/sites-available/abfahrt
+ln -sf ../sites-available/abfahrt /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/kennzeichen.example.de       /etc/nginx/sites-enabled/presse.example.de       /etc/nginx/sites-enabled/helfer.example.de
+
+# Adressen und Container-IP in der Datei anpassen, dann:
+nginx -t
+certbot --nginx -d admin.example.de
+systemctl reload nginx
+```
+
+Zuletzt der Sicherungsauftrag: ein Cron-Eintrag statt drei. `backup.sh` ohne
+`DB_PATH` sichert alle Datenbanken im Verzeichnis.
+
+```cron
+17 3 * * * BACKUP_DIR=/var/backups/abfahrt /opt/abfahrt/deploy/backup.sh
+```
+
+Läuft alles, können die beiden anderen Container weg – und mit ihnen die
+Dateien `kennzeichen.service`, `presse.service`, `helfer.service`,
+`nginx-kennzeichen.conf`, `nginx-presse.conf`, `nginx-helfer.conf` sowie die
+drei Proxy-Schnipsel. Sie stehen noch im Repo, solange der Umzug nicht
+gemacht ist.
+
+### Prüfliste
+
+- [ ] `systemctl status abfahrt` zeigt `active`, im Protokoll drei Bereiche
+- [ ] `kennzeichen.example.de` zeigt das Antragsformular
+- [ ] `presse.example.de` zeigt die Akkreditierung
+- [ ] `admin.example.de` zeigt die Startseite mit drei Kacheln
+- [ ] **Eine** Anmeldung öffnet alle drei Bereiche
+- [ ] `kennzeichen.example.de/kennzeichen` gibt 404 – das Backoffice liegt
+      nicht auf den öffentlichen Adressen
+- [ ] Eine Sicherung von Hand angestoßen, drei Dateien liegen im Zielordner
+- [ ] Die alten Zertifikate für die abgeschalteten Container abgeräumt
+
+## 11. Timetable ablösen
 
 Das Helfer-Dashboard ersetzt das bisherige `timetable`-Projekt vollständig.
 **Aus dessen Datenbank muss nichts übernommen werden** – der Aufgabenplan wird

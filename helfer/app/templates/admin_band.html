@@ -6,9 +6,9 @@
 {% block inhalt %}
   {% if not tage %}
     <p class="leer">Noch nichts erfasst.
-      <a href="/admin/import">Zum Import</a></p>
+      <a href="/helfer/import">Zum Import</a></p>
   {% else %}
-    <form method="get" action="/admin/band" class="filter">
+    <form method="get" action="/helfer/band" class="filter">
       <div>
         <label for="f-tag">Tag</label>
         <select id="f-tag" name="tag">

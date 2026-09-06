@@ -180,7 +180,7 @@ try:
     pruefe(status == 404, "und nicht ohne")
 
     print("Ohne Anmeldung")
-    pruefe("admin" not in seite.lower() or "/admin/login" not in seite,
+    pruefe("admin" not in seite.lower() or "/helfer/login" not in seite,
            "auf der Monitorseite steht kein Weg ins Backoffice")
     pruefe("csrf" not in seite, "und kein CSRF-Token")
 
@@ -383,28 +383,28 @@ try:
     pruefe(status == 404, "geht nicht")
 
     print("Backoffice")
-    anfrage("POST", "/admin/login",
+    anfrage("POST", "/helfer/login",
             {"passwort": "test-passwort-123", "kuerzel": "KK",
-             "weiter": "/admin"})
-    status, _, _, verwaltung = anfrage("GET", "/admin/monitor")
+             "weiter": "/helfer"})
+    status, _, _, verwaltung = anfrage("GET", "/helfer/monitor")
     pruefe(status == 200 and TOKEN in verwaltung, "der Link steht im Backoffice")
     CSRF = re.search(r'name="csrf" value="([^"]+)"', verwaltung).group(1)
 
     print("Neuer Link")
-    status, ort, _, _ = anfrage("POST", "/admin/monitor",
+    status, ort, _, _ = anfrage("POST", "/helfer/monitor",
                                 {"csrf": CSRF, "aktion": "neu"})
     pruefe("hinweis=neuer-link" in ort, "meldet Erfolg")
     status, _, _, _ = anfrage("GET", "/monitor/" + TOKEN)
     pruefe(status == 404, "der alte Link gilt nicht mehr")
 
-    _, _, _, verwaltung = anfrage("GET", "/admin/monitor")
+    _, _, _, verwaltung = anfrage("GET", "/helfer/monitor")
     NEU = re.search(r"/monitor/([A-Za-z0-9_-]{20,})", verwaltung).group(1)
     pruefe(NEU != TOKEN, "es ist wirklich ein anderer")
     status, _, _, _ = anfrage("GET", "/monitor/" + NEU)
     pruefe(status == 200, "und der neue oeffnet die Ansicht")
 
     print("Widerrufen")
-    status, ort, _, _ = anfrage("POST", "/admin/monitor",
+    status, ort, _, _ = anfrage("POST", "/helfer/monitor",
                                 {"csrf": CSRF, "aktion": "widerrufen"})
     pruefe("hinweis=widerrufen" in ort, "meldet Erfolg")
     status, _, _, _ = anfrage("GET", "/monitor/" + NEU)
@@ -413,7 +413,7 @@ try:
     pruefe(status in (404, 405), "auch der leere nicht")
 
     print("CSRF")
-    status, _, _, _ = anfrage("POST", "/admin/monitor",
+    status, _, _, _ = anfrage("POST", "/helfer/monitor",
                               {"csrf": "falsch", "aktion": "neu"})
     pruefe(status == 400, "ohne Token wird nichts erzeugt")
 

@@ -74,19 +74,19 @@ def csrf_aus(text):
     return treffer.group(1) if treffer else ""
 
 
-anmeldung = {"passwort": PASSWORT, "weiter": "/admin"}
+anmeldung = {"passwort": PASSWORT, "weiter": "/kennzeichen"}
 
 # --- 1. Ohne Anmeldung -------------------------------------------------------
 print("Ohne Anmeldung")
 o = oeffner(folgen=False)
-for pfad in ("/admin", "/admin/antrag/1", "/admin?status="):
+for pfad in ("/kennzeichen", "/kennzeichen/antrag/1", "/kennzeichen?status="):
     status, ort, _ = hole(o, pfad)
     pruefe(
-        status == 303 and ort.startswith("/admin/login?weiter="),
+        status == 303 and ort.startswith("/kennzeichen/login?weiter="),
         pfad + " leitet zur Anmeldung (" + str(status) + " -> " + ort + ")",
     )
 
-status, _, _ = hole(o, "/admin/antrag/1/loeschen", {"csrf": "x"})
+status, _, _ = hole(o, "/kennzeichen/antrag/1/loeschen", {"csrf": "x"})
 pruefe(status == 303, "Loeschen ohne Anmeldung wird abgewiesen")
 
 anzahl_vorher = zaehle("SELECT COUNT(*) FROM antrag")
@@ -119,54 +119,54 @@ pruefe("Straßensperre" in formular, "das Formular erklaert, wofuer es gebraucht
 # spaetere Zaehlprobe muss danach genommen werden.
 anzahl_vorher = zaehle("SELECT COUNT(*) FROM antrag")
 
-status, _, _ = hole(o, "/admin/login")
+status, _, _ = hole(o, "/kennzeichen/login")
 pruefe(status == 200, "Anmeldeseite ist erreichbar")
-status, _, text = hole(o, "/admin/login?weiter=" + urllib.parse.quote("//boese.example/"))
-pruefe('value="/admin"' in text, "fremdes Weiterleitungsziel wird auf /admin zurechtgebogen")
+status, _, text = hole(o, "/kennzeichen/login?weiter=" + urllib.parse.quote("//boese.example/"))
+pruefe('value="/kennzeichen"' in text, "fremdes Weiterleitungsziel wird auf /kennzeichen zurechtgebogen")
 
 # --- 2. Anmeldung ------------------------------------------------------------
 print("Anmeldung")
 o = oeffner(folgen=False)
-status, _, text = hole(o, "/admin/login", {"passwort": "falsch", "weiter": "/admin"})
+status, _, text = hole(o, "/kennzeichen/login", {"passwort": "falsch", "weiter": "/kennzeichen"})
 pruefe(status == 401 and "Passwort stimmt nicht" in text, "falsches Passwort -> 401")
 
-status, ort, _ = hole(o, "/admin/login", dict(anmeldung, kuerzel="KK"))
-pruefe(status == 303 and ort == "/admin", "richtiges Passwort -> 303 auf /admin")
+status, ort, _ = hole(o, "/kennzeichen/login", dict(anmeldung, kuerzel="KK"))
+pruefe(status == 303 and ort == "/kennzeichen", "richtiges Passwort -> 303 auf /kennzeichen")
 kekse = [c for c in o.jar if c.name == "abfahrt_sitzung"]
 pruefe(len(kekse) == 1, "Session-Cookie wurde gesetzt")
 if kekse:
-    pruefe(kekse[0].path == "/admin", "Cookie-Pfad ist /admin (nicht /)")
+    pruefe(kekse[0].path == "/kennzeichen", "Cookie-Pfad ist /kennzeichen (nicht /)")
     pruefe(kekse[0].has_nonstandard_attr("HttpOnly"), "Cookie ist HttpOnly")
 
-status, _, _ = hole(o, "/admin/login")
+status, _, _ = hole(o, "/kennzeichen/login")
 pruefe(status == 303, "angemeldet fuehrt die Anmeldeseite direkt weiter")
 
 # --- 3. Liste und Filter -----------------------------------------------------
 print("Liste und Filter")
 o = oeffner()
-hole(o, "/admin/login", dict(anmeldung, kuerzel="KK"))
-status, _, liste = hole(o, "/admin")
+hole(o, "/kennzeichen/login", dict(anmeldung, kuerzel="KK"))
+status, _, liste = hole(o, "/kennzeichen")
 pruefe(status == 200, "Liste laedt")
 pruefe("KK" in liste, "Kuerzel steht in der Kopfzeile")
 pruefe("Status „neu“" in liste, "Vorgabefilter ist neu")
 
-status, _, alle = hole(o, "/admin?status=")
+status, _, alle = hole(o, "/kennzeichen?status=")
 pruefe(
-    alle.count('href="/admin/antrag/') >= liste.count('<a href="/admin/antrag/'),
+    alle.count('href="/kennzeichen/antrag/') >= liste.count('<a href="/kennzeichen/antrag/'),
     "ohne Statusfilter sind es mindestens so viele",
 )
 
-status, _, gefiltert = hole(o, "/admin?status=&kategorie=vip")
+status, _, gefiltert = hole(o, "/kennzeichen?status=&kategorie=vip")
 pruefe("Beispiel" in gefiltert and "Mustermann" not in gefiltert, "Kategoriefilter greift")
 
-status, _, gesucht = hole(o, "/admin?status=&suche=" + urllib.parse.quote("mustermann"))
+status, _, gesucht = hole(o, "/kennzeichen?status=&suche=" + urllib.parse.quote("mustermann"))
 pruefe("Mustermann" in gesucht and "Beispiel" not in gesucht, "Suche greift")
 
-status, _, umlaut = hole(o, "/admin?status=&suche=" + urllib.parse.quote("weiß"))
+status, _, umlaut = hole(o, "/kennzeichen?status=&suche=" + urllib.parse.quote("weiß"))
 pruefe("Weiß" in umlaut, "Suche findet Umlaute unabhaengig von Gross/Klein")
 
 status, _, _ = hole(
-    o, "/admin?status=&sortierung=" + urllib.parse.quote("id; DROP TABLE antrag--")
+    o, "/kennzeichen?status=&sortierung=" + urllib.parse.quote("id; DROP TABLE antrag--")
 )
 pruefe(status == 200, "unbekannte Sortierung faellt auf die Vorgabe zurueck")
 pruefe(
@@ -174,65 +174,65 @@ pruefe(
     "Tabelle existiert noch (kein SQL aus der URL)",
 )
 
-status, _, _ = hole(o, "/admin?status=&sortierung=name")
+status, _, _ = hole(o, "/kennzeichen?status=&sortierung=name")
 pruefe(status == 200, "Sortierung nach Name laedt")
 
 # --- 4. Detailansicht --------------------------------------------------------
 print("Detailansicht")
-status, _, detail = hole(o, "/admin/antrag/1")
+status, _, detail = hole(o, "/kennzeichen/antrag/1")
 pruefe(status == 200 and "Mustermann" in detail, "Detailansicht zeigt den Antrag")
 pruefe("0171 1234567" in detail, "Telefonnummer ist sichtbar")
 pruefe("nur Telefon" in detail, "Antrag ohne Mail ist als 'nur Telefon' markiert")
-status, _, _ = hole(o, "/admin/antrag/99999")
+status, _, _ = hole(o, "/kennzeichen/antrag/99999")
 pruefe(status == 404, "unbekannte Nummer -> 404")
 
 # --- 5. Loeschen -------------------------------------------------------------
 print("Loeschen")
-status, _, _ = hole(o, "/admin/antrag/2/loeschen", {"csrf": "falsch"})
+status, _, _ = hole(o, "/kennzeichen/antrag/2/loeschen", {"csrf": "falsch"})
 pruefe(status == 400, "Loeschen ohne gueltigen CSRF-Token -> 400")
 pruefe(zaehle("SELECT COUNT(*) FROM antrag WHERE id=2") == 1, "Antrag 2 ist noch da")
 
 fremder_token = csrf_aus(detail)
 pruefe(bool(fremder_token), "CSRF-Token steht im Loeschformular")
 o_fremd = oeffner(folgen=False)
-hole(o_fremd, "/admin/login", anmeldung)
-status, _, _ = hole(o_fremd, "/admin/antrag/2/loeschen", {"csrf": fremder_token})
+hole(o_fremd, "/kennzeichen/login", anmeldung)
+status, _, _ = hole(o_fremd, "/kennzeichen/antrag/2/loeschen", {"csrf": fremder_token})
 pruefe(status == 400, "CSRF-Token einer fremden Sitzung wird abgelehnt")
 
-status, _, detail2 = hole(o, "/admin/antrag/2")
-hole(o, "/admin/antrag/2/loeschen", {"csrf": csrf_aus(detail2)})
+status, _, detail2 = hole(o, "/kennzeichen/antrag/2")
+hole(o, "/kennzeichen/antrag/2/loeschen", {"csrf": csrf_aus(detail2)})
 pruefe(zaehle("SELECT COUNT(*) FROM antrag WHERE id=2") == 0, "mit gueltigem Token wird geloescht")
 
 # --- 6. Abmelden -------------------------------------------------------------
 print("Abmelden")
 o = oeffner(folgen=False)
-hole(o, "/admin/login", anmeldung)
-status, _, seite = hole(o, "/admin")
-status, ort, _ = hole(o, "/admin/logout", {"csrf": "falsch"})
-pruefe(ort.startswith("/admin/login?weiter="), "Abmelden ohne CSRF-Token wird abgewiesen")
-status, _, seite = hole(o, "/admin")
+hole(o, "/kennzeichen/login", anmeldung)
+status, _, seite = hole(o, "/kennzeichen")
+status, ort, _ = hole(o, "/kennzeichen/logout", {"csrf": "falsch"})
+pruefe(ort.startswith("/kennzeichen/login?weiter="), "Abmelden ohne CSRF-Token wird abgewiesen")
+status, _, seite = hole(o, "/kennzeichen")
 pruefe(status == 200, "Sitzung besteht nach abgewiesenem Abmelden weiter")
-status, ort, _ = hole(o, "/admin/logout", {"csrf": csrf_aus(seite)})
-pruefe(ort == "/admin/login", "Abmelden leitet zur Anmeldeseite")
-status, ort, _ = hole(o, "/admin")
-pruefe(status == 303 and ort.startswith("/admin/login"), "nach dem Abmelden ist Schluss")
+status, ort, _ = hole(o, "/kennzeichen/logout", {"csrf": csrf_aus(seite)})
+pruefe(ort == "/kennzeichen/login", "Abmelden leitet zur Anmeldeseite")
+status, ort, _ = hole(o, "/kennzeichen")
+pruefe(status == 303 and ort.startswith("/kennzeichen/login"), "nach dem Abmelden ist Schluss")
 
 # --- 7. Manipuliertes Cookie -------------------------------------------------
 print("Manipuliertes Cookie")
 o = oeffner(folgen=False)
-hole(o, "/admin/login", dict(anmeldung, kuerzel="KK"))
+hole(o, "/kennzeichen/login", dict(anmeldung, kuerzel="KK"))
 for keks in o.jar:
     if keks.name == "abfahrt_sitzung":
         keks.value = keks.value[:-2] + "xy"
-status, ort, _ = hole(o, "/admin")
-pruefe(status == 303 and ort.startswith("/admin/login"), "verbogenes Cookie zaehlt nicht")
+status, ort, _ = hole(o, "/kennzeichen")
+pruefe(status == 303 and ort.startswith("/kennzeichen/login"), "verbogenes Cookie zaehlt nicht")
 
 # --- 8. Rate Limit -----------------------------------------------------------
 print("Rate Limit am Login (erwartet LOGIN_VERSUCHE=3)")
 o = oeffner(folgen=False)
-codes = [hole(o, "/admin/login", {"passwort": "falsch", "weiter": "/admin"})[0] for _ in range(4)]
+codes = [hole(o, "/kennzeichen/login", {"passwort": "falsch", "weiter": "/kennzeichen"})[0] for _ in range(4)]
 pruefe(codes[:3] == [401, 401, 401] and codes[3] == 429, "3x 401, dann 429: " + str(codes))
-status, _, _ = hole(o, "/admin/login", anmeldung)
+status, _, _ = hole(o, "/kennzeichen/login", anmeldung)
 pruefe(status == 429, "auch das richtige Passwort prallt waehrend der Sperre ab")
 
 # --- 9. Oeffentlicher Teil unberuehrt ---------------------------------------

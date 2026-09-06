@@ -5,13 +5,13 @@
 {% block inhalt %}
   <section class="kasten">
     <h2>Vorbelegung der Materialausgabe</h2>
-    <p>Womit das Ausgabeformular unter <a href="/admin/funk">Funk</a> gefüllt
+    <p>Womit das Ausgabeformular unter <a href="/helfer/funk">Funk</a> gefüllt
       ist, wenn es aufgeht. Ändern kann man die Mengen dort weiterhin bei jeder
       Ausgabe – hier steht nur, was ohne Zutun dasteht.</p>
     <p class="hilfe">Wenn sich am Ausgabetisch herausstellt, dass jeder auch
       ein Headset bekommt, spart das bei jeder Übergabe einen Handgriff.</p>
 
-    <form method="post" action="/admin/einstellungen">
+    <form method="post" action="/helfer/einstellungen">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <div class="mengen">
         {% for stueck in material %}
@@ -70,13 +70,13 @@
   <section>
     <h2>Wo sonst noch etwas eingestellt wird</h2>
     <ul class="hinweisliste">
-      <li><a href="/admin/monitor">Monitor</a> – Link für den Bildschirm im
+      <li><a href="/helfer/monitor">Monitor</a> – Link für den Bildschirm im
         Zelt, erzeugen und widerrufen</li>
-      <li><a href="/admin/unterschriften">Unterschriften</a> – Link für das
+      <li><a href="/helfer/unterschriften">Unterschriften</a> – Link für das
         Tablet am Ausgabetisch</li>
-      <li><a href="/admin/zeitplan">Zeitplan-Abruf</a> – von den Websites der
+      <li><a href="/helfer/zeitplan">Zeitplan-Abruf</a> – von den Websites der
         Rennserien, von Hand auslösen</li>
-      <li><a href="/admin/import">Import</a> – Schichten und Helfer aus dem
+      <li><a href="/helfer/import">Import</a> – Schichten und Helfer aus dem
         bisherigen Registrierungstool</li>
     </ul>
   </section>

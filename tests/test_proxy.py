@@ -133,16 +133,22 @@ with Server(FORWARDED_ALLOW_IPS="127.0.0.1", COOKIE_SECURE="auto") as s:
            "vertraute Zwischenstationen werden uebersprungen: " + str(s.letzte_ip()))
 
     # Cookie: Secure nur, wenn der Browser HTTPS gesehen hat.
-    _, _, keks, _ = s.anfrage("POST", "/admin/login",
-                              {"passwort": "test-passwort-123", "weiter": "/admin"},
+    _, _, keks, _ = s.anfrage("POST", "/kennzeichen/login",
+                              {"passwort": "test-passwort-123", "weiter": "/kennzeichen"},
                               {"X-Forwarded-Proto": "https"})
     pruefe("Secure" in keks, "mit X-Forwarded-Proto: https bekommt das Cookie Secure")
     pruefe("httponly" in keks.lower() and "samesite=lax" in keks.lower(),
            "HttpOnly und SameSite stehen ebenfalls dran")
-    pruefe("Path=/admin" in keks, "Cookie gilt nur unter /admin: " + keks)
+    # Pfad "/" und nicht mehr der Bereich: das Backoffice der drei
+    # Anwendungen liegt unter EINER Adresse, und wer sich einmal anmeldet,
+    # soll in allen drei Bereichen sein. Getrennt bleiben sie dadurch, dass
+    # die oeffentlichen Seiten unter eigenen Hostnamen liegen - dort schickt
+    # der Browser den Keks gar nicht erst hin.
+    pruefe("Path=/;" in keks or keks.rstrip().endswith("Path=/"),
+           "Cookie gilt fuer die ganze Adresse: " + keks)
 
-    _, _, keks, _ = s.anfrage("POST", "/admin/login",
-                              {"passwort": "test-passwort-123", "weiter": "/admin"},
+    _, _, keks, _ = s.anfrage("POST", "/kennzeichen/login",
+                              {"passwort": "test-passwort-123", "weiter": "/kennzeichen"},
                               {"X-Forwarded-Proto": "http"})
     pruefe("Secure" not in keks, "ohne HTTPS kein Secure – sonst waere lokal keine Anmeldung moeglich")
 
@@ -153,16 +159,16 @@ with Server(FORWARDED_ALLOW_IPS="10.0.0.10", COOKIE_SECURE="auto") as s:
     pruefe(s.letzte_ip() == "127.0.0.1",
            "fremde X-Forwarded-For werden ignoriert: " + str(s.letzte_ip()))
 
-    _, _, keks, _ = s.anfrage("POST", "/admin/login",
-                              {"passwort": "test-passwort-123", "weiter": "/admin"},
+    _, _, keks, _ = s.anfrage("POST", "/kennzeichen/login",
+                              {"passwort": "test-passwort-123", "weiter": "/kennzeichen"},
                               {"X-Forwarded-Proto": "https"})
     pruefe("Secure" not in keks, "auch das Protokoll wird nicht geglaubt")
 
 # --- COOKIE_SECURE erzwungen -------------------------------------------------
 print("COOKIE_SECURE=1")
 with Server(FORWARDED_ALLOW_IPS="127.0.0.1", COOKIE_SECURE="1") as s:
-    _, _, keks, _ = s.anfrage("POST", "/admin/login",
-                              {"passwort": "test-passwort-123", "weiter": "/admin"})
+    _, _, keks, _ = s.anfrage("POST", "/kennzeichen/login",
+                              {"passwort": "test-passwort-123", "weiter": "/kennzeichen"})
     pruefe("Secure" in keks, "erzwungenes Secure gilt auch ohne Proxy-Kopfzeile")
 
 # --- IP_SPEICHERN=0 ----------------------------------------------------------

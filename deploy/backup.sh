@@ -8,9 +8,27 @@
 
 set -eu
 
-DB="${DB_PATH:-/var/lib/abfahrt/antraege.db}"
+# Ohne DB_PATH werden ALLE Datenbanken im Verzeichnis gesichert. Seit die
+# drei Anwendungen ein Dienst sind, liegen sie nebeneinander in
+# /var/lib/abfahrt - ein Aufruf statt drei Cron-Eintraege.
+DB="${DB_PATH:-}"
 ZIEL="${BACKUP_DIR:-/var/backups/abfahrt}"
 TAGE="${BACKUP_TAGE:-30}"
+
+if [ -z "$DB" ]; then
+    VERZEICHNIS="${DB_DIR:-/var/lib/abfahrt}"
+    gefunden=0
+    for eine in "$VERZEICHNIS"/*.db; do
+        [ -f "$eine" ] || continue
+        gefunden=1
+        DB_PATH="$eine" "$0" "$@" || exit 1
+    done
+    if [ "$gefunden" = "0" ]; then
+        echo "Keine Datenbank in $VERZEICHNIS gefunden" >&2
+        exit 1
+    fi
+    exit 0
+fi
 
 if [ ! -f "$DB" ]; then
     echo "Datenbank $DB nicht gefunden" >&2

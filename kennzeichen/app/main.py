@@ -225,7 +225,7 @@ async def danke(request: Request, nr: str = ""):
 @app.exception_handler(auth.NichtAngemeldet)
 async def _nicht_angemeldet(request: Request, ausnahme):
     return RedirectResponse(
-        "/admin/login?weiter=" + quote(ausnahme.ziel), status_code=303
+        "/kennzeichen/login?weiter=" + quote(ausnahme.ziel), status_code=303
     )
 
 
@@ -239,13 +239,13 @@ async def _nicht_eingerichtet(request: Request, ausnahme):
 def _weiter_pfad(roh: str) -> str:
     """Nur eigene Backoffice-Pfade zulassen – sonst wäre das eine offene
     Weiterleitung."""
-    if roh.startswith("/admin") and not roh.startswith("//") and "\\" not in roh:
+    if roh.startswith("/kennzeichen") and not roh.startswith("//") and "\\" not in roh:
         return roh
-    return "/admin"
+    return "/kennzeichen"
 
 
-@app.get("/admin/login")
-async def login_formular(request: Request, weiter: str = "/admin"):
+@app.get("/kennzeichen/login")
+async def login_formular(request: Request, weiter: str = "/kennzeichen"):
     if not auth.eingerichtet():
         raise auth.NichtEingerichtet()
     if auth.sitzung_lesen(request) is not None:
@@ -262,13 +262,13 @@ async def login_formular(request: Request, weiter: str = "/admin"):
     )
 
 
-@app.post("/admin/login")
+@app.post("/kennzeichen/login")
 async def login_absenden(request: Request):
     if not auth.eingerichtet():
         raise auth.NichtEingerichtet()
 
     daten = await request.form()
-    weiter = _weiter_pfad(str(daten.get("weiter") or "/admin"))
+    weiter = _weiter_pfad(str(daten.get("weiter") or "/kennzeichen"))
     kuerzel = str(daten.get("kuerzel") or "").strip()[:20]
     ip = _remote_ip(request, immer=True) or "unbekannt"
 
@@ -298,15 +298,15 @@ async def login_absenden(request: Request):
     return antwort
 
 
-@app.post("/admin/logout")
+@app.post("/kennzeichen/logout")
 async def logout(request: Request):
     sitzung = auth.sitzung_lesen(request)
     daten = await request.form()
     if sitzung is not None and not auth.csrf_pruefen(
         sitzung, str(daten.get("csrf") or "")
     ):
-        raise auth.NichtAngemeldet("/admin")
-    antwort = RedirectResponse("/admin/login", status_code=303)
+        raise auth.NichtAngemeldet("/kennzeichen")
+    antwort = RedirectResponse("/kennzeichen/login", status_code=303)
     auth.cookie_loeschen(antwort)
     return antwort
 
@@ -387,13 +387,13 @@ def _csrf_fehler(request: Request, sitzung):
 
 
 def _zum_antrag(antrag_id: int, hinweis: str, anzahl: str = "") -> RedirectResponse:
-    ziel = f"/admin/antrag/{antrag_id}?hinweis={hinweis}"
+    ziel = f"/kennzeichen/antrag/{antrag_id}?hinweis={hinweis}"
     if anzahl:
         ziel += f"&anzahl={anzahl}"
     return RedirectResponse(ziel, status_code=303)
 
 
-@app.get("/admin")
+@app.get("/kennzeichen")
 async def admin_liste(
     request: Request,
     status: str = "neu",
@@ -458,7 +458,7 @@ def _detail_seite(request, sitzung, antrag, werte=None, fehler=None, hinweis="",
     )
 
 
-@app.get("/admin/antrag/{antrag_id}")
+@app.get("/kennzeichen/antrag/{antrag_id}")
 async def admin_detail(
     request: Request,
     antrag_id: int,
@@ -471,7 +471,7 @@ async def admin_detail(
     return _detail_seite(request, sitzung, antrag, hinweis=_meldung(hinweis))
 
 
-@app.post("/admin/antrag/{antrag_id}/speichern")
+@app.post("/kennzeichen/antrag/{antrag_id}/speichern")
 async def admin_speichern(
     request: Request, antrag_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -508,7 +508,7 @@ async def admin_speichern(
     return _zum_antrag(antrag_id, "gespeichert")
 
 
-@app.post("/admin/antrag/{antrag_id}/ablehnen")
+@app.post("/kennzeichen/antrag/{antrag_id}/ablehnen")
 async def admin_ablehnen(
     request: Request, antrag_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -538,7 +538,7 @@ async def admin_ablehnen(
     return _zum_antrag(antrag_id, "abgelehnt" if erledigt else "nichts")
 
 
-@app.post("/admin/antrag/{antrag_id}/status")
+@app.post("/kennzeichen/antrag/{antrag_id}/status")
 async def admin_status(
     request: Request, antrag_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -559,7 +559,7 @@ async def admin_status(
     return _zum_antrag(antrag_id, hinweis)
 
 
-@app.post("/admin/sammelaktion")
+@app.post("/kennzeichen/sammelaktion")
 async def admin_sammelaktion(
     request: Request, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -569,7 +569,7 @@ async def admin_sammelaktion(
         return _csrf_fehler(request, sitzung)
 
     ids = [int(w) for w in daten.getlist("ids") if str(w).isdigit()]
-    zurueck = _weiter_pfad(str(daten.get("zurueck") or "/admin"))
+    zurueck = _weiter_pfad(str(daten.get("zurueck") or "/kennzeichen"))
     trenner = "&" if "?" in zurueck else "?"
 
     if not ids:
@@ -591,7 +591,7 @@ async def admin_sammelaktion(
     )
 
 
-@app.post("/admin/antrag/{antrag_id}/loeschen")
+@app.post("/kennzeichen/antrag/{antrag_id}/loeschen")
 async def admin_loeschen(
     request: Request, antrag_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -599,7 +599,7 @@ async def admin_loeschen(
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return _csrf_fehler(request, sitzung)
     db.antrag_loeschen(antrag_id)
-    return RedirectResponse("/admin?hinweis=geloescht", status_code=303)
+    return RedirectResponse("/kennzeichen?hinweis=geloescht", status_code=303)
 
 
 # --- CSV-Export -------------------------------------------------------------
@@ -646,7 +646,7 @@ def _csv_zeile(antrag) -> list:
     return werte
 
 
-@app.get("/admin/export.csv")
+@app.get("/kennzeichen/export.csv")
 async def admin_export(
     request: Request,
     status: str = "",
@@ -686,7 +686,7 @@ async def admin_export(
 # --- Einstellungen ----------------------------------------------------------
 
 
-@app.get("/admin/einstellungen")
+@app.get("/kennzeichen/einstellungen")
 async def admin_einstellungen(
     request: Request,
     hinweis: str = "",
@@ -705,7 +705,7 @@ async def admin_einstellungen(
     )
 
 
-@app.post("/admin/einstellungen")
+@app.post("/kennzeichen/einstellungen")
 async def admin_einstellungen_speichern(
     request: Request, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -729,7 +729,7 @@ async def admin_einstellungen_speichern(
 
     db.benachrichtigung_mail_setzen(adresse)
     return RedirectResponse(
-        "/admin/einstellungen?hinweis=" + ("meldung_an" if adresse else "meldung_aus"),
+        "/kennzeichen/einstellungen?hinweis=" + ("meldung_an" if adresse else "meldung_aus"),
         status_code=303,
     )
 
@@ -777,7 +777,7 @@ async def durchfahrt_offen(request: Request, token: str):
     )
 
 
-@app.post("/admin/durchfahrt/link")
+@app.post("/kennzeichen/durchfahrt/link")
 async def admin_durchfahrt_link(
     request: Request, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -795,10 +795,10 @@ async def admin_durchfahrt_link(
     else:
         hinweis = "nichts"
 
-    return RedirectResponse("/admin/durchfahrt?hinweis=" + hinweis, status_code=303)
+    return RedirectResponse("/kennzeichen/durchfahrt?hinweis=" + hinweis, status_code=303)
 
 
-@app.get("/admin/durchfahrt")
+@app.get("/kennzeichen/durchfahrt")
 async def admin_durchfahrt(
     request: Request, hinweis: str = "", sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -836,14 +836,14 @@ def _qr_svg(antrag_id: int) -> str:
     setzt und data: damit blockiert waere.
     """
     if config.KARTEN_URL_BASIS:
-        inhalt = f"{config.KARTEN_URL_BASIS}/admin/antrag/{antrag_id}"
+        inhalt = f"{config.KARTEN_URL_BASIS}/kennzeichen/antrag/{antrag_id}"
     else:
         inhalt = f"Antrag {antrag_id} – {config.VERANSTALTUNG}"
     # Fehlerkorrektur "M": vertraegt einen Knick in der Karte.
     return segno.make(inhalt, error="m").svg_inline(scale=3, dark="#000000", border=0)
 
 
-@app.get("/admin/karten")
+@app.get("/kennzeichen/karten")
 async def admin_karten(
     request: Request,
     status: str = "genehmigt",
@@ -883,7 +883,7 @@ async def admin_karten(
 # --- Telefonisch zu informieren ---------------------------------------------
 
 
-@app.get("/admin/telefon")
+@app.get("/kennzeichen/telefon")
 async def admin_telefon(
     request: Request, hinweis: str = "", sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -899,7 +899,7 @@ async def admin_telefon(
     )
 
 
-@app.post("/admin/antrag/{antrag_id}/telefoniert")
+@app.post("/kennzeichen/antrag/{antrag_id}/telefoniert")
 async def admin_telefoniert(
     request: Request, antrag_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -913,7 +913,7 @@ async def admin_telefoniert(
     erledigt = str(daten.get("erledigt") or "1") == "1"
     db.tel_informiert_setzen(antrag_id, erledigt)
 
-    zurueck = _weiter_pfad(str(daten.get("zurueck") or "/admin/telefon"))
+    zurueck = _weiter_pfad(str(daten.get("zurueck") or "/kennzeichen/telefon"))
     trenner = "&" if "?" in zurueck else "?"
     hinweis = "angerufen" if erledigt else "anruf_offen"
     return RedirectResponse(zurueck + trenner + "hinweis=" + hinweis, status_code=303)
@@ -922,7 +922,7 @@ async def admin_telefoniert(
 # --- Mail-Queue -------------------------------------------------------------
 
 
-@app.post("/admin/mail/{mail_id}/erneut")
+@app.post("/kennzeichen/mail/{mail_id}/erneut")
 async def admin_mail_erneut(
     request: Request, mail_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -935,4 +935,4 @@ async def admin_mail_erneut(
     antrag_id = int(str(daten.get("antrag_id") or "0") or 0)
     if antrag_id:
         return _zum_antrag(antrag_id, "mail_erneut" if erneut else "nichts")
-    return RedirectResponse("/admin", status_code=303)
+    return RedirectResponse("/kennzeichen", status_code=303)

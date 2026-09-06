@@ -18,7 +18,7 @@
         </div>
       </div>
       {% if sitzung %}
-        <form method="post" action="/admin/logout" class="abmelden">
+        <form method="post" action="/helfer/logout" class="abmelden">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           {% if sitzung.kuerzel %}<span class="kuerzel">{{ sitzung.kuerzel }}</span>{% endif %}
           <button type="submit" class="knopf-schlicht">Abmelden</button>

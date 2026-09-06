@@ -32,7 +32,7 @@ from fastapi import Request, Response
 class NichtAngemeldet(Exception):
     """Löst die Umleitung zur Anmeldeseite aus (siehe Handler in main.py)."""
 
-    def __init__(self, ziel: str = "/admin") -> None:
+    def __init__(self, ziel: str = "/") -> None:
         self.ziel = ziel
 
 
@@ -76,11 +76,13 @@ class Auth:
     hash_erzeugen = staticmethod(hash_erzeugen)
 
     def __init__(self, config, cookie_name: str | None = None,
-                 cookie_pfad: str = "/admin") -> None:
+                 cookie_pfad: str = "/") -> None:
         self.config = config
-        # Je Anwendung ein eigener Name waere noetig, sobald sie sich eine
-        # Adresse teilen - bei getrennten Hostnamen trennt der Browser die
-        # Kekse schon selbst.
+        # Ein Name und ein Pfad "/" fuer alle drei: das Backoffice liegt
+        # unter EINER Adresse, und wer sich einmal anmeldet, soll in allen
+        # drei Bereichen sein. Dass das aufgeht, haengt daran, dass die drei
+        # denselben APP_SECRET_KEY benutzen - sonst laege zwar ein Keks da,
+        # aber die Unterschrift passte nicht.
         self.COOKIE_NAME = cookie_name or getattr(
             config, "COOKIE_NAME", "abfahrt_sitzung")
         self.COOKIE_PFAD = cookie_pfad

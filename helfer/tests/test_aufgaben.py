@@ -159,15 +159,15 @@ try:
         return ergebnis
 
     print("Ohne Anmeldung")
-    for pfad in ("/admin/aufgaben", "/admin/aufgabe/neu", "/admin/aufgabe/1"):
+    for pfad in ("/helfer/aufgaben", "/helfer/aufgabe/neu", "/helfer/aufgabe/1"):
         status, ort, _ = anfrage("GET", pfad)
-        pruefe(status == 303 and ort.startswith("/admin/login"),
+        pruefe(status == 303 and ort.startswith("/helfer/login"),
                pfad + " führt zur Anmeldung")
 
-    anfrage("POST", "/admin/login",
+    anfrage("POST", "/helfer/login",
             {"passwort": "test-passwort-123", "kuerzel": "KK",
-             "weiter": "/admin"})
-    _, _, seite = anfrage("GET", "/admin/aufgaben")
+             "weiter": "/helfer"})
+    _, _, seite = anfrage("GET", "/helfer/aufgaben")
     CSRF = re.search(r'name="csrf" value="([^"]+)"', seite).group(1)
     pruefe("Noch keine Aufgabe erfasst" in seite, "leerer Plan sagt das auch")
 
@@ -177,24 +177,24 @@ try:
             ("Strom legen", "2026-08-27", "13:00", "16:00", "aufbau"),
             ("Streckenband prüfen", "2026-08-29", "06:00", "07:00", "event"),
             ("Pokale besorgen", "", "", "", "sonstiges")):
-        status, ort, _ = anfrage("POST", "/admin/aufgabe/neu", {
+        status, ort, _ = anfrage("POST", "/helfer/aufgabe/neu", {
             "csrf": CSRF, "titel": titel, "datum": datum, "beginn": von,
             "ende": bis, "phase": phase, "ort": "Zeltplatz",
             "verantwortlich": "Kalle"})
         pruefe(status == 303 and "hinweis=angelegt" in ort, titel)
     pruefe(len(zeilen("SELECT id FROM aufgabe")) == 4, "vier Aufgaben stehen drin")
 
-    status, _, _ = anfrage("POST", "/admin/aufgabe/neu",
+    status, _, _ = anfrage("POST", "/helfer/aufgabe/neu",
                            {"csrf": "falsch", "titel": "Geschmuggelt"})
     pruefe(status == 400, "ohne CSRF-Token wird nichts angelegt")
     pruefe(len(zeilen("SELECT id FROM aufgabe")) == 4, "und nichts geschrieben")
 
     print("Fehlerhafte Eingabe")
-    status, _, seite = anfrage("POST", "/admin/aufgabe/neu",
+    status, _, seite = anfrage("POST", "/helfer/aufgabe/neu",
                                {"csrf": CSRF, "titel": ""})
     pruefe(status == 400 and 'class="fehler"' in seite,
            "ohne Titel kommt das Formular zurück")
-    status, _, seite = anfrage("POST", "/admin/aufgabe/neu",
+    status, _, seite = anfrage("POST", "/helfer/aufgabe/neu",
                                {"csrf": CSRF, "titel": "Merken",
                                 "notiz": "nicht verlieren", "beginn": "08:00"})
     pruefe("nicht verlieren" in seite,
@@ -202,54 +202,54 @@ try:
     pruefe(len(zeilen("SELECT id FROM aufgabe")) == 4, "nichts wurde angelegt")
 
     print("Liste")
-    _, _, seite = anfrage("GET", "/admin/aufgaben")
+    _, _, seite = anfrage("GET", "/helfer/aufgaben")
     pruefe(seite.count('<tr id="aufgabe-') == 4, "vier Zeilen")
     gruppen = re.findall(r'class="tagestitel">\s*([^<\n]+)', seite)
     pruefe([g.strip() for g in gruppen] == ["Do 27.08.", "Sa 29.08.", "Pool"],
            "nach Tagen gruppiert, der Pool ganz hinten: " + str(gruppen))
     pruefe("Zeltplatz" in seite and "Kalle" in seite, "Ort und Wer stehen drin")
 
-    _, _, seite = anfrage("GET", "/admin/aufgaben?phase=aufbau")
+    _, _, seite = anfrage("GET", "/helfer/aufgaben?phase=aufbau")
     pruefe(seite.count('<tr id="aufgabe-') == 2, "Filter nach Phase greift")
-    _, _, seite = anfrage("GET", "/admin/aufgaben?status=erledigt")
+    _, _, seite = anfrage("GET", "/helfer/aufgaben?status=erledigt")
     pruefe(seite.count('<tr id="aufgabe-') == 0, "Filter nach Status greift")
-    _, _, seite = anfrage("GET", "/admin/aufgaben?phase=erfunden")
+    _, _, seite = anfrage("GET", "/helfer/aufgaben?phase=erfunden")
     pruefe(seite.count('<tr id="aufgabe-') == 4,
            "eine erfundene Phase filtert nicht, statt zu scheitern")
 
     print("Status per Knopf")
-    status, ort, _ = anfrage("POST", "/admin/aufgabe/1/status",
+    status, ort, _ = anfrage("POST", "/helfer/aufgabe/1/status",
                              {"csrf": CSRF, "status": "arbeit"})
     pruefe("hinweis=status" in ort and "#aufgabe-1" in ort,
            "meldet Erfolg und springt zur Zeile: " + ort)
     pruefe(zeilen("SELECT status FROM aufgabe WHERE id = 1")[0][0] == "arbeit",
            "der Status steht in der Datenbank")
 
-    status, ort, _ = anfrage("POST", "/admin/aufgabe/1/status",
+    status, ort, _ = anfrage("POST", "/helfer/aufgabe/1/status",
                              {"csrf": CSRF, "status": "erfunden"})
     pruefe("hinweis=unbekannt" in ort, "ein erfundener Status wird abgewiesen")
     pruefe(zeilen("SELECT status FROM aufgabe WHERE id = 1")[0][0] == "arbeit",
            "und ändert nichts")
 
-    status, ort, _ = anfrage("POST", "/admin/aufgabe/1/status",
+    status, ort, _ = anfrage("POST", "/helfer/aufgabe/1/status",
                              {"csrf": CSRF, "status": "erledigt",
                               "f_phase": "aufbau"})
     pruefe("phase=aufbau" in ort, "der Filter überlebt den Statuswechsel")
 
     print("Konfliktschutz")
-    _, _, formular = anfrage("GET", "/admin/aufgabe/2")
+    _, _, formular = anfrage("GET", "/helfer/aufgabe/2")
     stand = re.search(r'name="version" value="(\d+)"', formular).group(1)
     pruefe(stand == "1", "das Formular trägt die Fassung mit: " + stand)
 
     felder = {"csrf": CSRF, "titel": "Strom legen (Fassung A)",
               "phase": "aufbau", "status": "offen", "datum": "2026-08-27",
               "beginn": "13:00", "ende": "16:00", "version": stand}
-    status, ort, _ = anfrage("POST", "/admin/aufgabe/2", felder)
+    status, ort, _ = anfrage("POST", "/helfer/aufgabe/2", felder)
     pruefe(status == 303 and "hinweis=gespeichert" in ort, "erster speichert")
 
     # Zweiter Browser, der das Formular vorher geladen hatte.
     felder["titel"] = "Strom legen (Fassung B)"
-    status, _, seite = anfrage("POST", "/admin/aufgabe/2", felder)
+    status, _, seite = anfrage("POST", "/helfer/aufgabe/2", felder)
     pruefe(status == 409, "mit veraltetem Stand gibt es 409, nicht 200")
     pruefe("Jemand anderes war schneller" in seite, "und eine klare Ansage")
     pruefe("Fassung A" in seite, "der jetzt gespeicherte Text wird gezeigt")
@@ -260,13 +260,13 @@ try:
     neuer_stand = re.search(r'name="version" value="(\d+)"', seite).group(1)
     pruefe(neuer_stand == "2", "das Formular trägt jetzt den neuen Stand")
     felder["version"] = neuer_stand
-    status, ort, _ = anfrage("POST", "/admin/aufgabe/2", felder)
+    status, ort, _ = anfrage("POST", "/helfer/aufgabe/2", felder)
     pruefe(status == 303, "ein zweiter, bewusster Versuch geht durch")
     pruefe(zeilen("SELECT titel FROM aufgabe WHERE id = 2")[0][0]
            == "Strom legen (Fassung B)", "und gewinnt dann")
 
     print("Vorschlagslisten")
-    _, _, formular = anfrage("GET", "/admin/aufgabe/neu")
+    _, _, formular = anfrage("GET", "/helfer/aufgabe/neu")
     pruefe('<datalist id="v-ort">' in formular, "es gibt eine Liste für den Ort")
     pruefe('value="Zeltplatz"' in formular,
            "und darin steht, was schon vorkommt")
@@ -275,18 +275,18 @@ try:
            "und es steht dabei, dass man auch anderes tippen kann")
 
     print("Löschen")
-    status, ort, _ = anfrage("POST", "/admin/aufgabe/3/loeschen", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/helfer/aufgabe/3/loeschen", {"csrf": CSRF})
     pruefe("hinweis=geloescht" in ort, "meldet Erfolg")
     pruefe(len(zeilen("SELECT id FROM aufgabe")) == 3, "die Zeile ist weg")
-    status, _, _ = anfrage("POST", "/admin/aufgabe/4/loeschen",
+    status, _, _ = anfrage("POST", "/helfer/aufgabe/4/loeschen",
                            {"csrf": "falsch"})
     pruefe(status == 400 and len(zeilen("SELECT id FROM aufgabe")) == 3,
            "ohne CSRF-Token wird nichts gelöscht")
 
     print("Unbekannte Nummern")
-    status, _, _ = anfrage("GET", "/admin/aufgabe/999999")
+    status, _, _ = anfrage("GET", "/helfer/aufgabe/999999")
     pruefe(status == 404, "unbekannte Aufgabe -> 404")
-    status, _, _ = anfrage("GET", "/admin/programm/999999")
+    status, _, _ = anfrage("GET", "/helfer/programm/999999")
     pruefe(status == 404, "unbekannter Programmpunkt -> 404")
 
     print("Programmpunkt von Hand")
@@ -299,14 +299,14 @@ try:
     con.close()
     pid = zeilen("SELECT id FROM programm")[0][0]
 
-    _, _, formular = anfrage("GET", "/admin/programm/%d" % pid)
+    _, _, formular = anfrage("GET", "/helfer/programm/%d" % pid)
     pruefe("ab 11.30 Uhr" in formular,
            "das Formular zeigt, was auf der Website steht")
     pstand = re.search(r'name="version" value="(\d+)"', formular).group(1)
 
     pfelder = {"csrf": CSRF, "titel": "Rennlauf", "beginn": "12:00",
                "ende": "14:00", "notiz": "laut Rennleitung", "version": pstand}
-    status, ort, _ = anfrage("POST", "/admin/programm/%d" % pid, pfelder)
+    status, ort, _ = anfrage("POST", "/helfer/programm/%d" % pid, pfelder)
     pruefe(status == 303 and "hinweis=gespeichert" in ort, "speichern klappt")
     zeile = zeilen("SELECT * FROM programm WHERE id = ?", pid)[0]
     pruefe(zeile["von_hand"] == 1,
@@ -315,27 +315,27 @@ try:
     pruefe(zeile["beginn"] == "2026-08-30 12:00", "die neue Zeit steht drin")
     pruefe(zeile["zeit_roh"] == "12:00 - 14:00 Uhr", "und ihr Wortlaut")
 
-    status, _, seite = anfrage("POST", "/admin/programm/%d" % pid, pfelder)
+    status, _, seite = anfrage("POST", "/helfer/programm/%d" % pid, pfelder)
     pruefe(status == 409 and "Jemand anderes war schneller" in seite,
            "auch hier schützt die Fassung")
 
-    status, ort, _ = anfrage("POST", "/admin/programm/%d/freigeben" % pid,
+    status, ort, _ = anfrage("POST", "/helfer/programm/%d/freigeben" % pid,
                              {"csrf": CSRF})
     pruefe("hinweis=freigegeben" in ort, "Freigabe meldet Erfolg")
     pruefe(zeilen("SELECT von_hand FROM programm WHERE id = ?", pid)[0][0] == 0,
            "danach folgt der Punkt wieder der Website")
 
     print("Aufgaben im Band")
-    _, _, seite = anfrage("GET", "/admin/band?tag=2026-08-27")
+    _, _, seite = anfrage("GET", "/helfer/band?tag=2026-08-27")
     pruefe("band-aufgabe" in seite, "die Aufgaben des Tages stehen im Band")
-    pruefe(seite.count('href="/admin/aufgabe/') >= 2,
+    pruefe(seite.count('href="/helfer/aufgabe/') >= 2,
            "und führen auf ihre Seite")
-    _, _, seite = anfrage("GET", "/admin/band?tag=2026-08-30")
+    _, _, seite = anfrage("GET", "/helfer/band?tag=2026-08-30")
     pruefe("band-aufgabe" not in seite,
            "an einem Tag ohne Aufgaben steht auch keine im Band")
 
     print("Der Pool bleibt draußen")
-    _, _, seite = anfrage("GET", "/admin/band?tag=2026-08-27")
+    _, _, seite = anfrage("GET", "/helfer/band?tag=2026-08-27")
     pruefe("Pokale besorgen" not in seite,
            "eine Aufgabe ohne Uhrzeit hat auf einer Zeitachse nichts verloren")
 

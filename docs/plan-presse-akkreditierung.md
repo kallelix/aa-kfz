@@ -281,6 +281,15 @@ Umzug von `kfz/` erst nach der Veranstaltung machen.** Sieht für eine Weile
 unsymmetrisch aus, riskiert aber nichts an einem System, das gerade gebraucht
 wird.
 
+> **Nachtrag, 06.09.2026.** Gemacht – und weiter, als hier stand. Es sind
+> nicht mehr zwei Apps mit gemeinsamem Kern, sondern drei Programme in einem
+> Dienst: `kennzeichen/`, `presse/`, `helfer/`, `kern/`, zusammengesetzt in
+> `dienst/`. Verteilt wird nach Hostname, damit die öffentlichen Adressen
+> bleiben; die drei Backoffices liegen unter einer Adresse mit einer
+> Anmeldung. Der Kern fiel dabei kleiner aus als gedacht: Wort für Wort gleich
+> waren nur 352 Zeilen. `worker.py`, `mail.py` und `db.py` tragen bloß
+> denselben Namen. Siehe `deploy/README.md`, Abschnitt 10.
+
 ---
 
 ## 8. Umsetzungsschritte
@@ -296,7 +305,7 @@ wird.
 | 7 | Ansicht „Bilder ausstehend" samt Erinnerungsmail | fertig |
 | 8 | CSV-Export | fertig |
 | 9 | Deployment: zweite Unit, zweiter nginx-Block, zweites Backup | fertig |
-| 10 | Später: Kern ziehen, `kfz/` umziehen | offen |
+| 10 | Kern ziehen, `kfz/` umziehen, drei Apps zu einem Dienst | fertig, 06.09.2026 |
 
 ---
 

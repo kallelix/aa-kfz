@@ -24,7 +24,7 @@
       <span class="kasten-titel">Ausgeben</span>
       <span class="klapp-pfeil" aria-hidden="true"></span>
     </summary>
-    <form method="post" action="/admin/funk/ausgeben">
+    <form method="post" action="/helfer/funk/ausgeben">
       <input type="hidden" name="csrf" value="{{ csrf }}">
 
       <div class="feld">
@@ -84,12 +84,12 @@
      nach jedem Seitenwechsel neu einstellen. #}
   <nav class="umschalter" data-merken-filter="funk-offen" aria-label="Anzeige">
     <a class="umschalter-teil {% if not nur_offen %}ist-aktiv{% endif %}"
-       href="/admin/funk" data-wert="0"
+       href="/helfer/funk" data-wert="0"
        {% if not nur_offen %}aria-current="true"{% endif %}>
       Alle <span class="umschalter-zahl">{{ anzahl_alle }}</span></a>
     <a class="umschalter-teil {% if nur_offen %}ist-aktiv{% endif %}
               {% if anzahl_offen %}hat-offene{% endif %}"
-       href="/admin/funk?offen=1" data-wert="1"
+       href="/helfer/funk?offen=1" data-wert="1"
        {% if nur_offen %}aria-current="true"{% endif %}>
       Noch draußen <span class="umschalter-zahl">{{ anzahl_offen }}</span></a>
   </nav>
@@ -173,14 +173,14 @@
               <td class="rechts">
                 <div class="zeilenaktionen">
                   {% if not a.zurueck_am %}
-                    <form method="post" action="/admin/ausleihe/{{ a.id }}/zurueck">
+                    <form method="post" action="/helfer/ausleihe/{{ a.id }}/zurueck">
                       <input type="hidden" name="csrf" value="{{ csrf }}">
                       <input type="hidden" name="offen" value="{{ '1' if nur_offen else '' }}">
                       <button type="submit" class="knopf-winzig">alles zurück</button>
                     </form>
                     <details class="teilrueckgabe">
                       <summary class="knopf-winzig">nur teilweise</summary>
-                      <form method="post" action="/admin/ausleihe/{{ a.id }}/zurueck">
+                      <form method="post" action="/helfer/ausleihe/{{ a.id }}/zurueck">
                         <input type="hidden" name="csrf" value="{{ csrf }}">
                         <input type="hidden" name="teilweise" value="1">
                         <input type="hidden" name="offen" value="{{ '1' if nur_offen else '' }}">
@@ -204,10 +204,10 @@
                   {{ unterschrift.knopf(
                        'material', a.id,
                        'rueckgabe' if a.zurueck_am else 'ausgabe',
-                       '/admin/funk', csrf, tablet,
+                       '/helfer/funk', csrf, tablet,
                        (unterschrieben.get(a.id) or {}).get(
                            'rueckgabe' if a.zurueck_am else 'ausgabe')) }}
-                  <form method="post" action="/admin/ausleihe/{{ a.id }}/loeschen">
+                  <form method="post" action="/helfer/ausleihe/{{ a.id }}/loeschen">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <button type="submit" class="knopf-winzig">löschen</button>
                   </form>

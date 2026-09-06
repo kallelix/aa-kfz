@@ -226,27 +226,27 @@ def _kontext(request: Request, **extra) -> dict:
 # staendig gebraucht wird, dann die beiden Ausgabetische.
 #
 # Jeder Eintrag nennt neben seinem Ziel die Pfade, die er mitmarkiert. Das ist
-# noetig, weil die Einzelansichten in der Einzahl heissen - /admin/schicht/7
-# gehoert zu "Schichten", faengt aber nicht mit /admin/schichten an.
+# noetig, weil die Einzelansichten in der Einzahl heissen - /helfer/schicht/7
+# gehoert zu "Schichten", faengt aber nicht mit /helfer/schichten an.
 HAUPTNAV = (
-    ("/admin", "Übersicht", ()),
-    ("/admin/band", "Zeitplan", ()),
-    ("/admin/aufgaben", "Aufgaben", ("/admin/aufgabe",)),
-    ("/admin/schichten", "Schichten", ("/admin/schicht",)),
-    ("/admin/helfer", "Helfer", ()),
-    ("/admin/funk", "Funken", ()),
-    ("/admin/schluessel", "Schlüssel", ()),
+    ("/helfer", "Übersicht", ()),
+    ("/helfer/band", "Zeitplan", ()),
+    ("/helfer/aufgaben", "Aufgaben", ("/helfer/aufgabe",)),
+    ("/helfer/schichten", "Schichten", ("/helfer/schicht",)),
+    ("/helfer/helfer", "Helfer", ()),
+    ("/helfer/funk", "Funken", ()),
+    ("/helfer/schluessel", "Schlüssel", ()),
 )
 
 # Was man einmal einrichtet und danach selten anfasst - zusammengefasst hinter
 # einem Punkt, damit die Zeile darueber die sieben zeigt, in denen man
 # tatsaechlich arbeitet.
 UNTERNAV = (
-    ("/admin/einstellungen", "Einstellungen", ()),
-    ("/admin/monitor", "Monitor", ()),
-    ("/admin/import", "Import", ()),
-    ("/admin/unterschriften", "Unterschriften", ()),
-    ("/admin/zeitplan", "Zeitplan-Abruf", ("/admin/programm",)),
+    ("/helfer/einstellungen", "Einstellungen", ()),
+    ("/helfer/monitor", "Monitor", ()),
+    ("/helfer/import", "Import", ()),
+    ("/helfer/unterschriften", "Unterschriften", ()),
+    ("/helfer/zeitplan", "Zeitplan-Abruf", ("/helfer/programm",)),
 )
 
 
@@ -254,7 +254,7 @@ def _navigation(pfad: str) -> dict:
     """Die Navigation mit dem Punkt der gerade offenen Seite markiert.
 
     Es gewinnt der laengste passende Pfadanfang. Ein blosses „faengt damit an“
-    reichte nicht: /admin ist der Anfang von allem und waere sonst auf jeder
+    reichte nicht: /helfer ist der Anfang von allem und waere sonst auf jeder
     Seite hervorgehoben. So braucht die Uebersicht auch keine Sonderregel –
     sie passt eben nur, solange nichts Genaueres passt.
     """
@@ -285,7 +285,7 @@ def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
     # Marke und Takt gehen an jede Backoffice-Seite: das Skript in der
     # Grundvorlage fragt damit nach, ob inzwischen jemand unterschrieben hat.
     #
-    # Heisst tabletstand und nicht stand: /admin/band reicht unter dem Namen
+    # Heisst tabletstand und nicht stand: /helfer/band reicht unter dem Namen
     # bereits den Tagesstand durch, und zwei gleiche Schluesselwoerter waeren
     # keine stille Ueberdeckung, sondern ein Fehler auf jeder solchen Seite.
     return _kontext(request, sitzung=sitzung,
@@ -305,7 +305,7 @@ def _remote_ip(request: Request) -> str:
 
 @app.exception_handler(auth.NichtAngemeldet)
 async def _nicht_angemeldet(request: Request, ausnahme):
-    return RedirectResponse("/admin/login?weiter=" + quote(ausnahme.ziel),
+    return RedirectResponse("/helfer/login?weiter=" + quote(ausnahme.ziel),
                             status_code=303)
 
 
@@ -318,18 +318,18 @@ async def _nicht_eingerichtet(request: Request, ausnahme):
 def _weiter_pfad(roh: str) -> str:
     """Nur eigene Backoffice-Pfade zulassen – sonst wäre das eine offene
     Weiterleitung."""
-    if roh.startswith("/admin") and not roh.startswith("//") and "\\" not in roh:
+    if roh.startswith("/helfer") and not roh.startswith("//") and "\\" not in roh:
         return roh
-    return "/admin"
+    return "/helfer"
 
 
 @app.get("/")
 async def start():
-    return RedirectResponse("/admin", status_code=303)
+    return RedirectResponse("/helfer", status_code=303)
 
 
-@app.get("/admin/login")
-async def login_formular(request: Request, weiter: str = "/admin"):
+@app.get("/helfer/login")
+async def login_formular(request: Request, weiter: str = "/helfer"):
     if not auth.eingerichtet():
         raise auth.NichtEingerichtet()
     if auth.sitzung_lesen(request) is not None:
@@ -340,13 +340,13 @@ async def login_formular(request: Request, weiter: str = "/admin"):
                  kuerzel_abfragen=config.KUERZEL_ABFRAGEN, kuerzel=""))
 
 
-@app.post("/admin/login")
+@app.post("/helfer/login")
 async def login_absenden(request: Request):
     if not auth.eingerichtet():
         raise auth.NichtEingerichtet()
 
     daten = await request.form()
-    weiter = _weiter_pfad(str(daten.get("weiter") or "/admin"))
+    weiter = _weiter_pfad(str(daten.get("weiter") or "/helfer"))
     kuerzel = str(daten.get("kuerzel") or "").strip()[:20]
     ip = _remote_ip(request)
 
@@ -370,14 +370,14 @@ async def login_absenden(request: Request):
     return antwort
 
 
-@app.post("/admin/logout")
+@app.post("/helfer/logout")
 async def logout(request: Request):
     sitzung = auth.sitzung_lesen(request)
     daten = await request.form()
     if sitzung is not None and not auth.csrf_pruefen(
             sitzung, str(daten.get("csrf") or "")):
-        raise auth.NichtAngemeldet("/admin")
-    antwort = RedirectResponse("/admin/login", status_code=303)
+        raise auth.NichtAngemeldet("/helfer")
+    antwort = RedirectResponse("/helfer/login", status_code=303)
     auth.cookie_loeschen(antwort)
     return antwort
 
@@ -404,7 +404,7 @@ def _zurueck(ziel: str, hinweis: str = "", **parameter) -> RedirectResponse:
 
 # --- Übersicht -------------------------------------------------------------
 
-@app.get("/admin")
+@app.get("/helfer")
 async def uebersicht(request: Request, hinweis: str = "",
                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     zaehler = db.zaehler()
@@ -420,7 +420,7 @@ async def uebersicht(request: Request, hinweis: str = "",
 
 # --- Schichten -------------------------------------------------------------
 
-@app.get("/admin/schichten")
+@app.get("/helfer/schichten")
 async def schichten(request: Request, liste: str = "", tag: str = "",
                     luecken: str = "", hinweis: str = "",
                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -432,7 +432,7 @@ async def schichten(request: Request, liste: str = "", tag: str = "",
                f_liste=liste, f_tag=tag, f_luecken=bool(luecken)))
 
 
-@app.get("/admin/schicht/{schicht_id}")
+@app.get("/helfer/schicht/{schicht_id}")
 async def schicht(request: Request, schicht_id: int, hinweis: str = "",
                   suche: str = "",
                   sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -449,16 +449,16 @@ async def schicht(request: Request, schicht_id: int, hinweis: str = "",
                helfer=[h for h in db.helfer_liste() if h["id"] not in drin]))
 
 
-@app.post("/admin/schicht/{schicht_id}/einteilen")
+@app.post("/helfer/schicht/{schicht_id}/einteilen")
 async def einteilen(request: Request, schicht_id: int,
                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
 
-    ziel = "/admin/schicht/" + str(schicht_id)
+    ziel = "/helfer/schicht/" + str(schicht_id)
     if db.schicht_laden(schicht_id) is None:
-        return _zurueck("/admin/schichten", "unbekannt")
+        return _zurueck("/helfer/schichten", "unbekannt")
 
     try:
         helfer_id = int(str(daten.get("helfer_id") or ""))
@@ -476,20 +476,20 @@ async def einteilen(request: Request, schicht_id: int,
     return _zurueck(ziel, "eingeteilt")
 
 
-@app.post("/admin/einteilung/{einteilung_id}/austragen")
+@app.post("/helfer/einteilung/{einteilung_id}/austragen")
 async def austragen(request: Request, einteilung_id: int,
                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
-    ziel = _weiter_pfad(str(daten.get("weiter") or "/admin/schichten"))
+    ziel = _weiter_pfad(str(daten.get("weiter") or "/helfer/schichten"))
     db.austragen(einteilung_id)
     return _zurueck(ziel, "ausgetragen")
 
 
 # --- Helfer ----------------------------------------------------------------
 
-@app.get("/admin/helfer")
+@app.get("/helfer/helfer")
 async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",
                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     return templates.TemplateResponse(
@@ -541,7 +541,7 @@ def _helfer_zeile(person) -> list:
     ]
 
 
-@app.get("/admin/helfer/export.csv")
+@app.get("/helfer/helfer/export.csv")
 async def helfer_ausfuhr(
         request: Request,
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -571,11 +571,11 @@ async def helfer_ausfuhr(
     )
 
 
-# ACHTUNG, Reihenfolge: /admin/helfer/neu muss VOR
-# /admin/helfer/{helfer_id} stehen. Starlette nimmt die erste Route, die
+# ACHTUNG, Reihenfolge: /helfer/helfer/neu muss VOR
+# /helfer/helfer/{helfer_id} stehen. Starlette nimmt die erste Route, die
 # passt – steht die parametrisierte vorn, landet "neu" als Wert in
 # helfer_id und die Anfrage scheitert an der Zahlenprüfung.
-@app.get("/admin/helfer/neu")
+@app.get("/helfer/helfer/neu")
 async def helfer_neu(request: Request,
                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     leer = {"name": "", "email": "", "telefon": "", "veggie": "",
@@ -583,7 +583,7 @@ async def helfer_neu(request: Request,
     return _helferformular(request, sitzung, leer, {})
 
 
-@app.post("/admin/helfer/neu")
+@app.post("/helfer/helfer/neu")
 async def helfer_anlegen_von_hand(
         request: Request,
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -602,10 +602,10 @@ async def helfer_anlegen_von_hand(
             request, sitzung, werte,
             {"name": "Diese Person steht schon in der Liste – gleicher Name "
                      "und gleiche Mailadresse."}, person=db.helfer_laden(nummer))
-    return _zurueck("/admin/helfer", "angelegt", sprung="helfer-" + str(nummer))
+    return _zurueck("/helfer/helfer", "angelegt", sprung="helfer-" + str(nummer))
 
 
-@app.get("/admin/helfer/{helfer_id}")
+@app.get("/helfer/helfer/{helfer_id}")
 async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     person = db.helfer_laden(helfer_id)
@@ -705,7 +705,7 @@ async def monitor_inhalt(request: Request, token: str, tag: str = ""):
     return antwort
 
 
-@app.get("/admin/monitor")
+@app.get("/helfer/monitor")
 async def monitor_verwalten(
         request: Request, hinweis: str = "",
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -719,7 +719,7 @@ async def monitor_verwalten(
                vorschau=config.MONITOR_VORSCHAU))
 
 
-@app.post("/admin/monitor")
+@app.post("/helfer/monitor")
 async def monitor_link(
         request: Request,
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -729,9 +729,9 @@ async def monitor_link(
 
     if str(daten.get("aktion")) == "widerrufen":
         db.monitor_token_loeschen()
-        return _zurueck("/admin/monitor", "widerrufen")
+        return _zurueck("/helfer/monitor", "widerrufen")
     db.monitor_token_neu()
-    return _zurueck("/admin/monitor", "neuer-link")
+    return _zurueck("/helfer/monitor", "neuer-link")
 
 
 # --- Zeitplan der Rennserien -----------------------------------------------
@@ -752,14 +752,14 @@ def _zeitplan_seite(request: Request, sitzung, berichte=None, code: int = 200):
                tage=config.TAGE), status_code=code)
 
 
-@app.get("/admin/zeitplan")
+@app.get("/helfer/zeitplan")
 async def zeitplan_ansicht(
         request: Request,
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     return _zeitplan_seite(request, sitzung)
 
 
-@app.post("/admin/zeitplan/abrufen")
+@app.post("/helfer/zeitplan/abrufen")
 async def zeitplan_abrufen(
         request: Request,
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -799,7 +799,7 @@ def _aus_zeile(zeile) -> dict:
     }
 
 
-@app.get("/admin/aufgaben")
+@app.get("/helfer/aufgaben")
 async def aufgaben(request: Request, phase: str = "", status: str = "",
                    hinweis: str = "",
                    sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -812,7 +812,7 @@ async def aufgaben(request: Request, phase: str = "", status: str = "",
                phasen=eintraege.PHASEN, status_texte=eintraege.STATUS))
 
 
-@app.get("/admin/aufgabe/neu")
+@app.get("/helfer/aufgabe/neu")
 async def aufgabe_neu(request: Request, tag: str = "",
                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     leer = {"titel": "", "phase": "event", "status": "offen",
@@ -823,7 +823,7 @@ async def aufgabe_neu(request: Request, tag: str = "",
         _aufgabe_kontext(request, sitzung, None, leer, {}))
 
 
-@app.post("/admin/aufgabe/neu")
+@app.post("/helfer/aufgabe/neu")
 async def aufgabe_anlegen(request: Request,
                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await request.form()
@@ -839,11 +839,11 @@ async def aufgabe_anlegen(request: Request,
             status_code=400)
 
     nummer = db.aufgabe_anlegen(werte, sitzung.kuerzel)
-    return _zurueck("/admin/aufgaben", "angelegt",
+    return _zurueck("/helfer/aufgaben", "angelegt",
                     sprung="aufgabe-" + str(nummer))
 
 
-@app.get("/admin/aufgabe/{aufgabe_id}")
+@app.get("/helfer/aufgabe/{aufgabe_id}")
 async def aufgabe_formular(request: Request, aufgabe_id: int,
                            sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     zeile = db.aufgabe_laden(aufgabe_id)
@@ -855,7 +855,7 @@ async def aufgabe_formular(request: Request, aufgabe_id: int,
         _aufgabe_kontext(request, sitzung, zeile, _aus_zeile(zeile), {}))
 
 
-@app.post("/admin/aufgabe/{aufgabe_id}")
+@app.post("/helfer/aufgabe/{aufgabe_id}")
 async def aufgabe_sichern(request: Request, aufgabe_id: int,
                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await request.form()
@@ -893,11 +893,11 @@ async def aufgabe_sichern(request: Request, aufgabe_id: int,
                              konflikt=_aus_zeile(aktuell)),
             status_code=409)
 
-    return _zurueck("/admin/aufgaben", "gespeichert",
+    return _zurueck("/helfer/aufgaben", "gespeichert",
                     sprung="aufgabe-" + str(aufgabe_id))
 
 
-@app.post("/admin/aufgabe/{aufgabe_id}/status")
+@app.post("/helfer/aufgabe/{aufgabe_id}/status")
 async def aufgabe_status(request: Request, aufgabe_id: int,
                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
@@ -905,27 +905,27 @@ async def aufgabe_status(request: Request, aufgabe_id: int,
         return Response("Ungültiger CSRF-Token", status_code=400)
     neu = str(daten.get("status") or "")
     if neu not in eintraege.STATUS:
-        return _zurueck("/admin/aufgaben", "unbekannt")
+        return _zurueck("/helfer/aufgaben", "unbekannt")
     db.aufgabe_status(aufgabe_id, neu, sitzung.kuerzel)
-    return _zurueck("/admin/aufgaben", "status",
+    return _zurueck("/helfer/aufgaben", "status",
                     phase=str(daten.get("f_phase") or ""),
                     status=str(daten.get("f_status") or ""),
                     sprung="aufgabe-" + str(aufgabe_id))
 
 
-@app.post("/admin/aufgabe/{aufgabe_id}/loeschen")
+@app.post("/helfer/aufgabe/{aufgabe_id}/loeschen")
 async def aufgabe_weg(request: Request, aufgabe_id: int,
                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     db.aufgabe_loeschen(aufgabe_id)
-    return _zurueck("/admin/aufgaben", "geloescht")
+    return _zurueck("/helfer/aufgaben", "geloescht")
 
 
 # --- Programmpunkt von Hand ------------------------------------------------
 
-@app.get("/admin/programm/{programm_id}")
+@app.get("/helfer/programm/{programm_id}")
 async def programm_formular(request: Request, programm_id: int,
                             sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     zeile = db.programm_eintrag(programm_id)
@@ -942,7 +942,7 @@ async def programm_formular(request: Request, programm_id: int,
                serie=config.serie(zeile["serie"])))
 
 
-@app.post("/admin/programm/{programm_id}")
+@app.post("/helfer/programm/{programm_id}")
 async def programm_sichern(request: Request, programm_id: int,
                            sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await request.form()
@@ -982,22 +982,22 @@ async def programm_sichern(request: Request, programm_id: int,
             "ende": eintraege.uhr(aktuell["ende"]),
             "notiz": aktuell["notiz"]}, code=409)
 
-    return _zurueck("/admin/zeitplan", "gespeichert")
+    return _zurueck("/helfer/zeitplan", "gespeichert")
 
 
-@app.post("/admin/programm/{programm_id}/freigeben")
+@app.post("/helfer/programm/{programm_id}/freigeben")
 async def programm_freigeben(request: Request, programm_id: int,
                              sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     db.programm_freigeben(programm_id)
-    return _zurueck("/admin/zeitplan", "freigegeben")
+    return _zurueck("/helfer/zeitplan", "freigegeben")
 
 
 # --- Programm-Band ---------------------------------------------------------
 
-@app.get("/admin/band")
+@app.get("/helfer/band")
 async def band_ansicht(request: Request, tag: str = "",
                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     jetzt = db.jetzt_lokal()
@@ -1024,41 +1024,41 @@ def _helfer_zurueck(request: Request, helfer_id: int, hinweis: str):
     Liste von hundert Namen – bei einer Ausgabe, bei der Leute Schlange
     stehen, ist das der Unterschied zwischen benutzbar und nicht.
     """
-    return _zurueck("/admin/helfer", hinweis,
+    return _zurueck("/helfer/helfer", hinweis,
                     suche=str(request.query_params.get("suche") or ""),
                     sprung="helfer-" + str(helfer_id))
 
 
-@app.post("/admin/helfer/{helfer_id}/tshirt")
+@app.post("/helfer/helfer/{helfer_id}/tshirt")
 async def tshirt_ausgeben(request: Request, helfer_id: int,
                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     if db.helfer_laden(helfer_id) is None:
-        return _zurueck("/admin/helfer", "unbekannt")
+        return _zurueck("/helfer/helfer", "unbekannt")
 
     groesse = str(daten.get("groesse") or "").strip()
     if groesse and groesse not in normalisieren.GROESSEN:
-        return _zurueck("/admin/helfer", "groesse",
+        return _zurueck("/helfer/helfer", "groesse",
                         suche=str(daten.get("suche") or ""),
                         sprung="helfer-" + str(helfer_id))
 
     db.tshirt_ausgeben(helfer_id, groesse, sitzung.kuerzel)
     _unterschrift_dazu("tshirt", helfer_id, "ausgabe", sitzung.kuerzel)
-    return _zurueck("/admin/helfer", "tshirt",
+    return _zurueck("/helfer/helfer", "tshirt",
                     suche=str(daten.get("suche") or ""),
                     sprung="helfer-" + str(helfer_id))
 
 
-@app.post("/admin/helfer/{helfer_id}/tshirt/zurueck")
+@app.post("/helfer/helfer/{helfer_id}/tshirt/zurueck")
 async def tshirt_zurueck(request: Request, helfer_id: int,
                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     db.tshirt_zuruecknehmen(helfer_id)
-    return _zurueck("/admin/helfer", "tshirt-zurueck",
+    return _zurueck("/helfer/helfer", "tshirt-zurueck",
                     suche=str(daten.get("suche") or ""),
                     sprung="helfer-" + str(helfer_id))
 
@@ -1093,7 +1093,7 @@ def _helfer_daten(werte: dict) -> dict:
     }
 
 
-@app.get("/admin/helfer/{helfer_id}/aendern")
+@app.get("/helfer/helfer/{helfer_id}/aendern")
 async def helfer_formular(request: Request, helfer_id: int,
                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     person = db.helfer_laden(helfer_id)
@@ -1108,7 +1108,7 @@ async def helfer_formular(request: Request, helfer_id: int,
     return _helferformular(request, sitzung, werte, {}, person=person)
 
 
-@app.post("/admin/helfer/{helfer_id}/aendern")
+@app.post("/helfer/helfer/{helfer_id}/aendern")
 async def helfer_sichern(request: Request, helfer_id: int,
                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await request.form()
@@ -1129,7 +1129,7 @@ async def helfer_sichern(request: Request, helfer_id: int,
             request, sitzung, werte,
             {"name": "So heißt schon jemand anderes mit derselben "
                      "Mailadresse."}, person)
-    return _zurueck("/admin/helfer/" + str(helfer_id), "gespeichert")
+    return _zurueck("/helfer/helfer/" + str(helfer_id), "gespeichert")
 
 
 # --- Funkgeräte und Material -----------------------------------------------
@@ -1153,7 +1153,7 @@ def _person_aus_formular(daten, sitzung) -> tuple[int | None, str]:
     return (nummer, "vorhanden") if db.helfer_laden(nummer) else (None, "keiner")
 
 
-@app.get("/admin/funk")
+@app.get("/helfer/funk")
 async def funk(request: Request, hinweis: str = "", offen: str = "",
                sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     # Einmal alles holen und in Python trennen: der Umschalter zeigt beide
@@ -1175,7 +1175,7 @@ async def funk(request: Request, hinweis: str = "", offen: str = "",
                tablet=bool(db.tablet_token())))
 
 
-@app.post("/admin/funk/ausgeben")
+@app.post("/helfer/funk/ausgeben")
 async def funk_ausgeben(request: Request,
                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
@@ -1184,7 +1184,7 @@ async def funk_ausgeben(request: Request,
 
     helfer_id, woher = _person_aus_formular(daten, sitzung)
     if helfer_id is None:
-        return _zurueck("/admin/funk", "keiner")
+        return _zurueck("/helfer/funk", "keiner")
 
     datum = _tag_pruefen(str(daten.get("datum") or ""))
 
@@ -1192,12 +1192,12 @@ async def funk_ausgeben(request: Request,
     nummer = db.ausleihen(helfer_id, mengen, datum,
                           str(daten.get("bemerkung") or ""), sitzung.kuerzel)
     if nummer is None:
-        return _zurueck("/admin/funk", "nichts")
+        return _zurueck("/helfer/funk", "nichts")
     _unterschrift_dazu("material", nummer, "ausgabe", sitzung.kuerzel)
-    return _zurueck("/admin/funk", "neu-angelegt" if woher == "neu" else "ausgegeben")
+    return _zurueck("/helfer/funk", "neu-angelegt" if woher == "neu" else "ausgegeben")
 
 
-@app.post("/admin/ausleihe/{ausleihe_id}/zurueck")
+@app.post("/helfer/ausleihe/{ausleihe_id}/zurueck")
 async def ausleihe_zurueck(request: Request, ausleihe_id: int,
                            sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
@@ -1210,23 +1210,23 @@ async def ausleihe_zurueck(request: Request, ausleihe_id: int,
         mengen = {stueck: daten.get(stueck) for stueck in db.MATERIAL}
     db.ausleihe_zurueck(ausleihe_id, mengen, sitzung.kuerzel)
     _unterschrift_dazu("material", ausleihe_id, "rueckgabe", sitzung.kuerzel)
-    return _zurueck("/admin/funk", "zurueck",
+    return _zurueck("/helfer/funk", "zurueck",
                     offen=str(daten.get("offen") or ""))
 
 
-@app.post("/admin/ausleihe/{ausleihe_id}/loeschen")
+@app.post("/helfer/ausleihe/{ausleihe_id}/loeschen")
 async def ausleihe_weg(request: Request, ausleihe_id: int,
                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     db.ausleihe_loeschen(ausleihe_id)
-    return _zurueck("/admin/funk", "geloescht")
+    return _zurueck("/helfer/funk", "geloescht")
 
 
 # --- KFZ-Schlüssel ---------------------------------------------------------
 
-@app.get("/admin/schluessel")
+@app.get("/helfer/schluessel")
 async def schluessel(request: Request, hinweis: str = "", offen: str = "",
                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     alle = db.schluessel_liste()
@@ -1242,7 +1242,7 @@ async def schluessel(request: Request, hinweis: str = "", offen: str = "",
                tablet=bool(db.tablet_token())))
 
 
-@app.post("/admin/schluessel/ausgeben")
+@app.post("/helfer/schluessel/ausgeben")
 async def schluessel_ausgeben(request: Request,
                               sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
@@ -1251,22 +1251,22 @@ async def schluessel_ausgeben(request: Request,
 
     kennzeichen = str(daten.get("kennzeichen") or "")
     if not normalisieren.kennzeichen(kennzeichen):
-        return _zurueck("/admin/schluessel", "kein-kennzeichen")
+        return _zurueck("/helfer/schluessel", "kein-kennzeichen")
 
     name = str(daten.get("name") or "")
     fahrzeug_id, neu = db.fahrzeug_sichern(kennzeichen, name)
     if fahrzeug_id is None:
-        return _zurueck("/admin/schluessel", "kein-kennzeichen")
+        return _zurueck("/helfer/schluessel", "kein-kennzeichen")
 
     nummer = db.schluessel_ausgeben(fahrzeug_id, name,
                                     str(daten.get("bemerkung") or ""),
                                     sitzung.kuerzel)
     _unterschrift_dazu("schluessel", nummer, "ausgabe", sitzung.kuerzel)
-    return _zurueck("/admin/schluessel",
+    return _zurueck("/helfer/schluessel",
                     "fahrzeug-neu" if neu else "schluessel-raus")
 
 
-@app.post("/admin/schluessel/{schluessel_id}/zurueck")
+@app.post("/helfer/schluessel/{schluessel_id}/zurueck")
 async def schluessel_zurueck(request: Request, schluessel_id: int,
                              sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
@@ -1275,28 +1275,28 @@ async def schluessel_zurueck(request: Request, schluessel_id: int,
     if db.schluessel_zurueck(schluessel_id, sitzung.kuerzel):
         _unterschrift_dazu("schluessel", schluessel_id, "rueckgabe",
                            sitzung.kuerzel)
-    return _zurueck("/admin/schluessel", "zurueck",
+    return _zurueck("/helfer/schluessel", "zurueck",
                     offen=str(daten.get("offen") or ""))
 
 
-@app.post("/admin/schluessel/{schluessel_id}/loeschen")
+@app.post("/helfer/schluessel/{schluessel_id}/loeschen")
 async def schluessel_weg(request: Request, schluessel_id: int,
                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     db.schluessel_loeschen(schluessel_id)
-    return _zurueck("/admin/schluessel", "geloescht")
+    return _zurueck("/helfer/schluessel", "geloescht")
 
 
-@app.post("/admin/fahrzeug/{fahrzeug_id}/loeschen")
+@app.post("/helfer/fahrzeug/{fahrzeug_id}/loeschen")
 async def fahrzeug_weg(request: Request, fahrzeug_id: int,
                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     ausgang = db.fahrzeug_loeschen(fahrzeug_id)
-    return _zurueck("/admin/schluessel",
+    return _zurueck("/helfer/schluessel",
                     {"weg": "fahrzeug-weg",
                      "hat-vorgaenge": "fahrzeug-hat-vorgaenge"}.get(
                          ausgang, "unbekannt"))
@@ -1349,13 +1349,13 @@ def _einstellungsseite(request: Request, sitzung, hinweis: str = ""):
                jetzt_fest=bool(config.JETZT_FEST)))
 
 
-@app.get("/admin/einstellungen")
+@app.get("/helfer/einstellungen")
 async def einstellungen(request: Request, hinweis: str = "",
                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     return _einstellungsseite(request, sitzung, hinweis)
 
 
-@app.post("/admin/einstellungen")
+@app.post("/helfer/einstellungen")
 async def einstellungen_speichern(
         request: Request,
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -1363,12 +1363,12 @@ async def einstellungen_speichern(
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     db.material_vorgaben_setzen({s: daten.get(s) for s in db.MATERIAL})
-    return _zurueck("/admin/einstellungen", "gespeichert")
+    return _zurueck("/helfer/einstellungen", "gespeichert")
 
 
 # --- Nachfragen aus dem Backoffice -----------------------------------------
 
-@app.get("/admin/stand")
+@app.get("/helfer/stand")
 async def admin_stand(request: Request, seit: int = 0, art: str = "",
                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     """Was sich seit `seit` getan hat. Klein gehalten – die Antwort geht alle
@@ -1463,7 +1463,7 @@ async def tablet_abbrechen(request: Request, token: str):
     return _zurueck("/unterschrift/" + token, "abgebrochen")
 
 
-@app.get("/admin/unterschriften")
+@app.get("/helfer/unterschriften")
 async def unterschriften_verwalten(
         request: Request, hinweis: str = "",
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -1478,7 +1478,7 @@ async def unterschriften_verwalten(
                minuten=config.UNTERSCHRIFT_MINUTEN))
 
 
-@app.post("/admin/unterschriften/link")
+@app.post("/helfer/unterschriften/link")
 async def unterschriften_link(
         request: Request,
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -1487,12 +1487,12 @@ async def unterschriften_link(
         return Response("Ungültiger CSRF-Token", status_code=400)
     if str(daten.get("aktion")) == "widerrufen":
         db.tablet_token_loeschen()
-        return _zurueck("/admin/unterschriften", "widerrufen")
+        return _zurueck("/helfer/unterschriften", "widerrufen")
     db.tablet_token_neu()
-    return _zurueck("/admin/unterschriften", "neuer-link")
+    return _zurueck("/helfer/unterschriften", "neuer-link")
 
 
-@app.post("/admin/unterschrift/anfordern")
+@app.post("/helfer/unterschrift/anfordern")
 async def unterschrift_anfordern(
         request: Request,
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -1500,7 +1500,7 @@ async def unterschrift_anfordern(
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
 
-    ziel = _weiter_pfad(str(daten.get("weiter") or "/admin/unterschriften"))
+    ziel = _weiter_pfad(str(daten.get("weiter") or "/helfer/unterschriften"))
     if not db.tablet_token():
         return _zurueck(ziel, "kein-tablet")
 
@@ -1515,7 +1515,7 @@ async def unterschrift_anfordern(
     return _zurueck(ziel, meldung)
 
 
-@app.post("/admin/unterschrift/abbrechen")
+@app.post("/helfer/unterschrift/abbrechen")
 async def unterschrift_abbrechen(
         request: Request,
         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
@@ -1535,7 +1535,7 @@ def _abruf_takt() -> int:
         return 0
     return config.IMPORT_TAKT_MINUTEN
 
-@app.get("/admin/import")
+@app.get("/helfer/import")
 async def import_formular(request: Request, hinweis: str = "",
                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     return templates.TemplateResponse(
@@ -1547,7 +1547,7 @@ async def import_formular(request: Request, hinweis: str = "",
                laeufe=db.importe()))
 
 
-@app.post("/admin/import")
+@app.post("/helfer/import")
 async def import_ausfuehren(request: Request,
                             sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     daten = await request.form()
@@ -1584,7 +1584,7 @@ async def import_ausfuehren(request: Request,
     return seite(bericht=bericht)
 
 
-@app.post("/admin/import/abrufen")
+@app.post("/helfer/import/abrufen")
 async def import_abrufen(request: Request,
                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
     """Holt beide Listen beim Dienst, statt sie hochladen zu lassen.

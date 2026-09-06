@@ -83,7 +83,7 @@
   }
 
   function nachfragen() {
-    var adresse = "/admin/stand?seit=" + encodeURIComponent(marke)
+    var adresse = "/helfer/stand?seit=" + encodeURIComponent(marke)
       + (meineArt ? "&art=" + encodeURIComponent(meineArt) : "");
     fetch(adresse, { cache: "no-store", credentials: "same-origin" })
       .then(function (antwort) {

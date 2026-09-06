@@ -182,8 +182,8 @@ try:
            "alle fuenf sind gespeichert: " + str(gespeichert))
 
     print("Backoffice")
-    anfrage("POST", "/admin/login", {"passwort": "test-passwort-123", "weiter": "/admin"})
-    status, _, liste = anfrage("GET", "/admin")
+    anfrage("POST", "/kennzeichen/login", {"passwort": "test-passwort-123", "weiter": "/kennzeichen"})
+    status, _, liste = anfrage("GET", "/kennzeichen")
     pruefe(status == 200, "Liste laedt")
     for _, beschriftung in ERWARTET:
         pruefe(beschriftung in liste, "Beschriftung " + beschriftung + " steht in der Liste")
@@ -191,12 +191,12 @@ try:
     pruefe(kacheln == len(ERWARTET) + 1, "eine Kachel je Kategorie plus Gesamt: " + str(kacheln))
 
     for schluessel, beschriftung in ERWARTET:
-        status, _, gefiltert = anfrage("GET", "/admin?status=&kategorie=" + schluessel)
-        treffer = len(re.findall(r'href="/admin/antrag/\d+"', gefiltert))
+        status, _, gefiltert = anfrage("GET", "/kennzeichen?status=&kategorie=" + schluessel)
+        treffer = len(re.findall(r'href="/kennzeichen/antrag/\d+"', gefiltert))
         # Nummer und Name verweisen beide auf denselben Antrag.
         pruefe(treffer == 2, "Filter " + schluessel + " zeigt genau einen Antrag")
 
-    status, _, csv_datei = anfrage("GET", "/admin/export.csv?status=")
+    status, _, csv_datei = anfrage("GET", "/kennzeichen/export.csv?status=")
     for schluessel, beschriftung in ERWARTET:
         pruefe(schluessel in csv_datei and beschriftung in csv_datei,
                "CSV nennt " + schluessel + " als Schluessel und " + beschriftung + " als Klartext")

@@ -37,8 +37,8 @@
           <span>{{ bericht.einteilungen }} ({{ bericht.ersetzt }} ersetzt)</span></li>
       </ul>
       <p class="knopfreihe">
-        <a class="knopf" href="/admin">Zur Übersicht</a>
-        <a class="knopf-schlicht" href="/admin/schichten">Schichten ansehen</a>
+        <a class="knopf" href="/helfer">Zur Übersicht</a>
+        <a class="knopf-schlicht" href="/helfer/schichten">Schichten ansehen</a>
       </p>
     </section>
 
@@ -72,7 +72,7 @@
         Hochladen. Danach passiert genau dasselbe wie bei hochgeladenen
         Dateien: derselbe Bedarf, derselbe Bericht, dieselbe
         Wiederholbarkeit.</p>
-      <form method="post" action="/admin/import/abrufen">
+      <form method="post" action="/helfer/import/abrufen">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <button type="submit" class="knopf">Jetzt abrufen</button>
       </form>
@@ -101,7 +101,7 @@
 
   <section>
     <h2>Dateien hochladen</h2>
-    <form method="post" action="/admin/import" enctype="multipart/form-data"
+    <form method="post" action="/helfer/import" enctype="multipart/form-data"
           class="hochladen">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <label for="offen">Offene Posten (CSV)</label>

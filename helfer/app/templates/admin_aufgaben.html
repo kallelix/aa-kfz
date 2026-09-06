@@ -26,7 +26,7 @@
     </div>
   </section>
 
-  <form method="get" action="/admin/aufgaben" class="filter">
+  <form method="get" action="/helfer/aufgaben" class="filter">
     <div>
       <label for="f-phase">Phase</label>
       <select id="f-phase" name="phase">
@@ -48,9 +48,9 @@
     <div class="filter-knoepfe">
       <button type="submit" class="knopf">Anzeigen</button>
       {% if f_phase or f_status %}
-        <a class="knopf-schlicht" href="/admin/aufgaben">zurücksetzen</a>
+        <a class="knopf-schlicht" href="/helfer/aufgaben">zurücksetzen</a>
       {% endif %}
-      <a class="knopf" href="/admin/aufgabe/neu">Neue Aufgabe</a>
+      <a class="knopf" href="/helfer/aufgabe/neu">Neue Aufgabe</a>
     </div>
   </form>
 
@@ -60,7 +60,7 @@
         Keine Aufgabe passt zu diesem Filter.
       {% else %}
         Noch keine Aufgabe erfasst.
-        <a href="/admin/aufgabe/neu">Die erste anlegen</a>.
+        <a href="/helfer/aufgabe/neu">Die erste anlegen</a>.
       {% endif %}
     </p>
   {% else %}
@@ -96,7 +96,7 @@
           {%- else %}<span class="gedaempft">–</span>{% endif %}
         </td>
         <td>
-          <a href="/admin/aufgabe/{{ a.id }}">{{ a.titel }}</a>
+          <a href="/helfer/aufgabe/{{ a.id }}">{{ a.titel }}</a>
           {% if a.notiz %}<br><span class="gedaempft">{{ a.notiz }}</span>{% endif %}
         </td>
         <td><span class="marke marke-{{ a.phase }}">{{ phasen[a.phase] }}</span></td>
@@ -107,7 +107,7 @@
         </td>
         <td>{% if a.ort %}{{ a.ort }}{% else %}<span class="gedaempft">–</span>{% endif %}</td>
         <td>
-          <form method="post" action="/admin/aufgabe/{{ a.id }}/status"
+          <form method="post" action="/helfer/aufgabe/{{ a.id }}/status"
                 class="statuswahl">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <input type="hidden" name="f_phase" value="{{ f_phase }}">
@@ -122,7 +122,7 @@
           </form>
         </td>
         <td class="rechts">
-          <a class="knopf-winzig" href="/admin/aufgabe/{{ a.id }}">ändern</a>
+          <a class="knopf-winzig" href="/helfer/aufgabe/{{ a.id }}">ändern</a>
         </td>
       </tr>
 

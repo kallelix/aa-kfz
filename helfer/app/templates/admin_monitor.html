@@ -19,7 +19,7 @@
       <h2>Kein Link vorhanden</h2>
       <p>Es gibt derzeit keinen gültigen Monitor-Link. Wer die alte Adresse
         noch offen hat, sieht nichts mehr.</p>
-      <form method="post" action="/admin/monitor">
+      <form method="post" action="/helfer/monitor">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="aktion" value="neu">
         <button type="submit" class="knopf">Link erzeugen</button>
@@ -42,12 +42,12 @@
       <p class="hilfe">Ein neuer Link macht den alten sofort ungültig. Beim
         Widerrufen gibt es gar keinen mehr, bis ein neuer erzeugt wird.</p>
       <div class="knopfreihe">
-        <form method="post" action="/admin/monitor">
+        <form method="post" action="/helfer/monitor">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <input type="hidden" name="aktion" value="neu">
           <button type="submit" class="knopf-schlicht">Neuen Link erzeugen</button>
         </form>
-        <form method="post" action="/admin/monitor">
+        <form method="post" action="/helfer/monitor">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <input type="hidden" name="aktion" value="widerrufen">
           <button type="submit" class="knopf-gefahr">Widerrufen</button>

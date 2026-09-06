@@ -58,11 +58,11 @@ def tabelle(text):
 
 # --- Ohne Anmeldung ----------------------------------------------------------
 print("Ohne Anmeldung")
-status, kopf, _ = hole("/admin/export.csv")
-pruefe(status == 303 and kopf.get("Location", "").startswith("/admin/login"),
+status, kopf, _ = hole("/kennzeichen/export.csv")
+pruefe(status == 303 and kopf.get("Location", "").startswith("/kennzeichen/login"),
        "Export ohne Anmeldung fuehrt zur Anmeldeseite")
 
-hole("/admin/login", {"passwort": PASSWORT, "kuerzel": "KK", "weiter": "/admin"})
+hole("/kennzeichen/login", {"passwort": PASSWORT, "kuerzel": "KK", "weiter": "/kennzeichen"})
 
 # Ein Antrag mit Zeichen, die CSV gern zerlegen.
 hole("/", {"vorname": "Anna", "nachname": "Semikolon; Zeile",
@@ -73,7 +73,7 @@ heikel = sqlite3.connect(DB).execute("SELECT MAX(id) FROM antrag").fetchone()[0]
 
 # --- Grundform ---------------------------------------------------------------
 print("Grundform")
-status, kopf, rohdaten = hole("/admin/export.csv", roh=True)
+status, kopf, rohdaten = hole("/kennzeichen/export.csv", roh=True)
 pruefe(status == 200, "Export liefert 200")
 pruefe(kopf.get("content-type", "").startswith("text/csv"),
        "Content-Type ist text/csv: " + str(kopf.get("content-type")))
@@ -113,31 +113,31 @@ pruefe("Weiß" in namen, "Umlaute kommen im Export an: " + str(namen))
 
 # --- Filter greifen ----------------------------------------------------------
 print("Filter")
-_, _, text = hole("/admin/export.csv?status=&kategorie=vip")
+_, _, text = hole("/kennzeichen/export.csv?status=&kategorie=vip")
 zeilen = tabelle(text.lstrip("﻿"))
 kategorien = {z[6] for z in zeilen[1:]}
 pruefe(kategorien == {"vip"}, "Kategoriefilter greift: " + str(kategorien))
 
-_, _, text = hole("/admin/export.csv?status=&suche=" + urllib.parse.quote("mustermann"))
+_, _, text = hole("/kennzeichen/export.csv?status=&suche=" + urllib.parse.quote("mustermann"))
 zeilen = tabelle(text.lstrip("﻿"))
 pruefe(len(zeilen) == 2 and zeilen[1][4] == "Mustermann", "Suche greift")
 
-_, _, text = hole("/admin/export.csv?status=neu")
+_, _, text = hole("/kennzeichen/export.csv?status=neu")
 zeilen = tabelle(text.lstrip("﻿"))
 pruefe(all(z[2] == "neu" for z in zeilen[1:]), "Statusfilter greift")
 
-_, _, text = hole("/admin/export.csv?status=&suche=gibtesnicht")
+_, _, text = hole("/kennzeichen/export.csv?status=&suche=gibtesnicht")
 zeilen = tabelle(text.lstrip("﻿"))
 pruefe(len(zeilen) == 1, "leere Auswahl liefert nur die Kopfzeile")
 
-_, _, text = hole("/admin/export.csv?sortierung=" + urllib.parse.quote("id; DROP TABLE antrag--"))
+_, _, text = hole("/kennzeichen/export.csv?sortierung=" + urllib.parse.quote("id; DROP TABLE antrag--"))
 pruefe(sqlite3.connect(DB).execute("SELECT COUNT(*) FROM antrag").fetchone()[0] > 0,
        "unbekannte Sortierung richtet keinen Schaden an")
 
 # --- Verweis in der Liste ----------------------------------------------------
 print("Verweis in der Liste")
-_, _, liste = hole("/admin?status=&kategorie=vip")
-pruefe("/admin/export.csv?status=&amp;kategorie=vip" in liste,
+_, _, liste = hole("/kennzeichen?status=&kategorie=vip")
+pruefe("/kennzeichen/export.csv?status=&amp;kategorie=vip" in liste,
        "die Liste verlinkt den Export mit den aktuellen Filtern")
 
 print()

@@ -146,37 +146,37 @@ try:
         return ergebnis
 
     print("Ohne Anmeldung")
-    for pfad in ("/admin", "/admin/schichten", "/admin/helfer", "/admin/import"):
+    for pfad in ("/helfer", "/helfer/schichten", "/helfer/helfer", "/helfer/import"):
         status, ort, _ = anfrage("GET", pfad)
-        pruefe(status == 303 and ort.startswith("/admin/login"),
+        pruefe(status == 303 and ort.startswith("/helfer/login"),
                pfad + " fuehrt zur Anmeldung")
 
     status, ort, _ = anfrage("GET", "/")
-    pruefe(status == 303 and ort == "/admin", "/ leitet ins Backoffice")
+    pruefe(status == 303 and ort == "/helfer", "/ leitet ins Backoffice")
 
     print("Anmelden")
-    anfrage("POST", "/admin/login",
-            {"passwort": "test-passwort-123", "kuerzel": "KK", "weiter": "/admin"})
-    status, _, seite = anfrage("GET", "/admin")
+    anfrage("POST", "/helfer/login",
+            {"passwort": "test-passwort-123", "kuerzel": "KK", "weiter": "/helfer"})
+    status, _, seite = anfrage("GET", "/helfer")
     pruefe(status == 200, "Uebersicht laedt")
     pruefe("Noch keine Daten" in seite, "leere Datenbank wird als solche erklaert")
     CSRF = re.search(r'name="csrf" value="([^"]+)"', seite).group(1)
 
     print("Import ohne CSRF")
-    status, _, _ = anfrage("POST", "/admin/import", {"csrf": "falsch"},
+    status, _, _ = anfrage("POST", "/helfer/import", {"csrf": "falsch"},
                            dateien={"offen": ("o.csv", OFFEN),
                                     "vergeben": ("v.csv", VERGEBEN)})
     pruefe(status == 400, "wird abgewiesen")
 
     print("Import mit nur einer Datei")
-    status, _, seite = anfrage("POST", "/admin/import", {"csrf": CSRF},
+    status, _, seite = anfrage("POST", "/helfer/import", {"csrf": CSRF},
                                dateien={"offen": ("o.csv", OFFEN)})
     pruefe(status == 400, "wird abgewiesen")
     pruefe("beide Dateien" in seite, "und erklaert, warum")
     pruefe(len(zeilen("SELECT id FROM schicht")) == 0, "nichts wurde geschrieben")
 
     print("Import mit falschen Spalten")
-    status, _, seite = anfrage("POST", "/admin/import", {"csrf": CSRF},
+    status, _, seite = anfrage("POST", "/helfer/import", {"csrf": CSRF},
                                dateien={"offen": ("o.csv", "a,b,c\n1,2,3\n"),
                                         "vergeben": ("v.csv", VERGEBEN)})
     pruefe(status == 400, "wird abgewiesen")
@@ -184,7 +184,7 @@ try:
     pruefe(len(zeilen("SELECT id FROM schicht")) == 0, "nichts wurde geschrieben")
 
     print("Import")
-    status, _, seite = anfrage("POST", "/admin/import", {"csrf": CSRF},
+    status, _, seite = anfrage("POST", "/helfer/import", {"csrf": CSRF},
                                dateien={"offen": ("offen.csv", OFFEN),
                                         "vergeben": ("vergeben.csv", VERGEBEN)})
     pruefe(status == 200, "laeuft durch")
@@ -252,13 +252,13 @@ try:
     pruefe("belegt 2 Plätze derselben Schicht" in seite, "steht im Bericht")
 
     print("Uebersicht nach dem Import")
-    _, _, seite = anfrage("GET", "/admin")
+    _, _, seite = anfrage("GET", "/helfer")
     pruefe("Noch keine Daten" not in seite, "zeigt jetzt Zahlen")
     pruefe(">12<" in seite, "Bedarf 12 steht drauf")
     pruefe("Mehrfach auf derselben Schicht" in seite, "Doppelbelegung wird gemeldet")
 
     print("Zweiter Lauf derselben Dateien")
-    _, _, seite = anfrage("POST", "/admin/import", {"csrf": CSRF},
+    _, _, seite = anfrage("POST", "/helfer/import", {"csrf": CSRF},
                           dateien={"offen": ("offen.csv", OFFEN),
                                    "vergeben": ("vergeben.csv", VERGEBEN)})
     pruefe(len(zeilen("SELECT id FROM schicht")) == 3, "keine neuen Schichten")
@@ -269,30 +269,30 @@ try:
            "die Einteilungen verdoppeln sich nicht")
 
     print("Schichtliste")
-    status, _, liste = anfrage("GET", "/admin/schichten")
+    status, _, liste = anfrage("GET", "/helfer/schichten")
     pruefe(status == 200, "laedt")
     pruefe(liste.count("<tr data-suche=") == 3, "drei Zeilen")
     pruefe('data-wert="2026-08-30 20:00"' in liste, "Sortierwert steht dran")
     pruefe("hat-luecke" in liste, "Luecken sind markiert")
 
-    _, _, liste = anfrage("GET", "/admin/schichten?liste=Nachtwache")
+    _, _, liste = anfrage("GET", "/helfer/schichten?liste=Nachtwache")
     pruefe(liste.count("<tr data-suche=") == 1, "Filter nach Liste greift")
-    _, _, liste = anfrage("GET", "/admin/schichten?tag=2026-08-27")
+    _, _, liste = anfrage("GET", "/helfer/schichten?tag=2026-08-27")
     pruefe(liste.count("<tr data-suche=") == 1, "Filter nach Tag greift")
-    _, _, liste = anfrage("GET", "/admin/schichten?luecken=1")
+    _, _, liste = anfrage("GET", "/helfer/schichten?luecken=1")
     pruefe(liste.count("<tr data-suche=") == 3, "alle drei haben Luecken")
 
     print("Einteilen von Hand")
     strecke_id = strecke["id"]
     anna_id = leute["Anna Berg"]["id"]
     status, ort, _ = anfrage(
-        "POST", "/admin/schicht/%d/einteilen" % strecke_id,
+        "POST", "/helfer/schicht/%d/einteilen" % strecke_id,
         {"csrf": CSRF, "helfer_id": str(anna_id)})
     pruefe("hinweis=schon-drin" in ort, "wer schon drauf steht, kommt nicht doppelt")
 
     clara_id = leute["Clara Groß"]["id"]
     status, ort, _ = anfrage(
-        "POST", "/admin/schicht/%d/einteilen" % strecke_id,
+        "POST", "/helfer/schicht/%d/einteilen" % strecke_id,
         {"csrf": CSRF, "helfer_id": str(clara_id)})
     pruefe("hinweis=eingeteilt" in ort, "sonst klappt es")
     neu = zeilen("SELECT * FROM einteilung WHERE schicht_id = ? AND helfer_id = ?",
@@ -300,15 +300,15 @@ try:
     pruefe(len(neu) == 1 and neu[0]["quelle"] == "hand", "als 'hand' vermerkt")
     pruefe(neu[0]["kuerzel"] == "KK", "mit Kuerzel")
 
-    status, ort, _ = anfrage("POST", "/admin/schicht/%d/einteilen" % strecke_id,
+    status, ort, _ = anfrage("POST", "/helfer/schicht/%d/einteilen" % strecke_id,
                              {"csrf": CSRF, "helfer_id": "999999"})
     pruefe("hinweis=keiner" in ort, "unbekannter Helfer wird abgefangen")
-    status, ort, _ = anfrage("POST", "/admin/schicht/999999/einteilen",
+    status, ort, _ = anfrage("POST", "/helfer/schicht/999999/einteilen",
                              {"csrf": CSRF, "helfer_id": str(clara_id)})
     pruefe("hinweis=unbekannt" in ort, "unbekannte Schicht wird abgefangen")
 
     print("Handeinteilung ueberlebt den naechsten Import")
-    anfrage("POST", "/admin/import", {"csrf": CSRF},
+    anfrage("POST", "/helfer/import", {"csrf": CSRF},
             dateien={"offen": ("offen.csv", OFFEN),
                      "vergeben": ("vergeben.csv", VERGEBEN)})
     pruefe(len(zeilen("SELECT id FROM einteilung WHERE quelle = 'hand'")) == 1,
@@ -319,57 +319,57 @@ try:
     print("Austragen")
     einteilung_id = zeilen(
         "SELECT id FROM einteilung WHERE quelle = 'hand'")[0]["id"]
-    status, ort, _ = anfrage("POST", "/admin/einteilung/%d/austragen" % einteilung_id,
-                             {"csrf": CSRF, "weiter": "/admin/schicht/%d" % strecke_id})
+    status, ort, _ = anfrage("POST", "/helfer/einteilung/%d/austragen" % einteilung_id,
+                             {"csrf": CSRF, "weiter": "/helfer/schicht/%d" % strecke_id})
     pruefe("hinweis=ausgetragen" in ort, "meldet Erfolg")
-    pruefe(ort.startswith("/admin/schicht/"), "und kehrt dorthin zurueck: " + ort)
+    pruefe(ort.startswith("/helfer/schicht/"), "und kehrt dorthin zurueck: " + ort)
     pruefe(len(zeilen("SELECT id FROM einteilung WHERE quelle = 'hand'")) == 0,
            "die Zeile ist weg")
 
-    status, ort, _ = anfrage("POST", "/admin/einteilung/%d/austragen" % einteilung_id,
+    status, ort, _ = anfrage("POST", "/helfer/einteilung/%d/austragen" % einteilung_id,
                              {"csrf": CSRF, "weiter": "https://beispiel.example/"})
     pruefe(not ort.startswith("http"), "fremdes Ziel wird nicht angesprungen: " + ort)
 
     print("Konflikte")
-    _, _, seite = anfrage("GET", "/admin")
+    _, _, seite = anfrage("GET", "/helfer")
     pruefe("Zur selben Zeit auf zwei Schichten" not in seite,
            "ohne Ueberschneidung steht dort nichts")
-    anfrage("POST", "/admin/schicht/%d/einteilen" % aufbau["id"],
+    anfrage("POST", "/helfer/schicht/%d/einteilen" % aufbau["id"],
             {"csrf": CSRF, "helfer_id": str(leute["Bert Öhl"]["id"])})
-    anfrage("POST", "/admin/schicht/%d/einteilen" % strecke_id,
+    anfrage("POST", "/helfer/schicht/%d/einteilen" % strecke_id,
             {"csrf": CSRF, "helfer_id": str(leute["Team1"]["id"])})
-    _, _, seite = anfrage("GET", "/admin")
+    _, _, seite = anfrage("GET", "/helfer")
     pruefe("Zur selben Zeit auf zwei Schichten" not in seite,
            "verschiedene Tage sind kein Konflikt")
 
     print("Helferliste und Detail")
-    status, _, seite = anfrage("GET", "/admin/helfer")
+    status, _, seite = anfrage("GET", "/helfer/helfer")
     # Nach der Zeilennummer suchen, nicht nach dem data-Attribut: das steht
     # inzwischen hinter einem id= und die Zaehlung ginge lautlos auf null.
     pruefe(status == 200 and seite.count('<tr id="helfer-') == 6,
            "sechs Helfer stehen drauf: " + str(seite.count('<tr id="helfer-')))
     pruefe("oehl" in seite, "der Suchtext loest Umlaute auf")
 
-    status, _, seite = anfrage("GET", "/admin/helfer/%d" % anna_id)
+    status, _, seite = anfrage("GET", "/helfer/helfer/%d" % anna_id)
     pruefe(status == 200 and "Anna Berg" in seite, "Detail laedt")
     pruefe("Damen L" in seite, "der Rohwert steht dran")
     pruefe("vegetarisch" in seite, "die Verpflegung steht dran")
 
-    status, _, _ = anfrage("GET", "/admin/helfer/999999")
+    status, _, _ = anfrage("GET", "/helfer/helfer/999999")
     pruefe(status == 404, "unbekannter Helfer -> 404")
-    status, _, _ = anfrage("GET", "/admin/schicht/999999")
+    status, _, _ = anfrage("GET", "/helfer/schicht/999999")
     pruefe(status == 404, "unbekannte Schicht -> 404")
 
     print("Schichtdetail")
-    status, _, seite = anfrage("GET", "/admin/schicht/%d" % nacht["id"])
+    status, _, seite = anfrage("GET", "/helfer/schicht/%d" % nacht["id"])
     pruefe(status == 200, "laedt")
     pruefe("20:00–08:00 (+1)" in seite,
            "die Nachtschicht wird als solche angezeigt")
     pruefe(seite.count("Doppel Dieter") == 2, "beide Plaetze werden gezeigt")
 
     print("CSRF ueberall")
-    for pfad in ("/admin/schicht/%d/einteilen" % strecke_id,
-                 "/admin/einteilung/1/austragen"):
+    for pfad in ("/helfer/schicht/%d/einteilen" % strecke_id,
+                 "/helfer/einteilung/1/austragen"):
         status, _, _ = anfrage("POST", pfad, {"csrf": "falsch"})
         pruefe(status == 400, pfad + " ohne Token -> 400")
 

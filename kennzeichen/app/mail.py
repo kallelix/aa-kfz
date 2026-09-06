@@ -132,7 +132,7 @@ def vorlage_orga(antrag, empfaenger: str, basis_url: str = "") -> tuple:
         zeilen.append(antrag["bemerkung"])
     if basis_url:
         zeilen.append("")
-        zeilen.append(f"Im Backoffice: {basis_url}/admin/antrag/{antrag['id']}")
+        zeilen.append(f"Im Backoffice: {basis_url}/kennzeichen/antrag/{antrag['id']}")
     zeilen.append("")
     zeilen.append(
         "Diese Nachricht geht an die Adresse, die im Backoffice unter"

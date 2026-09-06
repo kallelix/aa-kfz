@@ -1,0 +1,58 @@
+[Unit]
+Description=Die absolute Abfahrt – Kennzeichen, Presse und Helfer in einem Dienst
+Documentation=file:/opt/abfahrt/deploy/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=abfahrt
+Group=abfahrt
+
+# Eine Unit statt drei. Vorher lag in jedem der drei Container ein eigener
+# Klon mit eigener venv, eigenem Zertifikat und eigenem Sicherungslauf.
+WorkingDirectory=/opt/abfahrt
+
+# Hier stehen NUR die gemeinsamen Werte: Bind-Adresse, die vier Hostnamen,
+# das Anmeldepasswort und der Schluessel fuer die Sitzung. Was je Anwendung
+# verschieden ist - allen voran DB_PATH - steht in den drei Dateien, auf die
+# KENNZEICHEN_ENV, PRESSE_ENV und HELFER_ENV zeigen.
+EnvironmentFile=/etc/abfahrt/dienst.env
+
+ExecStart=/opt/abfahrt/.venv/bin/python -m dienst
+
+Restart=always
+RestartSec=5
+
+# --- Absicherung ---
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+# AF_INET/AF_INET6 braucht der Dienst nicht nur zum Lauschen, sondern auch
+# fuer AUSGEHENDE Verbindungen: Mailversand, der taegliche Zeitplan-Abruf und
+# der Helferabgleich. AF_UNIX muss mit, weil glibc unter Ubuntu ueber
+# systemd-resolved aufloest und das ueber einen Unix-Socket laeuft - ohne die
+# Familie scheitert schon die Namensaufloesung.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+
+# Ein Pfad statt drei. Die drei Datenbanken liegen darin nebeneinander:
+# antraege.db, presse.db, helfer.db. Getrennte Dateien, weil zwei
+# Tabellennamen sich sonst in die Quere kaemen (einstellung, mail_out) und
+# weil SQLite je Datei nur einen Schreiber zulaesst.
+ReadWritePaths=/var/lib/abfahrt
+
+[Install]
+WantedBy=multi-user.target

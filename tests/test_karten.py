@@ -56,27 +56,27 @@ def csrf_aus(text):
 
 # --- Ohne Anmeldung ----------------------------------------------------------
 print("Ohne Anmeldung")
-status, kopf, _ = hole("/admin/karten")
-pruefe(status == 303 and kopf.get("Location", "").startswith("/admin/login"),
+status, kopf, _ = hole("/kennzeichen/karten")
+pruefe(status == 303 and kopf.get("Location", "").startswith("/kennzeichen/login"),
        "Druckansicht ohne Anmeldung fuehrt zur Anmeldeseite")
 
-hole("/admin/login", {"passwort": PASSWORT, "kuerzel": "KK", "weiter": "/admin"})
+hole("/kennzeichen/login", {"passwort": PASSWORT, "kuerzel": "KK", "weiter": "/kennzeichen"})
 
 # --- Ohne genehmigte Antraege ------------------------------------------------
 print("Ohne genehmigte Antraege")
-status, _, seite = hole("/admin/karten")
+status, _, seite = hole("/kennzeichen/karten")
 pruefe(status == 200, "Seite laedt auch ohne Treffer")
 pruefe("nichts zu drucken" in seite, "sagt, dass es nichts zu drucken gibt")
-_, _, liste = hole("/admin?status=")
+_, _, liste = hole("/kennzeichen?status=")
 pruefe("Karten drucken" not in liste, "die Liste bietet den Druck noch nicht an")
 
 # --- Genehmigen und drucken --------------------------------------------------
 print("Mit genehmigten Antraegen")
-_, _, seite = hole("/admin/antrag/1")
+_, _, seite = hole("/kennzeichen/antrag/1")
 CSRF = csrf_aus(seite)
-hole("/admin/sammelaktion", {"csrf": CSRF, "ids": ["1", "3"], "zurueck": "/admin"})
+hole("/kennzeichen/sammelaktion", {"csrf": CSRF, "ids": ["1", "3"], "zurueck": "/kennzeichen"})
 
-status, _, seite = hole("/admin/karten")
+status, _, seite = hole("/kennzeichen/karten")
 pruefe(status == 200, "Druckansicht laedt")
 pruefe(seite.count('class="karte"') == 2, "zwei Karten: " + str(seite.count('class="karte"')))
 pruefe(seite.count('class="bogen"') == 1, "beide auf einem Bogen")
@@ -98,26 +98,26 @@ try:
     import segno  # noqa: F401
     from urllib.parse import urlparse
     basis = os.environ.get("TEST_KARTEN_BASIS", "https://kennzeichen.example.de")
-    erwartet = segno.make(basis + "/admin/antrag/1", error="m").svg_inline(
+    erwartet = segno.make(basis + "/kennzeichen/antrag/1", error="m").svg_inline(
         scale=3, dark="#000000", border=0
     )
-    pruefe(erwartet in seite, "QR-Code von Antrag 1 zeigt auf " + basis + "/admin/antrag/1")
+    pruefe(erwartet in seite, "QR-Code von Antrag 1 zeigt auf " + basis + "/kennzeichen/antrag/1")
 except ImportError:
     pruefe(False, "segno fehlt")
 
 # --- Nur genehmigte, wenn so gefiltert ---------------------------------------
 print("Filter")
-status, _, nur_neu = hole("/admin/karten?status=neu")
+status, _, nur_neu = hole("/kennzeichen/karten?status=neu")
 pruefe("Beispiel" in nur_neu, "mit status=neu kommen die neuen")
 pruefe("Mustermann" not in nur_neu, "und die genehmigten nicht")
 
-status, _, gefiltert = hole("/admin/karten?status=genehmigt&kategorie=camping")
+status, _, gefiltert = hole("/kennzeichen/karten?status=genehmigt&kategorie=camping")
 pruefe("Mustermann" in gefiltert and "Weiß" in gefiltert, "Kategoriefilter greift")
 
-status, _, gesucht = hole("/admin/karten?status=genehmigt&suche=" + urllib.parse.quote("mustermann"))
+status, _, gesucht = hole("/kennzeichen/karten?status=genehmigt&suche=" + urllib.parse.quote("mustermann"))
 pruefe(gesucht.count('class="karte"') == 1, "Suche grenzt ein")
 
-status, _, unfug = hole("/admin/karten?sortierung=" + urllib.parse.quote("id; DROP TABLE antrag--"))
+status, _, unfug = hole("/kennzeichen/karten?sortierung=" + urllib.parse.quote("id; DROP TABLE antrag--"))
 pruefe(status == 200, "unbekannte Sortierung faellt auf die Vorgabe zurueck")
 pruefe(sqlite3.connect(DB).execute("SELECT COUNT(*) FROM antrag").fetchone()[0] > 0,
        "und richtet keinen Schaden an")
@@ -131,9 +131,9 @@ for nummer in range(5):
                "telefon": "030 " + str(nummer)})
 neue = [str(z[0]) for z in sqlite3.connect(DB).execute(
     "SELECT id FROM antrag WHERE nachname = 'Test'")]
-hole("/admin/sammelaktion", {"csrf": CSRF, "ids": neue, "zurueck": "/admin"})
+hole("/kennzeichen/sammelaktion", {"csrf": CSRF, "ids": neue, "zurueck": "/kennzeichen"})
 
-status, _, viele = hole("/admin/karten")
+status, _, viele = hole("/kennzeichen/karten")
 karten = viele.count('class="karte"')
 boegen = viele.count('class="bogen"')
 pruefe(karten == 7, "sieben Karten: " + str(karten))
@@ -141,9 +141,9 @@ pruefe(boegen == 2, "auf zwei Boegen: " + str(boegen))
 
 # --- Verweis in der Liste ----------------------------------------------------
 print("Verweis in der Liste")
-_, _, liste = hole("/admin?status=neu")
+_, _, liste = hole("/kennzeichen?status=neu")
 pruefe("Karten drucken" in liste, "die Liste bietet den Druck jetzt an")
-pruefe("/admin/karten?status=genehmigt" in liste,
+pruefe("/kennzeichen/karten?status=genehmigt" in liste,
        "der Verweis zeigt auf genehmigt, nicht auf den gerade sichtbaren Filter")
 
 # --- Kein Logo hinterlegt ----------------------------------------------------

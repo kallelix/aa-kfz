@@ -35,7 +35,7 @@
           <tbody>
             {% for h in besetzung %}
               <tr>
-                <td><a href="/admin/helfer/{{ h.id }}">{{ h.name }}</a></td>
+                <td><a href="/helfer/helfer/{{ h.id }}">{{ h.name }}</a></td>
                 <td>
                   {% if h.email %}
                     <a href="mailto:{{ h.email }}">{{ h.email }}</a>
@@ -58,10 +58,10 @@
                 <td class="gedaempft">{{ 'Import' if h.quelle == 'import' else 'von Hand' }}</td>
                 <td class="rechts">
                   <form method="post"
-                        action="/admin/einteilung/{{ h.einteilung_id }}/austragen">
+                        action="/helfer/einteilung/{{ h.einteilung_id }}/austragen">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <input type="hidden" name="weiter"
-                           value="/admin/schicht/{{ schicht.id }}">
+                           value="/helfer/schicht/{{ schicht.id }}">
                     <button type="submit" class="knopf-winzig">austragen</button>
                   </form>
                 </td>
@@ -78,7 +78,7 @@
     {% if not helfer %}
       <p class="leer">Alle erfassten Helfer stehen bereits auf dieser Schicht.</p>
     {% else %}
-      <form method="post" action="/admin/schicht/{{ schicht.id }}/einteilen"
+      <form method="post" action="/helfer/schicht/{{ schicht.id }}/einteilen"
             class="einteilen">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label for="helfer_id">Helfer</label>
@@ -95,5 +95,5 @@
     {% endif %}
   </section>
 
-  <p class="zurueck-zeile"><a href="/admin/schichten">Zurück zu den Schichten</a></p>
+  <p class="zurueck-zeile"><a href="/helfer/schichten">Zurück zu den Schichten</a></p>
 {% endblock %}

@@ -3,7 +3,7 @@
 {% block ueberschrift %}Schichten{% endblock %}
 
 {% block inhalt %}
-  <form method="get" action="/admin/schichten" class="filter">
+  <form method="get" action="/helfer/schichten" class="filter">
     <div>
       <label for="f-liste">Liste</label>
       <select id="f-liste" name="liste">
@@ -30,7 +30,7 @@
     <div class="filter-knoepfe">
       <button type="submit" class="knopf">Anzeigen</button>
       {% if f_liste or f_tag or f_luecken %}
-        <a class="knopf-schlicht" href="/admin/schichten">zurücksetzen</a>
+        <a class="knopf-schlicht" href="/helfer/schichten">zurücksetzen</a>
       {% endif %}
     </div>
   </form>
@@ -93,7 +93,7 @@
             <tr data-suche="{{ s.suche }}"{% if s.fehlt %} class="hat-luecke"{% endif %}>
               <td class="nowrap" data-wert="{{ s.beginn }}">{{ s.datum | tag }}</td>
               <td class="zeit" data-wert="{{ s.beginn }}">{{ s | spanne }}</td>
-              <td><a href="/admin/schicht/{{ s.id }}">{{ s.liste }}</a></td>
+              <td><a href="/helfer/schicht/{{ s.id }}">{{ s.liste }}</a></td>
               <td class="rechts nowrap" data-wert="{{ s.besetzt }}">{{ s.besetzt }} / {{ s.bedarf }}</td>
               <td class="rechts" data-wert="{{ s.fehlt }}">
                 {% if s.fehlt %}
@@ -103,7 +103,7 @@
                 {% endif %}
               </td>
               <td class="rechts">
-                <a class="knopf-schlicht" href="/admin/schicht/{{ s.id }}">einteilen</a>
+                <a class="knopf-schlicht" href="/helfer/schicht/{{ s.id }}">einteilen</a>
               </td>
             </tr>
           {% endfor %}

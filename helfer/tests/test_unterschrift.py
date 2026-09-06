@@ -160,20 +160,20 @@ try:
     pruefe(status == 404, "und ohne Token wird nichts angenommen")
 
     pruefe("csrf" not in seite, "auf dem Tablet gibt es keinen CSRF-Token")
-    pruefe("/admin" not in seite, "und keinen Weg ins Backoffice")
+    pruefe("/helfer" not in seite, "und keinen Weg ins Backoffice")
 
     print("Anfordern")
-    anfrage("POST", "/admin/login",
+    anfrage("POST", "/helfer/login",
             {"passwort": "test-passwort-123", "kuerzel": "KK",
-             "weiter": "/admin"})
-    _, _, verwaltung = anfrage("GET", "/admin/unterschriften")
+             "weiter": "/helfer"})
+    _, _, verwaltung = anfrage("GET", "/helfer/unterschriften")
     CSRF = re.search(r'name="csrf" value="([^"]+)"', verwaltung).group(1)
 
-    status, ort, _ = anfrage("POST", "/admin/unterschrift/anfordern", {
+    status, ort, _ = anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/admin/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/funk"})
     pruefe("hinweis=angefordert" in ort, "meldet Erfolg")
-    pruefe(ort.startswith("/admin/funk"), "und kehrt dorthin zurück, wo man war")
+    pruefe(ort.startswith("/helfer/funk"), "und kehrt dorthin zurück, wo man war")
 
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     pruefe("Material Ausgabe" in stand, "das Tablet zeigt den Vorgang")
@@ -182,19 +182,19 @@ try:
     pruefe("Bereit" not in stand, "und nicht mehr den Wartezustand")
     nummer = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
 
-    status, ort, _ = anfrage("POST", "/admin/unterschrift/anfordern", {
+    status, ort, _ = anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": "falsch", "art": "material", "vorgang_id": str(ausleihe),
         "richtung": "ausgabe"})
     pruefe(status == 400, "ohne CSRF-Token wird nichts angefordert")
 
-    status, ort, _ = anfrage("POST", "/admin/unterschrift/anfordern", {
+    status, ort, _ = anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "erfunden", "vorgang_id": "1",
         "richtung": "ausgabe"})
     pruefe("hinweis=unbekannt" in ort, "eine erfundene Art wird abgewiesen")
 
     print("Bei jeder Ausgabe wird sofort angefordert")
     unterschriften.abbrechen()
-    status, ort, _ = anfrage("POST", "/admin/schluessel/ausgeben", {
+    status, ort, _ = anfrage("POST", "/helfer/schluessel/ausgeben", {
         "csrf": CSRF, "kennzeichen": "IL-Z 9", "name": "Sofort Sofortski"})
     pruefe("hinweis=" in ort, "Ausgabe laeuft")
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
@@ -202,7 +202,7 @@ try:
            "die Unterschrift steht ohne zweiten Klick auf dem Tablet")
     pruefe("Sofort Sofortski" in stand, "mit dem Namen im Feld")
 
-    status, ort, _ = anfrage("POST", "/admin/helfer/%d/tshirt" % anna,
+    status, ort, _ = anfrage("POST", "/helfer/helfer/%d/tshirt" % anna,
                              {"csrf": CSRF, "groesse": "XL"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     pruefe("T-Shirt Ausgabe" in stand,
@@ -210,7 +210,7 @@ try:
     unterschriften.abbrechen()
 
     print("Rücknahme nennt, was zurückkam")
-    anfrage("POST", "/admin/ausleihe/%d/zurueck" % ausleihe,
+    anfrage("POST", "/helfer/ausleihe/%d/zurueck" % ausleihe,
             {"csrf": CSRF, "teilweise": "1", "funke": "1", "ersatzakku": "0"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     pruefe("Material Rückgabe" in stand,
@@ -225,9 +225,9 @@ try:
     unterschriften.abbrechen()
 
     print("Nur eine Warteschlange")
-    anfrage("POST", "/admin/unterschrift/anfordern", {
+    anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "schluessel", "vorgang_id": str(schluessel),
-        "richtung": "ausgabe", "weiter": "/admin/schluessel"})
+        "richtung": "ausgabe", "weiter": "/helfer/schluessel"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     pruefe("Schlüssel Ausgabe" in stand, "die neue Anforderung löst die alte ab")
     pruefe(zeilen("SELECT abgebrochen_am FROM unterschrift WHERE id = ?",
@@ -264,9 +264,9 @@ try:
            "und ändert das Bild nicht")
 
     print("Was der Pfad nicht sein darf")
-    anfrage("POST", "/admin/unterschrift/anfordern", {
+    anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "tshirt", "vorgang_id": str(anna),
-        "richtung": "ausgabe", "weiter": "/admin/helfer"})
+        "richtung": "ausgabe", "weiter": "/helfer/helfer"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     dritte = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
     for pfad, was in (("", "leer"),
@@ -305,9 +305,9 @@ try:
            "Ablaufen gerade zeichnet, soll nicht von vorn anfangen")
 
     # Lange abgelaufen: auch nicht mehr annehmen.
-    anfrage("POST", "/admin/unterschrift/anfordern", {
+    anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "rueckgabe", "weiter": "/admin/funk"})
+        "richtung": "rueckgabe", "weiter": "/helfer/funk"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     vierte = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
     ablauf_setzen(vierte, 60)
@@ -316,9 +316,9 @@ try:
     pruefe("hinweis=zu-spaet" in ort, "lange danach nicht mehr")
 
     print("Eine Unterschrift zum Material")
-    anfrage("POST", "/admin/unterschrift/anfordern", {
+    anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/admin/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/funk"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     fuenfte = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
     status, ort, _ = anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
@@ -327,9 +327,9 @@ try:
 
     print("Ein korrigierter Name landet im Bestand")
     unterschriften.abbrechen()
-    anfrage("POST", "/admin/unterschrift/anfordern", {
+    anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/admin/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/funk"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     sechste = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
     anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
@@ -345,9 +345,9 @@ try:
            "und der Beleg trägt den bestätigten Namen")
 
     print("Abbrechen vom Tablet")
-    anfrage("POST", "/admin/unterschrift/anfordern", {
+    anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "rueckgabe", "weiter": "/admin/funk"})
+        "richtung": "rueckgabe", "weiter": "/helfer/funk"})
     status, ort, _ = anfrage("POST", "/unterschrift/" + TOKEN + "/abbrechen", {})
     pruefe("hinweis=abgebrochen" in ort, "geht ohne Anmeldung – wer abbricht, "
            "steht am Tablet und nicht am Rechner")
@@ -394,24 +394,24 @@ try:
            "eine Warnung dagegen schon – sie erklaert etwas")
 
     print("Das Backoffice fragt nach, statt neu zu laden")
-    status, ort, _ = anfrage("GET", "/admin/stand")
+    status, ort, _ = anfrage("GET", "/helfer/stand")
     pruefe(status == 200, "der Zustand laedt fuer Angemeldete")
 
-    _, _, funk = anfrage("GET", "/admin/funk")
+    _, _, funk = anfrage("GET", "/helfer/funk")
     pruefe("admin_stand.js" in funk, "das Skript haengt an der Seite")
     marke_jetzt = int(re.search(r'data-marke="(\d+)"', funk).group(1))
     pruefe("data-unterschrift=" in funk,
            "die Zellen tragen eine Kennung, damit das Skript sie wiederfindet")
 
     import json as _json
-    _, _, roh = anfrage("GET", "/admin/stand?seit=%d&art=material" % marke_jetzt)
+    _, _, roh = anfrage("GET", "/helfer/stand?seit=%d&art=material" % marke_jetzt)
     zustand = _json.loads(roh)
     pruefe(zustand["neu"] == [], "seit der eigenen Marke ist nichts Neues da")
 
     # Etwas ausgeben, unterschreiben, und nachsehen, ob es ankommt.
-    anfrage("POST", "/admin/funk/ausgeben",
+    anfrage("POST", "/helfer/funk/ausgeben",
             {"csrf": CSRF, "helfer_id": str(anna), "funke": "1"})
-    _, _, roh = anfrage("GET", "/admin/stand?seit=%d&art=material" % marke_jetzt)
+    _, _, roh = anfrage("GET", "/helfer/stand?seit=%d&art=material" % marke_jetzt)
     zustand = _json.loads(roh)
     pruefe(zustand["offen"] is not None,
            "was auf dem Tablet steht, meldet der Zustand mit – dafuer ist die "
@@ -423,7 +423,7 @@ try:
     anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
             {"id": str(siebte), "pfad": "M4,4L9,9", "name": "Anna Bergmann-Richtig"})
 
-    _, _, roh = anfrage("GET", "/admin/stand?seit=%d&art=material" % marke_jetzt)
+    _, _, roh = anfrage("GET", "/helfer/stand?seit=%d&art=material" % marke_jetzt)
     zustand = _json.loads(roh)
     pruefe(len(zustand["neu"]) == 1,
            "die Unterschrift kommt als Aenderung an: " + str(zustand["neu"]))
@@ -433,16 +433,16 @@ try:
     pruefe(zustand["offen"] is None, "und das Tablet steht wieder bereit")
     pruefe(zustand["marke"] > marke_jetzt, "die Marke ist weitergerueckt")
 
-    _, _, roh = anfrage("GET", "/admin/stand?seit=%d" % zustand["marke"])
+    _, _, roh = anfrage("GET", "/helfer/stand?seit=%d" % zustand["marke"])
     pruefe(_json.loads(roh)["neu"] == [],
            "beim naechsten Mal ist dieselbe Aenderung nicht noch einmal dabei")
 
-    _, _, roh = anfrage("GET", "/admin/stand?seit=0&art=schluessel")
+    _, _, roh = anfrage("GET", "/helfer/stand?seit=0&art=schluessel")
     pruefe(all(e["art"] == "schluessel" for e in _json.loads(roh)["neu"]),
            "nach Art gefiltert kommt nur, was die Seite auch anzeigen kann")
 
     print("Backoffice")
-    _, _, seite = anfrage("GET", "/admin/unterschriften")
+    _, _, seite = anfrage("GET", "/helfer/unterschriften")
     # Drei: Schluessel, T-Shirt und Material. Die vierte Anforderung war zu
     # spaet dran und wurde deshalb gerade nicht gespeichert.
     pruefe(seite.count("unterschriftbild") >= 3,
@@ -457,7 +457,7 @@ try:
     pruefe('viewBox="0 0 600 200"' not in seite,
            "keine feste viewBox mehr")
 
-    _, _, funk = anfrage("GET", "/admin/funk")
+    _, _, funk = anfrage("GET", "/helfer/funk")
     pruefe("unterschrieben" in funk,
            "in der Liste ist zu sehen, wo eine Unterschrift vorliegt")
 
@@ -465,18 +465,18 @@ try:
     # Der Zustand wird in _admin an ALLE Seiten gereicht. Ein Name, den eine
     # Seite schon benutzt, waere dort keine stille Ueberdeckung, sondern ein
     # Fehler - deshalb einmal alle durchklicken.
-    for pfad in ("/admin", "/admin/schichten", "/admin/band", "/admin/helfer",
-                 "/admin/aufgaben", "/admin/funk", "/admin/schluessel",
-                 "/admin/zeitplan", "/admin/monitor", "/admin/import",
-                 "/admin/unterschriften", "/admin/einstellungen",
-                 "/admin/helfer/neu", "/admin/aufgabe/neu"):
+    for pfad in ("/helfer", "/helfer/schichten", "/helfer/band", "/helfer/helfer",
+                 "/helfer/aufgaben", "/helfer/funk", "/helfer/schluessel",
+                 "/helfer/zeitplan", "/helfer/monitor", "/helfer/import",
+                 "/helfer/unterschriften", "/helfer/einstellungen",
+                 "/helfer/helfer/neu", "/helfer/aufgabe/neu"):
         status, _, _ = anfrage("GET", pfad)
         pruefe(status == 200, pfad + " laedt")
 
     print("Die Hauptnavigation")
-    _, _, seite = anfrage("GET", "/admin")
+    _, _, seite = anfrage("GET", "/helfer")
     leiste = seite[seite.index("admin-nav"):seite.index("</nav>")]
-    namen = re.findall(r'<a href="/admin[^"]*"[^>]*>\s*([^<]+?)\s*</a>', leiste)
+    namen = re.findall(r'<a href="/helfer[^"]*"[^>]*>\s*([^<]+?)\s*</a>', leiste)
     pruefe(namen == ["Übersicht", "Zeitplan", "Aufgaben", "Schichten", "Helfer",
                      "Funken", "Schlüssel",
                      "Einstellungen", "Monitor", "Import", "Unterschriften",
@@ -485,17 +485,17 @@ try:
     pruefe("nav-gruppe" in leiste and "admin_menue.js" in seite,
            "die hinteren fuenf stecken in einem Menue")
 
-    # Genau ein Punkt darf leuchten. /admin ist der Anfang von jedem Pfad und
+    # Genau ein Punkt darf leuchten. /helfer ist der Anfang von jedem Pfad und
     # wuerde bei einem blossen "faengt damit an" ueberall mitleuchten.
     print("Wo man gerade steht")
     for pfad, erwartet, im_menue in (
-            ("/admin", "Übersicht", False),
-            ("/admin/band", "Zeitplan", False),
-            ("/admin/aufgabe/neu", "Aufgaben", False),
-            ("/admin/helfer/neu", "Helfer", False),
-            ("/admin/funk", "Funken", False),
-            ("/admin/monitor", "Monitor", True),
-            ("/admin/zeitplan", "Zeitplan-Abruf", True)):
+            ("/helfer", "Übersicht", False),
+            ("/helfer/band", "Zeitplan", False),
+            ("/helfer/aufgabe/neu", "Aufgaben", False),
+            ("/helfer/helfer/neu", "Helfer", False),
+            ("/helfer/funk", "Funken", False),
+            ("/helfer/monitor", "Monitor", True),
+            ("/helfer/zeitplan", "Zeitplan-Abruf", True)):
         _, _, seite = anfrage("GET", pfad)
         leiste = seite[seite.index("admin-nav"):seite.index("</nav>")]
         hier = [n.strip() for n in
@@ -510,15 +510,15 @@ try:
     print("Der Zustand ist nichts fuer Fremde")
     keks_gemerkt = keks["wert"]
     keks["wert"] = ""
-    status, ort, _ = anfrage("GET", "/admin/stand")
-    pruefe(status == 303 and ort.startswith("/admin/login"),
+    status, ort, _ = anfrage("GET", "/helfer/stand")
+    pruefe(status == 303 and ort.startswith("/helfer/login"),
            "ohne Anmeldung fuehrt er zur Anmeldeseite")
     keks["wert"] = keks_gemerkt
 
     print("Die Anmeldeseite vertraegt die Grundvorlage")
     keks_gemerkt = keks["wert"]
     keks["wert"] = ""
-    status, _, seite = anfrage("GET", "/admin/login")
+    status, _, seite = anfrage("GET", "/helfer/login")
     pruefe(status == 200, "sie laedt")
     pruefe("admin_stand.js" not in seite,
            "ohne Anmeldung wird nicht nachgefragt")
@@ -526,16 +526,16 @@ try:
     keks["wert"] = keks_gemerkt
 
     print("Ohne Tablet-Link")
-    anfrage("POST", "/admin/unterschriften/link",
+    anfrage("POST", "/helfer/unterschriften/link",
             {"csrf": CSRF, "aktion": "widerrufen"})
     status, _, _ = anfrage("GET", "/unterschrift/" + TOKEN)
     pruefe(status == 404, "der alte Link gilt nicht mehr")
-    status, ort, _ = anfrage("POST", "/admin/unterschrift/anfordern", {
+    status, ort, _ = anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/admin/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/funk"})
     pruefe("hinweis=kein-tablet" in ort,
            "und ohne Link wird gar nicht erst angefordert")
-    _, _, funk = anfrage("GET", "/admin/funk")
+    _, _, funk = anfrage("GET", "/helfer/funk")
     pruefe("unterschrift/anfordern" not in funk,
            "die Knöpfe verschwinden dann auch aus den Zeilen")
 

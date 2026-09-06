@@ -33,7 +33,7 @@
       <span class="kasten-titel">Schlüssel ausgeben</span>
       <span class="klapp-pfeil" aria-hidden="true"></span>
     </summary>
-    <form method="post" action="/admin/schluessel/ausgeben">
+    <form method="post" action="/helfer/schluessel/ausgeben">
       <input type="hidden" name="csrf" value="{{ csrf }}">
 
       <div class="feld">
@@ -71,12 +71,12 @@
   <nav class="umschalter" data-merken-filter="schluessel-offen"
        aria-label="Anzeige">
     <a class="umschalter-teil {% if not nur_offen %}ist-aktiv{% endif %}"
-       href="/admin/schluessel" data-wert="0"
+       href="/helfer/schluessel" data-wert="0"
        {% if not nur_offen %}aria-current="true"{% endif %}>
       Alle <span class="umschalter-zahl">{{ anzahl_alle }}</span></a>
     <a class="umschalter-teil {% if nur_offen %}ist-aktiv{% endif %}
               {% if anzahl_offen %}hat-offene{% endif %}"
-       href="/admin/schluessel?offen=1" data-wert="1"
+       href="/helfer/schluessel?offen=1" data-wert="1"
        {% if nur_offen %}aria-current="true"{% endif %}>
       Noch draußen <span class="umschalter-zahl">{{ anzahl_offen }}</span></a>
   </nav>
@@ -149,7 +149,7 @@
               <td class="rechts">
                 <div class="zeilenaktionen">
                   {% if not s.zurueck_am %}
-                    <form method="post" action="/admin/schluessel/{{ s.id }}/zurueck">
+                    <form method="post" action="/helfer/schluessel/{{ s.id }}/zurueck">
                       <input type="hidden" name="csrf" value="{{ csrf }}">
                       <input type="hidden" name="offen" value="{{ '1' if nur_offen else '' }}">
                       <button type="submit" class="knopf-winzig">zurück</button>
@@ -158,10 +158,10 @@
                   {{ unterschrift.knopf(
                        'schluessel', s.id,
                        'rueckgabe' if s.zurueck_am else 'ausgabe',
-                       '/admin/schluessel', csrf, tablet,
+                       '/helfer/schluessel', csrf, tablet,
                        (unterschrieben.get(s.id) or {}).get(
                            'rueckgabe' if s.zurueck_am else 'ausgabe')) }}
-                  <form method="post" action="/admin/schluessel/{{ s.id }}/loeschen">
+                  <form method="post" action="/helfer/schluessel/{{ s.id }}/loeschen">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <button type="submit" class="knopf-winzig">löschen</button>
                   </form>
@@ -216,7 +216,7 @@
                   {% if f.ausgaben %}
                     <span class="gedaempft">hat Vorgänge</span>
                   {% else %}
-                    <form method="post" action="/admin/fahrzeug/{{ f.id }}/loeschen">
+                    <form method="post" action="/helfer/fahrzeug/{{ f.id }}/loeschen">
                       <input type="hidden" name="csrf" value="{{ csrf }}">
                       <button type="submit" class="knopf-winzig">löschen</button>
                     </form>

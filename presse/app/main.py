@@ -219,7 +219,7 @@ async def danke(request: Request, nr: str = "", art: str = ""):
 @app.exception_handler(auth.NichtAngemeldet)
 async def _nicht_angemeldet(request: Request, ausnahme):
     return RedirectResponse(
-        "/admin/login?weiter=" + quote(ausnahme.ziel), status_code=303
+        "/presse/login?weiter=" + quote(ausnahme.ziel), status_code=303
     )
 
 
@@ -233,13 +233,13 @@ async def _nicht_eingerichtet(request: Request, ausnahme):
 def _weiter_pfad(roh: str) -> str:
     """Nur eigene Backoffice-Pfade zulassen – sonst wäre das eine offene
     Weiterleitung."""
-    if roh.startswith("/admin") and not roh.startswith("//") and "\\" not in roh:
+    if roh.startswith("/presse") and not roh.startswith("//") and "\\" not in roh:
         return roh
-    return "/admin"
+    return "/presse"
 
 
-@app.get("/admin/login")
-async def login_formular(request: Request, weiter: str = "/admin"):
+@app.get("/presse/login")
+async def login_formular(request: Request, weiter: str = "/presse"):
     if not auth.eingerichtet():
         raise auth.NichtEingerichtet()
     if auth.sitzung_lesen(request) is not None:
@@ -251,13 +251,13 @@ async def login_formular(request: Request, weiter: str = "/admin"):
     )
 
 
-@app.post("/admin/login")
+@app.post("/presse/login")
 async def login_absenden(request: Request):
     if not auth.eingerichtet():
         raise auth.NichtEingerichtet()
 
     daten = await request.form()
-    weiter = _weiter_pfad(str(daten.get("weiter") or "/admin"))
+    weiter = _weiter_pfad(str(daten.get("weiter") or "/presse"))
     kuerzel = str(daten.get("kuerzel") or "").strip()[:20]
     ip = _remote_ip(request, immer=True) or "unbekannt"
 
@@ -282,15 +282,15 @@ async def login_absenden(request: Request):
     return antwort
 
 
-@app.post("/admin/logout")
+@app.post("/presse/logout")
 async def logout(request: Request):
     sitzung = auth.sitzung_lesen(request)
     daten = await request.form()
     if sitzung is not None and not auth.csrf_pruefen(
         sitzung, str(daten.get("csrf") or "")
     ):
-        raise auth.NichtAngemeldet("/admin")
-    antwort = RedirectResponse("/admin/login", status_code=303)
+        raise auth.NichtAngemeldet("/presse")
+    antwort = RedirectResponse("/presse/login", status_code=303)
     auth.cookie_loeschen(antwort)
     return antwort
 
@@ -353,7 +353,7 @@ def _nicht_gefunden(request: Request, sitzung):
     )
 
 
-@app.get("/admin")
+@app.get("/presse")
 async def admin_liste(
     request: Request,
     status: str = "",
@@ -406,7 +406,7 @@ def _detail_seite(request, sitzung, anmeldung, werte=None, fehler=None, hinweis=
     )
 
 
-@app.get("/admin/anmeldung/{anmeldung_id}")
+@app.get("/presse/anmeldung/{anmeldung_id}")
 async def admin_detail(
     request: Request,
     anmeldung_id: int,
@@ -419,7 +419,7 @@ async def admin_detail(
     return _detail_seite(request, sitzung, anmeldung, hinweis=_meldung(hinweis))
 
 
-@app.post("/admin/anmeldung/{anmeldung_id}/speichern")
+@app.post("/presse/anmeldung/{anmeldung_id}/speichern")
 async def admin_speichern(
     request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -441,11 +441,11 @@ async def admin_speichern(
 
     db.anmeldung_aktualisieren(anmeldung_id, werte)
     return RedirectResponse(
-        f"/admin/anmeldung/{anmeldung_id}?hinweis=gespeichert", status_code=303
+        f"/presse/anmeldung/{anmeldung_id}?hinweis=gespeichert", status_code=303
     )
 
 
-@app.post("/admin/anmeldung/{anmeldung_id}/loeschen")
+@app.post("/presse/anmeldung/{anmeldung_id}/loeschen")
 async def admin_loeschen(
     request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -453,13 +453,13 @@ async def admin_loeschen(
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return _csrf_fehler(request, sitzung)
     db.anmeldung_loeschen(anmeldung_id)
-    return RedirectResponse("/admin?hinweis=geloescht", status_code=303)
+    return RedirectResponse("/presse?hinweis=geloescht", status_code=303)
 
 
 # --- Abholliste am Orga-Büro ------------------------------------------------
 
 
-@app.get("/admin/abholung")
+@app.get("/presse/abholung")
 async def admin_abholung(
     request: Request, hinweis: str = "", suche: str = "",
     sitzung=Depends(auth.sitzung_erforderlich)
@@ -498,11 +498,11 @@ async def admin_abholung(
 # Listen, in denen nach einer Aktion zur bearbeiteten Zeile zurueckgesprungen
 # wird, statt oben zu landen. Am Schalter ist das der Unterschied zwischen
 # "weiterarbeiten" und "die Liste nochmal durchscrollen".
-_MIT_SPRUNGMARKE = ("/admin/abholung", "/admin/bilder")
+_MIT_SPRUNGMARKE = ("/presse/abholung", "/presse/bilder")
 
 
 def _zurueck(daten, anmeldung_id: int, hinweis: str,
-             vorgabe: str = "/admin/abholung") -> str:
+             vorgabe: str = "/presse/abholung") -> str:
     """Wohin nach einer Aktion – mit Rueckmeldung, Suchbegriff und Sprungmarke."""
     ziel = _weiter_pfad(str(daten.get("zurueck") or vorgabe))
     url = ziel + ("&" if "?" in ziel else "?") + "hinweis=" + hinweis
@@ -518,7 +518,7 @@ def _zurueck(daten, anmeldung_id: int, hinweis: str,
     return url
 
 
-@app.post("/admin/anmeldung/{anmeldung_id}/badge")
+@app.post("/presse/anmeldung/{anmeldung_id}/badge")
 async def admin_badge(
     request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -538,7 +538,7 @@ async def admin_badge(
     return RedirectResponse(_zurueck(daten, anmeldung_id, hinweis), status_code=303)
 
 
-@app.post("/admin/anmeldung/{anmeldung_id}/gebuehr")
+@app.post("/presse/anmeldung/{anmeldung_id}/gebuehr")
 async def admin_gebuehr(
     request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -559,7 +559,7 @@ async def admin_gebuehr(
 # --- Bilderspende nachhalten ------------------------------------------------
 
 
-@app.get("/admin/bilder")
+@app.get("/presse/bilder")
 async def admin_bilder(
     request: Request, hinweis: str = "", anzahl: str = "",
     sitzung=Depends(auth.sitzung_erforderlich)
@@ -580,7 +580,7 @@ async def admin_bilder(
     )
 
 
-@app.post("/admin/anmeldung/{anmeldung_id}/bilder")
+@app.post("/presse/anmeldung/{anmeldung_id}/bilder")
 async def admin_bilder_haken(
     request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -596,11 +596,11 @@ async def admin_bilder_haken(
     hinweis = ("bilder" if erhalten else "bilder_zurueck") if erledigt else "nichts"
 
     return RedirectResponse(
-        _zurueck(daten, anmeldung_id, hinweis, "/admin/bilder"), status_code=303
+        _zurueck(daten, anmeldung_id, hinweis, "/presse/bilder"), status_code=303
     )
 
 
-@app.post("/admin/anmeldung/{anmeldung_id}/erinnerung")
+@app.post("/presse/anmeldung/{anmeldung_id}/erinnerung")
 async def admin_erinnerung(
     request: Request, anmeldung_id: int, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -617,12 +617,12 @@ async def admin_erinnerung(
     )
     return RedirectResponse(
         _zurueck(daten, anmeldung_id, "erinnert" if erledigt else "nichts",
-                 "/admin/bilder"),
+                 "/presse/bilder"),
         status_code=303,
     )
 
 
-@app.post("/admin/erinnerungen")
+@app.post("/presse/erinnerungen")
 async def admin_erinnerungen(
     request: Request, sitzung=Depends(auth.sitzung_erforderlich)
 ):
@@ -637,7 +637,7 @@ async def admin_erinnerungen(
             verschickt += 1
 
     return RedirectResponse(
-        "/admin/bilder?hinweis=sammel&anzahl=" + str(verschickt), status_code=303
+        "/presse/bilder?hinweis=sammel&anzahl=" + str(verschickt), status_code=303
     )
 
 
@@ -699,7 +699,7 @@ def _csv_zeile(anmeldung) -> list:
     return werte
 
 
-@app.get("/admin/export.csv")
+@app.get("/presse/export.csv")
 async def admin_export(
     request: Request,
     status: str = "",

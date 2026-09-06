@@ -11,8 +11,8 @@
   {% endif %}
 
   <form method="post"
-        action="{{ '/admin/helfer/' ~ person.id ~ '/aendern' if person
-                   else '/admin/helfer/neu' }}">
+        action="{{ '/helfer/helfer/' ~ person.id ~ '/aendern' if person
+                   else '/helfer/helfer/neu' }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
 
     <div class="feld {% if fehler.name %}feld-fehler{% endif %}">
@@ -67,14 +67,14 @@
     <div class="knopfreihe">
       <button type="submit" class="knopf">Speichern</button>
       <a class="knopf-schlicht"
-         href="{{ '/admin/helfer/' ~ person.id if person else '/admin/helfer' }}">Abbrechen</a>
+         href="{{ '/helfer/helfer/' ~ person.id if person else '/helfer/helfer' }}">Abbrechen</a>
     </div>
   </form>
 
   {% if person and fehler %}
-    <p class="hilfe"><a href="/admin/helfer/{{ person.id }}">Zur vorhandenen
+    <p class="hilfe"><a href="/helfer/helfer/{{ person.id }}">Zur vorhandenen
       Person</a></p>
   {% endif %}
 
-  <p class="zurueck-zeile"><a href="/admin/helfer">Zurück zur Helferliste</a></p>
+  <p class="zurueck-zeile"><a href="/helfer/helfer">Zurück zur Helferliste</a></p>
 {% endblock %}

@@ -21,13 +21,13 @@
         {% if konflikt.notiz %}<li>Notiz: {{ konflikt.notiz }}</li>{% endif %}
       </ul>
       <p>Noch einmal auf <em>Speichern</em> übernimmt deine Fassung und
-        überschreibt die andere. <a href="/admin/aufgabe/{{ aufgabe.id }}">Verwerfen
+        überschreibt die andere. <a href="/helfer/aufgabe/{{ aufgabe.id }}">Verwerfen
         und neu laden</a> nimmt die andere.</p>
     </div>
   {% endif %}
 
   <form method="post"
-        action="{{ '/admin/aufgabe/' ~ aufgabe.id if aufgabe else '/admin/aufgabe/neu' }}">
+        action="{{ '/helfer/aufgabe/' ~ aufgabe.id if aufgabe else '/helfer/aufgabe/neu' }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {# Traegt den Konfliktschutz: die Version, die beim Laden galt. #}
     <input type="hidden" name="version" value="{{ werte.version }}">
@@ -123,7 +123,7 @@
 
     <div class="knopfreihe">
       <button type="submit" class="knopf">Speichern</button>
-      <a class="knopf-schlicht" href="/admin/aufgaben">Abbrechen</a>
+      <a class="knopf-schlicht" href="/helfer/aufgaben">Abbrechen</a>
     </div>
   </form>
 
@@ -132,7 +132,7 @@
       <h2>Löschen</h2>
       <p class="hilfe">Ist unwiderruflich. Erledigte Aufgaben lässt man besser
         stehen – sie sind der Nachweis, dass es gemacht wurde.</p>
-      <form method="post" action="/admin/aufgabe/{{ aufgabe.id }}/loeschen">
+      <form method="post" action="/helfer/aufgabe/{{ aufgabe.id }}/loeschen">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <button type="submit" class="knopf-gefahr">Endgültig löschen</button>
       </form>
@@ -146,5 +146,5 @@
     </p>
   {% endif %}
 
-  <p class="zurueck-zeile"><a href="/admin/aufgaben">Zurück zum Aufgabenplan</a></p>
+  <p class="zurueck-zeile"><a href="/helfer/aufgaben">Zurück zum Aufgabenplan</a></p>
 {% endblock %}

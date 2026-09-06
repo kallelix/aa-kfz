@@ -156,27 +156,27 @@ try:
            "ohne Wunsch wird nichts versprochen")
 
     print("Bilder ausstehend")
-    anfrage("POST", "/admin/login",
-            {"passwort": "test-passwort-123", "kuerzel": "KK", "weiter": "/admin"})
-    _, _, seite = anfrage("GET", "/admin")
+    anfrage("POST", "/presse/login",
+            {"passwort": "test-passwort-123", "kuerzel": "KK", "weiter": "/presse"})
+    _, _, seite = anfrage("GET", "/presse")
     CSRF = re.search(r'name="csrf" value="([^"]+)"', seite).group(1)
 
-    status, _, bilder = anfrage("GET", "/admin/bilder")
+    status, _, bilder = anfrage("GET", "/presse/bilder")
     pruefe(status == 200, "die Ansicht laedt")
     pruefe("Nichts offen" in bilder,
            "ohne abgeholtes Badge steht noch niemand drauf")
 
-    anfrage("POST", "/admin/anmeldung/2/badge", {"csrf": CSRF})
-    _, _, bilder = anfrage("GET", "/admin/bilder")
+    anfrage("POST", "/presse/anmeldung/2/badge", {"csrf": CSRF})
+    _, _, bilder = anfrage("GET", "/presse/bilder")
     pruefe("Spende" in bilder, "nach der Badge-Ausgabe steht er drauf")
     pruefe("noch nicht" in bilder, "und ist als noch nicht erinnert markiert")
 
-    anfrage("POST", "/admin/anmeldung/1/badge", {"csrf": CSRF})
-    _, _, bilder = anfrage("GET", "/admin/bilder")
+    anfrage("POST", "/presse/anmeldung/1/badge", {"csrf": CSRF})
+    _, _, bilder = anfrage("GET", "/presse/bilder")
     pruefe("Gebuehr" not in bilder, "wer die Gebuehr gewaehlt hat, steht nicht drauf")
 
     print("Erinnern")
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/2/erinnerung", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/2/erinnerung", {"csrf": CSRF})
     pruefe("hinweis=erinnert" in ort, "Erinnerung meldet Erfolg")
     mails = zeilen("SELECT * FROM mail_out WHERE anmeldung_id = 2 AND typ = 'erinnerung'")
     pruefe(len(mails) == 1, "die Erinnerung ist eingereiht")
@@ -186,41 +186,41 @@ try:
     pruefe(bool(zeilen("SELECT erinnerung_am FROM anmeldung WHERE id = 2")[0][0]),
            "der Zeitpunkt ist vermerkt")
 
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/erinnerung", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/1/erinnerung", {"csrf": CSRF})
     pruefe("hinweis=nichts" in ort, "wer keine Bilderspende gewaehlt hat, wird nicht erinnert")
     pruefe(len(zeilen("SELECT id FROM mail_out WHERE anmeldung_id = 1 AND typ = 'erinnerung'")) == 0,
            "und bekommt auch keine Mail")
 
     print("Bilder erhalten")
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/2/bilder", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/2/bilder", {"csrf": CSRF})
     pruefe("hinweis=bilder" in ort, "Haken meldet Erfolg")
-    _, _, bilder = anfrage("GET", "/admin/bilder")
+    _, _, bilder = anfrage("GET", "/presse/bilder")
     pruefe("Nichts offen" in bilder, "danach ist die Liste leer")
 
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/2/erinnerung", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/2/erinnerung", {"csrf": CSRF})
     pruefe("hinweis=nichts" in ort, "wer geliefert hat, wird nicht mehr erinnert")
 
-    anfrage("POST", "/admin/anmeldung/2/bilder", {"csrf": CSRF, "erhalten": "0"})
+    anfrage("POST", "/presse/anmeldung/2/bilder", {"csrf": CSRF, "erhalten": "0"})
     pruefe(zeilen("SELECT bilder_erhalten_am FROM anmeldung WHERE id = 2")[0][0] is None,
            "Haken laesst sich zuruecknehmen")
 
     print("Sammelerinnerung")
     anmelden("Uwe", "Zweispende", "ja", "bilderspende")
-    anfrage("POST", "/admin/anmeldung/5/badge", {"csrf": CSRF})
-    status, ort, _ = anfrage("POST", "/admin/erinnerungen", {"csrf": CSRF})
+    anfrage("POST", "/presse/anmeldung/5/badge", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/erinnerungen", {"csrf": CSRF})
     pruefe("anzahl=2" in ort, "beide offenen wurden erinnert: " + ort)
     pruefe(len(zeilen("SELECT id FROM mail_out WHERE typ = 'erinnerung'")) == 3,
            "insgesamt drei Erinnerungen in der Schlange")
 
-    anfrage("POST", "/admin/anmeldung/2/bilder", {"csrf": CSRF})
-    anfrage("POST", "/admin/anmeldung/5/bilder", {"csrf": CSRF})
-    anfrage("POST", "/admin/anmeldung/4/bilder", {"csrf": CSRF})
-    status, ort, _ = anfrage("POST", "/admin/erinnerungen", {"csrf": CSRF})
+    anfrage("POST", "/presse/anmeldung/2/bilder", {"csrf": CSRF})
+    anfrage("POST", "/presse/anmeldung/5/bilder", {"csrf": CSRF})
+    anfrage("POST", "/presse/anmeldung/4/bilder", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/erinnerungen", {"csrf": CSRF})
     pruefe("anzahl=0" in ort, "ohne Offene wird nichts verschickt")
 
     print("CSRF")
-    for pfad in ("/admin/anmeldung/2/erinnerung", "/admin/anmeldung/2/bilder",
-                 "/admin/erinnerungen"):
+    for pfad in ("/presse/anmeldung/2/erinnerung", "/presse/anmeldung/2/bilder",
+                 "/presse/erinnerungen"):
         status, _, _ = anfrage("POST", pfad, {"csrf": "falsch"})
         pruefe(status == 400, pfad + " ohne CSRF-Token -> 400")
 

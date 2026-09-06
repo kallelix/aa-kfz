@@ -100,9 +100,9 @@ try:
         return ergebnis
 
     print("Zugriffsschutz")
-    for pfad in ("/admin", "/admin/abholung", "/admin/anmeldung/1"):
+    for pfad in ("/presse", "/presse/abholung", "/presse/anmeldung/1"):
         status, ort, _ = anfrage("GET", pfad)
-        pruefe(status == 303 and ort.startswith("/admin/login"),
+        pruefe(status == 303 and ort.startswith("/presse/login"),
                pfad + " verlangt Anmeldung")
 
     # Drei Anmeldungen ueber das oeffentliche Formular anlegen.
@@ -123,12 +123,12 @@ try:
     pruefe(len(zeilen("SELECT id FROM anmeldung")) == 3, "drei Anmeldungen angelegt")
 
     print("Anmelden")
-    status, ort, _ = anfrage("POST", "/admin/login",
-                             {"passwort": "falsch", "weiter": "/admin"})
+    status, ort, _ = anfrage("POST", "/presse/login",
+                             {"passwort": "falsch", "weiter": "/presse"})
     pruefe(status == 401, "falsches Passwort wird abgewiesen")
-    anfrage("POST", "/admin/login",
-            {"passwort": "test-passwort-123", "kuerzel": "KK", "weiter": "/admin"})
-    status, _, liste = anfrage("GET", "/admin")
+    anfrage("POST", "/presse/login",
+            {"passwort": "test-passwort-123", "kuerzel": "KK", "weiter": "/presse"})
+    status, _, liste = anfrage("GET", "/presse")
     pruefe(status == 200, "Liste laedt nach der Anmeldung")
     CSRF = re.search(r'name="csrf" value="([^"]+)"', liste).group(1)
 
@@ -138,22 +138,22 @@ try:
     pruefe("3 Anmeldungen angezeigt" in liste, "Trefferzahl stimmt")
     pruefe("nicht kommerziell" in liste, "die nicht-kommerzielle ist als solche erkennbar")
 
-    _, _, gefiltert = anfrage("GET", "/admin?gegenleistung=gebuehr")
+    _, _, gefiltert = anfrage("GET", "/presse?gegenleistung=gebuehr")
     pruefe("Blende" in gefiltert and "Zoom" not in gefiltert, "Filter Gebuehr greift")
-    _, _, gefiltert = anfrage("GET", "/admin?gegenleistung=keine")
+    _, _, gefiltert = anfrage("GET", "/presse?gegenleistung=keine")
     pruefe("Zoom" in gefiltert and "Blende" not in gefiltert,
            "Filter 'nicht kommerziell' greift")
-    _, _, gefiltert = anfrage("GET", "/admin?suche=" + urllib.parse.quote("öhler"))
+    _, _, gefiltert = anfrage("GET", "/presse?suche=" + urllib.parse.quote("öhler"))
     pruefe("Öhler" in gefiltert and "Blende" not in gefiltert,
            "Suche findet Umlaute unabhaengig von Gross/Klein")
 
     print("Detailansicht und Korrektur")
-    status, _, detail = anfrage("GET", "/admin/anmeldung/1")
+    status, _, detail = anfrage("GET", "/presse/anmeldung/1")
     pruefe(status == 200 and "Blende" in detail, "Detailansicht laedt")
     pruefe("Sicherheitshinweis bestätigt" in detail,
            "der Zeitpunkt der Zustimmung steht im Verlauf")
 
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/speichern", {
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/1/speichern", {
         "csrf": CSRF, "vorname": "Petra", "nachname": "Blende-Licht",
         "firma": "Blende & Licht GmbH", "email": "petra@example.org",
         "kommerziell": "ja", "gegenleistung": "gebuehr"})
@@ -165,20 +165,20 @@ try:
     pruefe(bool(eintrag["sicherheit_ok_am"]),
            "der Zeitstempel der Sicherheitszustimmung bleibt unangetastet")
 
-    status, _, text = anfrage("POST", "/admin/anmeldung/1/speichern", {
+    status, _, text = anfrage("POST", "/presse/anmeldung/1/speichern", {
         "csrf": CSRF, "vorname": "", "nachname": "Blende", "firma": "X",
         "email": "petra@example.org", "kommerziell": "nein"})
     pruefe(status == 422 and "Vorname bitte" in text, "leerer Vorname wird abgewiesen")
 
     print("Umstellen auf Bilderspende vermerkt die Bildrechte")
-    status, _, _ = anfrage("POST", "/admin/anmeldung/1/speichern", {
+    status, _, _ = anfrage("POST", "/presse/anmeldung/1/speichern", {
         "csrf": CSRF, "vorname": "Petra", "nachname": "Blende-Licht",
         "firma": "Blende & Licht GmbH", "email": "petra@example.org",
         "kommerziell": "ja", "gegenleistung": "bilderspende"})
     pruefe(status == 303, "das Umstellen geht ohne Serverfehler durch: " + str(status))
     eintrag = zeilen("SELECT * FROM anmeldung WHERE id = 1")[0]
     pruefe(bool(eintrag["bildrechte_ok_am"]), "Zeitstempel wurde gesetzt")
-    anfrage("POST", "/admin/anmeldung/1/speichern", {
+    anfrage("POST", "/presse/anmeldung/1/speichern", {
         "csrf": CSRF, "vorname": "Petra", "nachname": "Blende-Licht",
         "firma": "Blende & Licht GmbH", "email": "petra@example.org",
         "kommerziell": "ja", "gegenleistung": "gebuehr"})
@@ -186,7 +186,7 @@ try:
     pruefe(eintrag["bildrechte_ok_am"] is None, "und beim Zurueckstellen wieder geraeumt")
 
     print("Abholliste")
-    status, _, abholung = anfrage("GET", "/admin/abholung")
+    status, _, abholung = anfrage("GET", "/presse/abholung")
     pruefe(status == 200, "Abholliste laedt")
     pruefe(abholung.count("data-suche=") == 3, "alle drei stehen drauf")
     pruefe('data-suche="petra blende-licht blende &amp; licht gmbh"' in abholung,
@@ -199,7 +199,7 @@ try:
     pruefe(abholung.count('name="suche"') >= 1,
            "die Zeilenformulare tragen den Suchbegriff mit")
 
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/badge",
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/1/badge",
                              {"csrf": CSRF, "suche": "blende"})
     pruefe(ort.endswith("#zeile-1"),
            "die Antwort springt zurueck zur Zeile: " + ort)
@@ -210,23 +210,23 @@ try:
            "das Suchfeld ist danach wieder vorbelegt")
 
     # Auf der Detailseite waere eine Sprungmarke sinnlos.
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/badge",
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/1/badge",
                              {"csrf": CSRF, "ausgeben": "0",
-                              "zurueck": "/admin/anmeldung/1"})
+                              "zurueck": "/presse/anmeldung/1"})
     pruefe("#zeile-" not in ort, "auf der Detailseite keine Sprungmarke: " + ort)
 
     print("Badge ausgeben")
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/badge", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/1/badge", {"csrf": CSRF})
     pruefe("hinweis=badge" in ort, "Ausgabe meldet Erfolg")
     eintrag = zeilen("SELECT * FROM anmeldung WHERE id = 1")[0]
     pruefe(eintrag["status"] == "ausgegeben", "Status ist ausgegeben")
     pruefe(bool(eintrag["badge_am"]), "Zeitpunkt steht")
     pruefe(eintrag["badge_durch"] == "KK", "das Kuerzel aus der Sitzung steht dabei")
 
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/badge", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/1/badge", {"csrf": CSRF})
     pruefe("hinweis=nichts" in ort, "zweimal ausgeben aendert nichts")
 
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/badge",
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/1/badge",
                              {"csrf": CSRF, "ausgeben": "0"})
     pruefe("hinweis=badge_zurueck" in ort, "zuruecknehmen geht")
     eintrag = zeilen("SELECT * FROM anmeldung WHERE id = 1")[0]
@@ -234,46 +234,46 @@ try:
            "Status und Zeitpunkt sind geraeumt")
 
     print("Gebuehr")
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/1/gebuehr", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/1/gebuehr", {"csrf": CSRF})
     pruefe("hinweis=gebuehr" in ort, "Gebuehr kassiert")
     pruefe(bool(zeilen("SELECT gebuehr_bezahlt_am FROM anmeldung WHERE id = 1")[0][0]),
            "Zeitpunkt steht")
-    anfrage("POST", "/admin/anmeldung/1/gebuehr", {"csrf": CSRF, "bezahlt": "0"})
+    anfrage("POST", "/presse/anmeldung/1/gebuehr", {"csrf": CSRF, "bezahlt": "0"})
     pruefe(zeilen("SELECT gebuehr_bezahlt_am FROM anmeldung WHERE id = 1")[0][0] is None,
            "zuruecknehmen geht")
 
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/3/gebuehr", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/3/gebuehr", {"csrf": CSRF})
     pruefe("hinweis=nichts" in ort,
            "wer keine Gebuehr gewaehlt hat, kann auch keine bezahlen")
 
     print("CSRF")
     for pfad, daten in (
-        ("/admin/anmeldung/1/badge", {"csrf": "falsch"}),
-        ("/admin/anmeldung/1/gebuehr", {"csrf": "falsch"}),
-        ("/admin/anmeldung/1/loeschen", {"csrf": "falsch"}),
-        ("/admin/anmeldung/1/speichern", {"csrf": "falsch", "vorname": "X"}),
+        ("/presse/anmeldung/1/badge", {"csrf": "falsch"}),
+        ("/presse/anmeldung/1/gebuehr", {"csrf": "falsch"}),
+        ("/presse/anmeldung/1/loeschen", {"csrf": "falsch"}),
+        ("/presse/anmeldung/1/speichern", {"csrf": "falsch", "vorname": "X"}),
     ):
         status, _, _ = anfrage("POST", pfad, daten)
         pruefe(status == 400, pfad + " ohne CSRF-Token -> 400")
     pruefe(len(zeilen("SELECT id FROM anmeldung")) == 3, "nichts davon hat gewirkt")
 
     print("Unbekannte Nummer")
-    for pfad in ("/admin/anmeldung/999", ):
+    for pfad in ("/presse/anmeldung/999", ):
         status, _, _ = anfrage("GET", pfad)
         pruefe(status == 404, pfad + " -> 404")
-    for pfad in ("/admin/anmeldung/999/badge", "/admin/anmeldung/999/gebuehr"):
+    for pfad in ("/presse/anmeldung/999/badge", "/presse/anmeldung/999/gebuehr"):
         status, _, _ = anfrage("POST", pfad, {"csrf": CSRF})
         pruefe(status == 404, pfad + " -> 404")
 
     print("Loeschen")
-    status, ort, _ = anfrage("POST", "/admin/anmeldung/3/loeschen", {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/presse/anmeldung/3/loeschen", {"csrf": CSRF})
     pruefe("hinweis=geloescht" in ort, "Loeschen meldet Erfolg")
     pruefe(len(zeilen("SELECT id FROM anmeldung")) == 2, "der Datensatz ist weg")
 
     print("Abmelden")
-    anfrage("POST", "/admin/logout", {"csrf": CSRF})
-    status, ort, _ = anfrage("GET", "/admin")
-    pruefe(status == 303 and ort.startswith("/admin/login"), "danach ist wieder zu")
+    anfrage("POST", "/presse/logout", {"csrf": CSRF})
+    status, ort, _ = anfrage("GET", "/presse")
+    pruefe(status == 303 and ort.startswith("/presse/login"), "danach ist wieder zu")
 
 finally:
     prozess.terminate()

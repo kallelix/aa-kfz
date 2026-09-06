@@ -60,7 +60,7 @@
           {% for z in zeilen %}
             <tr id="zeile-{{ z.id }}" data-suche="{{ z.suchtext }}">
               <td>
-                <a href="/admin/anmeldung/{{ z.id }}">{{ z.nachname }}, {{ z.vorname }}</a>
+                <a href="/presse/anmeldung/{{ z.id }}">{{ z.nachname }}, {{ z.vorname }}</a>
               </td>
               <td>{{ z.firma }}</td>
               <td>
@@ -73,7 +73,7 @@
                 {% endif %}
               </td>
               <td>
-                <form method="post" action="/admin/anmeldung/{{ z.id }}/badge">
+                <form method="post" action="/presse/anmeldung/{{ z.id }}/badge">
                   <input type="hidden" name="csrf" value="{{ csrf }}">
                   <input type="hidden" name="suche" value="{{ filter_suche }}">
                   {% if z.status == 'ausgegeben' %}
@@ -88,7 +88,7 @@
               </td>
               <td>
                 {% if z.gegenleistung == 'gebuehr' %}
-                  <form method="post" action="/admin/anmeldung/{{ z.id }}/gebuehr">
+                  <form method="post" action="/presse/anmeldung/{{ z.id }}/gebuehr">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <input type="hidden" name="suche" value="{{ filter_suche }}">
                     {% if z.gebuehr_bezahlt_am %}

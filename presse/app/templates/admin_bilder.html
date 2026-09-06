@@ -30,8 +30,8 @@
         <tbody>
           {% for a in anmeldungen %}
             <tr id="zeile-{{ a.id }}">
-              <td><a href="/admin/anmeldung/{{ a.id }}">{{ a.id }}</a></td>
-              <td><a href="/admin/anmeldung/{{ a.id }}">{{ a.nachname }}, {{ a.vorname }}</a></td>
+              <td><a href="/presse/anmeldung/{{ a.id }}">{{ a.id }}</a></td>
+              <td><a href="/presse/anmeldung/{{ a.id }}">{{ a.nachname }}, {{ a.vorname }}</a></td>
               <td>{{ a.firma }}</td>
               <td><a href="mailto:{{ a.email }}">{{ a.email }}</a></td>
               <td>
@@ -49,13 +49,13 @@
                 {% endif %}
               </td>
               <td class="aktionen">
-                <form method="post" action="/admin/anmeldung/{{ a.id }}/erinnerung">
+                <form method="post" action="/presse/anmeldung/{{ a.id }}/erinnerung">
                   <input type="hidden" name="csrf" value="{{ csrf }}">
                   <button type="submit" class="knopf-schlicht">
                     {% if a.erinnerung_am %}nochmal erinnern{% else %}erinnern{% endif %}
                   </button>
                 </form>
-                <form method="post" action="/admin/anmeldung/{{ a.id }}/bilder">
+                <form method="post" action="/presse/anmeldung/{{ a.id }}/bilder">
                   <input type="hidden" name="csrf" value="{{ csrf }}">
                   <input type="hidden" name="erhalten" value="1">
                   <button type="submit">Bilder erhalten</button>
@@ -68,7 +68,7 @@
     </div>
 
     <div class="sammelaktion">
-      <form method="post" action="/admin/erinnerungen"
+      <form method="post" action="/presse/erinnerungen"
             onsubmit="return confirm('An alle {{ anmeldungen|length }} offenen eine Erinnerung schicken?');">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <button type="submit">Alle erinnern</button>

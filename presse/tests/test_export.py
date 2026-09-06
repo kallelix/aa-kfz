@@ -92,8 +92,8 @@ try:
         return list(csv.reader(io.StringIO(text, newline=""), delimiter=TRENNER))
 
     print("Ohne Anmeldung")
-    status, kopf, _ = anfrage("GET", "/admin/export.csv")
-    pruefe(status == 303 and kopf.get("Location", "").startswith("/admin/login"),
+    status, kopf, _ = anfrage("GET", "/presse/export.csv")
+    pruefe(status == 303 and kopf.get("Location", "").startswith("/presse/login"),
            "Export ohne Anmeldung fuehrt zur Anmeldeseite")
 
     # Drei Anmeldungen, eine davon mit Zeichen, die CSV gern zerlegen.
@@ -112,11 +112,11 @@ try:
     ):
         anfrage("POST", "/", daten)
 
-    anfrage("POST", "/admin/login",
-            {"passwort": "test-passwort-123", "kuerzel": "KK", "weiter": "/admin"})
+    anfrage("POST", "/presse/login",
+            {"passwort": "test-passwort-123", "kuerzel": "KK", "weiter": "/presse"})
 
     print("Grundform")
-    status, kopf, rohdaten = anfrage("GET", "/admin/export.csv", roh=True)
+    status, kopf, rohdaten = anfrage("GET", "/presse/export.csv", roh=True)
     pruefe(status == 200, "Export liefert 200")
     pruefe(kopf.get("content-type", "").startswith("text/csv"), "Content-Type ist text/csv")
     verfuegung = kopf.get("content-disposition", "")
@@ -172,30 +172,30 @@ try:
            "Zeilenumbruch bleibt heil: " + repr(heikel["Bemerkung"]))
 
     print("Filter")
-    _, _, text = anfrage("GET", "/admin/export.csv?gegenleistung=gebuehr")
+    _, _, text = anfrage("GET", "/presse/export.csv?gegenleistung=gebuehr")
     zeilen = tabelle(text.lstrip("﻿"))
     pruefe(len(zeilen) == 2 and zeilen[1][4] == "Gebuehr", "Filter Gebuehr greift")
 
-    _, _, text = anfrage("GET", "/admin/export.csv?gegenleistung=keine")
+    _, _, text = anfrage("GET", "/presse/export.csv?gegenleistung=keine")
     zeilen = tabelle(text.lstrip("﻿"))
     pruefe(len(zeilen) == 2 and zeilen[1][4] == "Hobby",
            "Filter 'nicht kommerziell' greift")
 
-    _, _, text = anfrage("GET", "/admin/export.csv?suche=" + urllib.parse.quote("öhler"))
+    _, _, text = anfrage("GET", "/presse/export.csv?suche=" + urllib.parse.quote("öhler"))
     zeilen = tabelle(text.lstrip("﻿"))
     pruefe(len(zeilen) == 2, "Suche greift, auch mit Umlaut")
 
-    _, _, text = anfrage("GET", "/admin/export.csv?suche=gibtesnicht")
+    _, _, text = anfrage("GET", "/presse/export.csv?suche=gibtesnicht")
     pruefe(len(tabelle(text.lstrip("﻿"))) == 1, "leere Auswahl: nur die Kopfzeile")
 
     _, _, text = anfrage(
-        "GET", "/admin/export.csv?sortierung=" + urllib.parse.quote("id; DROP TABLE anmeldung--"))
+        "GET", "/presse/export.csv?sortierung=" + urllib.parse.quote("id; DROP TABLE anmeldung--"))
     pruefe(len(tabelle(text.lstrip("﻿"))) == 4,
            "unbekannte Sortierung richtet keinen Schaden an")
 
     print("Verweis in der Liste")
-    _, _, liste = anfrage("GET", "/admin?gegenleistung=gebuehr")
-    pruefe("/admin/export.csv?status=&amp;gegenleistung=gebuehr" in liste,
+    _, _, liste = anfrage("GET", "/presse?gegenleistung=gebuehr")
+    pruefe("/presse/export.csv?status=&amp;gegenleistung=gebuehr" in liste,
            "die Liste verlinkt den Export mit den aktuellen Filtern")
 
 finally:

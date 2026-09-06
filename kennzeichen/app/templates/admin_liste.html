@@ -2,12 +2,12 @@
 {% block titel %}Anträge{% endblock %}
 
 {% set filterteil = 'status=' ~ filter_status|urlencode ~ '&kategorie=' ~ filter_kategorie|urlencode ~ '&suche=' ~ filter_suche|urlencode ~ '&sortierung=' ~ sortierung|urlencode %}
-{% set aktuelle_ansicht = '/admin?' ~ filterteil %}
-{% set export_ziel = '/admin/export.csv?' ~ filterteil %}
+{% set aktuelle_ansicht = '/kennzeichen?' ~ filterteil %}
+{% set export_ziel = '/kennzeichen/export.csv?' ~ filterteil %}
 {# Karten bewusst immer nur fuer genehmigte: die Standardansicht ist auf "neu"
    gefiltert, und Karten fuer noch nicht Entschiedene zu drucken waere ein
    teurer Fehlgriff. Kategorie und Suche wandern mit. #}
-{% set karten_ziel = '/admin/karten?status=genehmigt&kategorie=' ~ filter_kategorie|urlencode ~ '&suche=' ~ filter_suche|urlencode ~ '&sortierung=name' %}
+{% set karten_ziel = '/kennzeichen/karten?status=genehmigt&kategorie=' ~ filter_kategorie|urlencode ~ '&suche=' ~ filter_suche|urlencode ~ '&sortierung=name' %}
 
 {% block inhalt %}
   {% if hinweis %}
@@ -49,7 +49,7 @@
     </div>
   </section>
 
-  <form method="get" action="/admin" class="filter">
+  <form method="get" action="/kennzeichen" class="filter">
     <div>
       <label for="f-status">Status</label>
       <select id="f-status" name="status">
@@ -88,7 +88,7 @@
 
     <div class="filter-knoepfe">
       <button type="submit">Filtern</button>
-      <a class="knopf-schlicht" href="/admin?status=">zurücksetzen</a>
+      <a class="knopf-schlicht" href="/kennzeichen?status=">zurücksetzen</a>
     </div>
   </form>
 
@@ -103,7 +103,7 @@
   </p>
 
   {% if antraege %}
-    <form method="post" action="/admin/sammelaktion">
+    <form method="post" action="/kennzeichen/sammelaktion">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="zurueck" value="{{ aktuelle_ansicht }}">
 
@@ -133,9 +133,9 @@
                     <span class="gedaempft">–</span>
                   {% endif %}
                 </td>
-                <td><a href="/admin/antrag/{{ a.id }}">{{ a.id }}</a></td>
+                <td><a href="/kennzeichen/antrag/{{ a.id }}">{{ a.id }}</a></td>
                 <td class="nowrap">{{ a.created_at|zeit }}</td>
-                <td><a href="/admin/antrag/{{ a.id }}">{{ a.nachname }}, {{ a.vorname }}</a></td>
+                <td><a href="/kennzeichen/antrag/{{ a.id }}">{{ a.nachname }}, {{ a.vorname }}</a></td>
                 <td class="kennzeichen-spalte">{{ a.kennzeichen or '—' }}</td>
                 <td>{{ a.funktion }}</td>
                 <td>{{ kategorie_labels.get(a.kategorie, a.kategorie) }}</td>

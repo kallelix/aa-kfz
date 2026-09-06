@@ -58,14 +58,14 @@
               <tr>
                 <td class="nowrap">{{ s.datum | tag }}</td>
                 <td class="zeit">{{ s | spanne }}</td>
-                <td><a href="/admin/schicht/{{ s.id }}">{{ s.liste }}</a></td>
+                <td><a href="/helfer/schicht/{{ s.id }}">{{ s.liste }}</a></td>
                 <td class="gedaempft">{{ 'Import' if s.quelle == 'import' else 'von Hand' }}</td>
                 <td class="rechts">
                   <form method="post"
-                        action="/admin/einteilung/{{ s.einteilung_id }}/austragen">
+                        action="/helfer/einteilung/{{ s.einteilung_id }}/austragen">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <input type="hidden" name="weiter"
-                           value="/admin/helfer/{{ person.id }}">
+                           value="/helfer/helfer/{{ person.id }}">
                     <button type="submit" class="knopf-winzig">austragen</button>
                   </form>
                 </td>
@@ -77,5 +77,5 @@
     {% endif %}
   </section>
 
-  <p class="zurueck-zeile"><a href="/admin/helfer">Zurück zur Helferliste</a></p>
+  <p class="zurueck-zeile"><a href="/helfer/helfer">Zurück zur Helferliste</a></p>
 {% endblock %}

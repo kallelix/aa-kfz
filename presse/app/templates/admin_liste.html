@@ -45,7 +45,7 @@
     </div>
   </section>
 
-  <form method="get" action="/admin" class="filter">
+  <form method="get" action="/presse" class="filter">
     <div>
       <label for="f-status">Status</label>
       <select id="f-status" name="status">
@@ -84,7 +84,7 @@
 
     <div class="filter-knoepfe">
       <button type="submit">Filtern</button>
-      <a class="knopf-schlicht" href="/admin">zurücksetzen</a>
+      <a class="knopf-schlicht" href="/presse">zurücksetzen</a>
     </div>
   </form>
 
@@ -93,7 +93,7 @@
   <p class="trefferzahl">
     {{ anmeldungen|length }} Anmeldung{{ 'en' if anmeldungen|length != 1 }} angezeigt.
     {% if anmeldungen %}
-      <a href="/admin/export.csv?{{ filterteil }}">Diese Auswahl als CSV</a>
+      <a href="/presse/export.csv?{{ filterteil }}">Diese Auswahl als CSV</a>
     {% endif %}
   </p>
 
@@ -113,9 +113,9 @@
         <tbody>
           {% for a in anmeldungen %}
             <tr>
-              <td><a href="/admin/anmeldung/{{ a.id }}">{{ a.id }}</a></td>
+              <td><a href="/presse/anmeldung/{{ a.id }}">{{ a.id }}</a></td>
               <td class="nowrap">{{ a.created_at|zeit }}</td>
-              <td><a href="/admin/anmeldung/{{ a.id }}">{{ a.nachname }}, {{ a.vorname }}</a></td>
+              <td><a href="/presse/anmeldung/{{ a.id }}">{{ a.nachname }}, {{ a.vorname }}</a></td>
               <td>{{ a.firma }}</td>
               <td>
                 {% if a.gegenleistung == 'gebuehr' %}
