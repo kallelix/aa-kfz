@@ -798,7 +798,52 @@ Wie in Abschnitt 4, zusätzlich:
 
 ---
 
-## 9. Timetable ablösen
+## 9. Nach der Veranstaltung: Personendaten löschen
+
+Zwei Zusagen stehen im Programm und haben ein Datum:
+
+- Die Kennzeichen-App sagt den Antragstellern, die Daten würden **spätestens
+  vier Wochen nach der Veranstaltung** gelöscht (`AUFBEWAHRUNG_HINWEIS`).
+- Das Unterschriften-Tablet sagt den Helfern, die Unterschrift werde **nach
+  der Veranstaltung** gelöscht – ohne Frist, also sofort fällig.
+
+Dafür gibt es `deploy/daten-loeschen.py`. Ohne `--wirklich` schreibt es
+nichts und zeigt nur, was verschwinden würde:
+
+```bash
+cd /opt/abfahrt
+python3 deploy/daten-loeschen.py --art kennzeichen --db /var/lib/abfahrt/antraege.db
+python3 deploy/daten-loeschen.py --art presse      --db /var/lib/presse/presse.db
+python3 deploy/daten-loeschen.py --art helfer      --db /var/lib/helfer/helfer.db
+```
+
+Sieht die Aufstellung richtig aus, denselben Aufruf mit `--wirklich`. Der
+Dienst sollte dabei stehen (`systemctl stop …`), sonst schreibt er
+möglicherweise gerade mit. Es wird vorher eine Sicherung neben die Datenbank
+gelegt – **die gehört anschließend auch gelöscht**, sonst war der Lauf
+umsonst.
+
+Was verschwindet: Anträge, Akkreditierungen, Helfer samt Einteilungen und
+Ausleihen, Schlüsselvorgänge, Fahrzeugstamm, Unterschriften, alle Mails samt
+Empfängern, die Namen an den Aufgaben, die Importprotokolle (dort stehen
+Hinweise wie „Julia Johren: in der Verpflegungsspalte stand ‚L'") – und die
+Token für Durchfahrtsliste, Monitor und Tablet, denn die ersetzen eine
+Anmeldung.
+
+Was bleibt: Schichtzeiten, der Zeitplan der Rennserien, die Aufgabenliste
+ohne die Namen dahinter, die Materialvorgaben. Das ist nächstes Jahr eine
+Vorlage und benennt niemanden.
+
+Nicht vergessen, weil außerhalb der Datenbank:
+
+- **Die Sicherungen** unter `/var/backups/…` aus der Zeit der Veranstaltung –
+  die enthalten alles noch.
+- **Die beiden Import-CSVs**, falls sie irgendwo liegengeblieben sind.
+- **Der Login-Link zur Helferliste** in `IMPORT_LOGIN_URL`: er ist ein
+  Passwort und gilt weiter. Beim Dienst widerrufen oder wenigstens aus der
+  `.env` nehmen.
+
+## 10. Timetable ablösen
 
 Das Helfer-Dashboard ersetzt das bisherige `timetable`-Projekt vollständig.
 **Aus dessen Datenbank muss nichts übernommen werden** – der Aufgabenplan wird
