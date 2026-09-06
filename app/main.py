@@ -21,11 +21,33 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from jinja2 import ChoiceLoader, FileSystemLoader
 
-from . import auth, config, db, mail, validation, worker
+from . import config, db, mail, validation, worker
+# Die Repo-Wurzel auf den Suchpfad, damit `kern` gefunden wird. Im
+# zusammengesetzten Betrieb hat sie schon jemand daraufgelegt; von Hand
+# gestartet (python -m app) tut es diese Zeile.
+import sys as _sys
+_WURZEL = str(Path(__file__).resolve().parents[1])
+if _WURZEL not in _sys.path:
+    _sys.path.insert(0, _WURZEL)
+
+from kern.auth import Auth
 
 BASIS = Path(__file__).resolve().parent
+# Eine Instanz je Anwendung: die drei laufen in einem Prozess und haben
+# verschiedene Schluessel, Passwoerter und Sitzungsdauern. Sie heisst `auth`,
+# damit jede Aufrufstelle bleibt, wie sie war.
+auth = Auth(config)
+
+# Zwei Sucher: erst die eigenen Vorlagen, dann die gemeinsamen aus kern. So
+# kann jede Anwendung eine gemeinsame Vorlage ueberschreiben, indem sie eine
+# gleichnamige daneben legt - und niemand muss dafuer kern anfassen.
 templates = Jinja2Templates(directory=str(BASIS / "templates"))
+templates.env.loader = ChoiceLoader([
+    FileSystemLoader(str(BASIS / "templates")),
+    FileSystemLoader(str(Path(_WURZEL) / "kern" / "templates")),
+])
 
 
 def _lokal(zeitstempel):

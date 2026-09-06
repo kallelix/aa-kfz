@@ -1,4 +1,4 @@
-"""Einheitentests für app/auth.py – ohne laufenden Server.
+"""Einheitentests für kern/auth.py – ohne laufenden Server.
 
     python tests/test_auth.py
 """
@@ -13,7 +13,14 @@ os.environ.setdefault("ADMIN_PASSWORD_HASH", "")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import auth, config  # noqa: E402
+from app import config  # noqa: E402
+from kern import auth as kern_auth  # noqa: E402
+from kern.auth import Auth  # noqa: E402
+
+# Wie in der Anwendung: eine Instanz, die ihre Werte aus config nimmt. Der
+# Test schiebt unten an config herum - das wirkt hier mit, weil die Instanz
+# erst beim Aufruf nachsieht.
+auth = Auth(config)
 
 fehler = []
 
@@ -44,7 +51,7 @@ pruefe(
     "veraenderte Signatur wird abgelehnt",
 )
 _, signatur = token.split(".")
-gefaelscht = auth._b64(b'{"k":"BOESE","exp":9999999999}') + "." + signatur
+gefaelscht = kern_auth._b64(b'{"k":"BOESE","exp":9999999999}') + "." + signatur
 pruefe(auth.token_pruefen(gefaelscht) is None, "getauschte Nutzlast wird abgelehnt")
 pruefe(auth.token_pruefen("") is None, "leeres Token wird abgelehnt")
 pruefe(auth.token_pruefen("kein.punkt.token") is None, "Unfug wird abgelehnt")

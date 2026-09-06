@@ -1,7 +1,7 @@
 """Erzeugt den bcrypt-Hash für ADMIN_PASSWORD_HASH.
 
-    python -m app.passwort              # fragt interaktiv (Eingabe unsichtbar)
-    python -m app.passwort 'geheim'     # nicht interaktiv, landet in der History
+    python -m kern.passwort              # fragt interaktiv (Eingabe unsichtbar)
+    python -m kern.passwort 'geheim'     # nicht interaktiv, landet in der History
 """
 
 from __future__ import annotations

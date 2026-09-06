@@ -76,7 +76,7 @@ also nicht an. Die Datenbank liegt ohnehin unter `/var/lib/abfahrt`.
 install -o root -g root -m 600 deploy/kennzeichen.env.example /etc/abfahrt/kennzeichen.env
 
 # Passwort-Hash und Session-Schlüssel erzeugen und eintragen
-/opt/abfahrt/.venv/bin/python -m app.passwort
+/opt/abfahrt/.venv/bin/python -m kern.passwort
 /opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
 
 editor /etc/abfahrt/kennzeichen.env
@@ -366,7 +366,7 @@ braucht nur die Kennzeichen-App und stört hier nicht.
 install -o root -g root -m 600 deploy/presse.env.example /etc/abfahrt/presse.env
 
 cd /opt/abfahrt/presse
-/opt/abfahrt/.venv/bin/python -m app.passwort
+/opt/abfahrt/.venv/bin/python -m kern.passwort
 /opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
 
 editor /etc/abfahrt/presse.env
@@ -517,7 +517,7 @@ Betriebssystem mitbringt.
 install -o root -g root -m 600 deploy/helfer.env.example /etc/abfahrt/helfer.env
 
 cd /opt/abfahrt/helfer
-/opt/abfahrt/.venv/bin/python -m app.passwort
+/opt/abfahrt/.venv/bin/python -m kern.passwort
 /opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
 
 editor /etc/abfahrt/helfer.env

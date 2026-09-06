@@ -60,7 +60,7 @@ rm -f "$DB"*
 
 # 1. Server mit Testkonfiguration starten (eigenes Terminal)
 DB_PATH="$DB" \
-ADMIN_PASSWORD_HASH="$(.venv/Scripts/python.exe -m app.passwort 'test-passwort-123' | cut -d= -f2-)" \
+ADMIN_PASSWORD_HASH="$(.venv/Scripts/python.exe -m kern.passwort 'test-passwort-123' | cut -d= -f2-)" \
 APP_SECRET_KEY=test-schluessel \
 COOKIE_SECURE=0 \
 LOGIN_VERSUCHE=3 \
