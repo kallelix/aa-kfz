@@ -12,6 +12,8 @@ os.environ.setdefault("APP_SECRET_KEY", "test-schluessel-fuer-die-pruefung")
 os.environ.setdefault("ADMIN_PASSWORD_HASH", "")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Das Programm liegt seit der Zusammenfuehrung unter kennzeichen/.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "kennzeichen"))
 
 from app import config  # noqa: E402
 from kern import auth as kern_auth  # noqa: E402

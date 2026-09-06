@@ -19,6 +19,8 @@ os.environ["KONTAKT_NAME"] = "Orga Absolute Abfahrt"
 os.environ["KONTAKT_MAIL"] = "orga@example.org"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Das Programm liegt seit der Zusammenfuehrung unter kennzeichen/.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "kennzeichen"))
 
 from app import config, db, mail, worker  # noqa: E402
 

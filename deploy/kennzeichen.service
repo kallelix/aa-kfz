@@ -8,7 +8,7 @@ Wants=network-online.target
 Type=exec
 User=abfahrt
 Group=abfahrt
-WorkingDirectory=/opt/abfahrt
+WorkingDirectory=/opt/abfahrt/kennzeichen
 
 # Alle Einstellungen inklusive Geheimnisse. Datei root:root 0600 – systemd liest
 # sie, bevor es die Rechte auf abfahrt fallen laesst.

@@ -68,7 +68,7 @@ class Server:
     def __enter__(self):
         self.prozess = subprocess.Popen(
             [str(PYTHON), "-m", "app"],
-            cwd=str(WURZEL),
+            cwd=str(WURZEL / "kennzeichen"),
             env=self.umgebung,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

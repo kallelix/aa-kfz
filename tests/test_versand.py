@@ -27,6 +27,8 @@ os.environ["MAIL_REPLY_TO"] = "orga@example.org"
 os.environ["MAIL_INTERVALL"] = "1"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Das Programm liegt seit der Zusammenfuehrung unter kennzeichen/.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "kennzeichen"))
 
 fehler = []
 empfangen = []

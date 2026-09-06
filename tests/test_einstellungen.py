@@ -19,6 +19,8 @@ from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL))
+# Das Programm liegt seit der Zusammenfuehrung unter kennzeichen/.
+sys.path.insert(0, str(WURZEL / "kennzeichen"))
 
 PYTHON = WURZEL / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
@@ -102,7 +104,7 @@ hafen = freier_hafen()
 
 prozess = subprocess.Popen(
     [str(PYTHON), "-m", "app"],
-    cwd=str(WURZEL),
+    cwd=str(WURZEL / "kennzeichen"),
     env={**os.environ, "DB_PATH": str(db), "BIND": f"127.0.0.1:{hafen}",
          "ADMIN_PASSWORD_HASH": HASH, "APP_SECRET_KEY": "test-schluessel",
          "COOKIE_SECURE": "0", "SMTP_HOST": "", "MAIL_FROM": "",

@@ -28,7 +28,7 @@ from . import config, db, mail, validation, worker
 # zusammengesetzten Betrieb hat sie schon jemand daraufgelegt; von Hand
 # gestartet (python -m app) tut es diese Zeile.
 import sys as _sys
-_WURZEL = str(Path(__file__).resolve().parents[1])
+_WURZEL = str(Path(__file__).resolve().parents[2])
 if _WURZEL not in _sys.path:
     _sys.path.insert(0, _WURZEL)
 
