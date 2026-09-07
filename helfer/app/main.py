@@ -1270,7 +1270,11 @@ async def ausleihe_zurueck(request: Request, ausleihe_id: int,
     if str(daten.get("teilweise") or ""):
         mengen = {stueck: daten.get(stueck) for stueck in db.MATERIAL}
     db.ausleihe_zurueck(ausleihe_id, mengen, sitzung.kuerzel)
-    _unterschrift_dazu("material", ausleihe_id, "rueckgabe", sitzung.kuerzel)
+    # Keine Unterschrift bei der Ruecknahme - in der Praxis war das nicht zu
+    # machen: bei der Ausgabe steht die Person ohnehin da und wartet, bei der
+    # Rueckgabe legt sie das Geraet hin und ist weg. Wer unterschreibt, geht
+    # eine Verpflichtung ein; die entsteht beim Empfangen, nicht beim
+    # Zurueckgeben.
     return _zurueck("/helfer/funk", "zurueck",
                     offen=str(daten.get("offen") or ""))
 
@@ -1333,9 +1337,8 @@ async def schluessel_zurueck(request: Request, schluessel_id: int,
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
-    if db.schluessel_zurueck(schluessel_id, sitzung.kuerzel):
-        _unterschrift_dazu("schluessel", schluessel_id, "rueckgabe",
-                           sitzung.kuerzel)
+    # Wie beim Material: keine Unterschrift bei der Ruecknahme.
+    db.schluessel_zurueck(schluessel_id, sitzung.kuerzel)
     return _zurueck("/helfer/schluessel", "zurueck",
                     offen=str(daten.get("offen") or ""))
 

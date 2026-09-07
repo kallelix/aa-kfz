@@ -35,7 +35,15 @@ from datetime import datetime, timedelta
 from . import config, db, normalisieren
 
 ARTEN = ("tshirt", "material", "schluessel")
+# Beide Richtungen bleiben lesbar - in aelteren Bestaenden stehen noch
+# Ruecknahme-Unterschriften, und die Uebersicht soll sie zeigen koennen.
 RICHTUNGEN = ("ausgabe", "rueckgabe")
+
+# Angefordert wird aber nur noch fuer die Ausgabe. Bei der Ruecknahme war es
+# in der Praxis nicht zu machen: bei der Ausgabe steht die Person da und
+# wartet auf ihr Geraet, bei der Rueckgabe legt sie es hin und ist weg. Wer
+# unterschreibt, geht eine Verpflichtung ein - die entsteht beim Empfangen.
+ANFORDERBAR = ("ausgabe",)
 
 RICHTUNG_TEXT = {"ausgabe": "Ausgabe", "rueckgabe": "Rückgabe"}
 
@@ -111,7 +119,7 @@ def anfordern(art: str, vorgang_id: int, richtung: str,
     am Tisch steht immer nur eine Person, und ein Stapel unerledigter
     Anforderungen wäre nur eine Falle für den nächsten.
     """
-    if art not in ARTEN or richtung not in RICHTUNGEN:
+    if art not in ARTEN or richtung not in ANFORDERBAR:
         return None, "unbekannt"
 
     titel, text, person = wortlaut(art, vorgang_id, richtung)

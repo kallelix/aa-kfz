@@ -201,12 +201,15 @@
                       </form>
                     </details>
                   {% endif %}
+                  {# Immer die Ausgabe, nie die Ruecknahme: unterschrieben
+                     wird, was jemand empfaengt. Ist der Vorgang zurueck, wird
+                     kein Tablet mehr angeboten (tablet=false) - die Marke
+                     bleibt aber stehen, damit sichtbar ist, ob bei der Ausgabe
+                     unterschrieben wurde. #}
                   {{ unterschrift.knopf(
-                       'material', a.id,
-                       'rueckgabe' if a.zurueck_am else 'ausgabe',
-                       '/helfer/funk', csrf, tablet,
-                       (unterschrieben.get(a.id) or {}).get(
-                           'rueckgabe' if a.zurueck_am else 'ausgabe')) }}
+                       'material', a.id, 'ausgabe', '/helfer/funk', csrf,
+                       tablet if not a.zurueck_am else false,
+                       (unterschrieben.get(a.id) or {}).get('ausgabe')) }}
                   <form method="post" action="/helfer/ausleihe/{{ a.id }}/loeschen">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <button type="submit" class="knopf-winzig">löschen</button>

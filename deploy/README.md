@@ -549,6 +549,9 @@ Zusätzlich zu Abschnitt 4:
 - [ ] `helfer.example.de/monitor/<token>` ist **ohne** Anmeldung
       erreichbar, `admin.example.de/helfer` nicht
 - [ ] Ein falscher Token gibt 404
+- [ ] Falls Unterschriften genutzt werden: sie werden **nur bei der Ausgabe**
+      verlangt, nicht bei der Rücknahme – bei der Ausgabe steht die Person da
+      und wartet, bei der Rückgabe legt sie das Gerät hin und ist weg
 - [ ] Falls Unterschriften genutzt werden: Tablet-Link erzeugt, auf dem Tablet
       im Vollbild geöffnet, Bildschirmsperre aus. Eine Übergabe probeweise
       anfordern und unterschreiben

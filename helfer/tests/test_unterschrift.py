@@ -220,19 +220,39 @@ try:
            "auch die T-Shirt-Ausgabe fordert von selbst an")
     unterschriften.abbrechen()
 
-    print("Rücknahme nennt, was zurückkam")
+    print("Die Ruecknahme verlangt keine Unterschrift")
+    # In der Praxis nicht zu machen: bei der Ausgabe steht die Person da und
+    # wartet auf ihr Geraet, bei der Rueckgabe legt sie es hin und ist weg.
+    # Wer unterschreibt, geht eine Verpflichtung ein - die entsteht beim
+    # Empfangen, nicht beim Zurueckgeben.
+    unterschriften.abbrechen()
     anfrage("POST", "/helfer/ausleihe/%d/zurueck" % ausleihe,
             {"csrf": CSRF, "teilweise": "1", "funke": "1", "ersatzakku": "0"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
-    pruefe("Material Rückgabe" in stand,
-           "die Rücknahme fordert ebenfalls von selbst an")
-    wortlaut = re.search(r'vorgang-wortlaut">(.*?)</p>', stand, re.S).group(1)
-    wortlaut = " ".join(wortlaut.split())
-    pruefe(wortlaut.startswith("1× Funkgerät"),
-           "im Wortlaut steht zuerst, was zurückkam: " + wortlaut)
-    pruefe("noch draußen: 2× Ersatzakku" in wortlaut,
-           "und danach, was noch fehlt – wer das Funkgerät bringt und den "
-           "Akku behält, soll nicht quittieren, alles abgegeben zu haben")
+    pruefe("bereit-zeichen" in stand,
+           "das Tablet bleibt im Wartezustand")
+    pruefe("Material Rückgabe" not in stand,
+           "und nichts steht darauf")
+
+    status, ort, _ = anfrage("POST", "/helfer/schluessel/%d/zurueck" % schluessel,
+                             {"csrf": CSRF})
+    _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
+    pruefe("bereit-zeichen" in stand,
+           "auch die Schluesselrueckgabe fordert nichts an")
+
+    # Auch von Hand nicht: was es nicht mehr gibt, soll auch ueber die
+    # Adresse nicht zu erreichen sein.
+    status, ort, _ = anfrage("POST", "/helfer/unterschrift/anfordern", {
+        "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
+        "richtung": "rueckgabe"})
+    pruefe("hinweis=unbekannt" in ort,
+           "eine Ruecknahme laesst sich auch von Hand nicht anfordern")
+
+    # Der Wortlaut bleibt lesbar - in aelteren Bestaenden stehen noch
+    # Ruecknahme-Unterschriften, und die Uebersicht soll sie zeigen koennen.
+    titel, wortlaut, _ = unterschriften.wortlaut("material", ausleihe, "rueckgabe")
+    pruefe(titel == "Material Rückgabe" and "Funkgerät" in wortlaut,
+           "der Wortlaut dafuer gibt es noch, fuer alte Eintraege: " + wortlaut[:44])
     unterschriften.abbrechen()
 
     print("Nur eine Warteschlange")
@@ -318,7 +338,7 @@ try:
     # Lange abgelaufen: auch nicht mehr annehmen.
     anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "rueckgabe", "weiter": "/helfer/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/funk"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     vierte = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
     ablauf_setzen(vierte, 60)
@@ -358,7 +378,7 @@ try:
     print("Abbrechen vom Tablet")
     anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "rueckgabe", "weiter": "/helfer/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/funk"})
     status, ort, _ = anfrage("POST", "/unterschrift/" + TOKEN + "/abbrechen", {})
     pruefe("hinweis=abgebrochen" in ort, "geht ohne Anmeldung – wer abbricht, "
            "steht am Tablet und nicht am Rechner")
