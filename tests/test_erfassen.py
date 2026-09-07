@@ -41,7 +41,34 @@ def pruefe(bedingung, text):
         fehler.append(text)
 
 
+NL = chr(10)
+
+
 # --- Die Regel selbst, ohne Server ------------------------------------------
+print("Mehrere Kennzeichen aus einem Feld")
+from app import validation as _v  # noqa: E402
+
+faelle = [
+    ("IL-A 123", ["IL-A 123"], "eines bleibt eines"),
+    ("IL-A 123, IL-B 7; IL-C 9", ["IL-A 123", "IL-B 7", "IL-C 9"],
+     "Komma und Semikolon trennen"),
+    ("IL-A 123" + NL + "IL-B 7", ["IL-A 123", "IL-B 7"], "Zeilenumbruch auch"),
+    # Das Leerzeichen darf NICHT trennen - es steht mitten im Kennzeichen.
+    ("IL-A 123", ["IL-A 123"], "das Leerzeichen im Kennzeichen bleibt"),
+    ("IL-A 123, ila123", ["IL-A 123"],
+     "dieselbe Nummer anders geschrieben faellt weg"),
+    ("  ,, IL-X 1 ,  ", ["IL-X 1"], "Leerraum und leere Stuecke stoeren nicht"),
+]
+for roh, erwartet, was in faelle:
+    liste, meldung = _v.kennzeichen_liste(roh)
+    pruefe(liste == erwartet and not meldung, was + ": " + str(liste))
+
+for roh in ("AB", "IL-A 123, XY", "x" * 40):
+    liste, meldung = _v.kennzeichen_liste(roh)
+    pruefe(not liste and meldung,
+           "unbrauchbare Eingabe wird benannt: " + meldung[:44])
+
+
 print("Kontaktweg: Pflicht nur, wenn noch entschieden werden muss")
 from app import validation  # noqa: E402
 
@@ -205,10 +232,50 @@ try:
         "kategorie": "expo", "kennzeichen": "IL-E 1", "aktion": "genehmigen"})
     pruefe(status == 400, "ohne gueltigen Token abgelehnt")
 
+    print("Mehrere Fahrzeuge in einem Rutsch")
+    status, ort, _ = ruf("POST", "/kennzeichen/antrag/neu", {
+        "csrf": csrf, "vorname": "Emil", "nachname": "Fuchs",
+        "funktion": "Aufbau", "kategorie": "expo",
+        # Vier Eingaben, aber "ilf2" ist derselbe Wagen wie "IL-F 2".
+        "kennzeichen": "IL-F 2" + NL + "IL-G 3, ilf2; IL-H 4",
+        "aktion": "genehmigen"})
+    fuchs = zeilen("SELECT * FROM antrag WHERE nachname = 'Fuchs' ORDER BY id")
+    pruefe(len(fuchs) == 3,
+           "drei Antraege aus vier Eingaben - die Dopplung faellt weg")
+    pruefe([z["kennzeichen"] for z in fuchs] == ["IL-F 2", "IL-G 3", "IL-H 4"],
+           "je Antrag ein Kennzeichen: "
+           + ", ".join(z["kennzeichen"] for z in fuchs))
+    pruefe(all(z["status"] == "genehmigt" and z["entscheidung_durch"] == "KK"
+               for z in fuchs),
+           "alle drei genehmigt, alle mit Kuerzel")
+    pruefe(all(z["vorname"] == "Emil" and z["funktion"] == "Aufbau"
+               for z in fuchs),
+           "und alle mit denselben uebrigen Angaben")
+    pruefe(status == 303 and "hinweis=mehrere_genehmigt" in ort
+           and "anzahl=3" in ort,
+           "danach zurueck in die Liste, nicht auf einen der drei: " + ort)
+
+    status, _, seite = ruf("GET", "/kennzeichen?" + ort.split("?", 1)[1])
+    pruefe("3 Fahrzeuge erfasst und genehmigt" in seite,
+           "die Liste sagt, wie viele es waren")
+
+    print("Ein Tippfehler mittendrin verwirft alles")
+    vorher = len(zeilen("SELECT id FROM antrag"))
+    status, _, seite = ruf("POST", "/kennzeichen/antrag/neu", {
+        "csrf": csrf, "vorname": "Gerd", "nachname": "Hain", "funktion": "Bau",
+        "kategorie": "expo", "kennzeichen": "IL-I 5, XY, IL-J 6",
+        "aktion": "genehmigen"})
+    pruefe(status == 422 and "„XY“" in seite,
+           "die Meldung nennt das unbrauchbare Stueck")
+    pruefe(len(zeilen("SELECT id FROM antrag")) == vorher,
+           "und kein einziger der drei ist entstanden")
+    pruefe("IL-I 5, XY, IL-J 6" in seite,
+           "die Eingabe steht noch da - sonst waere die Arbeit weg")
+
     print("Das Ergebnis steht in der Liste")
     status, _, seite = ruf("GET", "/kennzeichen?status=genehmigt")
-    pruefe(seite.count("marke-genehmigt") == 3,
-           "drei genehmigte Antraege, ohne dass jemand zweimal geklickt haette")
+    pruefe(seite.count("marke-genehmigt") == 6,
+           "sechs genehmigte Antraege, ohne dass jemand zweimal geklickt haette")
 
 finally:
     prozess.terminate()

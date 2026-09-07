@@ -36,7 +36,9 @@ node tests/test_durchfahrt_js.js
 - `test_erfassen.py` – Fahrzeug im Backoffice erfassen: gleich genehmigt
   (mit Zeitpunkt und Kürzel, ohne zweiten Klick) oder nur angelegt. Dazu die
   Regel, dass der Kontaktweg nur Pflicht ist, wenn noch entschieden werden
-  muss, und dass die Zusage nur auf Wunsch hinausgeht.
+  muss, und dass die Zusage nur auf Wunsch hinausgeht. Und mehrere
+  Kennzeichen in einem Feld: Trennzeichen, Dopplungen, und dass ein
+  Tippfehler mittendrin alles verwirft statt die halbe Liste anzulegen.
 
 - `test_durchfahrt.py` – Durchfahrtsliste: nur Berechtigte, nur die vier
   Spalten, korrekt vorgekaute `data`-Attribute, und ein Abgleich, dass Python

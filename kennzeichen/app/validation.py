@@ -51,6 +51,52 @@ def ist_bot(formular) -> bool:
     return bool((formular.get(HONEYPOT) or "").strip())
 
 
+# Womit mehrere Kennzeichen in einem Feld getrennt werden. Das Leerzeichen
+# ist ABSICHTLICH nicht dabei: "IL-A 123" enthaelt selbst eines, und aus einer
+# Eingabe wuerden zwei unbrauchbare Bruchstuecke.
+KFZ_TRENNER = (",", ";", chr(10), chr(13), chr(9))
+
+
+def kennzeichen_liste(roh) -> tuple[list, str]:
+    """Zerlegt ein Feld mit mehreren Kennzeichen. Gibt (Liste, Fehler).
+
+    Nur im Backoffice: wer am Tisch drei Fahrzeuge derselben Person erfasst,
+    soll das Formular einmal ausfuellen. Das oeffentliche Formular bleibt bei
+    einem Kennzeichen - dort kommt jeder Antrag von einem Menschen.
+
+    Doppelte fallen weg, und zwar nach der Normalisierung: "IL-A 123" und
+    "ila123" sind derselbe Wagen. Die erste Schreibweise gewinnt, weil sie
+    gedruckt wird.
+    """
+    if not isinstance(roh, str):
+        roh = "" if roh is None else str(roh)
+
+    stuecke = [roh]
+    for zeichen in KFZ_TRENNER:
+        zerlegt = []
+        for stueck in stuecke:
+            zerlegt.extend(stueck.split(zeichen))
+        stuecke = zerlegt
+
+    liste: list = []
+    gesehen: set = set()
+    for stueck in stuecke:
+        # Mehrfache Leerzeichen einebnen, aber eines darf bleiben.
+        eines = " ".join(stueck.split()).upper()
+        if not eines:
+            continue
+        if len(eines) < MIN_KENNZEICHEN:
+            return [], "„" + eines + "“ sieht nicht nach einem Kennzeichen aus."
+        if len(eines) > MAX_LAENGE["kennzeichen"]:
+            return [], "„" + eines + "“ ist zu lang."
+        merkmal = "".join(z for z in eines if z.isalnum())
+        if merkmal in gesehen:
+            continue
+        gesehen.add(merkmal)
+        liste.append(eines)
+    return liste, ""
+
+
 def pruefen(formular, kontakt_pflicht: bool = True) -> tuple[dict, dict]:
     """Prueft die Formularwerte. Gibt (Werte, Fehler) zurueck.
 

@@ -333,6 +333,8 @@ MELDUNGEN = {
     "gespeichert": "Änderungen gespeichert.",
     "angelegt": "Angelegt und auf „neu“ gestellt.",
     "angelegt_genehmigt": "Angelegt und gleich genehmigt.",
+    "mehrere": "Angelegt und auf „neu“ gestellt.",
+    "mehrere_genehmigt": "Angelegt und gleich genehmigt.",
     "genehmigt": "Antrag genehmigt.",
     "abgelehnt": "Antrag abgelehnt.",
     "zurueckgesetzt": "Entscheidung zurückgenommen, der Antrag steht wieder auf „neu“.",
@@ -351,6 +353,9 @@ MELDUNGEN = {
 
 
 def _meldung(schluessel: str, anzahl: str = "") -> str:
+    if schluessel in ("mehrere", "mehrere_genehmigt") and anzahl.isdigit():
+        was = "genehmigt" if schluessel.endswith("genehmigt") else "angelegt"
+        return f"{anzahl} Fahrzeuge erfasst und {was}."
     if schluessel == "sammel":
         if not anzahl.isdigit():
             return ""
@@ -506,24 +511,51 @@ async def admin_neu_anlegen(request: Request,
     gleich = str(daten.get("aktion") or "genehmigen") == "genehmigen"
     status = "genehmigt" if gleich else "neu"
 
+    # Mehrere Kennzeichen in einem Feld: dieselbe Person, dieselbe Funktion,
+    # mehrere Fahrzeuge. Daraus werden mehrere Antraege - ein Antrag traegt
+    # ein Kennzeichen, und an der Sperre wird je Fahrzeug eine Karte gesucht.
+    kennzeichen, kfz_fehler = validation.kennzeichen_liste(
+        daten.get("kennzeichen"))
+
+    # Fuer die uebrigen Felder zaehlt das erste Kennzeichen: so greifen die
+    # gewohnten Regeln auf einen echten Wert und nicht auf die ganze Liste.
+    zum_pruefen = dict(daten)
+    zum_pruefen["kennzeichen"] = kennzeichen[0] if kennzeichen else ""
+
     # Kontaktweg nur verlangen, wenn die Entscheidung noch aussteht - dann
     # muss sie ja jemanden erreichen. Wer sofort genehmigt wird, steht davor.
-    werte, fehler = validation.pruefen(daten, kontakt_pflicht=not gleich)
+    werte, fehler = validation.pruefen(zum_pruefen, kontakt_pflicht=not gleich)
+    if kfz_fehler:
+        fehler["kennzeichen"] = kfz_fehler
     if fehler:
+        # Die Eingabe unveraendert zurueckgeben, nicht das erste Kennzeichen -
+        # sonst waeren die anderen nach einem Tippfehler weg.
+        werte["kennzeichen"] = str(daten.get("kennzeichen") or "")
         return _neu_seite(request, sitzung, werte, fehler, status_code=422)
 
-    # Die Zusage nur, wenn sie ausdruecklich gewuenscht ist UND eine Adresse
-    # dasteht - mail.fuer() gibt sonst ohnehin None. Wer am Tisch steht,
-    # bekommt seine Karte in die Hand und braucht keine Mail.
-    vorlage = None
-    if gleich and daten.get("mail_schicken"):
-        vorlage = mail.fuer({**werte, "id": 0}, "genehmigt")
+    nummern = []
+    for eines in kennzeichen:
+        einzeln = {**werte, "kennzeichen": eines}
+        # Die Zusage nur, wenn sie ausdruecklich gewuenscht ist UND eine
+        # Adresse dasteht - mail.fuer() gibt sonst ohnehin None. Je Fahrzeug
+        # eine: sie nennt Nummer und Kennzeichen, und es kommt je Fahrzeug
+        # eine Karte.
+        vorlage = None
+        if gleich and daten.get("mail_schicken"):
+            vorlage = mail.fuer({**einzeln, "id": 0}, "genehmigt")
+        nummern.append(db.antrag_anlegen(
+            einzeln, _remote_ip(request), status=status,
+            kuerzel=sitzung.kuerzel, mail=vorlage))
 
-    nummer = db.antrag_anlegen(
-        werte, _remote_ip(request), status=status,
-        kuerzel=sitzung.kuerzel, mail=vorlage)
-
-    return _zum_antrag(nummer, "angelegt_genehmigt" if gleich else "angelegt")
+    if len(nummern) == 1:
+        return _zum_antrag(nummern[0],
+                           "angelegt_genehmigt" if gleich else "angelegt")
+    # Bei mehreren gibt es keinen einen Antrag, auf den man springen koennte -
+    # also zurueck in die Liste, gefiltert auf das, was gerade entstanden ist.
+    ziel = "/kennzeichen?status=" + ("genehmigt" if gleich else "neu")
+    return RedirectResponse(
+        ziel + "&hinweis=" + ("mehrere_genehmigt" if gleich else "mehrere")
+        + "&anzahl=" + str(len(nummern)), status_code=303)
 
 
 @app.get("/kennzeichen/antrag/{antrag_id}")

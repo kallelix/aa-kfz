@@ -69,11 +69,17 @@
     {% if kennzeichen_erfassen %}
       <div class="feld{% if fehler.get('kennzeichen') %} feld-fehler{% endif %}">
         <label for="kennzeichen">Kennzeichen</label>
-        <input type="text" id="kennzeichen" name="kennzeichen"
-               value="{{ werte.get('kennzeichen', '') }}"
-               autocapitalize="characters" autocomplete="off"
-               placeholder="IL-A 123">
+        {# Ein Textfeld statt einer Zeile: mehrere Fahrzeuge derselben Person
+           lassen sich so untereinander schreiben, ohne an Trennzeichen zu
+           denken. #}
+        <textarea id="kennzeichen" name="kennzeichen" rows="2"
+                  autocapitalize="characters" autocomplete="off" spellcheck="false"
+                  placeholder="IL-A 123">{{ werte.get('kennzeichen', '') }}</textarea>
         {{ fehlermeldung('kennzeichen') }}
+        <p class="hilfe">Mehrere Fahrzeuge derselben Person: eines je Zeile
+          oder durch Komma getrennt. Daraus wird je Fahrzeug ein Antrag – an
+          der Sperre wird schließlich je Fahrzeug eine Karte gesucht.
+          Dopplungen fallen weg, „IL-A 123“ und „ila123“ sind derselbe Wagen.</p>
       </div>
     {% endif %}
 
@@ -111,7 +117,9 @@
         Zusage per Mail schicken
       </label>
       <p class="hilfe">Nur sinnvoll, wenn oben eine Adresse steht – und wenn
-        die Person die Bestätigung nicht ohnehin gerade bekommt.</p>
+        die Person die Bestätigung nicht ohnehin gerade bekommt. Bei mehreren
+        Fahrzeugen geht je Fahrzeug eine Zusage hinaus; sie nennt Nummer und
+        Kennzeichen der einen Karte.</p>
     </div>
 
     <p class="knopfreihe">
