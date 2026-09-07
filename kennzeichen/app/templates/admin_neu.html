@@ -1,0 +1,126 @@
+{% extends "admin_base.html" %}
+{% block titel %}Fahrzeug erfassen{% endblock %}
+{% block ueberschrift %}Fahrzeug erfassen{% endblock %}
+
+{% macro fehlermeldung(feld) %}
+  {% if fehler.get(feld) %}<p class="fehler" id="fehler-{{ feld }}">{{ fehler[feld] }}</p>{% endif %}
+{% endmacro %}
+
+{% block inhalt %}
+  <p class="zurueck-zeile"><a href="/kennzeichen">← zurück zur Liste</a></p>
+
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">
+      Bitte die markierten Felder prüfen – nichts wurde gespeichert.
+    </p>
+  {% endif %}
+
+  <p class="hilfe">Für alles, was nicht über das öffentliche Formular kommt –
+    jemand steht am Tisch, ruft an oder wird nachgetragen. „Erfassen und
+    genehmigen“ macht beides in einem Schritt.</p>
+
+  <form method="post" action="/kennzeichen/antrag/neu">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="paar">
+      <div class="feld{% if fehler.get('vorname') %} feld-fehler{% endif %}">
+        <label for="vorname">Vorname</label>
+        <input type="text" id="vorname" name="vorname"
+               value="{{ werte.get('vorname', '') }}" autofocus>
+        {{ fehlermeldung('vorname') }}
+      </div>
+      <div class="feld{% if fehler.get('nachname') %} feld-fehler{% endif %}">
+        <label for="nachname">Name</label>
+        <input type="text" id="nachname" name="nachname"
+               value="{{ werte.get('nachname', '') }}">
+        {{ fehlermeldung('nachname') }}
+      </div>
+    </div>
+
+    <div class="feld{% if fehler.get('funktion') %} feld-fehler{% endif %}">
+      <label for="funktion">Funktion</label>
+      <input type="text" id="funktion" name="funktion"
+             value="{{ werte.get('funktion', '') }}"
+             placeholder="z. B. Streckenposten, Sanitäter, Aussteller">
+      {{ fehlermeldung('funktion') }}
+    </div>
+
+    <div class="feld{% if fehler.get('kategorie') %} feld-fehler{% endif %}">
+      <label for="kategorie">Kategorie</label>
+      <select id="kategorie" name="kategorie">
+        <option value="">– bitte wählen –</option>
+        {% for schluessel, beschriftung in kategorien %}
+          <option value="{{ schluessel }}"
+                  {% if werte.get('kategorie') == schluessel %}selected{% endif %}>
+            {{ beschriftung }}
+            {%- set k = kontingente.get(schluessel) %}
+            {%- if k %} ({{ k.belegt }} von {{ k.grenze }}{% if k.voll %}, voll{% endif %}){% endif %}
+          </option>
+        {% endfor %}
+      </select>
+      {{ fehlermeldung('kategorie') }}
+      {% if kontingente %}
+        <p class="hilfe">In Klammern steht, wie viel schon vergeben ist. Ein
+          volles Kontingent hindert nicht am Genehmigen – es ist eine Zahl,
+          keine Sperre.</p>
+      {% endif %}
+    </div>
+
+    {% if kennzeichen_erfassen %}
+      <div class="feld{% if fehler.get('kennzeichen') %} feld-fehler{% endif %}">
+        <label for="kennzeichen">Kennzeichen</label>
+        <input type="text" id="kennzeichen" name="kennzeichen"
+               value="{{ werte.get('kennzeichen', '') }}"
+               autocapitalize="characters" autocomplete="off"
+               placeholder="IL-A 123">
+        {{ fehlermeldung('kennzeichen') }}
+      </div>
+    {% endif %}
+
+    <div class="paar">
+      <div class="feld{% if fehler.get('email') %} feld-fehler{% endif %}">
+        <label for="email">E-Mail <span class="optional">meist optional</span></label>
+        <input type="email" id="email" name="email"
+               value="{{ werte.get('email', '') }}">
+        {{ fehlermeldung('email') }}
+      </div>
+      <div class="feld{% if fehler.get('telefon') %} feld-fehler{% endif %}">
+        <label for="telefon">Telefon <span class="optional">meist optional</span></label>
+        <input type="text" id="telefon" name="telefon"
+               value="{{ werte.get('telefon', '') }}">
+        {{ fehlermeldung('telefon') }}
+      </div>
+    </div>
+
+    <p class="hilfe">Kontaktweg braucht es nur, wenn <em>nicht</em> sofort
+      entschieden wird – dann muss die Entscheidung ja jemanden erreichen.
+      Wer am Tisch steht und gleich genehmigt wird, muss nichts angeben.</p>
+
+    <div class="feld{% if fehler.get('bemerkung') %} feld-fehler{% endif %}">
+      <label for="bemerkung">Bemerkung <span class="optional">optional</span></label>
+      <textarea id="bemerkung" name="bemerkung" rows="3">{{ werte.get('bemerkung', '') }}</textarea>
+      {{ fehlermeldung('bemerkung') }}
+    </div>
+
+    {# Ohne Adresse geht ohnehin nichts hinaus - mail.fuer() gibt dann None.
+       Deshalb hier unangekreuzt: wer am Tisch steht, bekommt seine Karte in
+       die Hand und braucht keine Mail. #}
+    <div class="feld">
+      <label for="mail_schicken" class="waagerecht">
+        <input type="checkbox" id="mail_schicken" name="mail_schicken" value="1">
+        Zusage per Mail schicken
+      </label>
+      <p class="hilfe">Nur sinnvoll, wenn oben eine Adresse steht – und wenn
+        die Person die Bestätigung nicht ohnehin gerade bekommt.</p>
+    </div>
+
+    <p class="knopfreihe">
+      <button type="submit" name="aktion" value="genehmigen">
+        Erfassen und genehmigen
+      </button>
+      <button type="submit" name="aktion" value="nur_anlegen" class="knopf-schlicht">
+        Nur erfassen, noch nicht entscheiden
+      </button>
+    </p>
+  </form>
+{% endblock %}

@@ -11,6 +11,7 @@ heißt bestanden.
 .venv/Scripts/python.exe tests/test_versand.py
 .venv/Scripts/python.exe tests/test_proxy.py
 .venv/Scripts/python.exe tests/test_kategorien.py
+.venv/Scripts/python.exe tests/test_erfassen.py
 .venv/Scripts/python.exe tests/test_durchfahrt.py
 .venv/Scripts/python.exe tests/test_einstellungen.py
 node tests/test_durchfahrt_js.js
@@ -31,6 +32,11 @@ node tests/test_durchfahrt_js.js
 - `test_kategorien.py` – startet den Server selbst und führt **jede** Kategorie
   aus der Konfiguration einmal durch: Formular, Absenden, Liste, Filter, CSV.
   Die Seed-Daten decken nur zwei ab, deshalb dieser eigene Durchlauf.
+
+- `test_erfassen.py` – Fahrzeug im Backoffice erfassen: gleich genehmigt
+  (mit Zeitpunkt und Kürzel, ohne zweiten Klick) oder nur angelegt. Dazu die
+  Regel, dass der Kontaktweg nur Pflicht ist, wenn noch entschieden werden
+  muss, und dass die Zusage nur auf Wunsch hinausgeht.
 
 - `test_durchfahrt.py` – Durchfahrtsliste: nur Berechtigte, nur die vier
   Spalten, korrekt vorgekaute `data`-Attribute, und ein Abgleich, dass Python

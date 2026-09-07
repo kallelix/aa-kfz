@@ -95,6 +95,16 @@ label { display: block; font-weight: 600; margin-bottom: .3rem; }
 .pflicht { color: var(--fehler); }
 .optional { font-weight: 400; color: var(--gedaempft); font-size: .85rem; }
 
+/* Haekchen und Beschriftung in einer Zeile - sonst steht das Kaestchen
+   allein ueber seinem Text und man weiss nicht, wozu es gehoert. */
+.feld label.waagerecht {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 600;
+}
+.feld label.waagerecht input { margin: 0; }
+
 input[type="text"], input[type="email"], input[type="tel"], textarea {
   width: 100%;
   padding: .55rem .65rem;

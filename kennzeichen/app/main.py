@@ -331,6 +331,8 @@ def _admin_kontext(request: Request, sitzung, **extra) -> dict:
 # die Weiterleitung – so bleibt der Text im Code und nichts Fremdes auf der Seite.
 MELDUNGEN = {
     "gespeichert": "Änderungen gespeichert.",
+    "angelegt": "Angelegt und auf „neu“ gestellt.",
+    "angelegt_genehmigt": "Angelegt und gleich genehmigt.",
     "genehmigt": "Antrag genehmigt.",
     "abgelehnt": "Antrag abgelehnt.",
     "zurueckgesetzt": "Entscheidung zurückgenommen, der Antrag steht wieder auf „neu“.",
@@ -456,6 +458,72 @@ def _detail_seite(request, sitzung, antrag, werte=None, fehler=None, hinweis="",
         ),
         status_code=status_code,
     )
+
+
+# ACHTUNG, Reihenfolge: /kennzeichen/antrag/neu muss VOR
+# /kennzeichen/antrag/{antrag_id} stehen. Starlette nimmt die erste Route, die
+# passt - steht die parametrisierte vorn, landet "neu" als Wert in antrag_id
+# und die Anfrage scheitert an der Zahlenpruefung.
+
+def _neu_seite(request, sitzung, werte=None, fehler=None, status_code=200):
+    return templates.TemplateResponse(
+        "admin_neu.html",
+        _admin_kontext(
+            request, sitzung,
+            werte=werte or {},
+            fehler=fehler or {},
+            kategorien=config.KATEGORIEN,
+            kategorie_labels=dict(config.KATEGORIEN),
+            kontingente=_kontingent_stand(),
+            kennzeichen_erfassen=config.KENNZEICHEN_ERFASSEN,
+        ),
+        status_code=status_code,
+    )
+
+
+@app.get("/kennzeichen/antrag/neu")
+async def admin_neu_formular(request: Request,
+                             sitzung=Depends(auth.sitzung_erforderlich)):
+    """Fahrzeug direkt erfassen - fuer alles, was nicht ueber das oeffentliche
+    Formular kommt.
+
+    Am Tisch steht die Person davor und nennt ihr Kennzeichen; der Umweg ueber
+    das oeffentliche Formular und danach das Suchen und Genehmigen sind zwei
+    Schritte fuer einen Vorgang.
+    """
+    return _neu_seite(request, sitzung)
+
+
+@app.post("/kennzeichen/antrag/neu")
+async def admin_neu_anlegen(request: Request,
+                            sitzung=Depends(auth.sitzung_erforderlich)):
+    daten = await request.form()
+    if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
+        return _csrf_fehler(request, sitzung)
+
+    # Zwei Knoepfe wie auf der Detailseite: der uebliche Fall ist gleich
+    # genehmigen, der seltene "erst noch anschauen".
+    gleich = str(daten.get("aktion") or "genehmigen") == "genehmigen"
+    status = "genehmigt" if gleich else "neu"
+
+    # Kontaktweg nur verlangen, wenn die Entscheidung noch aussteht - dann
+    # muss sie ja jemanden erreichen. Wer sofort genehmigt wird, steht davor.
+    werte, fehler = validation.pruefen(daten, kontakt_pflicht=not gleich)
+    if fehler:
+        return _neu_seite(request, sitzung, werte, fehler, status_code=422)
+
+    # Die Zusage nur, wenn sie ausdruecklich gewuenscht ist UND eine Adresse
+    # dasteht - mail.fuer() gibt sonst ohnehin None. Wer am Tisch steht,
+    # bekommt seine Karte in die Hand und braucht keine Mail.
+    vorlage = None
+    if gleich and daten.get("mail_schicken"):
+        vorlage = mail.fuer({**werte, "id": 0}, "genehmigt")
+
+    nummer = db.antrag_anlegen(
+        werte, _remote_ip(request), status=status,
+        kuerzel=sitzung.kuerzel, mail=vorlage)
+
+    return _zum_antrag(nummer, "angelegt_genehmigt" if gleich else "angelegt")
 
 
 @app.get("/kennzeichen/antrag/{antrag_id}")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import secrets
 import sqlite3
 from contextlib import contextmanager
@@ -120,6 +121,68 @@ def _mail_out_umbauen(con: sqlite3.Connection) -> bool:
     return True
 
 
+def _antrag_kontaktpruefung_loesen(con: sqlite3.Connection) -> bool:
+    """Nimmt den CHECK auf Mail-oder-Telefon aus der Tabelle antrag.
+
+    Die Regel gilt weiter – nur nicht mehr unbedingt. Ihr Grund ist, dass eine
+    ausstehende Entscheidung jemanden erreichen muss; wer am Tisch steht und
+    sofort genehmigt wird, hat nichts zu empfangen. Sie steht deshalb in
+    validation.pruefen(), wo sie an die Lage gebunden werden kann.
+
+    In der Tabelle liesse sich das nicht ohne neuen Fehler ausdruecken: an
+    status zu binden hiesse, dass „zurueck auf neu“ bei einem Eintrag ohne
+    Kontakt mitten im UPDATE scheitert – mit einem 500er, nicht mit einer
+    Meldung.
+
+    Der Bauplan fuer die neue Tabelle kommt aus schema.sql und wird nicht aus
+    der alten Definition herausgeschnitten. Das war der erste Versuch, und er
+    griff daneben: die Tabelle hat mehrere CHECK-Klauseln, die erste gehoert
+    zu status.
+    """
+    zeile = con.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'antrag'"
+    ).fetchone()
+    if zeile is None or "COALESCE(NULLIF(TRIM(email)" not in (zeile["sql"] or ""):
+        return False
+
+    schema = SCHEMA.read_text(encoding="utf-8")
+    # Der Bauplan endet an der Zeile, die nur ");" enthaelt.
+    muster = ("CREATE TABLE(?: IF NOT EXISTS)?"
+              r"\s+antrag\s*\((?:[^;])*?" + chr(10) + r"\);")
+    treffer = re.search(muster, schema, re.S)
+    if treffer is None:
+        return False
+    bauplan = re.sub(r"CREATE TABLE(?: IF NOT EXISTS)?\s+antrag",
+                     "CREATE TABLE antrag_neu", treffer.group(0),
+                     count=1)
+
+    alt_spalten = [z["name"] for z in con.execute("PRAGMA table_info(antrag)")]
+    con.execute("PRAGMA foreign_keys = OFF")
+    try:
+        con.execute("BEGIN")
+        con.execute(bauplan.rstrip(";"))
+        neu_spalten = {z["name"] for z in con.execute("PRAGMA table_info(antrag_neu)")}
+        # Nur, was es in beiden gibt - sonst scheitert das Kopieren an einer
+        # Spalte, die inzwischen weggefallen oder dazugekommen ist.
+        gemeinsam = ", ".join(s for s in alt_spalten if s in neu_spalten)
+        con.execute(
+            f"INSERT INTO antrag_neu ({gemeinsam}) SELECT {gemeinsam} FROM antrag")
+        # mail_out zeigt mit ON DELETE CASCADE auf antrag - ohne das
+        # Abschalten oben naehme das DROP alle Mails mit.
+        con.execute("DROP TABLE antrag")
+        con.execute("ALTER TABLE antrag_neu RENAME TO antrag")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_antrag_status ON antrag (status)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_antrag_kategorie ON antrag (kategorie)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_antrag_created_at ON antrag (created_at)")
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    finally:
+        con.execute("PRAGMA foreign_keys = ON")
+    return True
+
+
 def _spalten_nachtragen(con: sqlite3.Connection) -> list:
     ergaenzt = []
     for tabelle, spalte, typ in NACHTRAEGLICHE_SPALTEN:
@@ -147,20 +210,36 @@ def init() -> list:
         # eine eigene Transaktion – deshalb ausserhalb des with-Blocks.
         if _mail_out_umbauen(con):
             ergaenzt.append("mail_out.typ (Umbau: Typ 'orga' ergaenzt)")
+        if _antrag_kontaktpruefung_loesen(con):
+            ergaenzt.append("antrag (Umbau: Kontaktpflicht nur noch in der Pruefung)")
         return ergaenzt
     finally:
         con.close()
 
 
-def antrag_anlegen(werte: dict, remote_ip: str | None) -> int:
-    """Speichert einen validierten Antrag und liefert dessen Nummer."""
+def antrag_anlegen(werte: dict, remote_ip: str | None,
+                   status: str = "neu", kuerzel: str = "",
+                   mail: tuple | None = None) -> int:
+    """Speichert einen validierten Antrag und liefert dessen Nummer.
+
+    `status` ist normalerweise 'neu' – so kommt jeder Antrag aus dem
+    oeffentlichen Formular. Legt die Orga selbst einen an, steht die Person
+    meist davor, und die Entscheidung ist mit dem Eintragen schon gefallen.
+    Dann wird gleich 'genehmigt' geschrieben, samt Zeitpunkt und Kuerzel.
+
+    Kein Umweg ueber antrag_status_setzen: der prueft einen Uebergang, den es
+    hier nicht gibt – der Antrag entsteht ja erst. Zwei Schreibvorgaenge
+    daraus zu machen hiesse nur, dass zwischen ihnen etwas schiefgehen kann.
+    """
+    entscheidung = jetzt() if status in ("genehmigt", "abgelehnt") else None
     with transaktion() as con:
         cur = con.execute(
             """
             INSERT INTO antrag (
                 vorname, nachname, funktion, kategorie, email, telefon,
-                kennzeichen, bemerkung, status, created_at, remote_ip
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'neu', ?, ?)
+                kennzeichen, bemerkung, status, created_at, remote_ip,
+                entscheidung_am, entscheidung_durch
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 werte["vorname"],
@@ -171,11 +250,19 @@ def antrag_anlegen(werte: dict, remote_ip: str | None) -> int:
                 werte["telefon"] or None,
                 werte["kennzeichen"] or None,
                 werte["bemerkung"] or None,
+                status,
                 jetzt(),
                 remote_ip,
+                entscheidung,
+                (kuerzel or None) if entscheidung else None,
             ),
         )
-        return int(cur.lastrowid)
+        nummer = int(cur.lastrowid)
+        if mail is not None:
+            # In derselben Transaktion wie der Antrag: sonst gaebe es einen
+            # genehmigten Antrag, zu dem die Zusage nie eingereiht wurde.
+            _mail_einreihen(con, nummer, mail)
+        return nummer
 
 
 # --- Backoffice-Abfragen (Schritt 4) ---------------------------------------

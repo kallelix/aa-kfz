@@ -17,10 +17,16 @@ CREATE TABLE IF NOT EXISTS antrag (
   begruendung        TEXT,                      -- Pflicht bei Ablehnung
   tel_informiert_am  TEXT,                      -- für Anträge ohne Mailadresse
   created_at  TEXT NOT NULL,
-  remote_ip   TEXT,                             -- nur für Missbrauchsfälle, kurz aufbewahren
-  CHECK (
-    COALESCE(NULLIF(TRIM(email), ''), NULLIF(TRIM(telefon), '')) IS NOT NULL
-  )
+  remote_ip   TEXT                              -- nur für Missbrauchsfälle, kurz aufbewahren
+  -- Frueher stand hier eine CHECK-Bedingung, die E-Mail ODER Telefon
+  -- verlangte. Die Regel gilt weiter, aber nicht mehr unbedingt: sie steht in
+  -- validation.pruefen(), wo sie an die Lage gebunden werden kann. Ihr Grund
+  -- ist, dass eine ausstehende Entscheidung jemanden erreichen muss - wer am
+  -- Tisch steht und sofort genehmigt wird, hat nichts zu empfangen.
+  --
+  -- Eine CHECK-Bedingung kann das nicht ausdruecken, ohne einen neuen Fehler
+  -- zu schaffen: an status zu binden hiesse, dass "zurueck auf neu" bei einem
+  -- Eintrag ohne Kontakt mitten im UPDATE scheitert.
 );
 
 CREATE INDEX IF NOT EXISTS idx_antrag_status     ON antrag (status);

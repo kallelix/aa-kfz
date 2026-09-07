@@ -51,7 +51,17 @@ def ist_bot(formular) -> bool:
     return bool((formular.get(HONEYPOT) or "").strip())
 
 
-def pruefen(formular) -> tuple[dict, dict]:
+def pruefen(formular, kontakt_pflicht: bool = True) -> tuple[dict, dict]:
+    """Prueft die Formularwerte. Gibt (Werte, Fehler) zurueck.
+
+    `kontakt_pflicht=False` nur fuer den Fall, in dem es nichts zu beantworten
+    gibt: die Orga erfasst jemanden am Tisch und genehmigt sofort. Die Person
+    steht davor und bekommt ihre Karte in die Hand - eine Adresse zu verlangen,
+    nur damit das Formular durchgeht, brachte niemandem etwas.
+
+    Ueberall sonst bleibt es Pflicht, und das aus dem Grund, der unten steht:
+    ohne Kontaktweg erreicht die Entscheidung den Antragsteller nie.
+    """
     werte = {feld: _saeubern(formular.get(feld)) for feld in FELDER}
     werte["bemerkung"] = _saeubern_mehrzeilig(formular.get("bemerkung"))
     werte["email"] = werte["email"].lower()
@@ -90,7 +100,7 @@ def pruefen(formular) -> tuple[dict, dict]:
         fehler["telefon"] = "Bitte nur Ziffern und die Zeichen + ( ) / - verwenden."
 
     # Kernregel: ohne Kontaktweg ist der Antrag nicht bearbeitbar.
-    if not werte["email"] and not werte["telefon"]:
+    if kontakt_pflicht and not werte["email"] and not werte["telefon"]:
         meldung = "Bitte mindestens E-Mail oder Telefon angeben – sonst können wir nicht antworten."
         fehler.setdefault("email", meldung)
         fehler.setdefault("telefon", meldung)
