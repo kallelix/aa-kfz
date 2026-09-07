@@ -9,8 +9,9 @@ import sys
 from pathlib import Path
 
 from starlette.applications import Starlette
-from starlette.responses import HTMLResponse, RedirectResponse, Response
-from starlette.routing import Host, Route
+from starlette.responses import HTMLResponse, Response
+from starlette.routing import Host, Mount, Route
+from starlette.staticfiles import StaticFiles
 
 WURZEL = Path(__file__).resolve().parents[1]
 if str(WURZEL) not in sys.path:
@@ -93,7 +94,14 @@ class AdminVerteiler:
 
     def __init__(self, bereiche: dict) -> None:
         self.bereiche = bereiche
-        self.startseite = Starlette(routes=[Route("/", startseite)])
+        # /static gehoert dem Backoffice als ganzem: ein Stilblatt und ein
+        # Wappen fuer alle drei Bereiche. Was nur einen Bereich betrifft,
+        # liegt unter /<bereich>/static und kommt von dessen Anwendung.
+        self.startseite = Starlette(routes=[
+            Route("/", startseite),
+            Mount("/static", StaticFiles(directory=str(WURZEL / "kern" / "static")),
+                  name="kernstatic"),
+        ])
 
     async def __call__(self, scope, receive, send) -> None:
         pfad = scope.get("path", "/")

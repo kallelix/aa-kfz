@@ -1,46 +1,9 @@
-<!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
-  <title>{% block titel %}Backoffice{% endblock %} – {{ veranstaltung }}</title>
-  <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-  <div class="huelle {% block breite %}huelle-breit{% endblock %}">
-    <header class="admin-kopf">
-      <div class="kopf-marke">
-        <img class="vereinslogo" src="/static/ilrc-logo.svg" alt="" aria-hidden="true" width="52" height="52">
-        <div>
-        <p class="veranstaltung">{{ veranstaltung }} · Backoffice</p>
-        <h1>{% block ueberschrift %}Anträge{% endblock %}</h1>
-        </div>
-      </div>
-      {% if sitzung %}
-        <form method="post" action="/kennzeichen/logout" class="abmelden">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          {% if sitzung.kuerzel %}<span class="kuerzel">{{ sitzung.kuerzel }}</span>{% endif %}
-          <button type="submit" class="knopf-schlicht">Abmelden</button>
-        </form>
-      {% endif %}
-    </header>
+{# Der Kennzeichen-Bereich hat der gemeinsamen Huelle nichts hinzuzufuegen.
+   Die Datei bleibt trotzdem stehen: alle Vorlagen erweitern "admin_base.html",
+   und hier stuende, was nur diesen Bereich betrifft, falls es je etwas gibt. #}
+{% extends "kern_base.html" %}
 
-    {% if sitzung %}
-      <nav class="admin-nav">
-        <a href="/kennzeichen">Anträge</a>
-        <a href="/kennzeichen/durchfahrt">Durchfahrtsliste</a>
-        <a href="/kennzeichen/telefon">
-          Telefonisch informieren
-          {% if telefon_offen %}<span class="marke marke-telefon">{{ telefon_offen }}</span>{% endif %}
-        </a>
-        <a href="/kennzeichen/einstellungen">Einstellungen</a>
-      </nav>
-    {% endif %}
-
-    <main>
-      {% block inhalt %}{% endblock %}
-    </main>
-  </div>
-</body>
-</html>
+{# Die Vorgabe fuer Seiten, die keine eigene setzen. Sie stand
+   frueher in der bereichseigenen Huelle. #}
+{% block titel %}Backoffice{% endblock %}
+{% block ueberschrift %}Anträge{% endblock %}

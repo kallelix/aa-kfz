@@ -1,0 +1,1425 @@
+/* Keine externen Fonts, keine CDNs – siehe Datenschutz im Plan. */
+
+:root {
+  --grund: #ffffff;
+  --flaeche: #f4f5f7;
+  --rand: #d6d9de;
+  --text: #1c1f23;
+  --gedaempft: #5b6169;
+  --akzent: #1f6feb;
+  --fehler: #b3261e;
+  --ok: #1a7f37;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grund: #16181c;
+    --flaeche: #1f2227;
+    --rand: #343a42;
+    --text: #e8eaed;
+    --gedaempft: #a2a9b3;
+    --akzent: #6aa4ff;
+    --fehler: #ff8f86;
+    --ok: #6fcf8b;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 1.5rem 1rem 3rem;
+  background: var(--flaeche);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.huelle {
+  max-width: 40rem;
+  margin: 0 auto;
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 12px;
+  padding: 1.75rem;
+}
+
+header { margin-bottom: 1.5rem; }
+
+.veranstaltung {
+  margin: 0;
+  font-size: .8rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gedaempft);
+}
+
+h1 { margin: .25rem 0 0; font-size: 1.5rem; line-height: 1.25; }
+h2 { font-size: 1rem; margin: 0 0 .4rem; }
+
+.feld { margin-bottom: 1.1rem; }
+
+fieldset.feld {
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: .75rem 1rem 1rem;
+}
+
+legend { font-weight: 600; padding: 0 .35rem; }
+
+label { display: block; font-weight: 600; margin-bottom: .3rem; }
+
+/* Mit Erklaerungstext werden die Zeilen mehrzeilig, deshalb oben ausrichten
+   statt mittig. Das ganze Label ist klickbar - auf dem Telefon zaehlt das. */
+.auswahl {
+  font-weight: 400;
+  display: flex;
+  gap: .6rem;
+  align-items: flex-start;
+  margin-bottom: .75rem;
+  cursor: pointer;
+}
+
+.auswahl input { width: auto; margin-top: .25rem; flex: none; }
+.auswahl-text { display: flex; flex-direction: column; }
+.auswahl-titel { font-weight: 600; }
+
+.auswahl-hilfe {
+  font-size: .875rem;
+  line-height: 1.35;
+  color: var(--gedaempft);
+  margin-top: .1rem;
+}
+
+.pflicht { color: var(--fehler); }
+.optional { font-weight: 400; color: var(--gedaempft); font-size: .85rem; }
+
+input[type="text"], input[type="email"], input[type="tel"], textarea {
+  width: 100%;
+  padding: .55rem .65rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+}
+
+input:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--akzent);
+  outline-offset: 1px;
+}
+
+textarea { resize: vertical; }
+
+.feld-fehler input, .feld-fehler textarea, fieldset.feld-fehler { border-color: var(--fehler); }
+
+.fehler { color: var(--fehler); font-size: .875rem; margin: .35rem 0 0; }
+.hilfe { color: var(--gedaempft); font-size: .85rem; margin: .3rem 0 0; }
+
+.gruppenhinweis {
+  background: var(--flaeche);
+  border-left: 3px solid var(--akzent);
+  padding: .6rem .8rem;
+  border-radius: 0 8px 8px 0;
+  font-size: .925rem;
+}
+
+.hinweis { padding: .7rem .9rem; border-radius: 8px; border: 1px solid var(--rand); }
+.hinweis-fehler { border-color: var(--fehler); color: var(--fehler); }
+.hinweis-ok { border-color: var(--ok); }
+
+button {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--akzent);
+  border: 0;
+  border-radius: 8px;
+  padding: .7rem 1.4rem;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(1.08); }
+
+/* Honeypot: aus dem Bild schieben statt display:none – manche Bots prüfen das. */
+.honigtopf {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.datenschutz {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rand);
+  color: var(--gedaempft);
+  font-size: .875rem;
+}
+
+.zurueck, a { color: var(--akzent); }
+
+footer {
+  margin-top: 1.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rand);
+  color: var(--gedaempft);
+  font-size: .875rem;
+}
+
+/* --- Backoffice ---------------------------------------------------------- */
+
+/* Das Backoffice zeigt vor allem Tabellen, und die brauchen Breite. 68 rem
+   liessen auf einem 1920er Bildschirm gut 800 Pixel Grau links und rechts
+   liegen, waehrend die Funkliste mit sechs Spalten eng wurde.
+
+   Gedeckelt wird stattdessen der Fliesstext weiter unten: eine Erklaerung
+   ueber 1800 Pixel Breite liest niemand mehr. */
+.huelle-breit { max-width: min(118rem, 100%); }
+
+/* Ein Formular gehoert nicht ueber die ganze Breite gezogen - ein Feld fuer
+   eine Telefonnummer wird davon nicht besser. Aber der Rahmen darum soll
+   stehenbleiben: bisher schrumpfte die ganze Seite auf 40 rem, also sprangen
+   Kopfzeile und Navigation beim Klick aus einer breiten Liste heraus mit.
+   Jetzt bleibt der Rahmen, wo er ist, und nur die Spalte darunter ist
+   schmal. */
+main.spalte-schmal { max-width: 52rem; }
+
+.admin-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.abmelden { display: flex; align-items: center; gap: .6rem; }
+
+.kuerzel {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 999px;
+  padding: .15rem .6rem;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.knopf-schlicht {
+  display: inline-block;
+  font: inherit;
+  font-size: .9rem;
+  color: var(--text);
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: .45rem .9rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.knopf-gefahr {
+  background: transparent;
+  color: var(--fehler);
+  border: 1px solid var(--fehler);
+}
+
+.knopf-gefahr:hover { background: var(--fehler); color: #fff; filter: none; }
+
+/* Zähler pro Kategorie */
+.zaehler {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: .75rem;
+  margin-bottom: 1.25rem;
+}
+
+.zaehler-kachel {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  padding: .7rem .9rem;
+}
+
+.zaehler-titel { margin: 0; font-size: .8rem; color: var(--gedaempft); }
+.zaehler-zahl { margin: .1rem 0; font-size: 1.6rem; font-weight: 700; line-height: 1; }
+.zaehler-detail { margin: 0; font-size: .78rem; color: var(--gedaempft); }
+
+/* An den beiden Ausgabetischen steht der Zaehler in einer Zeile statt in
+   dreien. Die drei Kacheln kosteten sonst die Hoehe, die unten dem Knopf
+   fehlt - und wer ausgibt, liest sie nebenbei, nicht andaechtig. */
+.zaehler-flach { margin-bottom: .9rem; }
+.zaehler-flach .zaehler-kachel {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .1rem .5rem;
+  padding: .45rem .8rem;
+}
+.zaehler-flach .zaehler-titel { font-size: .85rem; color: var(--text); font-weight: 600; }
+.zaehler-flach .zaehler-zahl { margin: 0; font-size: 1.25rem; }
+
+/* Filterleiste */
+.filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: flex-end;
+  padding: .9rem;
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.filter label { font-size: .78rem; color: var(--gedaempft); margin-bottom: .2rem; }
+.filter-suche { flex: 1 1 14rem; }
+.filter-knoepfe { display: flex; gap: .5rem; align-items: center; }
+
+select, input[type="search"], input[type="password"] {
+  font: inherit;
+  padding: .45rem .55rem;
+  color: var(--text);
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+}
+
+input[type="search"], input[type="password"] { width: 100%; }
+
+.trefferzahl { font-size: .85rem; color: var(--gedaempft); margin: 0 0 .6rem; }
+
+/* Tabelle */
+.tabelle-huelle { overflow-x: auto; }
+
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+
+th, td {
+  text-align: left;
+  padding: .55rem .6rem;
+  border-bottom: 1px solid var(--rand);
+  vertical-align: top;
+}
+
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--gedaempft); }
+
+tbody tr:hover { background: var(--flaeche); }
+
+.nowrap { white-space: nowrap; }
+
+.kennzeichen {
+  display: inline-block;
+  margin-left: .4rem;
+  font-size: .75rem;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  color: var(--gedaempft);
+}
+
+/* Status-Marken */
+.marke {
+  display: inline-block;
+  padding: .1rem .5rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 600;
+  border: 1px solid var(--rand);
+  white-space: nowrap;
+}
+
+.marke-neu { border-color: var(--akzent); color: var(--akzent); }
+.marke-genehmigt { border-color: var(--ok); color: var(--ok); }
+.marke-abgelehnt { border-color: var(--fehler); color: var(--fehler); }
+.marke-ausgegeben { border-color: var(--gedaempft); color: var(--gedaempft); }
+.marke-telefon { border-style: dashed; color: var(--gedaempft); }
+
+/* Detailansicht */
+.zurueck-zeile { margin-top: 0; font-size: .9rem; }
+.status-zeile { display: flex; gap: .4rem; margin: 0 0 1rem; }
+
+.daten {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  gap: .35rem 1rem;
+  margin: 0 0 1.5rem;
+}
+
+.daten dt { font-weight: 600; color: var(--gedaempft); font-size: .875rem; }
+.daten dd { margin: 0; }
+.mehrzeilig { white-space: pre-line; }
+.gedaempft { color: var(--gedaempft); }
+
+.loeschen {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rand);
+}
+
+.loeschen .hilfe { margin: 0; }
+
+pre {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: .7rem .9rem;
+  overflow-x: auto;
+}
+
+code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; }
+
+@media (max-width: 34rem) {
+  .daten { grid-template-columns: 1fr; gap: 0 0; }
+  .daten dd { margin-bottom: .6rem; }
+}
+
+/* --- Freigabe (Schritt 5) ------------------------------------------------- */
+
+.hinweis-warnung { border-color: #d29200; color: #8a6100; }
+
+@media (prefers-color-scheme: dark) {
+  .hinweis-warnung { color: #e8b339; }
+}
+
+.zaehler-voll { border-color: #d29200; }
+.zaehler-grenze { font-size: 1rem; font-weight: 400; color: var(--gedaempft); }
+
+/* Zwei Felder nebeneinander, solange Platz ist */
+.paar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0 1rem;
+}
+
+.knopfreihe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.knopfreihe form { margin: 0; }
+
+.ablehnen { margin-bottom: 1rem; }
+
+.sammelaktion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.sammelaktion .hilfe { margin: 0; flex: 1 1 16rem; }
+
+h2 {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rand);
+}
+
+/* Nur für Screenreader */
+.nur-vorleser {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* --- Mail und Telefonliste (Schritt 6) ------------------------------------ */
+
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: .75rem;
+  border-bottom: 1px solid var(--rand);
+  font-size: .9rem;
+}
+
+.admin-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.admin-nav a:hover { text-decoration: underline; }
+
+/* Wo man gerade ist. Bisher sah die Zeile auf jeder Seite gleich aus - mit
+   einem zusammengefassten Menue geht das nicht mehr, sonst weiss man nicht,
+   dass die offene Seite dahinter steckt. */
+.admin-nav .ist-hier {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: .4rem;
+  text-decoration-color: var(--akzent);
+}
+
+/* --- Zusammengefasstes Menue in der Navigation ---------------------------- */
+
+.nav-gruppe { position: relative; }
+
+.nav-gruppe-knopf {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-weight: 600;
+  color: var(--akzent);
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-gruppe-knopf::-webkit-details-marker { display: none; }
+.nav-gruppe-knopf:hover { text-decoration: underline; }
+.nav-gruppe-knopf:focus-visible { outline: 3px solid var(--akzent); outline-offset: 3px; }
+
+.nav-pfeil {
+  flex: none;
+  width: .4rem;
+  height: .4rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-bottom: .18rem;
+  transition: transform .15s ease;
+}
+details[open] > .nav-gruppe-knopf .nav-pfeil {
+  transform: rotate(-135deg);
+  margin-bottom: 0;
+}
+@media (prefers-reduced-motion: reduce) { .nav-pfeil { transition: none; } }
+
+.nav-klappe {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + .7rem);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 13rem;
+  padding: .4rem;
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .14);
+}
+
+.nav-klappe a {
+  padding: .45rem .6rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.nav-klappe a:hover { background: var(--flaeche); text-decoration: none; }
+
+/* Im Menue traegt die offene Seite ihre Markierung als Flaeche - ein
+   Unterstrich unter einem Eintrag in einer Liste liest sich wie ein Trenner. */
+.nav-klappe a.ist-hier {
+  background: var(--flaeche);
+  text-decoration: none;
+  color: var(--text);
+}
+
+td .hilfe { display: block; margin-top: .2rem; }
+td form { margin: 0; }
+
+/* --- Kennzeichen in der Liste --------------------------------------------- */
+
+.kennzeichen-spalte {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Schmale Schirme ------------------------------------------------------ */
+
+/* Das Menue legt sich hier nicht ueber die Seite, sondern schiebt sie nach
+   unten: eine Flaeche am rechten Rand muesste man ausrechnen, und Platz zum
+   Ueberlappen gibt es auf einem Telefon ohnehin nicht. */
+@media (max-width: 40rem) {
+  .nav-gruppe { width: 100%; }
+  .nav-klappe {
+    position: static;
+    margin-top: .5rem;
+    box-shadow: none;
+  }
+}
+
+/* Auf dem Telefon frisst der aeussere Rahmen nur Platz: die Seite IST der
+   Inhalt, es gibt daneben nichts, wovon sie sich absetzen muesste. */
+@media (max-width: 40rem) {
+  body {
+    padding: 0;
+    background: var(--grund);
+  }
+
+  .huelle {
+    max-width: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    padding: 1.25rem 1rem 2.5rem;
+  }
+
+  .gruppenhinweis {
+    border-radius: 0 6px 6px 0;
+  }
+
+  /* Die Filterleiste stapelt sich, sonst wird jedes Feld handtuchschmal. */
+  .filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter select,
+  .filter-knoepfe { width: 100%; }
+  .filter-knoepfe button { flex: 1; }
+
+  .admin-kopf { gap: .5rem; }
+}
+
+/* --- Durchfahrtsliste an der Strassensperre ------------------------------- */
+
+/* Wird vermutlich am Telefon im Stehen bedient: grosse Trefferflaechen,
+   grosse Schrift, wenig drumherum. */
+
+.sperre-suche { margin-bottom: 1.25rem; }
+
+.sperre-suche label { font-size: .8rem; color: var(--gedaempft); }
+
+.sperre-suche-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: stretch;
+}
+
+.sperre-suche input[type="search"] {
+  flex: 1 1 12rem;
+  font-size: 1.15rem;
+  padding: .6rem .7rem;
+}
+
+.sperre-suche button { font-size: 1rem; }
+.sperre-suche .knopf-schlicht { display: flex; align-items: center; }
+.sperre-suche .hilfe { margin-top: .4rem; }
+
+.sperre-tabelle { font-size: 1rem; }
+.sperre-tabelle th { font-size: .75rem; padding: 0; }
+.sperre-tabelle td { padding: .7rem .6rem; }
+
+/* Die Ueberschrift ist ein Knopf, damit sie auch per Tastatur und Screenreader
+   bedienbar ist. Sie fuellt die ganze Zelle - auf dem Telefon zaehlt jede
+   Millimeter Trefferflaeche. */
+.sortknopf {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  width: 100%;
+  padding: .6rem;
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--gedaempft);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sortknopf:hover { background: var(--flaeche); color: var(--text); }
+
+th[aria-sort="ascending"] .sortknopf,
+th[aria-sort="descending"] .sortknopf { color: var(--text); }
+
+.sortpfeil { font-size: .7em; line-height: 1; }
+
+.sperre-kennzeichen {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.sperre-fuss {
+  margin-top: 1.5rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--rand);
+}
+
+/* Vom Filterskript gesetzt. !important, weil display bei Tabellenzeilen sonst
+   von der Tabellendarstellung gewinnt. */
+.weg { display: none !important; }
+
+@media (max-width: 40rem) {
+  .sperre-suche-zeile input[type="search"] { flex-basis: 100%; }
+  .sperre-suche-zeile button { flex: 1; }
+}
+
+/* Der offene Link zur Durchfahrtsliste – muss abschreibbar und antippbar sein. */
+.teilen-url {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: .7rem .9rem;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: .85rem;
+  overflow-wrap: anywhere;
+}
+
+/* --- Presse-Akkreditierung ------------------------------------------------ */
+
+.einleitung {
+  font-size: 1.05rem;
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+/* Bedingungen zum Anhaken: Sicherheitshinweis und Bildrechte. Abgesetzt, damit
+   niemand behaupten kann, er habe es uebersehen. */
+.bedingungen {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+
+.bedingungen h2 {
+  margin: 0 0 .5rem;
+  font-size: .95rem;
+}
+
+.bedingungen p {
+  margin: 0 0 .75rem;
+  font-size: .925rem;
+  line-height: 1.5;
+}
+
+.bedingungen .auswahl { margin-bottom: 0; }
+.bedingungen.feld-fehler { border-color: var(--fehler); }
+
+/* Bedingte Felder ohne JavaScript.
+   Sichtbar ist der Standard - faellt :has() aus, steht schlicht alles da und
+   die Validierung verwirft, was nicht passt. Kein kaputtes Formular. */
+form:has(#kommerziell-nein:checked) .nur-kommerziell { display: none; }
+form:has(#gegen-gebuehr:checked) .nur-bilderspende { display: none; }
+
+.nur-kommerziell > .feld:first-child { margin-top: 0; }
+
+/* Kleiner Knopf fuer Nebenaktionen in Tabellenzellen. */
+.knopf-winzig {
+  font: inherit;
+  font-size: .75rem;
+  color: var(--gedaempft);
+  background: none;
+  border: 0;
+  padding: .15rem .2rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.knopf-winzig:hover { color: var(--text); background: none; }
+
+.sperre-tabelle td form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+
+/* Mehrere Knoepfe nebeneinander in einer Tabellenzelle. */
+.aktionen { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+.aktionen form { margin: 0; }
+
+/* Beschriftung, die unter einem Haekchen einrueckt. */
+.nachgerueckt {
+  margin-top: .6rem;
+  font-size: .8rem;
+  color: var(--gedaempft);
+}
+
+/* Nach einer Aktion springt der Browser zur Zeile zurueck. Etwas Luft darueber,
+   damit sie nicht am oberen Rand klebt. */
+tr[id^="zeile-"] { scroll-margin-top: 4rem; }
+tr[id^="zeile-"]:target { background: var(--flaeche); }
+
+.datenschutz ul {
+  margin: .4rem 0 .8rem;
+  padding-left: 1.2rem;
+}
+
+.datenschutz li { margin-bottom: .35rem; }
+
+/* --- Helfer-Dashboard ---------------------------------------------------- */
+
+/* Zwei Marken zusätzlich zu den Status-Marken der Schwester-Apps: hier geht
+   es nicht um einen Zustand, sondern um Bedarf gegen Besetzung. */
+.marke-luecke { border-color: var(--fehler); color: var(--fehler); }
+.marke-voll { border-color: var(--ok); color: var(--ok); }
+
+tr.hat-luecke td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
+
+.zeit { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rechts { text-align: right; }
+
+/* Besetzung auf einen Blick. */
+.balken {
+  height: .5rem;
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0 0 .35rem;
+}
+.balken-voll { display: block; height: 100%; background: var(--ok); }
+
+/* Kleine Auszählungen (T-Shirt-Größen, Verpflegung). */
+.strichliste { list-style: none; margin: 0; padding: 0; }
+.strichliste li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--rand);
+}
+.strichliste li:last-child { border-bottom: none; }
+.strichliste li.offen { color: var(--gedaempft); }
+.strichliste li span:last-child { font-variant-numeric: tabular-nums; }
+
+.spalten {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1.5rem;
+}
+
+/* Meldungen des Imports. Lang, deshalb als Liste und nicht als Fließtext. */
+.hinweisliste { margin: 0; padding-left: 1.2rem; font-size: .875rem; }
+.hinweisliste li { margin-bottom: .35rem; }
+
+.kasten {
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+.kasten h2 { margin-top: 0; }
+.kasten-ok { border-color: var(--ok); }
+
+.unterzeile { margin-top: -.6rem; color: var(--gedaempft); }
+
+.hochladen label, .einteilen label { display: block; margin-bottom: 1rem; }
+.hochladen input[type="file"], .einteilen select { width: 100%; }
+
+.leer { color: var(--gedaempft); font-style: italic; }
+
+/* Zeitplan: was von der Website verschwunden ist, bleibt sichtbar, tritt
+   aber zurueck. */
+tr.entfallen td { opacity: .55; text-decoration: line-through; }
+tr.entfallen td:last-child { text-decoration: none; }
+
+.hinweisliste-warnung li { color: #8a6100; }
+
+/* --- Vereinslogo ---------------------------------------------------------- */
+
+/* Das Logo traegt die Vereinsfarben und weisse Anteile (Schriftzug, Kontur).
+   Auf hellem Grund waeren die weg, deshalb sitzt es auf einer dunklen Kachel
+   in seiner eigenen dunkelsten Farbe. Bringt es einen eigenen dunklen Grund
+   mit, faellt die Kachel nicht auf; bringt es keinen mit, rettet sie den
+   Schriftzug. Bewusst eine abgerundete Kachel und kein Kreis: ein Kreis
+   wuerde die Ecken eines quadratischen Logos abschneiden.
+
+   Heisst nicht .marke - so heisst in allen drei Apps schon die
+   Status-Plakette. */
+/* Ohne Kachel: das Wappen hat eine fast schwarze Kontur, die auf hellem
+   Grund von selbst traegt - die weissen Flaechen sind die Fuellung des
+   Schilds und duerfen mit dem Papier verschmelzen. Im dunklen Modus
+   uebernehmen umgekehrt die weissen Flaechen die Form. */
+.vereinslogo {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: none;
+}
+
+.kopf-marke {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+}
+
+.kopfzeile {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+}
+.kopfzeile .kopftext { min-width: 0; }
+.kopfzeile h1 { margin-top: .1rem; }
+
+@media (max-width: 30rem) {
+  .vereinslogo { width: 2.6rem; height: 2.6rem; }
+  .kopf-marke, .kopfzeile { gap: .6rem; }
+}
+
+/* Farben des Programm-Bands im hellen Backoffice. */
+:root {
+  --band-linie: var(--rand);
+  --band-flaeche: #fff;
+  --band-text: var(--gedaempft);
+  --band-jetzt: #ef4444;
+  --band-programm: #0d9488;
+  --band-voll: #4e690f;
+  --band-fehlt: #b3261e;
+}
+
+/* --- Programm-Band -------------------------------------------------------- */
+
+/* Ein Tag als Zeitachse: oben die Programmpunkte der Rennserien, darunter die
+   Schichten. Alle Positionen kommen als Prozentwerte aus band.py - hier wird
+   nichts gerechnet und im Browser laeuft dafuer kein Skript.
+
+   Die Farben stehen als Variablen weiter oben in der jeweiligen Datei, damit
+   dieselben Regeln im hellen Backoffice und auf dem dunklen Monitor gelten. */
+
+.band {
+  border: 1px solid var(--band-linie);
+  border-radius: 10px;
+  background: var(--band-flaeche);
+  padding: .6rem .8rem .5rem;
+  /* Bei vielen Stunden wird es eng: lieber schieben als stauchen. */
+  overflow-x: auto;
+}
+
+/* Traegt das Raster und die Spuren. position:relative, weil alles darin per
+   left-Prozent sitzt. Der Abstand oben macht Platz fuer die Stundenzahlen und
+   die Beschriftung der Jetzt-Linie. */
+.band-gitter {
+  position: relative;
+  min-width: 34rem;
+  padding-top: 1.6rem;
+}
+
+.band-strich {
+  position: absolute;
+  top: 1.5rem;
+  bottom: 0;
+  width: 1px;
+  background: var(--band-linie);
+  transform: translateX(-.5px);
+}
+
+/* Mitternacht bekommt einen eigenen Strich: sonst laese sich die "08" einer
+   Nachtschicht wie der Morgen desselben Tages. */
+.band-tageswechsel {
+  width: 2px;
+  background: var(--band-text);
+  opacity: .55;
+}
+
+.band-stunde {
+  position: absolute;
+  top: .35rem;
+  font-size: .7rem;
+  color: var(--band-text);
+  transform: translateX(-50%);
+  font-variant-numeric: tabular-nums;
+}
+.band-stunde-wechsel { font-weight: 700; }
+
+.band-jetzt {
+  position: absolute;
+  top: 1.5rem;
+  bottom: 0;
+  width: 2px;
+  background: var(--band-jetzt);
+  transform: translateX(-1px);
+  z-index: 3;
+}
+.band-jetzt::after {
+  content: "jetzt";
+  position: absolute;
+  top: -1.45rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .62rem;
+  font-weight: 700;
+  color: var(--band-jetzt);
+  background: var(--band-flaeche);
+  padding: 0 .2rem;
+  border-radius: 3px;
+}
+
+.band-spur {
+  position: relative;
+  height: 1.35rem;
+  margin-top: .2rem;
+}
+
+.band-trenner {
+  height: 1px;
+  margin: .4rem 0 .3rem;
+  background: var(--band-linie);
+}
+
+.band-balken {
+  position: absolute;
+  top: 0;
+  height: 1.35rem;
+  line-height: 1.35rem;
+  border-radius: 4px;
+  padding: 0 .35rem;
+  font-size: .72rem;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  border: 0;
+  z-index: 2;
+}
+
+a.band-balken:hover, button.band-balken:hover { filter: brightness(1.15); }
+.band-balken:focus-visible { outline: 2px solid var(--band-jetzt); outline-offset: 1px; }
+button.band-balken { font-family: inherit; cursor: pointer; }
+a.band-balken { cursor: pointer; }
+
+/* Offenes Ende: auslaufen lassen, statt ein Ende zu behaupten, das auf der
+   Website der Rennserie gar nicht steht. */
+.band-offen {
+  -webkit-mask-image: linear-gradient(90deg, #000 55%, transparent);
+  mask-image: linear-gradient(90deg, #000 55%, transparent);
+}
+
+.band-programm { background: var(--band-programm); }
+.band-serie-dhc { background: #95bf0b; color: #13160f; }
+.band-serie-kids { background: #4e690f; }
+
+.band-schicht { background: var(--band-voll); }
+.band-luecke { background: var(--band-fehlt); }
+
+.band-fuss {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem .9rem;
+  align-items: center;
+  margin: .5rem 0 0;
+  font-size: .72rem;
+  color: var(--band-text);
+}
+.band-schluessel { display: flex; align-items: center; gap: .3rem; }
+.band-tupfer {
+  display: inline-block;
+  width: .9rem;
+  height: .5rem;
+  border-radius: 2px;
+}
+.band-ohne-zeit { font-style: italic; }
+
+/* --- Aufgabenplan --------------------------------------------------------- */
+
+.tagestitel {
+  margin: 1.6rem 0 .5rem;
+  font-size: 1.1rem;
+  padding-bottom: .3rem;
+  border-bottom: 2px solid var(--rand);
+}
+
+/* Phasen. Absichtlich blass: die Phase ordnet ein, sie warnt nicht. */
+.marke-aufbau { border-color: #0ea5e9; color: #0369a1; }
+.marke-event { border-color: #16a34a; color: #15803d; }
+.marke-abbau { border-color: #f97316; color: #c2410c; }
+.marke-sonstiges { border-color: var(--gedaempft); color: var(--gedaempft); }
+
+/* Status als Knopfreihe: ein Klick statt Formular aufmachen, aendern,
+   speichern. Der aktive Zustand ist gefuellt, die anderen sind nur Umriss. */
+.statuswahl { display: flex; gap: .25rem; margin: 0; flex-wrap: wrap; }
+
+.statusknopf {
+  padding: .15rem .5rem;
+  font-size: .72rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--rand);
+  background: none;
+  color: var(--gedaempft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.statusknopf:hover { border-color: var(--text); color: var(--text); }
+
+.statusknopf.ist-aktiv { color: #fff; }
+.status-offen.ist-aktiv { background: #ef4444; border-color: #ef4444; }
+.status-arbeit.ist-aktiv { background: #d29200; border-color: #d29200; }
+.status-erledigt.ist-aktiv { background: var(--ok); border-color: var(--ok); }
+
+/* Aufgaben im Band. Eigene Farbe, damit sie sich von Programm und Schichten
+   abheben; der Status faerbt den linken Rand. */
+.band-aufgabe { background: #8b5cf6; }
+.band-status-erledigt { opacity: .55; }
+.band-status-offen { box-shadow: inset 3px 0 0 rgba(255, 255, 255, .85); }
+
+/* Erste und letzte Stundenzahl nach innen ruecken. Mittig ausgerichtet wuerde
+   je die halbe Zahl ueber die Achse hinausragen - und der Browser zeigte
+   einen waagerechten Rollbalken fuer zehn Pixel. Dasselbe fuer die
+   Beschriftung der Jetzt-Linie, wenn sie nah an den Rand kommt. */
+.band-stunde-links { transform: none; }
+.band-stunde-rechts { transform: translateX(-100%); }
+.band-jetzt-links::after { left: 0; transform: none; }
+.band-jetzt-rechts::after { left: auto; right: 0; transform: none; }
+
+/* Die Striche selbst muessen ebenfalls nach innen, nicht nur ihre Zahlen.
+   Ein Strich ist 1 px breit, sitzt bei 100 Prozent und wird nur um einen
+   halben Pixel zurueckgezogen - er ragt also garantiert einen halben Pixel
+   ueber die Achse hinaus. Das genuegt dem Browser fuer einen waagerechten
+   Rollbalken. Dieselbe Rechnung gilt fuer die 2 px breite Jetzt-Linie. */
+.band-strich-links { transform: none; }
+.band-strich-rechts { transform: translateX(-100%); }
+.band-jetzt-links { transform: none; }
+.band-jetzt-rechts { transform: translateX(-100%); }
+
+/* --- Materialausgabe ------------------------------------------------------ */
+
+/* Zeilenaktionen in der Helferliste: Groesse waehlen und ausgeben in einem
+   Zug, ohne die Zeile zu verlassen. */
+.ausgabe, .ausgabe-fertig {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.ausgabe select { padding: .15rem .3rem; font-size: .8rem; }
+.ausgabe-fertig form { margin: 0; }
+
+tr.ist-ausgegeben td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
+
+/* Wenn die ausgegebene Groesse von der angekuendigten abweicht - die Zahl,
+   die bei der naechsten Bestellung zaehlt. */
+.marke-abweichung { border-color: #d29200; color: #8a6100; }
+
+/* Mengenfelder fuer das Material: schmal, damit drei nebeneinander passen. */
+.mengen {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.menge { display: flex; flex-direction: column; gap: .2rem; }
+.menge input { width: 4.5rem; }
+.menge label { font-size: .78rem; color: var(--gedaempft); }
+
+.zeilenaktionen { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+.zeilenaktionen form { margin: 0; }
+
+/* Ein Stueck Material in der Uebersichtszeile. */
+.stueck {
+  display: inline-block;
+  padding: .1rem .45rem;
+  border-radius: 4px;
+  border: 1px solid var(--rand);
+  font-size: .8rem;
+  white-space: nowrap;
+}
+.stueck-offen { border-color: var(--fehler); color: var(--fehler); font-weight: 600; }
+
+.kennzeichen-feld { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+                    text-transform: uppercase; letter-spacing: .06em; }
+
+tr.ist-draussen td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
+
+/* Teilrueckgabe steckt aufgeklappt in der Zeile - der haeufige Fall ist ein
+   Klick, der seltene braucht ein Formular und soll es nicht verstellen. */
+.teilrueckgabe summary { cursor: pointer; list-style: none; display: inline-block; }
+.teilrueckgabe summary::-webkit-details-marker { display: none; }
+.teilrueckgabe[open] { display: block; margin-top: .4rem; }
+.teilrueckgabe[open] > form { margin-top: .4rem; }
+
+/* Unterschriften im Backoffice. */
+.unterschriftbild {
+  width: 12rem;
+  height: 4rem;
+  background: #fff;
+  border: 1px solid var(--rand);
+  border-radius: 6px;
+}
+.pruefsumme { font-family: ui-monospace, Consolas, monospace; font-size: .72rem; }
+
+/* --- Was gerade auf dem Tablet steht -------------------------------------- */
+
+/* Auf jeder Backoffice-Seite. Man soll nicht raten muessen, ob schon
+   unterschrieben wurde - und nicht neu laden, um es zu erfahren. */
+.tabletleiste {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+  margin: 0 0 1rem;
+  padding: .5rem .8rem;
+  border: 1px solid #d29200;
+  border-radius: 8px;
+  background: #fff8e6;
+  color: #6b4d00;
+  font-size: .9rem;
+}
+.tabletleiste-punkt {
+  width: .6rem;
+  height: .6rem;
+  border-radius: 50%;
+  background: #d29200;
+  flex: none;
+  animation: tabletpuls 1.6s ease-in-out infinite;
+}
+@keyframes tabletpuls {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tabletleiste-punkt { animation: none; }
+}
+@media (prefers-color-scheme: dark) {
+  .tabletleiste { background: #2b2412; color: #f0d9a0; }
+}
+
+/* Die Zelle, in der der Knopf oder die Marke sitzt. */
+.unterschrift-feld { display: inline-flex; align-items: center; }
+.unterschrift-feld form { margin: 0; }
+
+/* Kurz hervorheben, wenn eine Unterschrift gerade eingegangen ist - sonst
+   uebersieht man die Aenderung in einer langen Liste. */
+.frisch { animation: frischauf 2.5s ease-out; }
+@keyframes frischauf {
+  0% { background: #d3f0d8; }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .frisch { animation: none; }
+}
+
+/* --- Ausgabe und Ruecknahme nebeneinander --------------------------------- */
+
+/* Untereinander muesste man fuer jede Ruecknahme am ganzen Ausgabeformular
+   vorbeiscrollen. Ab einer Breite, in der beides nebeneinander passt, steht es
+   nebeneinander; darunter bleibt es gestapelt und das Formular laesst sich
+   zuklappen. */
+.arbeitsflaeche { display: block; }
+
+@media (min-width: 76rem) {
+  .arbeitsflaeche {
+    display: grid;
+    /* Das Formular so schmal, wie es gerade noch bequem ist - der Rest gehoert
+       der Liste, die bei sechs Spalten jeden Millimeter braucht. */
+    grid-template-columns: minmax(19rem, 22rem) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+  /* Das Formular bleibt stehen, waehrend die Liste rollt. */
+  .arbeit-formular { position: sticky; top: 1rem; }
+  .arbeit-liste { min-width: 0; }
+}
+
+/* Ein Kasten, der sich zuklappen laesst. */
+.kasten-klapp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  cursor: pointer;
+  list-style: none;
+  padding: .1rem 0;
+}
+.kasten-klapp::-webkit-details-marker { display: none; }
+.kasten-klapp:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+
+.kasten-titel { font-size: 1.05rem; font-weight: 600; }
+
+.klapp-pfeil {
+  flex: none;
+  width: .55rem;
+  height: .55rem;
+  border-right: 2px solid var(--gedaempft);
+  border-bottom: 2px solid var(--gedaempft);
+  transform: rotate(45deg);
+  margin-right: .2rem;
+  transition: transform .15s ease;
+}
+details[open] > .kasten-klapp .klapp-pfeil { transform: rotate(-135deg); }
+@media (prefers-reduced-motion: reduce) { .klapp-pfeil { transition: none; } }
+
+details.kasten:not([open]) { padding-bottom: .7rem; }
+
+.fahrzeugstamm {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--rand);
+  padding-top: .8rem;
+}
+
+/* --- Fliesstext bleibt lesbar breit --------------------------------------- */
+
+/* Die Huelle ist breit, damit Tabellen Platz haben. Erklaerungen sollen davon
+   nichts abbekommen - ueber etwa 60 Zeichen Zeilenlaenge findet das Auge den
+   Zeilenanfang nicht mehr zuverlaessig wieder. */
+.kasten > p,
+.hilfe,
+main > p:not(.trefferzahl):not(.knopfreihe):not(.balken),
+.hinweisliste {
+  max-width: 62rem;
+}
+
+/* In der schmalen Spalte neben der Liste gilt die Breite der Spalte. */
+.arbeit-formular .kasten > p,
+.arbeit-formular .hilfe { max-width: none; }
+
+/* Die Kacheln sollen sich nicht ueber die volle Breite strecken - vier Stueck
+   auf 1900 Pixel waeren je 460 Pixel breit fuer eine zweistellige Zahl. */
+.zaehler { max-width: 74rem; }
+
+/* --- Felder bleiben in ihrer Spalte --------------------------------------- */
+
+/* Ein <select> misst sich am laengsten Eintrag - "Anna Berg - anna@example.org"
+   sprengt damit die 22 rem der Formularspalte. Es bekommt deshalb die Breite
+   des Feldes vorgeschrieben und schneidet lange Eintraege ab.
+
+   min-width: 0 an der Spalte selbst ist noetig, weil ein Rasterfeld sonst
+   nicht unter die Mindestbreite seines Inhalts schrumpft - die Spalte wuerde
+   also mitwachsen, statt das Feld zu begrenzen. */
+.arbeit-formular { min-width: 0; }
+
+.feld select,
+.feld input[type="text"],
+.feld input[type="email"],
+.feld input[type="search"],
+.feld input[type="number"],
+.feld input[type="date"],
+.feld input[type="time"],
+.feld textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.feld select { text-overflow: ellipsis; }
+
+/* Die Mengenfelder bleiben schmal - drei nebeneinander. */
+.mengen .menge input { width: 4.5rem; }
+
+/* An einem Ausgabetisch soll der Knopf zu sehen sein, ohne zu scrollen: das
+   Formular steht fest, die Liste daneben rollt. Deshalb hier enger als in
+   einem Formular, das die Seite fuer sich hat. */
+.arbeit-formular .feld { margin-bottom: .7rem; }
+.arbeit-formular .hilfe { margin-top: .15rem; line-height: 1.35; }
+.arbeit-formular label { margin-bottom: .2rem; }
+
+/* --- Umschalter statt Haekchen und Knopf ---------------------------------- */
+
+/* Ein Haekchen mit einem "Anzeigen"-Knopf daneben sind zwei Handgriffe fuer
+   eine Frage mit zwei Antworten. Der Umschalter ist einer - und zeigt
+   nebenbei, wie viel hinter jeder Seite steckt. */
+.umschalter {
+  display: inline-flex;
+  border: 1px solid var(--rand);
+  border-radius: 999px;
+  background: var(--grund);
+  padding: .15rem;
+  gap: .15rem;
+}
+
+.umschalter-teil {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .3rem .8rem;
+  border-radius: 999px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--gedaempft);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.umschalter-teil:hover { color: var(--text); background: var(--flaeche); }
+
+.umschalter-teil.ist-aktiv {
+  background: var(--akzent);
+  color: #fff;
+}
+.umschalter-teil.ist-aktiv:hover { background: var(--akzent); color: #fff; }
+
+.umschalter-zahl {
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  opacity: .8;
+}
+
+/* Die Zahl der offenen Vorgaenge ist die, auf die es ankommt. */
+.umschalter-teil.hat-offene .umschalter-zahl { color: var(--fehler); font-weight: 700; }
+.umschalter-teil.ist-aktiv.hat-offene .umschalter-zahl { color: #fff; }
+
+/* ===========================================================================
+   Was beim Zusammenfuehren der drei Backoffices dazukam
+   ===========================================================================
+
+   Dieses Blatt ist aus dem Stil des Helfer-Dashboards hervorgegangen - er war
+   der reichste der drei. Die Kennzeichen- und Presse-Vorlagen brauchten
+   daraus nur zwei Dinge, die es dort nicht gab. */
+
+/* Ein Link, der wie ein Knopf aussieht. Den benutzten alle drei Anwendungen
+   - eine Regel dafuer hatte keine. "Fahrzeug erfassen" und "Helfer
+   hinzufuegen" waren deshalb gewoehnliche Links neben echten Knoepfen. */
+.knopf {
+  display: inline-block;
+  font-weight: 600;
+  color: #fff;
+  background: var(--akzent);
+  border: 0;
+  border-radius: 8px;
+  padding: .7rem 1.4rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.knopf:hover { filter: brightness(1.08); color: #fff; text-decoration: none; }
+
+/* Haekchen und Beschriftung in einer Zeile - sonst steht das Kaestchen
+   allein ueber seinem Text und man weiss nicht, wozu es gehoert. */
+.feld label.waagerecht {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 600;
+}
+.feld label.waagerecht input { margin: 0; }
+
+/* --- Bereichswechsel im Backoffice --------------------------------------- */
+
+/* Die oberste Zeile: Kennzeichen, Presse, Helfer. Darunter die Punkte des
+   Bereichs, in dem man gerade ist. Zwei Zeilen statt einer, weil eine Zeile
+   mit allen Punkten aus drei Anwendungen niemandem mehr hilft. */
+.bereiche {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  margin-bottom: .9rem;
+  padding-bottom: .6rem;
+  border-bottom: 2px solid var(--rand);
+}
+
+.bereich {
+  padding: .45rem .95rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: .95rem;
+  text-decoration: none;
+  color: var(--gedaempft);
+}
+.bereich:hover { background: var(--flaeche); color: var(--text); }
+
+.bereich.ist-hier {
+  background: var(--akzent);
+  color: #fff;
+}
+.bereich.ist-hier:hover { background: var(--akzent); color: #fff; }

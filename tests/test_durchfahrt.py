@@ -232,7 +232,12 @@ try:
 
     print("Reiter")
     _, _, liste = anfrage("GET", "/kennzeichen")
-    pruefe('href="/kennzeichen/durchfahrt">Durchfahrtsliste' in liste,
+    # Nicht auf die genaue Zeichenfolge pruefen: die gemeinsame Huelle setzt
+    # zwischen href und Namen noch Attribute und einen Umbruch.
+    navigation = liste[liste.index('class="admin-nav"'):
+                       liste.index("</nav>", liste.index('class="admin-nav"'))]
+    pruefe('"/kennzeichen/durchfahrt"' in navigation
+           and "Durchfahrtsliste" in navigation,
            "der Reiter steht im Backoffice")
 
     print("Offener Link: ohne Token kein Zugang")

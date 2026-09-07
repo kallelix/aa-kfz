@@ -1,60 +1,10 @@
-<!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
-  <title>{% block titel %}Helfer{% endblock %} – {{ veranstaltung }}</title>
-  <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-  <div class="huelle {% block breite %}huelle-breit{% endblock %}">
-    <header class="admin-kopf">
-      <div class="kopf-marke">
-        <img class="vereinslogo" src="/static/ilrc-logo.svg" alt="" aria-hidden="true" width="52" height="52">
-        <div>
-        <p class="veranstaltung">{{ veranstaltung }} · Helfer-Dashboard</p>
-        <h1>{% block ueberschrift %}Übersicht{% endblock %}</h1>
-        </div>
-      </div>
-      {% if sitzung %}
-        <form method="post" action="/helfer/logout" class="abmelden">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          {% if sitzung.kuerzel %}<span class="kuerzel">{{ sitzung.kuerzel }}</span>{% endif %}
-          <button type="submit" class="knopf-schlicht">Abmelden</button>
-        </form>
-      {% endif %}
-    </header>
+{# Der Helferbereich bringt zwei Dinge mit, die es in den anderen nicht
+   gibt: die Leiste mit dem, was gerade auf dem Tablet steht, und die
+   Skripte, die sie und die Klappzustaende in Gang halten. #}
+{% extends "kern_base.html" %}
 
-    {% if sitzung %}
-      <nav class="admin-nav" aria-label="Hauptnavigation">
-        {% for punkt in hauptnav %}
-          <a href="{{ punkt.ziel }}"
-             {% if punkt.hier %}class="ist-hier" aria-current="page"{% endif %}
-             >{{ punkt.name }}</a>
-        {% endfor %}
-
-        {# details/summary klappt ohne Skript auf und zu - admin_menue.js
-           schliesst das Menue nur wieder, wenn man daneben tippt oder Esc
-           drueckt. Ohne Skript bliebe es offen stehen, bis man den Punkt
-           erneut trifft. #}
-        <details class="nav-gruppe" data-menue>
-          <summary class="nav-gruppe-knopf{% if unternav_hier %} ist-hier{% endif %}">
-            Einstellungen
-            <span class="nav-pfeil" aria-hidden="true"></span>
-          </summary>
-          <div class="nav-klappe">
-            {% for punkt in unternav %}
-              <a href="{{ punkt.ziel }}"
-                 {% if punkt.hier %}class="ist-hier" aria-current="page"{% endif %}
-                 >{{ punkt.name }}</a>
-            {% endfor %}
-          </div>
-        </details>
-      </nav>
-    {% endif %}
-
-    {% if sitzung %}
+{% block leiste %}
+  {% if sitzung %}
       {# Was gerade auf dem Tablet steht - auf jeder Seite sichtbar, damit man
          nicht raten muss, ob schon unterschrieben wurde. Das Skript blendet
          die Leiste ein und aus, ohne die Seite neu zu laden. #}
@@ -70,62 +20,43 @@
         </span>
         <span class="gedaempft">– wartet auf Unterschrift</span>
       </p>
-    {% endif %}
+  {% endif %}
+{% endblock %}
 
-    {% set meldungen = {
-      'eingeteilt': 'Eingeteilt.',
-      'ausgetragen': 'Ausgetragen.',
-      'schon-drin': 'Diese Person steht bereits auf der Schicht.',
-      'keiner': 'Es war niemand ausgewählt.',
-      'unbekannt': 'Diese Schicht gibt es nicht.',
-      'neuer-link': 'Neuer Monitor-Link erzeugt. Der alte gilt nicht mehr.',
-      'widerrufen': 'Der Monitor-Link ist widerrufen.',
-      'angelegt': 'Angelegt.',
-      'gespeichert': 'Gespeichert.',
-      'geloescht': 'Gelöscht.',
-      'status': 'Status geändert.',
-      'freigegeben': 'Der Punkt folgt wieder der Website.',
-      'tshirt': 'T-Shirt als ausgegeben vermerkt.',
-      'tshirt-zurueck': 'Die Ausgabe wurde zurückgenommen.',
-      'groesse': 'Diese Größe gibt es nicht.',
-      'ausgegeben': 'Material ausgegeben.',
-      'neu-angelegt': 'Material ausgegeben – die Person war noch nicht erfasst und wurde angelegt.',
-      'nichts': 'Es war nichts zum Ausgeben angekreuzt.',
-      'zurueck': 'Als zurück vermerkt.',
-      'schluessel-raus': 'Schlüssel ausgegeben.',
-      'fahrzeug-neu': 'Schlüssel ausgegeben – das Fahrzeug war neu und steht jetzt im Stamm.',
-      'kein-kennzeichen': 'Ohne Kennzeichen geht es nicht.',
-      'angefordert': 'Steht auf dem Tablet.',
-      'abgebrochen': 'Die Anforderung ist zurückgenommen.',
-      'kein-tablet': 'Es gibt keinen Tablet-Link – erst einen erzeugen.',
-      'fahrzeug-weg': 'Fahrzeug aus dem Stamm genommen.',
-      'fahrzeug-hat-vorgaenge': 'An diesem Fahrzeug hängen noch Vorgänge. '
-                                'Erst die löschen, sonst ginge die '
-                                'Ausgabehistorie mit verloren.',
-
-    } %}
-    {% if hinweis %}
-      <p class="hinweis {{ 'hinweis-warnung' if hinweis in ('schon-drin', 'keiner', 'unbekannt', 'widerrufen',
-                            'groesse', 'nichts', 'kein-kennzeichen',
-                            'fahrzeug-hat-vorgaenge',
-                            'tshirt-zurueck', 'geloescht', 'abgebrochen',
-                            'kein-tablet') else 'hinweis-ok' }}"
-         role="status">{{ meldungen.get(hinweis, hinweis) }}</p>
-    {% endif %}
-
-    <main class="{% block hauptklasse %}{% endblock %}">
-      {% block inhalt %}{% endblock %}
-    </main>
-  </div>
+{% block navzusatz %}
   {% if sitzung %}
-    <script src="/static/admin_merken.js"></script>
-    <script src="/static/admin_menue.js"></script>
+    {# details/summary klappt ohne Skript auf und zu - admin_menue.js
+       schliesst das Menue nur wieder, wenn man daneben tippt oder Esc
+       drueckt. #}
+    <details class="nav-gruppe" data-menue>
+      <summary class="nav-gruppe-knopf{% if unternav_hier %} ist-hier{% endif %}">
+        Einstellungen
+        <span class="nav-pfeil" aria-hidden="true"></span>
+      </summary>
+      <div class="nav-klappe">
+        {% for punkt in unternav %}
+          <a href="{{ punkt.ziel }}"
+             {% if punkt.hier %}class="ist-hier" aria-current="page"{% endif %}
+             >{{ punkt.name }}</a>
+        {% endfor %}
+      </div>
+    </details>
+  {% endif %}
+{% endblock %}
+
+{% block skript %}
+  {% if sitzung %}
+    <script src="/helfer/static/admin_merken.js"></script>
+    <script src="/helfer/static/admin_menue.js"></script>
   {% endif %}
   {% if sitzung and admin_takt %}
-    <script src="/static/admin_stand.js"
+    <script src="/helfer/static/admin_stand.js"
             data-marke="{{ tabletstand.marke }}"
             data-takt="{{ admin_takt }}"></script>
   {% endif %}
-  {% block skript %}{% endblock %}
-</body>
-</html>
+  {% block bereichsskript %}{% endblock %}
+{% endblock %}
+
+{# Vorgabe wie frueher in der eigenen Huelle. #}
+{% block titel %}Helfer{% endblock %}
+{% block ueberschrift %}Übersicht{% endblock %}

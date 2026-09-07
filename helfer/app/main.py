@@ -38,6 +38,7 @@ _WURZEL = str(Path(__file__).resolve().parents[2])
 if _WURZEL not in _sys.path:
     _sys.path.insert(0, _WURZEL)
 
+from kern import navigation
 from kern.auth import Auth
 
 BASIS = Path(__file__).resolve().parent
@@ -204,7 +205,12 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+# Siehe kennzeichen/app/main.py: zweimal dasselbe Verzeichnis. Monitor und
+# Tablet liegen unter dem eigenen Hostnamen an der Wurzel und brauchen
+# "/static"; das Backoffice liegt unter /helfer.
 app.mount("/static", StaticFiles(directory=str(BASIS / "static")), name="static")
+app.mount("/helfer/static", StaticFiles(directory=str(BASIS / "static")),
+          name="bereichsstatic")
 
 
 def _kontext(request: Request, **extra) -> dict:
@@ -218,6 +224,45 @@ def _kontext(request: Request, **extra) -> dict:
     }
     basis.update(extra)
     return basis
+
+
+# Die Meldungen standen bis zur Zusammenfuehrung in der eigenen Huelle des
+# Helferbereichs. Die gibt es nicht mehr - die gemeinsame zeigt nur noch, was
+# ihr gereicht wird.
+MELDUNGEN = {
+    'eingeteilt': 'Eingeteilt.',
+    'ausgetragen': 'Ausgetragen.',
+    'schon-drin': 'Diese Person steht bereits auf der Schicht.',
+    'keiner': 'Es war niemand ausgewählt.',
+    'unbekannt': 'Diese Schicht gibt es nicht.',
+    'neuer-link': 'Neuer Monitor-Link erzeugt. Der alte gilt nicht mehr.',
+    'widerrufen': 'Der Monitor-Link ist widerrufen.',
+    'angelegt': 'Angelegt.',
+    'gespeichert': 'Gespeichert.',
+    'geloescht': 'Gelöscht.',
+    'status': 'Status geändert.',
+    'freigegeben': 'Der Punkt folgt wieder der Website.',
+    'tshirt': 'T-Shirt als ausgegeben vermerkt.',
+    'tshirt-zurueck': 'Die Ausgabe wurde zurückgenommen.',
+    'groesse': 'Diese Größe gibt es nicht.',
+    'ausgegeben': 'Material ausgegeben.',
+    'neu-angelegt': 'Material ausgegeben – die Person war noch nicht erfasst und wurde angelegt.',
+    'nichts': 'Es war nichts zum Ausgeben angekreuzt.',
+    'zurueck': 'Als zurück vermerkt.',
+    'schluessel-raus': 'Schlüssel ausgegeben.',
+    'fahrzeug-neu': 'Schlüssel ausgegeben – das Fahrzeug war neu und steht jetzt im Stamm.',
+    'kein-kennzeichen': 'Ohne Kennzeichen geht es nicht.',
+    'angefordert': 'Steht auf dem Tablet.',
+    'abgebrochen': 'Die Anforderung ist zurückgenommen.',
+    'kein-tablet': 'Es gibt keinen Tablet-Link – erst einen erzeugen.',
+    'fahrzeug-weg': 'Fahrzeug aus dem Stamm genommen.',
+    'fahrzeug-hat-vorgaenge': 'An diesem Fahrzeug hängen noch Vorgänge. Erst die löschen, sonst ginge die Ausgabehistorie mit verloren.',
+}
+
+# Welche davon eine Warnung ist und keine Erfolgsmeldung.
+WARNUNGEN = ("schon-drin", "keiner", "unbekannt", "widerrufen", "groesse",
+             "nichts", "kein-kennzeichen", "tshirt-zurueck", "geloescht",
+             "abgebrochen", "kein-tablet")
 
 
 # --- Hauptnavigation -------------------------------------------------------
@@ -272,12 +317,14 @@ def _navigation(pfad: str) -> dict:
         gemacht = []
         for ziel, name, weitere in eintraege:
             eigen = treffer((ziel, name, weitere))
-            gemacht.append({"ziel": ziel, "name": name,
+            gemacht.append({"ziel": ziel, "name": name, "marke": "",
                             "hier": eigen > 0 and eigen == laengster})
         return gemacht
 
     unten = punkte(UNTERNAV)
-    return {"hauptnav": punkte(HAUPTNAV), "unternav": unten,
+    # bereichsnav heisst, was frueher hauptnav hiess: die gemeinsame Huelle
+    # rendert unter dieser Bezeichnung die Punkte des offenen Bereichs.
+    return {"bereichsnav": punkte(HAUPTNAV), "unternav": unten,
             "unternav_hier": any(punkt["hier"] for punkt in unten)}
 
 
@@ -288,10 +335,19 @@ def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
     # Heisst tabletstand und nicht stand: /helfer/band reicht unter dem Namen
     # bereits den Tagesstand durch, und zwei gleiche Schluesselwoerter waeren
     # keine stille Ueberdeckung, sondern ein Fehler auf jeder solchen Seite.
+    roh = str(extra.pop("hinweis", "") or "")
     return _kontext(request, sitzung=sitzung,
                     csrf=auth.csrf_token(sitzung.token),
                     tabletstand=unterschriften.stand(),
                     admin_takt=config.ADMIN_TAKT,
+                    bereich="helfer",
+                    bereich_name="Helfer",
+                    bereiche=navigation.bereiche(request.url.path),
+                    # Die Meldung wird hier aufgeloest, nicht in der Vorlage:
+                    # die gemeinsame Huelle kennt die Tabelle nicht.
+                    hinweis=MELDUNGEN.get(roh, roh),
+                    hinweis_art=("hinweis-warnung" if roh in WARNUNGEN
+                                 else "hinweis-ok"),
                     **_navigation(request.url.path), **extra)
 
 

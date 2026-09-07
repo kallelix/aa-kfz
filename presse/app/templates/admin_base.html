@@ -1,45 +1,7 @@
-<!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
-  <title>{% block titel %}Backoffice{% endblock %} – {{ veranstaltung }}</title>
-  <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-  <div class="huelle {% block breite %}huelle-breit{% endblock %}">
-    <header class="admin-kopf">
-      <div class="kopf-marke">
-        <img class="vereinslogo" src="/static/ilrc-logo.svg" alt="" aria-hidden="true" width="52" height="52">
-        <div>
-        <p class="veranstaltung">{{ veranstaltung }} · Presse-Backoffice</p>
-        <h1>{% block ueberschrift %}Anmeldungen{% endblock %}</h1>
-        </div>
-      </div>
-      {% if sitzung %}
-        <form method="post" action="/presse/logout" class="abmelden">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          {% if sitzung.kuerzel %}<span class="kuerzel">{{ sitzung.kuerzel }}</span>{% endif %}
-          <button type="submit" class="knopf-schlicht">Abmelden</button>
-        </form>
-      {% endif %}
-    </header>
+{# Siehe kennzeichen/app/templates/admin_base.html - nichts Eigenes. #}
+{% extends "kern_base.html" %}
 
-    {% if sitzung %}
-      <nav class="admin-nav">
-        <a href="/presse">Anmeldungen</a>
-        <a href="/presse/abholung">Abholliste</a>
-        <a href="/presse/bilder">
-          Bilder ausstehend
-          {% if bilder_offen %}<span class="marke marke-telefon">{{ bilder_offen }}</span>{% endif %}
-        </a>
-      </nav>
-    {% endif %}
-
-    <main>
-      {% block inhalt %}{% endblock %}
-    </main>
-  </div>
-</body>
-</html>
+{# Die Vorgabe fuer Seiten, die keine eigene setzen. Sie stand
+   frueher in der bereichseigenen Huelle. #}
+{% block titel %}Backoffice{% endblock %}
+{% block ueberschrift %}Anmeldungen{% endblock %}

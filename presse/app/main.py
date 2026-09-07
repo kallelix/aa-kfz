@@ -30,6 +30,7 @@ _WURZEL = str(Path(__file__).resolve().parents[2])
 if _WURZEL not in _sys.path:
     _sys.path.insert(0, _WURZEL)
 
+from kern import navigation
 from kern.auth import Auth
 
 BASIS = Path(__file__).resolve().parent
@@ -123,7 +124,11 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+# Siehe kennzeichen/app/main.py: zweimal dasselbe Verzeichnis, einmal fuer
+# die oeffentliche Seite und einmal fuers Backoffice unter /presse.
 app.mount("/static", StaticFiles(directory=str(BASIS / "static")), name="static")
+app.mount("/presse/static", StaticFiles(directory=str(BASIS / "static")),
+          name="bereichsstatic")
 
 DANKE_PFAD = config.pfad("danke")
 
@@ -324,13 +329,30 @@ def _meldung(schluessel: str, anzahl: str = "") -> str:
     return MELDUNGEN.get(schluessel, "")
 
 
+BEREICHSNAV = (
+    ("/presse", "Anmeldungen", ("/presse/anmeldung",)),
+    ("/presse/abholung", "Abholliste", ()),
+    ("/presse/bilder", "Bilder ausstehend", ()),
+)
+
+
 def _admin_kontext(request: Request, sitzung, **extra) -> dict:
+    offen = db.bilder_offen_zaehlen()
+    punkte = navigation.punkte(BEREICHSNAV, request.url.path)
+    if offen:
+        for punkt in punkte:
+            if punkt["ziel"].endswith("/bilder"):
+                punkt["marke"] = offen
     return _kontext(
         request,
         sitzung=sitzung,
         csrf=auth.csrf_token(sitzung.token),
         status_werte=db.STATUS_WERTE,
-        bilder_offen=db.bilder_offen_zaehlen(),
+        bilder_offen=offen,
+        bereich="presse",
+        bereich_name="Presse",
+        bereiche=navigation.bereiche(request.url.path),
+        bereichsnav=punkte,
         **extra,
     )
 

@@ -215,7 +215,10 @@ try:
 
     print("Reiter")
     _, _, liste = anfrage("GET", "/kennzeichen")
-    pruefe('href="/kennzeichen/einstellungen">Einstellungen' in liste,
+    navigation = liste[liste.index('class="admin-nav"'):
+                       liste.index("</nav>", liste.index('class="admin-nav"'))]
+    pruefe('"/kennzeichen/einstellungen"' in navigation
+           and "Einstellungen" in navigation,
            "der Reiter steht im Backoffice")
 
 finally:

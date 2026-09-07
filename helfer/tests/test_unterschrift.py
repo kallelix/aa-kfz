@@ -35,6 +35,17 @@ HASH = "$2b$12$jWSkTX2jwE2Afm795IqpuuLOLzUGEL8Qruhfa67JQvzJd4fn.6fnm"
 fehler = []
 
 
+def nav_ausschnitt(seite):
+    """Nur die Punkte des Bereichs, nicht die Bereichszeile darueber.
+
+    Seit die drei Backoffices eine Huelle teilen, stehen zwei <nav> auf der
+    Seite: oben die drei Bereiche, darunter die Punkte des offenen. Bis zum
+    ERSTEN </nav> zu schneiden erwischt die falsche.
+    """
+    anfang = seite.index('class="admin-nav"')
+    return seite[anfang:seite.index("</nav>", anfang)]
+
+
 def pruefe(bedingung, text):
     print(("  ok   " if bedingung else "  FEHL ") + text)
     if not bedingung:
@@ -475,7 +486,7 @@ try:
 
     print("Die Hauptnavigation")
     _, _, seite = anfrage("GET", "/helfer")
-    leiste = seite[seite.index("admin-nav"):seite.index("</nav>")]
+    leiste = nav_ausschnitt(seite)
     namen = re.findall(r'<a href="/helfer[^"]*"[^>]*>\s*([^<]+?)\s*</a>', leiste)
     pruefe(namen == ["Übersicht", "Zeitplan", "Aufgaben", "Schichten", "Helfer",
                      "Funken", "Schlüssel",
@@ -497,7 +508,7 @@ try:
             ("/helfer/monitor", "Monitor", True),
             ("/helfer/zeitplan", "Zeitplan-Abruf", True)):
         _, _, seite = anfrage("GET", pfad)
-        leiste = seite[seite.index("admin-nav"):seite.index("</nav>")]
+        leiste = nav_ausschnitt(seite)
         hier = [n.strip() for n in
                 re.findall(r'ist-hier[^>]*>\s*([^<]+?)\s*<', leiste)]
         pruefe(erwartet in hier, pfad + " markiert " + erwartet)

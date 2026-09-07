@@ -1,0 +1,81 @@
+{# Die gemeinsame Hülle des Backoffice.
+
+   Vorher hatte jede Anwendung ihre eigene: derselbe Kopf, dieselbe
+   Abmeldezeile, dasselbe Raster – dreimal gepflegt und dreimal ein bisschen
+   anders. Jetzt eine, und der Bereichswechsel oben macht aus drei
+   Backoffices eines.
+
+   Was je Bereich verschieden ist, kommt über den Kontext:
+     bereich       Schlüssel des offenen Bereichs (kennzeichen|presse|helfer)
+     bereiche      die drei für die oberste Zeile
+     bereichsnav   die Punkte des offenen Bereichs
+   und über Blöcke: `leiste` für eine Zeile unter der Navigation,
+   `skript` für Skripte am Seitenende. #}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block titel %}Backoffice{% endblock %} – {{ veranstaltung }}</title>
+  {# Ein Blatt für alle drei Bereiche. Es liegt in kern/static und wird vom
+     Dienst ausgeliefert, nicht von einer der Anwendungen - sonst haenge es
+     davon ab, in welchem Bereich man gerade ist. #}
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+  <div class="huelle {% block breite %}huelle-breit{% endblock %}">
+    <header class="admin-kopf">
+      <div class="kopf-marke">
+        <img class="vereinslogo" src="/static/ilrc-logo.svg" alt=""
+             aria-hidden="true" width="52" height="52">
+        <div>
+          <p class="veranstaltung">{{ veranstaltung }} · Backoffice</p>
+          <h1>{% block ueberschrift %}Übersicht{% endblock %}</h1>
+        </div>
+      </div>
+      {% if sitzung %}
+        {# Abmelden gilt für alle drei: der Keks liegt auf Pfad "/". Welcher
+           Bereich die Abmeldung entgegennimmt, ist deshalb einerlei - es ist
+           der, in dem man gerade steht. #}
+        <form method="post" action="/{{ bereich }}/logout" class="abmelden">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if sitzung.kuerzel %}<span class="kuerzel">{{ sitzung.kuerzel }}</span>{% endif %}
+          <button type="submit" class="knopf-schlicht">Abmelden</button>
+        </form>
+      {% endif %}
+    </header>
+
+    {% if sitzung %}
+      <nav class="bereiche" aria-label="Bereiche">
+        {% for b in bereiche %}
+          <a class="bereich{% if b.hier %} ist-hier{% endif %}"
+             href="{{ b.ziel }}"
+             {% if b.hier %}aria-current="true"{% endif %}>{{ b.name }}</a>
+        {% endfor %}
+      </nav>
+
+      <nav class="admin-nav" aria-label="{{ bereich_name }}">
+        {% for punkt in bereichsnav %}
+          <a href="{{ punkt.ziel }}"
+             {% if punkt.hier %}class="ist-hier" aria-current="page"{% endif %}
+             >{{ punkt.name }}
+            {%- if punkt.marke %} <span class="marke marke-telefon">{{ punkt.marke }}</span>{% endif %}</a>
+        {% endfor %}
+        {% block navzusatz %}{% endblock %}
+      </nav>
+    {% endif %}
+
+    {% block leiste %}{% endblock %}
+
+    {% if hinweis %}
+      <p class="hinweis {{ hinweis_art|default('hinweis-ok') }}" role="status">{{ hinweis }}</p>
+    {% endif %}
+
+    <main class="{% block hauptklasse %}{% endblock %}">
+      {% block inhalt %}{% endblock %}
+    </main>
+  </div>
+  {% block skript %}{% endblock %}
+</body>
+</html>

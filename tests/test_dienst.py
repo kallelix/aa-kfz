@@ -151,6 +151,40 @@ try:
         pruefe(status == 200,
                "/" + bereich + " ist ohne zweite Anmeldung offen")
 
+    print("Das Backoffice ist eine Oberflaeche")
+    # Genau der Fehler, der beim ersten Zusammenbau durchrutschte: die
+    # Vorlagen verwiesen auf /static/style.css, der Verteiler waehlt aber am
+    # ersten Pfadstueck - und "static" ist keiner der drei Bereiche. Das
+    # Backoffice kam ohne jedes Stilblatt.
+    status, _, seite, _ = ruf("admin.test", "/static/admin.css", keks=keks)
+    pruefe(status == 200 and len(seite) > 10000,
+           "das gemeinsame Stilblatt kommt an (%d Bytes)" % len(seite))
+    status, _, seite, _ = ruf("admin.test", "/static/ilrc-logo.svg", keks=keks)
+    pruefe(status == 200, "das Wappen auch")
+
+    for bereich, datei in (("helfer", "liste.js"), ("presse", "liste.js")):
+        status, _, _, _ = ruf("admin.test", "/%s/static/%s" % (bereich, datei),
+                              keks=keks)
+        pruefe(status == 200,
+               "was nur einen Bereich betrifft, liegt unter seinem Pfad: "
+               + bereich + "/static/" + datei)
+
+    for bereich, name in (("kennzeichen", "Kennzeichen"), ("presse", "Presse"),
+                          ("helfer", "Helfer")):
+        status, _, seite, _ = ruf("admin.test", "/" + bereich, keks=keks)
+        pruefe('href="/static/admin.css"' in seite,
+               "/" + bereich + " holt dasselbe Stilblatt")
+        pruefe('class="bereiche"' in seite,
+               "und zeigt die Zeile zum Wechseln der Bereiche")
+        # Der offene Bereich ist markiert, die anderen zwei sind Links.
+        marke = 'class="bereich ist-hier"'
+        pruefe(seite.count(marke) == 1,
+               "genau ein Bereich ist hervorgehoben")
+        anfang = seite.index('class="bereiche"')
+        zeile = seite[anfang:seite.index("</nav>", anfang)]
+        pruefe(all(('"/%s"' % b) in zeile for b in ("kennzeichen", "presse", "helfer")),
+               "und von jedem Bereich kommt man in die anderen beiden")
+
     print("Ein falscher Keks kommt nirgends durch")
     kaputt = keks[:-4] + "xxxx"
     status, ort, _, _ = ruf("admin.test", "/presse", keks=kaputt)

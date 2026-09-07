@@ -32,6 +32,7 @@ _WURZEL = str(Path(__file__).resolve().parents[2])
 if _WURZEL not in _sys.path:
     _sys.path.insert(0, _WURZEL)
 
+from kern import navigation
 from kern.auth import Auth
 
 BASIS = Path(__file__).resolve().parent
@@ -132,7 +133,13 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+# Zweimal dasselbe Verzeichnis: unter "/static" fuer die oeffentlichen Seiten,
+# die unter ihrem eigenen Hostnamen an der Wurzel liegen, und unter
+# "/kennzeichen/static" fuers Backoffice - dort verteilt der Dienst am ersten
+# Pfadstueck, und "static" waere keiner der drei Bereiche.
 app.mount("/static", StaticFiles(directory=str(BASIS / "static")), name="static")
+app.mount("/kennzeichen/static", StaticFiles(directory=str(BASIS / "static")),
+          name="bereichsstatic")
 
 DANKE_PFAD = config.pfad("danke")
 
@@ -314,13 +321,35 @@ async def logout(request: Request):
 # --- Backoffice -------------------------------------------------------------
 
 
+BEREICHSNAV = (
+    ("/kennzeichen", "Anträge", ()),
+    ("/kennzeichen/durchfahrt", "Durchfahrtsliste", ()),
+    ("/kennzeichen/telefon", "Telefonisch informieren", ()),
+    ("/kennzeichen/einstellungen", "Einstellungen", ()),
+)
+
+
+def _navigation(pfad: str, telefon_offen: int) -> list:
+    punkte = navigation.punkte(BEREICHSNAV, pfad)
+    if telefon_offen:
+        for punkt in punkte:
+            if punkt["ziel"].endswith("/telefon"):
+                punkt["marke"] = telefon_offen
+    return punkte
+
+
 def _admin_kontext(request: Request, sitzung, **extra) -> dict:
+    offen = db.telefonisch_offen()
     return _kontext(
         request,
         sitzung=sitzung,
+        bereich="kennzeichen",
+        bereich_name="Kennzeichen",
+        bereiche=navigation.bereiche(request.url.path),
+        bereichsnav=_navigation(request.url.path, offen),
         csrf=auth.csrf_token(sitzung.token),
         status_werte=db.STATUS_WERTE,
-        telefon_offen=db.telefonisch_offen(),
+        telefon_offen=offen,
         mail_aktiv=config.MAIL_AKTIV,
         mail_max_versuche=config.MAIL_MAX_VERSUCHE,
         **extra,
