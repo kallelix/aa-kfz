@@ -8,7 +8,10 @@
     <p class="hinweis hinweis-fehler" role="alert">{{ fehler }}</p>
   {% endif %}
 
-  <form method="post" action="/admin/login">
+  {# An den Bereich, in dem man gerade steht - nicht an einen festen Pfad.
+     Die Anmeldung gilt ohnehin fuer alle drei, aber die Route liegt je
+     Bereich. #}
+  <form method="post" action="/{{ bereich }}/login">
     <input type="hidden" name="weiter" value="{{ weiter }}">
 
     <div class="feld">

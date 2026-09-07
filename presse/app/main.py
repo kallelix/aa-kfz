@@ -133,10 +133,17 @@ app.mount("/presse/static", StaticFiles(directory=str(BASIS / "static")),
 DANKE_PFAD = config.pfad("danke")
 
 
+# Siehe kennzeichen/app/main.py.
+BEREICH = "presse"
+BEREICH_NAME = "Presse"
+
+
 def _kontext(request: Request, **extra) -> dict:
     """Werte, die jede Seite braucht."""
     basis = {
         "request": request,
+        "bereich": BEREICH,
+        "bereich_name": BEREICH_NAME,
         "veranstaltung": config.VERANSTALTUNG,
         "ort": config.ORT,
         "abholort": config.ABHOLORT,
@@ -349,8 +356,6 @@ def _admin_kontext(request: Request, sitzung, **extra) -> dict:
         csrf=auth.csrf_token(sitzung.token),
         status_werte=db.STATUS_WERTE,
         bilder_offen=offen,
-        bereich="presse",
-        bereich_name="Presse",
         bereiche=navigation.bereiche(request.url.path),
         bereichsnav=punkte,
         **extra,

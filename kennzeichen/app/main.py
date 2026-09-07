@@ -144,10 +144,19 @@ app.mount("/kennzeichen/static", StaticFiles(directory=str(BASIS / "static")),
 DANKE_PFAD = config.pfad("danke")
 
 
+# Welcher Bereich das hier ist. Steckt in _kontext und nicht erst im
+# Backoffice-Kontext: die Anmeldeseite hat noch keine Sitzung, muss ihr
+# Formular aber an den richtigen Bereich schicken.
+BEREICH = "kennzeichen"
+BEREICH_NAME = "Kennzeichen"
+
+
 def _kontext(request: Request, **extra) -> dict:
     """Werte, die jede Seite braucht."""
     basis = {
         "request": request,
+        "bereich": BEREICH,
+        "bereich_name": BEREICH_NAME,
         "veranstaltung": config.VERANSTALTUNG,
         "kategorien": config.KATEGORIEN,
         "kategorie_labels": config.KATEGORIE_LABELS,
@@ -343,8 +352,6 @@ def _admin_kontext(request: Request, sitzung, **extra) -> dict:
     return _kontext(
         request,
         sitzung=sitzung,
-        bereich="kennzeichen",
-        bereich_name="Kennzeichen",
         bereiche=navigation.bereiche(request.url.path),
         bereichsnav=_navigation(request.url.path, offen),
         csrf=auth.csrf_token(sitzung.token),

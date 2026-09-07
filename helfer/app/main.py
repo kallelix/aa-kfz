@@ -213,9 +213,16 @@ app.mount("/helfer/static", StaticFiles(directory=str(BASIS / "static")),
           name="bereichsstatic")
 
 
+# Siehe kennzeichen/app/main.py.
+BEREICH = "helfer"
+BEREICH_NAME = "Helfer"
+
+
 def _kontext(request: Request, **extra) -> dict:
     basis = {
         "request": request,
+        "bereich": BEREICH,
+        "bereich_name": BEREICH_NAME,
         "veranstaltung": config.VERANSTALTUNG,
         "ort": config.ORT,
         "kontakt_name": config.KONTAKT_NAME,
@@ -340,9 +347,7 @@ def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
                     csrf=auth.csrf_token(sitzung.token),
                     tabletstand=unterschriften.stand(),
                     admin_takt=config.ADMIN_TAKT,
-                    bereich="helfer",
-                    bereich_name="Helfer",
-                    bereiche=navigation.bereiche(request.url.path),
+                                            bereiche=navigation.bereiche(request.url.path),
                     # Die Meldung wird hier aufgeloest, nicht in der Vorlage:
                     # die gemeinsame Huelle kennt die Tabelle nicht.
                     hinweis=MELDUNGEN.get(roh, roh),

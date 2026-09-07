@@ -130,10 +130,26 @@ try:
            "admin.test zeigt die Startseite mit allen drei Bereichen")
 
     print("Ohne Anmeldung kommt niemand hinein")
-    for bereich in ("kennzeichen", "presse", "helfer"):
-        status, ort, _, _ = ruf("admin.test", "/" + bereich)
+    for pfad, bereich in (("/kennzeichen", "kennzeichen"),
+                          ("/kennzeichen/antrag/neu", "kennzeichen"),
+                          ("/presse", "presse"), ("/presse/abholung", "presse"),
+                          ("/helfer", "helfer"), ("/helfer/schichten", "helfer")):
+        status, ort, _, _ = ruf("admin.test", pfad)
         pruefe(status == 303 and ort.startswith("/" + bereich + "/login"),
-               "/" + bereich + " fuehrt zur Anmeldung")
+               pfad + " fuehrt zur Anmeldung des eigenen Bereichs: " + ort)
+
+    print("Die Anmeldeseite gehoert zu ihrem Bereich")
+    # Die Vorlage ist gemeinsam, ihr Formularziel darf es nicht sein. Sie
+    # kam mit kern/ aus der Zeit vor der Pfadumbenennung und schickte noch
+    # an /admin/login - das gibt es nicht mehr, und niemand kam hinein.
+    for bereich in ("kennzeichen", "presse", "helfer"):
+        status, _, seite, _ = ruf("admin.test", "/%s/login?weiter=/%s"
+                                  % (bereich, bereich))
+        pruefe(status == 200, "/" + bereich + "/login laedt")
+        pruefe(('action="/%s/login"' % bereich) in seite,
+               "und schickt an den eigenen Bereich zurueck")
+        pruefe('href="/static/admin.css"' in seite,
+               "auch die Anmeldeseite hat ihr Stilblatt")
 
     print("Einmal anmelden reicht fuer alle drei")
     status, ort, _, gesetzt = ruf(
