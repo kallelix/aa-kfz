@@ -12,6 +12,8 @@ heißt bestanden.
 .venv/Scripts/python.exe tests/test_proxy.py
 .venv/Scripts/python.exe tests/test_kategorien.py
 .venv/Scripts/python.exe tests/test_erfassen.py
+.venv/Scripts/python.exe tests/test_suchen.py
+node tests/test_suchen_js.js
 .venv/Scripts/python.exe tests/test_durchfahrt.py
 .venv/Scripts/python.exe tests/test_einstellungen.py
 node tests/test_durchfahrt_js.js
@@ -46,6 +48,12 @@ node tests/test_durchfahrt_js.js
   wenn `node` fehlt). Dazu der offene Link: erzeugen, erneuern, zurückziehen,
   falsche Token, und dass die offene Ansicht nichts über die vier Spalten
   hinaus preisgibt.
+- `test_suchen.py` / `test_suchen_js.js` – Suchen mit Umlauten: dass
+  "Müller", "Mueller" und "Muller" einander finden, und dass Python und
+  JavaScript denselben durchsuchbaren Text erzeugen. Beim ersten Lauf hat
+  der Abgleich gleich eine Abweichung gefunden: Pythons casefold() macht aus
+  "ß" ein "ss", JavaScripts toLowerCase() nicht.
+
 - `test_durchfahrt_js.js` – die Filterlogik selbst, unter **node**, gegen
   dieselbe Datei, die der Browser lädt.
 

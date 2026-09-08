@@ -8,6 +8,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from kern import suchen
+
 from . import config
 
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
@@ -30,6 +32,11 @@ def verbinden() -> sqlite3.Connection:
     con.execute("PRAGMA foreign_keys = ON")
     con.execute("PRAGMA busy_timeout = 5000")
     con.create_function("lower_u", 1, _lower_u, deterministic=True)
+    # Dieselbe Umformung wie im Browser (kern/static/suchtext.js):
+    # "Mueller", "Muller" und "Müller" sollen einander finden.
+    con.create_function(
+        "suchtext", 1,
+        lambda wert: suchen.suchtext(wert or ""), deterministic=True)
     return con
 
 
@@ -169,8 +176,13 @@ def anmeldungen_suchen(
         parameter.append(gegenleistung)
     if suche:
         heuhaufen = " || ' ' || ".join(f"COALESCE({feld}, '')" for feld in _SUCHFELDER)
-        bedingungen.append(f"INSTR(lower_u({heuhaufen}), lower_u(?)) > 0")
-        parameter.append(suche)
+        # Siehe kennzeichen/app/db.py: eine Schreibweise davon muss vorkommen.
+        teile = []
+        for variante in suchen.varianten(suche):
+            teile.append(f"INSTR(suchtext({heuhaufen}), ?) > 0")
+            parameter.append(variante)
+        if teile:
+            bedingungen.append("(" + " OR ".join(teile) + ")")
 
     wo = f"WHERE {' AND '.join(bedingungen)}" if bedingungen else ""
     ordnung = SORTIERUNGEN.get(sortierung, SORTIERUNGEN["neueste"])

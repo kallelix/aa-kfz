@@ -236,4 +236,6 @@
 
 {# bereichsskript, nicht skript: skript gehoert der Huelle und traegt die
    gemeinsamen Skripte. Wer ihn ueberschreibt, wirft sie weg. #}
-{% block bereichsskript %}<script src="/helfer/static/liste.js"></script>{% endblock %}
+{# suchtext.js zuerst: liste.js benutzt es. #}
+{% block bereichsskript %}<script src="{{ gemeinsam }}/suchtext.js"></script>
+<script src="/helfer/static/liste.js"></script>{% endblock %}

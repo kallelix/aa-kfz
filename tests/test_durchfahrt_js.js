@@ -9,8 +9,13 @@
 "use strict";
 
 const path = require("path");
+
+// Zuerst suchtext.js: im Browser liegt es als eigenes <script> davor und
+// setzt Suchtext global. durchfahrt.js benutzt es beim Filtern.
+require(path.join(__dirname, "..", "kern", "static", "suchtext.js"));
+
 const { kfzNormalisieren, passt, vergleiche } = require(
-  path.join(__dirname, "..", "app", "static", "durchfahrt.js")
+  path.join(__dirname, "..", "kennzeichen", "app", "static", "durchfahrt.js")
 );
 
 const fehler = [];
@@ -39,8 +44,10 @@ console.log("Normalisierung");
 });
 
 // So, wie der Server sie in die data-Attribute schreibt.
-const BERGER = { name: "andrea berger", kfz: "KAAB101" };
-const OEZTUERK = { name: "dennis öztürk", kfz: "HHDO4" };
+// Den durchsuchbaren Namen so bauen, wie der Server es tut - nicht von Hand
+// hinschreiben. Sonst prueft der Test eine Form, die es gar nicht gibt.
+const BERGER = { name: Suchtext.suchtext("Andrea", "Berger"), kfz: "KAAB101" };
+const OEZTUERK = { name: Suchtext.suchtext("Dennis", "Öztürk"), kfz: "HHDO4" };
 const OHNE_KFZ = { name: "eva ohnewagen", kfz: "" };
 
 console.log("Leere Suche");
@@ -64,9 +71,17 @@ console.log("Namenssuche");
          "Berger + " + JSON.stringify(paar[0]) + " -> " + paar[1]);
 });
 
-pruefe(passt(OEZTUERK, "öztürk"), "Umlaute im Namen werden gefunden");
-pruefe(passt(OEZTUERK, "ÖZTÜRK"), "auch in Großschrift");
-pruefe(passt(OEZTUERK, "Dennis"), "Vorname wird gefunden");
+[
+  ["öztürk", "wie geschrieben"],
+  ["Öztürk", "mit grossem Anfang"],
+  ["ÖZTÜRK", "in Grossschrift"],
+  ["oeztuerk", "mit aufgeloestem Umlaut"],
+  ["Ozturk", "ganz ohne Umlaut"],
+  ["Dennis", "und der Vorname"],
+].forEach(function (paar) {
+  pruefe(passt(OEZTUERK, paar[0]), "Öztürk findet man " + paar[1]);
+});
+pruefe(!passt(OEZTUERK, "Meier"), "ein anderer Name findet ihn nicht");
 
 console.log("Kennzeichensuche, trennzeichentolerant");
 [

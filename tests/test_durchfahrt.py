@@ -211,9 +211,15 @@ try:
 
     print("Vorgekaute Suchwerte")
     zeilen = dict(re.findall(r'<tr data-name="([^"]*)" data-kfz="([^"]*)">', seite))
-    pruefe(zeilen.get("andrea berger") == "KAAB101",
-           "Berger: data-name klein, data-kfz ohne Trennzeichen -> " + str(zeilen))
-    pruefe(zeilen.get("dennis öztürk") == "HHDO4", "Öztürk ebenso")
+    # data-name traegt seit der Umlautkorrektur alle Schreibweisen, unter
+    # denen der Name zu finden sein soll - siehe kern/suchen.py.
+    from kern import suchen  # noqa: E402
+    pruefe(zeilen.get(suchen.suchtext("Andrea", "Berger")) == "KAAB101",
+           "Berger: data-name normalisiert, data-kfz ohne Trennzeichen -> "
+           + str(zeilen))
+    oeztuerk = suchen.suchtext("Dennis", "Öztürk")
+    pruefe(zeilen.get(oeztuerk) == "HHDO4",
+           "Öztürk ebenso, in beiden Schreibweisen: " + oeztuerk)
     pruefe(all(name == name.lower() for name in zeilen),
            "alle Namen sind kleingeschrieben")
 

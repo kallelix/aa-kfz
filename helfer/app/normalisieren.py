@@ -12,6 +12,8 @@ import re
 import unicodedata
 from datetime import date, datetime, timedelta
 
+from kern import suchen as kern_suchen
+
 # --- Text ------------------------------------------------------------------
 
 
@@ -156,14 +158,14 @@ def zeitspanne(datum_roh: str | None,
 
 
 def suchtext(*teile: str) -> str:
-    """Alles klein, Umlaute aufgelöst – für die clientseitige Suche im
-    data-Attribut. 'Öztürk' findet man dann auch als 'oztuerk'."""
-    roh = " ".join(text(t) for t in teile if t).casefold()
-    ersetzt = (roh.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
-                  .replace("ß", "ss"))
-    zerlegt = unicodedata.normalize("NFKD", ersetzt)
-    return re.sub(r"\s+", " ",
-                  "".join(z for z in zerlegt if not unicodedata.combining(z))).strip()
+    """Der durchsuchbare Text - jetzt aus kern.
+
+    Stand hier, solange das Helfer-Dashboard die einzige Anwendung mit einer
+    Suche im Browser war. Seit alle drei dieselbe brauchen, liegt die Regel
+    in kern/suchen.py, und dieselbe gibt es Wort fuer Wort in
+    kern/static/suchtext.js fuer die Filterung im Browser.
+    """
+    return kern_suchen.suchtext(*teile)
 
 
 # --- Kennzeichen -----------------------------------------------------------

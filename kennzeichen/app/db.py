@@ -9,6 +9,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from kern import suchen
+
 from . import config
 
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
@@ -42,6 +44,11 @@ def verbinden() -> sqlite3.Connection:
     # SQLite kennt nur ASCII-Groß/Kleinschreibung; für die Suche nach "Müller"
     # brauchen wir Pythons Unicode-Variante.
     con.create_function("lower_u", 1, _lower_u, deterministic=True)
+    # Dieselbe Umformung wie im Browser (kern/static/suchtext.js):
+    # "Mueller", "Muller" und "Müller" sollen einander finden.
+    con.create_function(
+        "suchtext", 1,
+        lambda wert: suchen.suchtext(wert or ""), deterministic=True)
     con.create_function("kfz_norm", 1, kfz_normalisieren, deterministic=True)
     return con
 
@@ -307,14 +314,19 @@ def antraege_suchen(
         parameter.append(kategorie)
     if suche:
         heuhaufen = " || ' ' || ".join(f"COALESCE({feld}, '')" for feld in _SUCHFELDER)
-        teile = [f"INSTR(lower_u({heuhaufen}), lower_u(?)) > 0"]
-        parameter.append(suche)
+        # Ein Suchbegriff kann zwei Schreibweisen haben - "Müller" wird zu
+        # "mueller" UND "muller". Eine davon muss vorkommen.
+        teile = []
+        for variante in suchen.varianten(suche):
+            teile.append(f"INSTR(suchtext({heuhaufen}), ?) > 0")
+            parameter.append(variante)
         # "kaxy123" soll auch "KA-XY 123" finden.
         gesuchtes_kfz = kfz_normalisieren(suche)
         if gesuchtes_kfz:
             teile.append("INSTR(kfz_norm(COALESCE(kennzeichen, '')), ?) > 0")
             parameter.append(gesuchtes_kfz)
-        bedingungen.append("(" + " OR ".join(teile) + ")")
+        if teile:
+            bedingungen.append("(" + " OR ".join(teile) + ")")
 
     wo = f"WHERE {' AND '.join(bedingungen)}" if bedingungen else ""
     ordnung = SORTIERUNGEN.get(sortierung, SORTIERUNGEN["neueste"])

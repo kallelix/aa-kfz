@@ -22,16 +22,14 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader
 
 from . import config, db, mail, validation, worker
-# Die Repo-Wurzel auf den Suchpfad, damit `kern` gefunden wird. Im
-# zusammengesetzten Betrieb hat sie schon jemand daraufgelegt; von Hand
-# gestartet (python -m app) tut es diese Zeile.
-import sys as _sys
-_WURZEL = str(Path(__file__).resolve().parents[2])
-if _WURZEL not in _sys.path:
-    _sys.path.insert(0, _WURZEL)
+# Die Repo-Wurzel steht schon auf dem Suchpfad - siehe __init__.py.
+from . import WURZEL as _WURZELPFAD
+_WURZEL = str(_WURZELPFAD)
 
-from kern import navigation
+from kern import navigation, suchen
 from kern.auth import Auth
+
+WURZEL_STATIC = Path(_WURZEL) / "kern" / "static"
 
 BASIS = Path(__file__).resolve().parent
 # Eine Instanz je Anwendung: die drei laufen in einem Prozess und haben
@@ -130,6 +128,14 @@ app.mount("/static", StaticFiles(directory=str(BASIS / "static")), name="static"
 app.mount("/presse/static", StaticFiles(directory=str(BASIS / "static")),
           name="bereichsstatic")
 
+# kern/static zweimal: unter der Wurzel fuer die oeffentlichen Seiten, die
+# unter ihrem eigenen Hostnamen liegen, und unter dem Bereich fuers
+# Backoffice. Dort liefert zwar auch der Dienst /static aus kern - aber die
+# oeffentlichen Seiten erreicht der nie.
+_GEMEINSAM = StaticFiles(directory=str(WURZEL_STATIC))
+app.mount("/gemeinsam", _GEMEINSAM, name="gemeinsam")
+app.mount("/presse/gemeinsam", _GEMEINSAM, name="bereichsgemeinsam")
+
 DANKE_PFAD = config.pfad("danke")
 
 
@@ -143,6 +149,9 @@ def _kontext(request: Request, **extra) -> dict:
     basis = {
         "request": request,
         "bereich": BEREICH,
+        # Wo die gemeinsamen Dateien liegen. Ohne Anmeldung ist es eine
+        # oeffentliche Seite unter eigenem Hostnamen, dort ohne Bereich.
+        "gemeinsam": "/gemeinsam",
         "bereich_name": BEREICH_NAME,
         "veranstaltung": config.VERANSTALTUNG,
         "ort": config.ORT,
@@ -357,6 +366,7 @@ def _admin_kontext(request: Request, sitzung, **extra) -> dict:
         status_werte=db.STATUS_WERTE,
         bilder_offen=offen,
         bereiche=navigation.bereiche(request.url.path),
+        gemeinsam="/presse/gemeinsam",
         bereichsnav=punkte,
         **extra,
     )
@@ -510,7 +520,8 @@ async def admin_abholung(
             "badge_durch": a["badge_durch"] or "",
             "gebuehr_bezahlt_am": a["gebuehr_bezahlt_am"],
             # Vorgekaut fürs Filtern im Browser.
-            "suchtext": f"{a['vorname']} {a['nachname']} {a['firma']}".lower(),
+            # Siehe kern/suchen.py: dieselbe Regel wie beim Suchbegriff.
+            "suchtext": suchen.suchtext(a["vorname"], a["nachname"], a["firma"]),
         }
         for a in db.anmeldungen_abholung()
     ]

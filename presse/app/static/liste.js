@@ -17,9 +17,12 @@
 (function () {
   "use strict";
 
+  /* Suchtext.passt kommt aus kern/static/suchtext.js und formt den
+   * Suchbegriff genauso um wie kern/suchen.py den durchsuchbaren Text.
+   * Vorher wurde nur kleingeschrieben - ein getipptes "ü" fand deshalb
+   * nichts, weil im data-Attribut "ue" stand. */
   function passt(zeile, suche) {
-    var roh = String(suche || "").trim().toLowerCase();
-    return roh === "" || zeile.suche.indexOf(roh) !== -1;
+    return Suchtext.passt(zeile.suche, suche);
   }
 
   /* localeCompare mit "de": Umlaute landen bei ihrem Grundbuchstaben, Ö also

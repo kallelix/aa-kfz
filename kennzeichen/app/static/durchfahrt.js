@@ -18,11 +18,12 @@
   }
 
   function passt(zeile, suche) {
-    var roh = String(suche || "").trim().toLowerCase();
-    if (roh === "") {
+    if (String(suche || "").trim() === "") {
       return true;
     }
-    if (zeile.name.indexOf(roh) !== -1) {
+    // Suchtext.passt formt den Begriff genauso um wie kern/suchen.py den
+    // durchsuchbaren Namen - sonst faende ein getipptes "ü" nichts.
+    if (Suchtext.passt(zeile.name, suche)) {
       return true;
     }
     var kfz = kfzNormalisieren(suche);
