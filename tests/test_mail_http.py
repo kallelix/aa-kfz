@@ -8,8 +8,8 @@ tests/README.md. Verändert die Daten.
 import http.cookiejar
 import os
 import re
-import sqlite3
 import sys
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -19,8 +19,18 @@ DB = os.environ.get("TEST_DB", "")
 PASSWORT = os.environ.get("TEST_PASSWORT", "test-passwort-123")
 
 if not DB:
-    print("TEST_DB muss auf die Datenbank des laufenden Servers zeigen.", file=sys.stderr)
+    print("TEST_DB muss die DATABASE_URL des laufenden Servers enthalten.", file=sys.stderr)
     sys.exit(2)
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from kern import testdb  # noqa: E402
+
+
+def sql(befehl, *parameter):
+    """Abfrage gegen die Datenbank des laufenden Servers, Schema kennzeichen."""
+    return testdb.abfrage(DB, "kennzeichen", befehl, parameter)
+
 
 fehler = []
 
@@ -31,13 +41,8 @@ def pruefe(bedingung, text):
         fehler.append(text)
 
 
-def frage(sql, *parameter):
-    con = sqlite3.connect(DB)
-    con.row_factory = sqlite3.Row
-    try:
-        return con.execute(sql, parameter).fetchall()
-    finally:
-        con.close()
+def frage(befehl, *parameter):
+    return sql(befehl, *parameter)
 
 
 def mails(antrag_id):
@@ -165,11 +170,8 @@ pruefe(status == 404, "Telefonhaken auf unbekannten Antrag -> 404")
 # --- Mail erneut anstossen ---------------------------------------------------
 print("Mail erneut anstossen")
 mail_id = mails(neu)[0]["id"]
-con = sqlite3.connect(DB)
-with con:
-    con.execute("UPDATE mail_out SET versuche = 99, letzter_fehler = 'Testfehler' WHERE id = ?",
-                (mail_id,))
-con.close()
+sql("UPDATE mail_out SET versuche = 99, letzter_fehler = 'Testfehler' WHERE id = ?",
+    mail_id)
 _, _, seite = hole("/kennzeichen/antrag/" + str(neu))
 pruefe("fehlgeschlagen" in seite and "Testfehler" in seite, "Detailseite zeigt den Fehlschlag")
 pruefe("erneut versuchen" in seite, "Knopf zum erneuten Anstossen ist da")

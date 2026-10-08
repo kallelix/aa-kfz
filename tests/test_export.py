@@ -8,8 +8,8 @@ import csv
 import http.cookiejar
 import io
 import os
-import sqlite3
 import sys
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,8 +20,18 @@ PASSWORT = os.environ.get("TEST_PASSWORT", "test-passwort-123")
 TRENNER = os.environ.get("TEST_CSV_TRENNER", ";")
 
 if not DB:
-    print("TEST_DB muss auf die Datenbank des laufenden Servers zeigen.", file=sys.stderr)
+    print("TEST_DB muss die DATABASE_URL des laufenden Servers enthalten.", file=sys.stderr)
     sys.exit(2)
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from kern import testdb  # noqa: E402
+
+
+def sql(befehl, *parameter):
+    """Abfrage gegen die Datenbank des laufenden Servers, Schema kennzeichen."""
+    return testdb.abfrage(DB, "kennzeichen", befehl, parameter)
+
 
 fehler = []
 
@@ -69,7 +79,7 @@ hole("/", {"vorname": "Anna", "nachname": "Semikolon; Zeile",
            "funktion": 'Presse "Vor Ort"', "kategorie": "vip",
            "email": "anna@example.org", "kennzeichen": "B-AS 1",
            "bemerkung": "Zeile eins\nZeile zwei; mit Trenner"})
-heikel = sqlite3.connect(DB).execute("SELECT MAX(id) FROM antrag").fetchone()[0]
+heikel = sql("SELECT MAX(id) FROM antrag")[0][0]
 
 # --- Grundform ---------------------------------------------------------------
 print("Grundform")
@@ -89,7 +99,7 @@ kopfzeile = zeilen[0]
 pruefe(kopfzeile[0] == "Nr." and "Kategorie (Klartext)" in kopfzeile,
        "Kopfzeile stimmt: " + str(kopfzeile[:4]))
 pruefe(all("IP" not in feld for feld in kopfzeile), "keine IP-Spalte im Export")
-pruefe(len(zeilen) - 1 == sqlite3.connect(DB).execute("SELECT COUNT(*) FROM antrag").fetchone()[0],
+pruefe(len(zeilen) - 1 == sql("SELECT COUNT(*) FROM antrag")[0][0],
        "ohne Filter sind alle Antraege drin")
 
 # --- Sonderzeichen -----------------------------------------------------------
@@ -131,7 +141,7 @@ zeilen = tabelle(text.lstrip("﻿"))
 pruefe(len(zeilen) == 1, "leere Auswahl liefert nur die Kopfzeile")
 
 _, _, text = hole("/kennzeichen/export.csv?sortierung=" + urllib.parse.quote("id; DROP TABLE antrag--"))
-pruefe(sqlite3.connect(DB).execute("SELECT COUNT(*) FROM antrag").fetchone()[0] > 0,
+pruefe(sql("SELECT COUNT(*) FROM antrag")[0][0] > 0,
        "unbekannte Sortierung richtet keinen Schaden an")
 
 # --- Verweis in der Liste ----------------------------------------------------

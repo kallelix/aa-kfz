@@ -39,6 +39,25 @@ def wegwerf(praefix: str = "test") -> str:
     return conninfo.make_conninfo(VERWALTUNG_URL, dbname=name)
 
 
+def abfrage(url: str, schema: str, sql_text: str, parameter=()):
+    """Eine Abfrage zum Nachsehen oder Vorbereiten, ohne den Server.
+
+    Gibt bei SELECT die Zeilen zurück (lesbar wie sqlite3.Row), sonst die
+    Zahl der betroffenen Zeilen. Bestätigt sofort.
+    """
+    from kern.db import verbinden
+
+    con = verbinden(url, schema)
+    try:
+        with con:
+            zeiger = con.execute(sql_text, parameter)
+            if zeiger.description is None:
+                return zeiger.rowcount
+            return zeiger.fetchall()
+    finally:
+        con.close()
+
+
 def _entfernen(name: str) -> None:
     try:
         with psycopg.connect(VERWALTUNG_URL, autocommit=True,

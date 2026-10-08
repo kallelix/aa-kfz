@@ -94,9 +94,11 @@ def bind_adresse() -> tuple[str, int]:
 
 def nur_localhost() -> bool:
     return bind_adresse()[0] in ("127.0.0.1", "::1", "localhost")
-DB_PATH = Path(_env("DB_PATH", str(BASE_DIR / "data" / "antraege.db")))
-if not DB_PATH.is_absolute():
-    DB_PATH = BASE_DIR / DB_PATH
+# Die Datenbank: eine fuer den ganzen Dienst, dieser Bereich in seinem
+# eigenen Schema (kern/db.py). Im Betrieb steht die Verbindung in
+# dienst.env. Leer heisst: der Entwicklungs-Container aus compose.yaml.
+DATABASE_URL = _env("DATABASE_URL", "").strip()
+DB_SCHEMA = "kennzeichen"
 
 FORM_PATH = "/" + _env("FORM_PATH", "/").strip("/")
 

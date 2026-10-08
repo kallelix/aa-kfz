@@ -6,19 +6,18 @@ Legt eine eigene Wegwerf-Datenbank an und fasst nichts anderes an.
 """
 
 import os
-import sqlite3
 import sys
-import tempfile
 from pathlib import Path
 
-TEMP = Path(tempfile.mkdtemp(prefix="abfahrt-mailtest-"))
-os.environ["DB_PATH"] = str(TEMP / "test.db")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from kern import testdb  # noqa: E402
+
+os.environ["DATABASE_URL"] = testdb.wegwerf("test_mail")
 os.environ["APP_SECRET_KEY"] = "test"
 os.environ["MAIL_MAX_VERSUCHE"] = "3"
 os.environ["KONTAKT_NAME"] = "Orga Absolute Abfahrt"
 os.environ["KONTAKT_MAIL"] = "orga@example.org"
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Das Programm liegt seit der Zusammenfuehrung unter kennzeichen/.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "kennzeichen"))
 
@@ -143,7 +142,7 @@ print("Worker ohne SMTP")
 config.MAIL_AKTIV = False
 gesendet, misslungen = worker.runde()
 pruefe(gesendet == 0 and misslungen > 0, "ohne SMTP schlaegt jeder Versuch fehl")
-con = sqlite3.connect(config.DB_PATH)
+con = db.verbinden()
 uebrig = con.execute("SELECT COUNT(*) FROM mail_out WHERE gesendet_am IS NULL").fetchone()[0]
 con.close()
 pruefe(uebrig > 0, "die Mails bleiben liegen, nichts geht verloren")
@@ -162,7 +161,7 @@ echt = mail.senden
 mail.senden = _merken
 # Alle liegengebliebenen zuruecksetzen – mails_faellig() liefert die
 # aufgegebenen ja gerade nicht mehr.
-con = sqlite3.connect(config.DB_PATH)
+con = db.verbinden()
 with con:
     con.execute(
         "UPDATE mail_out SET versuche = 0, naechster_versuch = NULL,"
@@ -216,29 +215,15 @@ pruefe(db.antrag_laden(abgelehnt_ohne_mail)["tel_informiert_am"] is not None,
 db.tel_informiert_setzen(abgelehnt_ohne_mail, False)
 pruefe(db.telefonisch_offen() == vorher, "Haken laesst sich zuruecknehmen")
 
-# --- Migration ----------------------------------------------------------------
-print("Migration einer alten Datenbank")
-alt = TEMP / "alt.db"
-con = sqlite3.connect(alt)
-con.executescript(
-    "CREATE TABLE antrag (id INTEGER PRIMARY KEY, vorname TEXT, nachname TEXT,"
-    " funktion TEXT, kategorie TEXT, email TEXT, telefon TEXT, kennzeichen TEXT,"
-    " bemerkung TEXT, status TEXT, entscheidung_am TEXT, entscheidung_durch TEXT,"
-    " begruendung TEXT, tel_informiert_am TEXT, created_at TEXT, remote_ip TEXT);"
-    "CREATE TABLE mail_out (id INTEGER PRIMARY KEY, antrag_id INTEGER, typ TEXT,"
-    " empfaenger TEXT, betreff TEXT, body TEXT, versuche INTEGER DEFAULT 0,"
-    " gesendet_am TEXT, letzter_fehler TEXT, created_at TEXT);"
-)
-con.commit()
+# --- Migrationen ---------------------------------------------------------------
+print("Migrationen")
+pruefe(db.init() == [], "zweiter Start spielt nichts mehr ein")
+con = db.verbinden()
+spalten = {z["column_name"] for z in con.execute(
+    "SELECT column_name FROM information_schema.columns"
+    " WHERE table_schema = 'kennzeichen' AND table_name = 'mail_out'")}
 con.close()
-config.DB_PATH = alt
-ergaenzt = db.init()
-pruefe("mail_out.naechster_versuch" in ergaenzt, "fehlende Spalte wird nachgetragen: " + str(ergaenzt))
-pruefe(db.init() == [], "zweiter Lauf traegt nichts mehr nach")
-con = sqlite3.connect(alt)
-spalten = {z[1] for z in con.execute("PRAGMA table_info(mail_out)")}
-con.close()
-pruefe("naechster_versuch" in spalten, "Spalte ist wirklich da")
+pruefe("naechster_versuch" in spalten, "mail_out hat naechster_versuch von Anfang an")
 
 print()
 if fehler:
@@ -247,5 +232,4 @@ if fehler:
         print("  - " + eintrag)
 else:
     print("alle Pruefungen bestanden")
-print("Wegwerf-Datenbanken lagen in " + str(TEMP))
 sys.exit(1 if fehler else 0)

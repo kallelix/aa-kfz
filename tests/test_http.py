@@ -8,8 +8,8 @@ für die eigene IP; danach gehört die Test-Datenbank weggeworfen.
 import http.cookiejar
 import os
 import re
-import sqlite3
 import sys
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -19,8 +19,18 @@ DB = os.environ.get("TEST_DB", "")
 PASSWORT = os.environ.get("TEST_PASSWORT", "test-passwort-123")
 
 if not DB:
-    print("TEST_DB muss auf die Datenbank des laufenden Servers zeigen.", file=sys.stderr)
+    print("TEST_DB muss die DATABASE_URL des laufenden Servers enthalten.", file=sys.stderr)
     sys.exit(2)
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from kern import testdb  # noqa: E402
+
+
+def sql(befehl, *parameter):
+    """Abfrage gegen die Datenbank des laufenden Servers, Schema kennzeichen."""
+    return testdb.abfrage(DB, "kennzeichen", befehl, parameter)
+
 
 fehler = []
 
@@ -31,12 +41,8 @@ def pruefe(bedingung, text):
         fehler.append(text)
 
 
-def zaehle(sql, *parameter):
-    con = sqlite3.connect(DB)
-    try:
-        return con.execute(sql, parameter).fetchone()[0]
-    finally:
-        con.close()
+def zaehle(befehl, *parameter):
+    return sql(befehl, *parameter)[0][0]
 
 
 class KeineWeiterleitung(urllib.request.HTTPRedirectHandler):

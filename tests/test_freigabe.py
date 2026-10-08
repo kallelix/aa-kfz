@@ -7,8 +7,8 @@ tests/README.md. Verändert die Daten, also nur gegen eine Wegwerf-Datenbank.
 import http.cookiejar
 import os
 import re
-import sqlite3
 import sys
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -18,8 +18,18 @@ DB = os.environ.get("TEST_DB", "")
 PASSWORT = os.environ.get("TEST_PASSWORT", "test-passwort-123")
 
 if not DB:
-    print("TEST_DB muss auf die Datenbank des laufenden Servers zeigen.", file=sys.stderr)
+    print("TEST_DB muss die DATABASE_URL des laufenden Servers enthalten.", file=sys.stderr)
     sys.exit(2)
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from kern import testdb  # noqa: E402
+
+
+def sql(befehl, *parameter):
+    """Abfrage gegen die Datenbank des laufenden Servers, Schema kennzeichen."""
+    return testdb.abfrage(DB, "kennzeichen", befehl, parameter)
+
 
 fehler = []
 
@@ -31,12 +41,8 @@ def pruefe(bedingung, text):
 
 
 def zeile(antrag_id):
-    con = sqlite3.connect(DB)
-    con.row_factory = sqlite3.Row
-    try:
-        return con.execute("SELECT * FROM antrag WHERE id = ?", (antrag_id,)).fetchone()
-    finally:
-        con.close()
+    zeilen = testdb.abfrage(DB, "kennzeichen", "SELECT * FROM antrag WHERE id = ?", (antrag_id,))
+    return zeilen[0] if zeilen else None
 
 
 class KeineWeiterleitung(urllib.request.HTTPRedirectHandler):
@@ -158,11 +164,8 @@ pruefe("Doch genehmigen" in seite, "abgelehnter Antrag laesst sich noch genehmig
 
 # --- Sammelaktion ------------------------------------------------------------
 print("Sammelaktion")
-con = sqlite3.connect(DB)
-with con:
-    con.execute("UPDATE antrag SET status='neu', entscheidung_am=NULL,"
-                " entscheidung_durch=NULL, begruendung=NULL")
-con.close()
+sql("UPDATE antrag SET status='neu', entscheidung_am=NULL,"
+    " entscheidung_durch=NULL, begruendung=NULL")
 
 status, ort, _ = hole("/kennzeichen/sammelaktion", {"csrf": CSRF, "zurueck": "/kennzeichen"})
 pruefe("hinweis=nichts_markiert" in ort, "ohne Markierung passiert nichts")
@@ -209,11 +212,8 @@ for pfad, daten in (
 
 # --- Kontingent --------------------------------------------------------------
 print("Kontingentwarnung (erwartet KONTINGENTE=camping:1)")
-con = sqlite3.connect(DB)
-with con:
-    con.execute("UPDATE antrag SET status='neu' WHERE id=3")
-    con.execute("UPDATE antrag SET status='genehmigt' WHERE id=1")
-con.close()
+sql("UPDATE antrag SET status='neu' WHERE id=3")
+sql("UPDATE antrag SET status='genehmigt' WHERE id=1")
 _, _, seite = hole("/kennzeichen/antrag/3")
 pruefe("Kontingent für" in seite and "ausgeschöpft" in seite,
        "volles Kontingent wird auf der Detailseite gewarnt")

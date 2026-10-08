@@ -11,13 +11,14 @@ import os
 import socket
 import socketserver
 import sys
-import tempfile
 import threading
 from email import message_from_string, policy
 from pathlib import Path
 
-TEMP = Path(tempfile.mkdtemp(prefix="abfahrt-versand-"))
-os.environ["DB_PATH"] = str(TEMP / "test.db")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from kern import testdb  # noqa: E402
+
+os.environ["DATABASE_URL"] = testdb.wegwerf("test_versand")
 os.environ["APP_SECRET_KEY"] = "test"
 os.environ["SMTP_HOST"] = "127.0.0.1"
 os.environ["SMTP_TLS"] = "keine"
@@ -26,7 +27,6 @@ os.environ["MAIL_FROM"] = "Absolute Abfahrt <kennzeichen@example.org>"
 os.environ["MAIL_REPLY_TO"] = "orga@example.org"
 os.environ["MAIL_INTERVALL"] = "1"
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Das Programm liegt seit der Zusammenfuehrung unter kennzeichen/.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "kennzeichen"))
 
@@ -167,5 +167,4 @@ if fehler:
         print("  - " + eintrag)
 else:
     print("alle Pruefungen bestanden")
-print("Wegwerf-Datenbank lag in " + str(TEMP))
 sys.exit(1 if fehler else 0)

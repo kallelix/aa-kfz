@@ -13,15 +13,16 @@ Wegwerf-Datenbanken an.
 import http.client
 import os
 import socket
-import sqlite3
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.parse
 from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(WURZEL))
+from kern import testdb  # noqa: E402
+
 PYTHON = WURZEL / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
     PYTHON = WURZEL / ".venv" / "bin" / "python"
@@ -50,12 +51,11 @@ class Server:
     """Startet `python -m app` mit eigener Umgebung und raeumt wieder auf."""
 
     def __init__(self, **umgebung):
-        self.verzeichnis = Path(tempfile.mkdtemp(prefix="abfahrt-proxy-"))
         self.hafen = freier_hafen()
-        self.db = self.verzeichnis / "test.db"
+        self.db = testdb.wegwerf("test_proxy")
         self.umgebung = {
             **os.environ,
-            "DB_PATH": str(self.db),
+            "DATABASE_URL": self.db,
             "BIND": f"127.0.0.1:{self.hafen}",
             "ADMIN_PASSWORD_HASH": HASH,
             "APP_SECRET_KEY": "test-schluessel",
@@ -102,11 +102,8 @@ class Server:
         return ergebnis
 
     def letzte_ip(self):
-        con = sqlite3.connect(self.db)
-        try:
-            return con.execute("SELECT remote_ip FROM antrag ORDER BY id DESC LIMIT 1").fetchone()[0]
-        finally:
-            con.close()
+        return testdb.abfrage(self.db, "kennzeichen",
+                              "SELECT remote_ip FROM antrag ORDER BY id DESC LIMIT 1")[0][0]
 
 
 ANTRAG = {

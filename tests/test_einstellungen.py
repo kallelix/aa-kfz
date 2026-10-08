@@ -9,16 +9,15 @@ import http.client
 import os
 import re
 import socket
-import sqlite3
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.parse
 from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL))
+from kern import testdb  # noqa: E402
 # Das Programm liegt seit der Zusammenfuehrung unter kennzeichen/.
 sys.path.insert(0, str(WURZEL / "kennzeichen"))
 
@@ -39,58 +38,6 @@ def pruefe(bedingung, text):
         fehler.append(text)
 
 
-# --- Umbau einer alten Datenbank ---------------------------------------------
-print("Umbau von mail_out")
-from app import config as config_modul  # noqa: E402
-from app import db as db_modul  # noqa: E402
-
-alt_verzeichnis = Path(tempfile.mkdtemp(prefix="abfahrt-umbau-"))
-alt_db = alt_verzeichnis / "alt.db"
-con = sqlite3.connect(alt_db)
-con.executescript(
-    "CREATE TABLE antrag (id INTEGER PRIMARY KEY, vorname TEXT, nachname TEXT,"
-    " funktion TEXT, kategorie TEXT, email TEXT, telefon TEXT, kennzeichen TEXT,"
-    " bemerkung TEXT, status TEXT, entscheidung_am TEXT, entscheidung_durch TEXT,"
-    " begruendung TEXT, tel_informiert_am TEXT, created_at TEXT, remote_ip TEXT);"
-    "CREATE TABLE mail_out (id INTEGER PRIMARY KEY, antrag_id INTEGER,"
-    " typ TEXT NOT NULL CHECK (typ IN ('eingang', 'genehmigt', 'abgelehnt')),"
-    " empfaenger TEXT NOT NULL, betreff TEXT NOT NULL, body TEXT NOT NULL,"
-    " versuche INTEGER NOT NULL DEFAULT 0, gesendet_am TEXT, letzter_fehler TEXT,"
-    " created_at TEXT NOT NULL);"
-    "INSERT INTO mail_out (id, antrag_id, typ, empfaenger, betreff, body, versuche,"
-    " created_at) VALUES (7, 1, 'eingang', 'a@example.org', 'Betreff', 'Text', 2,"
-    " '2026-01-01T00:00:00+00:00');"
-)
-con.commit()
-con.close()
-
-config_modul.DB_PATH = alt_db
-ergaenzt = db_modul.init()
-pruefe(any("mail_out.typ" in eintrag for eintrag in ergaenzt),
-       "der Umbau wird gemeldet: " + str(ergaenzt))
-
-con = sqlite3.connect(alt_db)
-con.row_factory = sqlite3.Row
-zeile = con.execute("SELECT * FROM mail_out WHERE id = 7").fetchone()
-pruefe(zeile is not None, "die vorhandene Zeile hat den Umbau ueberlebt")
-if zeile:
-    pruefe(zeile["typ"] == "eingang" and zeile["versuche"] == 2
-           and zeile["empfaenger"] == "a@example.org",
-           "mit allen Werten")
-    pruefe(zeile["naechster_versuch"] is None, "die neue Spalte ist da und leer")
-sql = con.execute("SELECT sql FROM sqlite_master WHERE name = 'mail_out'").fetchone()[0]
-pruefe("'orga'" in sql, "der neue Typ ist erlaubt")
-indizes = [z[0] for z in con.execute(
-    "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'mail_out'")]
-pruefe("idx_mail_out_offen" in indizes, "der Index wurde wieder angelegt")
-con.execute("INSERT INTO mail_out (antrag_id, typ, empfaenger, betreff, body, created_at)"
-            " VALUES (1, 'orga', 'x@example.org', 'B', 'T', '2026-01-01T00:00:00+00:00')")
-con.commit()
-con.close()
-pruefe(True, "eine orga-Mail laesst sich einfuegen")
-pruefe(db_modul.init() == [], "zweiter Lauf baut nichts mehr um")
-
-
 # --- Ueber HTTP --------------------------------------------------------------
 def freier_hafen():
     with socket.socket() as s:
@@ -98,14 +45,13 @@ def freier_hafen():
         return s.getsockname()[1]
 
 
-verzeichnis = Path(tempfile.mkdtemp(prefix="abfahrt-einstellungen-"))
-db = verzeichnis / "test.db"
+db = testdb.wegwerf("test_einstellungen")
 hafen = freier_hafen()
 
 prozess = subprocess.Popen(
     [str(PYTHON), "-m", "app"],
     cwd=str(WURZEL / "kennzeichen"),
-    env={**os.environ, "DB_PATH": str(db), "BIND": f"127.0.0.1:{hafen}",
+    env={**os.environ, "DATABASE_URL": db, "BIND": f"127.0.0.1:{hafen}",
          "ADMIN_PASSWORD_HASH": HASH, "APP_SECRET_KEY": "test-schluessel",
          "COOKIE_SECURE": "0", "SMTP_HOST": "", "MAIL_FROM": "",
          "PYTHONIOENCODING": "utf-8"},
@@ -144,14 +90,8 @@ try:
         return ergebnis
 
     def mails(typ):
-        con = sqlite3.connect(db)
-        con.row_factory = sqlite3.Row
-        try:
-            return con.execute(
-                "SELECT * FROM mail_out WHERE typ = ? ORDER BY id", (typ,)
-            ).fetchall()
-        finally:
-            con.close()
+        return testdb.abfrage(
+            db, "kennzeichen", "SELECT * FROM mail_out WHERE typ = ? ORDER BY id", (typ,))
 
     antrag = {"vorname": "Nina", "nachname": "Neu", "funktion": "Aufbau",
               "kategorie": "camping", "kennzeichen": "KA-NN 1",
@@ -235,5 +175,4 @@ if fehler:
         print("  - " + eintrag)
 else:
     print("alle Pruefungen bestanden")
-print("Wegwerf-Datenbanken lagen in " + str(verzeichnis) + " und " + str(alt_verzeichnis))
 sys.exit(1 if fehler else 0)

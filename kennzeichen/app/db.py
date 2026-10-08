@@ -1,28 +1,23 @@
-"""SQLite-Zugriff. Eine Datei, ein `cp` als Backup."""
+"""Datenbankzugriff. PostgreSQL, Schema kennzeichen – siehe kern/db.py."""
 
 from __future__ import annotations
 
-import re
 import secrets
-import sqlite3
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
 from kern import suchen
+from kern.db import Datenbank, Verbindung
 
 from . import config
 
-SCHEMA = Path(__file__).resolve().parent / "schema.sql"
+_DATENBANK = Datenbank(lambda: config.DATABASE_URL, config.DB_SCHEMA,
+                       Path(__file__).resolve().parent / "migrationen")
 
 
 def jetzt() -> str:
     """Zeitstempel in ISO-8601 mit Sekundenauflösung, immer UTC."""
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-
-def _lower_u(wert):
-    return wert.lower() if isinstance(wert, str) else wert
 
 
 def kfz_normalisieren(wert):
@@ -36,192 +31,18 @@ def kfz_normalisieren(wert):
     return "".join(zeichen for zeichen in wert if zeichen.isalnum()).upper()
 
 
-def verbinden() -> sqlite3.Connection:
-    con = sqlite3.connect(config.DB_PATH, timeout=10)
-    con.row_factory = sqlite3.Row
-    con.execute("PRAGMA foreign_keys = ON")
-    con.execute("PRAGMA busy_timeout = 5000")
-    # SQLite kennt nur ASCII-Groß/Kleinschreibung; für die Suche nach "Müller"
-    # brauchen wir Pythons Unicode-Variante.
-    con.create_function("lower_u", 1, _lower_u, deterministic=True)
-    # Dieselbe Umformung wie im Browser (kern/static/suchtext.js):
-    # "Mueller", "Muller" und "Müller" sollen einander finden.
-    con.create_function(
-        "suchtext", 1,
-        lambda wert: suchen.suchtext(wert or ""), deterministic=True)
-    con.create_function("kfz_norm", 1, kfz_normalisieren, deterministic=True)
-    return con
+def verbinden() -> Verbindung:
+    return _DATENBANK.verbinden()
 
 
-@contextmanager
 def transaktion():
     """Verbindung mit Commit bei Erfolg, Rollback bei Ausnahme."""
-    con = verbinden()
-    try:
-        with con:
-            yield con
-    finally:
-        con.close()
-
-
-# Spalten, die nach dem ersten Ausliefern dazugekommen sind. SQLite kann
-# ADD COLUMN, mehr brauchen wir fuer eine Datei mit ein paar hundert Zeilen nicht.
-NACHTRAEGLICHE_SPALTEN = (
-    ("mail_out", "naechster_versuch", "TEXT"),
-)
-
-
-# Spalten von mail_out in der Reihenfolge, in der beim Umbau kopiert wird.
-_MAIL_OUT_SPALTEN = (
-    "id", "antrag_id", "typ", "empfaenger", "betreff", "body",
-    "versuche", "gesendet_am", "letzter_fehler", "naechster_versuch", "created_at",
-)
-
-
-def _mail_out_umbauen(con: sqlite3.Connection) -> bool:
-    """Zieht den CHECK auf mail_out.typ nach.
-
-    SQLite kann Constraints nicht aendern, deshalb die uebliche Prozedur: neue
-    Tabelle daneben, Daten hinueber, alte weg, umbenennen. Laeuft nur, wenn die
-    gespeicherte Definition den Typ 'orga' noch nicht kennt.
-    """
-    zeile = con.execute(
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'mail_out'"
-    ).fetchone()
-    if zeile is None or "'orga'" in zeile["sql"]:
-        return False
-
-    # Fremdschluessel fuer den Umbau abschalten - so steht es in der
-    # SQLite-Anleitung. Sonst scheitert das Kopieren an Zeilen, deren Antrag es
-    # nicht mehr gibt; die alte Tabelle kannte diese Bedingung noch nicht.
-    # PRAGMA wirkt nur ausserhalb einer Transaktion, deshalb hier und nicht im
-    # Skript.
-    con.execute("PRAGMA foreign_keys = OFF")
-    spalten = ", ".join(_MAIL_OUT_SPALTEN)
-    try:
-        con.executescript(
-            f"""
-        BEGIN;
-        CREATE TABLE mail_out_neu (
-          id          INTEGER PRIMARY KEY,
-          antrag_id   INTEGER REFERENCES antrag(id) ON DELETE CASCADE,
-          typ         TEXT NOT NULL
-                      CHECK (typ IN ('eingang', 'genehmigt', 'abgelehnt', 'orga')),
-          empfaenger  TEXT NOT NULL,
-          betreff     TEXT NOT NULL,
-          body        TEXT NOT NULL,
-          versuche    INTEGER NOT NULL DEFAULT 0,
-          gesendet_am TEXT,
-          letzter_fehler TEXT,
-          naechster_versuch TEXT,
-          created_at  TEXT NOT NULL
-        );
-        INSERT INTO mail_out_neu ({spalten}) SELECT {spalten} FROM mail_out;
-        DROP TABLE mail_out;
-        ALTER TABLE mail_out_neu RENAME TO mail_out;
-        CREATE INDEX IF NOT EXISTS idx_mail_out_offen ON mail_out (gesendet_am, versuche);
-        COMMIT;
-        """
-        )
-    finally:
-        con.execute("PRAGMA foreign_keys = ON")
-    return True
-
-
-def _antrag_kontaktpruefung_loesen(con: sqlite3.Connection) -> bool:
-    """Nimmt den CHECK auf Mail-oder-Telefon aus der Tabelle antrag.
-
-    Die Regel gilt weiter – nur nicht mehr unbedingt. Ihr Grund ist, dass eine
-    ausstehende Entscheidung jemanden erreichen muss; wer am Tisch steht und
-    sofort genehmigt wird, hat nichts zu empfangen. Sie steht deshalb in
-    validation.pruefen(), wo sie an die Lage gebunden werden kann.
-
-    In der Tabelle liesse sich das nicht ohne neuen Fehler ausdruecken: an
-    status zu binden hiesse, dass „zurueck auf neu“ bei einem Eintrag ohne
-    Kontakt mitten im UPDATE scheitert – mit einem 500er, nicht mit einer
-    Meldung.
-
-    Der Bauplan fuer die neue Tabelle kommt aus schema.sql und wird nicht aus
-    der alten Definition herausgeschnitten. Das war der erste Versuch, und er
-    griff daneben: die Tabelle hat mehrere CHECK-Klauseln, die erste gehoert
-    zu status.
-    """
-    zeile = con.execute(
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'antrag'"
-    ).fetchone()
-    if zeile is None or "COALESCE(NULLIF(TRIM(email)" not in (zeile["sql"] or ""):
-        return False
-
-    schema = SCHEMA.read_text(encoding="utf-8")
-    # Der Bauplan endet an der Zeile, die nur ");" enthaelt.
-    muster = ("CREATE TABLE(?: IF NOT EXISTS)?"
-              r"\s+antrag\s*\((?:[^;])*?" + chr(10) + r"\);")
-    treffer = re.search(muster, schema, re.S)
-    if treffer is None:
-        return False
-    bauplan = re.sub(r"CREATE TABLE(?: IF NOT EXISTS)?\s+antrag",
-                     "CREATE TABLE antrag_neu", treffer.group(0),
-                     count=1)
-
-    alt_spalten = [z["name"] for z in con.execute("PRAGMA table_info(antrag)")]
-    con.execute("PRAGMA foreign_keys = OFF")
-    try:
-        con.execute("BEGIN")
-        con.execute(bauplan.rstrip(";"))
-        neu_spalten = {z["name"] for z in con.execute("PRAGMA table_info(antrag_neu)")}
-        # Nur, was es in beiden gibt - sonst scheitert das Kopieren an einer
-        # Spalte, die inzwischen weggefallen oder dazugekommen ist.
-        gemeinsam = ", ".join(s for s in alt_spalten if s in neu_spalten)
-        con.execute(
-            f"INSERT INTO antrag_neu ({gemeinsam}) SELECT {gemeinsam} FROM antrag")
-        # mail_out zeigt mit ON DELETE CASCADE auf antrag - ohne das
-        # Abschalten oben naehme das DROP alle Mails mit.
-        con.execute("DROP TABLE antrag")
-        con.execute("ALTER TABLE antrag_neu RENAME TO antrag")
-        con.execute("CREATE INDEX IF NOT EXISTS idx_antrag_status ON antrag (status)")
-        con.execute("CREATE INDEX IF NOT EXISTS idx_antrag_kategorie ON antrag (kategorie)")
-        con.execute("CREATE INDEX IF NOT EXISTS idx_antrag_created_at ON antrag (created_at)")
-        con.execute("COMMIT")
-    except Exception:
-        con.execute("ROLLBACK")
-        raise
-    finally:
-        con.execute("PRAGMA foreign_keys = ON")
-    return True
-
-
-def _spalten_nachtragen(con: sqlite3.Connection) -> list:
-    ergaenzt = []
-    for tabelle, spalte, typ in NACHTRAEGLICHE_SPALTEN:
-        vorhanden = {z["name"] for z in con.execute(f"PRAGMA table_info({tabelle})")}
-        if spalte not in vorhanden:
-            con.execute(f"ALTER TABLE {tabelle} ADD COLUMN {spalte} {typ}")
-            ergaenzt.append(f"{tabelle}.{spalte}")
-    return ergaenzt
+    return _DATENBANK.transaktion()
 
 
 def init() -> list:
-    """Legt Verzeichnis, Datei und Schema an und zieht fehlende Spalten nach.
-
-    Liefert die nachgetragenen Spalten, damit der Start sie protokollieren kann.
-    """
-    config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = verbinden()
-    try:
-        # WAL, damit der Mail-Worker nebenläufig lesen kann.
-        con.execute("PRAGMA journal_mode = WAL")
-        with con:
-            con.executescript(SCHEMA.read_text(encoding="utf-8"))
-            ergaenzt = _spalten_nachtragen(con)
-        # Der Tabellenumbau braucht abgeschaltete Fremdschluessel und damit
-        # eine eigene Transaktion – deshalb ausserhalb des with-Blocks.
-        if _mail_out_umbauen(con):
-            ergaenzt.append("mail_out.typ (Umbau: Typ 'orga' ergaenzt)")
-        if _antrag_kontaktpruefung_loesen(con):
-            ergaenzt.append("antrag (Umbau: Kontaktpflicht nur noch in der Pruefung)")
-        return ergaenzt
-    finally:
-        con.close()
+    """Spielt fehlende Migrationen ein und liefert ihre Namen fürs Protokoll."""
+    return _DATENBANK.init()
 
 
 def antrag_anlegen(werte: dict, remote_ip: str | None,
@@ -247,6 +68,7 @@ def antrag_anlegen(werte: dict, remote_ip: str | None,
                 kennzeichen, bemerkung, status, created_at, remote_ip,
                 entscheidung_am, entscheidung_durch
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
             """,
             (
                 werte["vorname"],
@@ -264,7 +86,7 @@ def antrag_anlegen(werte: dict, remote_ip: str | None,
                 (kuerzel or None) if entscheidung else None,
             ),
         )
-        nummer = int(cur.lastrowid)
+        nummer = int(cur.fetchone()[0])
         if mail is not None:
             # In derselben Transaktion wie der Antrag: sonst gaebe es einen
             # genehmigten Antrag, zu dem die Zusage nie eingereiht wurde.
@@ -279,7 +101,7 @@ def antrag_anlegen(werte: dict, remote_ip: str | None,
 SORTIERUNGEN = {
     "neueste": "created_at DESC, id DESC",
     "aelteste": "created_at ASC, id ASC",
-    "name": "nachname COLLATE NOCASE, vorname COLLATE NOCASE",
+    "name": "lower(nachname), lower(vorname)",
     "kategorie": "kategorie, created_at DESC",
 }
 
@@ -297,6 +119,25 @@ _SUCHFELDER = (
 )
 
 
+def _passt(antrag, suche: str) -> bool:
+    """Ob ein Antrag zum Suchbegriff passt.
+
+    Unter SQLite lief das als SQL-Funktion, die Python registrierte.
+    PostgreSQL kann keine Python-Funktion aufrufen; die Regel bleibt deshalb
+    in Python, an EINER Stelle (kern/suchen.py), und wird auf die geladenen
+    Zeilen angewandt. Bei ein paar hundert Antraegen kostet das nichts.
+    """
+    heuhaufen = suchen.suchtext(*(antrag[feld] or "" for feld in _SUCHFELDER))
+    # Ein Suchbegriff kann zwei Schreibweisen haben - "Müller" wird zu
+    # "mueller" UND "muller". Eine davon muss vorkommen.
+    if suchen.passt(heuhaufen, suche):
+        return True
+    # "kaxy123" soll auch "KA-XY 123" finden.
+    gesuchtes_kfz = kfz_normalisieren(suche)
+    return bool(gesuchtes_kfz) and gesuchtes_kfz in kfz_normalisieren(
+        antrag["kennzeichen"] or "")
+
+
 def antraege_suchen(
     status: str = "",
     kategorie: str = "",
@@ -312,32 +153,20 @@ def antraege_suchen(
     if kategorie:
         bedingungen.append("kategorie = ?")
         parameter.append(kategorie)
-    if suche:
-        heuhaufen = " || ' ' || ".join(f"COALESCE({feld}, '')" for feld in _SUCHFELDER)
-        # Ein Suchbegriff kann zwei Schreibweisen haben - "Müller" wird zu
-        # "mueller" UND "muller". Eine davon muss vorkommen.
-        teile = []
-        for variante in suchen.varianten(suche):
-            teile.append(f"INSTR(suchtext({heuhaufen}), ?) > 0")
-            parameter.append(variante)
-        # "kaxy123" soll auch "KA-XY 123" finden.
-        gesuchtes_kfz = kfz_normalisieren(suche)
-        if gesuchtes_kfz:
-            teile.append("INSTR(kfz_norm(COALESCE(kennzeichen, '')), ?) > 0")
-            parameter.append(gesuchtes_kfz)
-        if teile:
-            bedingungen.append("(" + " OR ".join(teile) + ")")
 
     wo = f"WHERE {' AND '.join(bedingungen)}" if bedingungen else ""
     ordnung = SORTIERUNGEN.get(sortierung, SORTIERUNGEN["neueste"])
 
     con = verbinden()
     try:
-        return con.execute(
+        zeilen = con.execute(
             f"SELECT * FROM antrag {wo} ORDER BY {ordnung}", parameter
         ).fetchall()
     finally:
         con.close()
+    if suche and suche.strip():
+        zeilen = [zeile for zeile in zeilen if _passt(zeile, suche)]
+    return zeilen
 
 
 def antrag_laden(antrag_id: int):
@@ -662,7 +491,7 @@ DURCHFAHRT_STATUS = ("genehmigt", "ausgegeben")
 
 
 def antraege_durchfahrt() -> list:
-    """Alle berechtigten Fahrzeuge, sortiert nach Nachname.
+    """Alle berechtigten Fahrzeuge, sortiert nach Kennzeichen.
 
     Bewusst ohne Suchparameter: an der Strassensperre ist der Empfang mies,
     deshalb geht die vollstaendige Liste einmal in die Seite und gefiltert wird
@@ -670,19 +499,23 @@ def antraege_durchfahrt() -> list:
     """
     con = verbinden()
     try:
-        return con.execute(
+        zeilen = con.execute(
             "SELECT * FROM antrag WHERE status IN (%s)"
-            # Nach Kennzeichen, denn danach wird an der Sperre gesucht.
-            # Normalisiert, damit KA-AB 1 und KAAB1 beieinander stehen, und
-            # Zeilen ohne Kennzeichen ans Ende statt nach vorn.
-            " ORDER BY (COALESCE(TRIM(kennzeichen), '') = ''),"
-            "          kfz_norm(COALESCE(kennzeichen, '')),"
-            "          nachname COLLATE NOCASE, vorname COLLATE NOCASE"
             % ", ".join("?" for _ in DURCHFAHRT_STATUS),
             DURCHFAHRT_STATUS,
         ).fetchall()
     finally:
         con.close()
+    # Nach Kennzeichen, denn danach wird an der Sperre gesucht. Normalisiert,
+    # damit KA-AB 1 und KAAB1 beieinander stehen, und Zeilen ohne Kennzeichen
+    # ans Ende statt nach vorn. In Python und nicht in SQL: dieselbe
+    # Normalisierung, die auch data-kfz in der Seite traegt.
+    return sorted(zeilen, key=lambda z: (
+        not (z["kennzeichen"] or "").strip(),
+        kfz_normalisieren(z["kennzeichen"] or ""),
+        (z["nachname"] or "").lower(),
+        (z["vorname"] or "").lower(),
+    ))
 
 
 # --- Einstellungen und der Token fuer die offene Durchfahrtsliste -----------

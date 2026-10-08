@@ -16,13 +16,13 @@ import re
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.parse
 from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL))
+from kern import testdb  # noqa: E402
 # Das Programm liegt seit der Zusammenfuehrung unter kennzeichen/.
 sys.path.insert(0, str(WURZEL / "kennzeichen"))
 
@@ -97,14 +97,13 @@ def freier_hafen():
         return s.getsockname()[1]
 
 
-verzeichnis = Path(tempfile.mkdtemp(prefix="abfahrt-sperre-"))
-db = verzeichnis / "test.db"
+db = testdb.wegwerf("test_durchfahrt")
 hafen = freier_hafen()
 
 prozess = subprocess.Popen(
     [str(PYTHON), "-m", "app"],
     cwd=str(WURZEL / "kennzeichen"),
-    env={**os.environ, "DB_PATH": str(db), "BIND": f"127.0.0.1:{hafen}",
+    env={**os.environ, "DATABASE_URL": db, "BIND": f"127.0.0.1:{hafen}",
          "ADMIN_PASSWORD_HASH": HASH, "APP_SECRET_KEY": "test-schluessel",
          "COOKIE_SECURE": "0", "SMTP_HOST": "", "MAIL_FROM": "",
          "PYTHONIOENCODING": "utf-8"},
@@ -352,5 +351,4 @@ if fehler:
         print("  - " + eintrag)
 else:
     print("alle Pruefungen bestanden")
-print("Wegwerf-Datenbank lag in " + str(verzeichnis))
 sys.exit(1 if fehler else 0)

@@ -8,8 +8,8 @@ tests/README.md. Der Server sollte mit
 import http.cookiejar
 import os
 import re
-import sqlite3
 import sys
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -19,8 +19,18 @@ DB = os.environ.get("TEST_DB", "")
 PASSWORT = os.environ.get("TEST_PASSWORT", "test-passwort-123")
 
 if not DB:
-    print("TEST_DB muss auf die Datenbank des laufenden Servers zeigen.", file=sys.stderr)
+    print("TEST_DB muss die DATABASE_URL des laufenden Servers enthalten.", file=sys.stderr)
     sys.exit(2)
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from kern import testdb  # noqa: E402
+
+
+def sql(befehl, *parameter):
+    """Abfrage gegen die Datenbank des laufenden Servers, Schema kennzeichen."""
+    return testdb.abfrage(DB, "kennzeichen", befehl, parameter)
+
 
 fehler = []
 
@@ -119,7 +129,7 @@ pruefe(gesucht.count('class="karte"') == 1, "Suche grenzt ein")
 
 status, _, unfug = hole("/kennzeichen/karten?sortierung=" + urllib.parse.quote("id; DROP TABLE antrag--"))
 pruefe(status == 200, "unbekannte Sortierung faellt auf die Vorgabe zurueck")
-pruefe(sqlite3.connect(DB).execute("SELECT COUNT(*) FROM antrag").fetchone()[0] > 0,
+pruefe(sql("SELECT COUNT(*) FROM antrag")[0][0] > 0,
        "und richtet keinen Schaden an")
 
 # --- Umbruch auf mehrere Boegen ----------------------------------------------
@@ -129,7 +139,7 @@ for nummer in range(5):
                "funktion": "Aufbau", "kategorie": "camping",
                "kennzeichen": "B-BT " + str(nummer + 1),
                "telefon": "030 " + str(nummer)})
-neue = [str(z[0]) for z in sqlite3.connect(DB).execute(
+neue = [str(z[0]) for z in sql(
     "SELECT id FROM antrag WHERE nachname = 'Test'")]
 hole("/kennzeichen/sammelaktion", {"csrf": CSRF, "ids": neue, "zurueck": "/kennzeichen"})
 
