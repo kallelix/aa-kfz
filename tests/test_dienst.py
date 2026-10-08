@@ -132,9 +132,9 @@ try:
            "presse.test zeigt die Akkreditierung")
 
     print("Das Backoffice liegt unter einer eigenen Adresse")
-    status, _, seite, _ = ruf("admin.test", "/")
-    pruefe(status == 200 and seite.count('<a href="/') >= 3,
-           "admin.test zeigt die Startseite mit allen drei Bereichen")
+    status, ort, _, _ = ruf("admin.test", "/")
+    pruefe(status == 303 and ort.startswith("/konto/login"),
+           "admin.test fuehrt ohne Anmeldung zur Anmeldung")
 
     print("Ohne Anmeldung kommt niemand hinein")
     for pfad, bereich in (("/kennzeichen", "kennzeichen"),
@@ -173,6 +173,10 @@ try:
         status, ort, _, _ = ruf("admin.test", "/" + bereich, keks=keks)
         pruefe(status == 200,
                "/" + bereich + " ist ohne zweite Anmeldung offen")
+    status, _, seite, _ = ruf("admin.test", "/", keks=keks)
+    pruefe(status == 200 and all(('href="/%s"' % b) in seite
+                                 for b in ("kennzeichen", "presse", "helfer")),
+           "die Startseite zeigt danach alle drei Bereiche")
 
     print("Das Backoffice ist eine Oberflaeche")
     # Genau der Fehler, der beim ersten Zusammenbau durchrutschte: die
@@ -248,8 +252,9 @@ try:
            "und raeumt den Keks fuer die ganze Adresse weg")
 
     print("Ein unbekannter Hostname fuehrt nicht ins Leere")
-    status, _, seite, _ = ruf("irgendwas.test", "/")
-    pruefe(status == 200, "es kommt eine Seite, kein Fehler")
+    status, ort, _, _ = ruf("irgendwas.test", "/")
+    pruefe(status == 303 and ort.startswith("/konto/login"),
+           "es geht zur Anmeldung, kein Fehler")
 
 finally:
     prozess.terminate()

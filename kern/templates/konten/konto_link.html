@@ -1,0 +1,20 @@
+{% extends "admin_base.html" %}
+{% block titel %}Link weitergeben{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Die Mail ging nicht hinaus{% endblock %}
+
+{% block inhalt %}
+  <p class="hinweis hinweis-warnung">{{ grund }}</p>
+
+  <p>Das Konto für <strong>{{ konto.name }}</strong> ({{ konto.email }}) steht. Gib
+    {{ konto.name.split(' ')[0] }} diesen Link selbst weiter, etwa per Messenger –
+    damit legt {{ konto.name.split(' ')[0] }} das Passwort fest:</p>
+
+  <p class="teilen-url"><code>{{ link }}</code></p>
+
+  <p class="hilfe">Der Link gilt nur einmal und wird ungültig, sobald ein neuer
+    verschickt wird. Wer ihn hat, kann das Passwort setzen – also nicht in einen
+    offenen Verteiler.</p>
+
+  <p><a href="/konten/{{ konto.id }}">Zum Konto</a> · <a href="/konten">Alle Konten</a></p>
+{% endblock %}

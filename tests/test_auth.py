@@ -15,6 +15,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Das Programm liegt seit der Zusammenfuehrung unter kennzeichen/.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "kennzeichen"))
 
+# Auth schlaegt seit den Konten in der Datenbank nach, ob das gemeinsame
+# Passwort noch gilt. Ausdruecklich eine eigene - sonst griffe es zur
+# Entwicklungsdatenbank.
+from kern import testdb  # noqa: E402
+os.environ["DATABASE_URL"] = testdb.wegwerf("test_auth")
+
 from app import config  # noqa: E402
 from kern import auth as kern_auth  # noqa: E402
 from kern.auth import Auth  # noqa: E402
@@ -23,6 +29,7 @@ from kern.auth import Auth  # noqa: E402
 # Test schiebt unten an config herum - das wirkt hier mit, weil die Instanz
 # erst beim Aufruf nachsieht.
 auth = Auth(config)
+auth.init()
 
 fehler = []
 

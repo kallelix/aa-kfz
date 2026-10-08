@@ -1,4 +1,7 @@
-{% extends "admin_base.html" %}
+{# Direkt auf der gemeinsamen Huelle, nicht auf der des Bereichs: wer hier
+   landet, darf den Bereich nicht sehen - also auch nicht dessen Menue und
+   Leisten, die zudem Werte erwarten, die diese Seite nicht hat. #}
+{% extends "kern_base.html" %}
 {% block titel %}Kein Zugang{% endblock %}
 {% block breite %}{% endblock %}
 {% block ueberschrift %}Kein Zugang{% endblock %}

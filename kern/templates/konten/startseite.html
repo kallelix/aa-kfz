@@ -1,0 +1,31 @@
+{% extends "admin_base.html" %}
+{% block titel %}Backoffice{% endblock %}
+{% block ueberschrift %}Backoffice{% endblock %}
+
+{% block inhalt %}
+  {% if sitzung.name %}<p>Hallo {{ sitzung.name.split(' ')[0] }}!</p>{% endif %}
+
+  {% set texte = {
+      'kennzeichen': 'Anträge auf Durchfahrt, Karten, Durchfahrtsliste',
+      'presse': 'Akkreditierungen, Abholliste, Bilder',
+      'helfer': 'Schichten, Aufgaben, Material, Monitor'} %}
+  <nav class="kacheln" aria-label="Bereiche">
+    {% for b in bereiche %}
+      <a class="kachel" href="{{ b.ziel }}">
+        <span class="kachel-titel">{{ b.name }}</span>
+        <span class="kachel-text">{{ texte[b.schluessel] }}</span>
+      </a>
+    {% endfor %}
+    {% if sitzung.ist_admin %}
+      <a class="kachel" href="/konten">
+        <span class="kachel-titel">Konten</span>
+        <span class="kachel-text">Wer ins Backoffice darf, und wohin</span>
+      </a>
+    {% endif %}
+  </nav>
+
+  {% if not bereiche %}
+    <p class="hinweis hinweis-warnung">Für dein Konto ist noch kein Bereich freigegeben.
+      Sag einem Admin Bescheid.</p>
+  {% endif %}
+{% endblock %}

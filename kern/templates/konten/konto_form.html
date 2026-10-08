@@ -1,0 +1,102 @@
+{% extends "admin_base.html" %}
+{% block titel %}{{ konto.name if konto else 'Konto anlegen' }}{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}{{ konto.name if konto else 'Konto anlegen' }}{% endblock %}
+
+{% block inhalt %}
+  <p class="zurueck-zeile"><a href="/konten">‹ Alle Konten</a></p>
+
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">{{ fehler }}</p>
+  {% endif %}
+
+  {% if konto %}
+    <p class="gedaempft">
+      Angelegt {{ konto.angelegt_am|zeit }}{% if konto.angelegt_von %} von {{ konto.angelegt_von }}{% endif %}.
+      {% if konto.zuletzt_angemeldet_am %}Zuletzt angemeldet {{ konto.zuletzt_angemeldet_am|zeit }}.{% endif %}
+      {% if not konto.hat_passwort %}Die Einladung ist noch nicht eingelöst.{% endif %}
+    </p>
+  {% endif %}
+
+  <form method="post" action="{{ '/konten/' ~ konto.id if konto else '/konten/neu' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="spalten">
+      <div class="feld">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required value="{{ werte.name }}">
+      </div>
+      <div class="feld">
+        <label for="kuerzel">Kürzel</label>
+        <input type="text" id="kuerzel" name="kuerzel" required maxlength="10"
+               placeholder="z. B. KK" value="{{ werte.kuerzel }}">
+        <p class="hilfe">Steht als „bearbeitet von“ in den Daten.</p>
+      </div>
+    </div>
+
+    <div class="feld">
+      <label for="email">Mailadresse</label>
+      <input type="email" id="email" name="email" required value="{{ werte.email }}">
+      {% if not konto %}<p class="hilfe">Dorthin geht die Einladung; damit meldet sich die Person an.</p>{% endif %}
+    </div>
+
+    <fieldset class="feld">
+      <legend>Rolle</legend>
+      {% for schluessel, name in rollen.items() %}
+        <label class="auswahl">
+          <input type="radio" name="rolle" value="{{ schluessel }}"
+                 {% if werte.rolle == schluessel %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">{{ name }}</span>
+            <span class="auswahl-hilfe">{{ rollen_text[schluessel] }}</span>
+          </span>
+        </label>
+      {% endfor %}
+    </fieldset>
+
+    <fieldset class="feld">
+      <legend>Bereiche</legend>
+      <p class="hilfe">Ein Admin sieht ohnehin alle.</p>
+      {% for schluessel, name in alle_bereiche.items() %}
+        <label class="auswahl">
+          <input type="checkbox" name="bereich_{{ schluessel }}" value="1"
+                 {% if schluessel in werte.bereiche %}checked{% endif %}>
+          <span class="auswahl-text"><span class="auswahl-titel">{{ name }}</span></span>
+        </label>
+      {% endfor %}
+    </fieldset>
+
+    {% if konto %}
+      <fieldset class="feld">
+        <legend>Zugang</legend>
+        <label class="auswahl">
+          <input type="checkbox" name="aktiv" value="1" {% if konto.aktiv %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">Aktiv</span>
+            <span class="auswahl-hilfe">Ohne Haken ist das Konto gesperrt und sofort abgemeldet.</span>
+          </span>
+        </label>
+      </fieldset>
+    {% endif %}
+
+    <div class="knopfreihe">
+      <button type="submit">{{ 'Speichern' if konto else 'Anlegen und einladen' }}</button>
+    </div>
+  </form>
+
+  {% if konto and konto.aktiv %}
+    <h2>Passwort und Geräte</h2>
+    <div class="knopfreihe">
+      <form method="post" action="/konten/{{ konto.id }}/link">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="knopf-schlicht">
+          {{ 'Link zum Zurücksetzen schicken' if konto.hat_passwort else 'Einladung noch einmal schicken' }}
+        </button>
+      </form>
+      <form method="post" action="/konten/{{ konto.id }}/abmelden">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="knopf-schlicht">Auf allen Geräten abmelden</button>
+      </form>
+    </div>
+  {% endif %}
+{% endblock %}

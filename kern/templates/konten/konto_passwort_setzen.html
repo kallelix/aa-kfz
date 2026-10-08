@@ -1,0 +1,41 @@
+{% extends "admin_base.html" %}
+{% block titel %}Passwort festlegen{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Passwort festlegen{% endblock %}
+
+{% block inhalt %}
+  {% if not konto %}
+    <p class="hinweis hinweis-fehler" role="alert">Dieser Link gilt nicht mehr.</p>
+    <p>Links aus diesen Mails gelten nur eine Weile und nur einmal; ein neuerer
+      macht ältere ungültig. <a href="/konto/vergessen">Neuen Link anfordern</a>
+      oder einen Admin fragen.</p>
+  {% else %}
+    <p>{% if konto.zweck == 'einladung' %}Willkommen, {{ konto.name }}!
+      Leg dein Passwort fest – danach meldest du dich mit
+      <strong>{{ konto.email }}</strong> und diesem Passwort an.
+      {% else %}Hallo {{ konto.name }}, leg dein neues Passwort fest.{% endif %}</p>
+
+    {% if fehler %}
+      <p class="hinweis hinweis-fehler" role="alert">{{ fehler }}</p>
+    {% endif %}
+
+    <form method="post" action="/konto/passwort/{{ token }}">
+      <input type="hidden" name="email" autocomplete="username" value="{{ konto.email }}">
+      <div class="feld">
+        <label for="neu">Neues Passwort</label>
+        <input type="password" id="neu" name="neu" required minlength="10" autofocus
+               autocomplete="new-password">
+        <p class="hilfe">Mindestens 10 Zeichen. Ein Satz aus ein paar Wörtern ist
+          leichter zu merken und schwerer zu erraten als ein kurzes Kauderwelsch.</p>
+      </div>
+      <div class="feld">
+        <label for="wiederholung">Noch einmal</label>
+        <input type="password" id="wiederholung" name="wiederholung" required
+               autocomplete="new-password">
+      </div>
+      <div class="knopfreihe">
+        <button type="submit">Passwort festlegen</button>
+      </div>
+    </form>
+  {% endif %}
+{% endblock %}

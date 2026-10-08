@@ -260,6 +260,27 @@ main.spalte-schmal { max-width: 52rem; }
 .zaehler-flach .zaehler-titel { font-size: .85rem; color: var(--text); font-weight: 600; }
 .zaehler-flach .zaehler-zahl { margin: 0; font-size: 1.25rem; }
 
+/* Startseite des Backoffice: je Bereich eine Kachel, die als Ganzes ein
+   Link ist. Gezeigt werden nur die Bereiche, die das Konto sehen darf. */
+.kacheln {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: .9rem;
+  margin: 1rem 0 1.25rem;
+}
+.kachel {
+  display: block;
+  padding: 1rem 1.1rem;
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.kachel:hover, .kachel:focus-visible { border-color: var(--akzent); }
+.kachel-titel { display: block; font-size: 1.1rem; font-weight: 700; color: var(--akzent); }
+.kachel-text { display: block; margin-top: .2rem; font-size: .9rem; color: var(--gedaempft); }
+
 /* Filterleiste */
 .filter {
   display: flex;

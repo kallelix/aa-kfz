@@ -1,0 +1,32 @@
+{% extends "admin_base.html" %}
+{% block titel %}Passwort vergessen{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Passwort vergessen{% endblock %}
+
+{% block inhalt %}
+  {% if fertig %}
+    <p class="hinweis hinweis-ok" role="status">
+      Wenn es zu <strong>{{ email }}</strong> ein Konto gibt, ist jetzt eine Mail mit
+      einem Link unterwegs. Er gilt 24 Stunden.
+    </p>
+    <p>Keine Mail da? Im Spamordner nachsehen – oder einen Admin fragen.</p>
+    <p><a href="/konto/login">Zur Anmeldung</a></p>
+  {% else %}
+    {% if fehler %}
+      <p class="hinweis hinweis-fehler" role="alert">{{ fehler }}</p>
+    {% endif %}
+    <p>Gib deine Mailadresse ein. Wir schicken dir einen Link, mit dem du ein neues
+      Passwort festlegst.</p>
+    <form method="post" action="/konto/vergessen">
+      <div class="feld">
+        <label for="email">Mailadresse</label>
+        <input type="email" id="email" name="email" required autofocus
+               autocomplete="username" value="{{ email }}">
+      </div>
+      <div class="knopfreihe">
+        <button type="submit">Link schicken</button>
+      </div>
+    </form>
+    <p><a href="/konto/login">Zurück zur Anmeldung</a></p>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "admin_base.html" %}
+{% block titel %}Konten{% endblock %}
+{% block ueberschrift %}Konten{% endblock %}
+
+{% block inhalt %}
+  {% if not sitzung.konto_id %}
+    <p class="hinweis hinweis-warnung">
+      Du bist mit dem gemeinsamen Passwort angemeldet. Leg zuerst dein eigenes
+      Konto als <strong>Admin</strong> an. Sobald du die Einladung eingelöst hast,
+      gilt das gemeinsame Passwort nicht mehr – für niemanden.
+    </p>
+  {% endif %}
+
+  <div class="knopfreihe">
+    <a class="knopf" href="/konten/neu">Konto anlegen</a>
+  </div>
+
+  {% if konten %}
+    <div class="tabelle-huelle">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Kürzel</th>
+            <th>Mailadresse</th>
+            <th>Rolle</th>
+            <th>Bereiche</th>
+            <th>Stand</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for k in konten %}
+            <tr{% if not k.aktiv %} class="gedaempft"{% endif %}>
+              <td><a href="/konten/{{ k.id }}">{{ k.name }}</a></td>
+              <td>{{ k.kuerzel }}</td>
+              <td>{{ k.email }}</td>
+              <td>{{ rollen[k.rolle] }}</td>
+              <td>
+                {% if k.rolle == 'admin' %}alle{% else %}
+                  {% for b in k.bereiche %}{{ alle_bereiche[b] }}{% if not loop.last %}, {% endif %}{% endfor %}
+                {% endif %}
+              </td>
+              <td>
+                {% if not k.aktiv %}
+                  <span class="marke marke-abgelehnt">gesperrt</span>
+                {% elif not k.hat_passwort %}
+                  <span class="marke marke-neu">eingeladen</span>
+                  {% if k.link_bis %}<span class="gedaempft">Link bis {{ k.link_bis|zeit }}</span>
+                  {% else %}<span class="gedaempft">Link abgelaufen</span>{% endif %}
+                {% elif k.zuletzt_angemeldet_am %}
+                  <span class="gedaempft">zuletzt {{ k.zuletzt_angemeldet_am|zeit }}</span>
+                {% else %}
+                  <span class="marke marke-genehmigt">aktiv</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="leer">Noch keine Konten.</p>
+  {% endif %}
+{% endblock %}

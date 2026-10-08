@@ -9,8 +9,7 @@ import sys
 from pathlib import Path
 
 from starlette.applications import Starlette
-from starlette.responses import HTMLResponse, Response
-from starlette.routing import Host, Mount, Route
+from starlette.routing import Host
 from starlette.staticfiles import StaticFiles
 
 WURZEL = Path(__file__).resolve().parents[1]
@@ -40,6 +39,13 @@ def _hosts() -> dict[str, str]:
 from kennzeichen.app.main import app as kennzeichen_app  # noqa: E402
 from presse.app.main import app as presse_app  # noqa: E402
 from helfer.app.main import app as helfer_app  # noqa: E402
+from kennzeichen.app import config as kennzeichen_config  # noqa: E402
+from kern import auth as kern_auth  # noqa: E402
+from kern import konten_app  # noqa: E402
+
+# Ab hier zeigen die Bereiche "Mein Konto" und "Konten" im Kopf: im Dienst
+# gibt es die Verwaltung, in einem allein gestarteten Bereich nicht.
+kern_auth.VERWALTUNG = True
 
 BEREICHE = {
     "kennzeichen": kennzeichen_app,
@@ -47,40 +53,10 @@ BEREICHE = {
     "helfer": helfer_app,
 }
 
-STARTSEITE = """<!doctype html>
-<html lang="de"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<title>Backoffice – Die absolute Abfahrt</title>
-<style>
- body{margin:0;padding:2rem 1rem;background:#f4f5f7;color:#13160f;
-   font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
- .h{max-width:52rem;margin:0 auto}
- h1{font-size:1.6rem;margin:0 0 .3rem}
- p.u{color:#5b6169;margin:0 0 2rem}
- ul{list-style:none;padding:0;display:grid;gap:1rem;
-   grid-template-columns:repeat(auto-fit,minmax(14rem,1fr))}
- a{display:block;padding:1.2rem 1.3rem;background:#fff;border:1px solid #d6d9de;
-   border-radius:12px;text-decoration:none;color:inherit}
- a:hover{border-color:#1f6feb}
- strong{display:block;font-size:1.15rem;margin-bottom:.2rem;color:#1f6feb}
- span{color:#5b6169;font-size:.9rem}
-</style></head><body><div class="h">
-<h1>Backoffice</h1>
-<p class="u">Die absolute Abfahrt &middot; eine Anmeldung f&uuml;r alle drei Bereiche</p>
-<ul>
-<li><a href="/kennzeichen"><strong>Kennzeichen</strong>
-  <span>Antr&auml;ge auf Durchfahrt, Karten, Durchfahrtsliste</span></a></li>
-<li><a href="/presse"><strong>Presse</strong>
-  <span>Akkreditierungen, Abholliste, Bilder</span></a></li>
-<li><a href="/helfer"><strong>Helfer</strong>
-  <span>Schichten, Aufgaben, Material, Monitor</span></a></li>
-</ul>
-</div></body></html>"""
-
-
-async def startseite(request) -> Response:
-    return HTMLResponse(STARTSEITE)
+# Startseite, Kontenverwaltung und das eigene Konto. Die Einladungen gehen
+# über das Postfach des Kennzeichen-Bereichs: es schreibt schon heute an die
+# Orga, und die Konten gehören zu keinem Bereich allein.
+KONTEN = konten_app.bauen(kennzeichen_config, mail_config=kennzeichen_config)
 
 
 class AdminVerteiler:
@@ -92,28 +68,31 @@ class AdminVerteiler:
     Hier wird der Pfad also unverändert durchgereicht.
     """
 
-    def __init__(self, bereiche: dict) -> None:
+    def __init__(self, bereiche: dict, konten) -> None:
         self.bereiche = bereiche
         # /static gehoert dem Backoffice als ganzem: ein Stilblatt und ein
         # Wappen fuer alle drei Bereiche. Was nur einen Bereich betrifft,
         # liegt unter /<bereich>/static und kommt von dessen Anwendung.
-        self.startseite = Starlette(routes=[
-            Route("/", startseite),
-            Mount("/static", StaticFiles(directory=str(WURZEL / "kern" / "static")),
-                  name="kernstatic"),
-        ])
+        self.static = StaticFiles(directory=str(WURZEL / "kern" / "static"))
+        # Alles andere - die Startseite, /konten, /konto - gehoert der
+        # Kontenverwaltung.
+        self.konten = konten
 
     async def __call__(self, scope, receive, send) -> None:
         pfad = scope.get("path", "/")
         erstes = pfad.strip("/").split("/")[0] if pfad.strip("/") else ""
         anwendung = self.bereiche.get(erstes)
-        if anwendung is None:
-            await self.startseite(scope, receive, send)
-            return
-        await anwendung(scope, receive, send)
+        if anwendung is not None:
+            await anwendung(scope, receive, send)
+        elif erstes == "static":
+            # Wie ein Mount: StaticFiles zieht root_path vom Pfad ab.
+            await self.static(dict(scope, root_path=scope.get("root_path", "") + "/static"),
+                              receive, send)
+        else:
+            await self.konten(scope, receive, send)
 
 
-admin_verteiler = AdminVerteiler(BEREICHE)
+admin_verteiler = AdminVerteiler(BEREICHE, KONTEN)
 
 
 class NachPfad:

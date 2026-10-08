@@ -1,0 +1,47 @@
+{% extends "admin_base.html" %}
+{% block titel %}Mein Konto{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Mein Konto{% endblock %}
+
+{% block inhalt %}
+  <dl class="daten">
+    <dt>Name</dt><dd>{{ konto.name }}</dd>
+    <dt>Kürzel</dt><dd>{{ konto.kuerzel }}</dd>
+    <dt>Mailadresse</dt><dd>{{ konto.email }}</dd>
+    <dt>Rolle</dt><dd>{{ rollen[konto.rolle] }} – {{ rollen_text[konto.rolle] }}</dd>
+    <dt>Bereiche</dt>
+    <dd>{% if konto.rolle == 'admin' %}alle{% else %}
+      {% for b in konto.bereiche %}{{ alle_bereiche[b] }}{% if not loop.last %}, {% endif %}{% endfor %}
+    {% endif %}</dd>
+  </dl>
+  <p class="hilfe">Name, Kürzel oder Rechte ändert ein Admin.</p>
+
+  <h2>Passwort ändern</h2>
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">{{ fehler }}</p>
+  {% endif %}
+  <form method="post" action="/konto/passwort">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {# Fuer den Passwortmanager: das Konto, zu dem das Passwort gehoert. #}
+    <input type="hidden" name="email" autocomplete="username" value="{{ konto.email }}">
+    <div class="feld">
+      <label for="alt">Bisheriges Passwort</label>
+      <input type="password" id="alt" name="alt" required autocomplete="current-password">
+    </div>
+    <div class="feld">
+      <label for="neu">Neues Passwort</label>
+      <input type="password" id="neu" name="neu" required minlength="10"
+             autocomplete="new-password">
+      <p class="hilfe">Mindestens 10 Zeichen. Ein Satz aus ein paar Wörtern ist
+        leichter zu merken und schwerer zu erraten als ein kurzes Kauderwelsch.</p>
+    </div>
+    <div class="feld">
+      <label for="wiederholung">Neues Passwort noch einmal</label>
+      <input type="password" id="wiederholung" name="wiederholung" required
+             autocomplete="new-password">
+    </div>
+    <div class="knopfreihe">
+      <button type="submit">Passwort ändern</button>
+    </div>
+  </form>
+{% endblock %}
