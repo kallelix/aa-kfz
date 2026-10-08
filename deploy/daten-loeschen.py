@@ -55,7 +55,7 @@ PLAENE: dict[str, list[tuple[str, str]]] = {
         # helfer zieht einteilung und ausleihe über ON DELETE CASCADE mit.
         ("DELETE FROM helfer",
          "Helfer samt Kontakt – und darüber Einteilungen und Ausleihen"),
-        # In den Berichten stehen Hinweise wie „Julia Johren: in der
+        # In den Berichten stehen Hinweise wie „Erika Mustermann: in der
         # Verpflegungsspalte stand 'L'".
         ("DELETE FROM import_lauf", "Importprotokolle samt Namen darin"),
         ("UPDATE aufgabe SET verantwortlich = '', kontakt = '', kuerzel = ''",

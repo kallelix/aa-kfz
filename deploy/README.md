@@ -589,7 +589,7 @@ umsonst.
 Was verschwindet: Anträge, Akkreditierungen, Helfer samt Einteilungen und
 Ausleihen, Schlüsselvorgänge, Fahrzeugstamm, Unterschriften, alle Mails samt
 Empfängern, die Namen an den Aufgaben, die Importprotokolle (dort stehen
-Hinweise wie „Julia Johren: in der Verpflegungsspalte stand ‚L'") – und die
+Hinweise wie „Erika Mustermann: in der Verpflegungsspalte stand ‚L'") – und die
 Token für Durchfahrtsliste, Monitor und Tablet, denn die ersetzen eine
 Anmeldung.
 
