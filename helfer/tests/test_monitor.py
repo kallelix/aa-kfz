@@ -12,13 +12,14 @@ import re
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.parse
 from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL))
+sys.path.insert(0, str(WURZEL.parent))
+from kern import testdb  # noqa: E402
 
 PYTHON = WURZEL.parent / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
@@ -46,11 +47,10 @@ def freier_hafen():
         return s.getsockname()[1]
 
 
-verzeichnis = Path(tempfile.mkdtemp(prefix="helfer-monitor-"))
-db_pfad = verzeichnis / "helfer.db"
+db_url = testdb.wegwerf("helfer_monitor")
 
 # Datenbank vor dem Start füllen – der Server liest sie dann nur noch.
-os.environ["DB_PATH"] = str(db_pfad)
+os.environ["DATABASE_URL"] = db_url
 os.environ["TAGE"] = "2026-08-28,2026-08-29,2026-08-30"
 from app import db  # noqa: E402
 
@@ -128,7 +128,7 @@ hafen = freier_hafen()
 prozess = subprocess.Popen(
     [str(PYTHON), "-m", "app"],
     cwd=str(WURZEL),
-    env={**os.environ, "DB_PATH": str(db_pfad), "BIND": f"127.0.0.1:{hafen}",
+    env={**os.environ, "DATABASE_URL": db_url, "BIND": f"127.0.0.1:{hafen}",
          "ADMIN_PASSWORD_HASH": HASH, "APP_SECRET_KEY": "test-schluessel",
          "COOKIE_SECURE": "0", "JETZT_FEST": JETZT,
          "MONITOR_VORSCHAU": "120", "MONITOR_WARNUNG": "1",
@@ -431,5 +431,4 @@ if fehler:
         print("  - " + eintrag)
 else:
     print("alle Pruefungen bestanden")
-print("Wegwerf-Datenbank lag in " + str(verzeichnis))
 sys.exit(1 if fehler else 0)

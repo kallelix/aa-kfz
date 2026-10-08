@@ -123,9 +123,9 @@ templates.env.filters["ausschnitt"] = unterschriften.ausschnitt
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    nachgetragen = db.init()
-    if nachgetragen:
-        protokoll.info("Datenbank ergaenzt: %s", ", ".join(nachgetragen))
+    eingespielt = db.init()
+    if eingespielt:
+        protokoll.info("Migrationen eingespielt: %s", ", ".join(eingespielt))
     if config.SECRET_KEY_FLUECHTIG:
         protokoll.warning(
             "APP_SECRET_KEY ist nicht gesetzt - es wurde einer erzeugt. "

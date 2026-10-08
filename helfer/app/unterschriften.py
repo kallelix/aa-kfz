@@ -139,10 +139,11 @@ def anfordern(art: str, vorgang_id: int, richtung: str,
             zeiger = con.execute(
                 "INSERT INTO unterschrift (art, vorgang_id, richtung, titel,"
                 " wortlaut, person, angefordert_am, laeuft_ab_am, kuerzel)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
                 (art, vorgang_id, richtung, titel, text, person,
                  db.jetzt(), ablauf.strftime("%Y-%m-%d %H:%M:%S"), kuerzel))
-        return int(zeiger.lastrowid), "angefordert"
+            nummer = int(zeiger.fetchone()[0])
+        return nummer, "angefordert"
     finally:
         con.close()
 
@@ -231,8 +232,10 @@ def zeichnen(unterschrift_id: int, pfad: str, name: str = "") -> str:
     con = db.verbinden()
     try:
         with con:
+            # FOR UPDATE: schickt das Tablet zweimal ab, wartet der zweite
+            # Vorgang hier und sieht danach die schon gesetzte Unterschrift.
             zeile = con.execute(
-                "SELECT * FROM unterschrift WHERE id = ?",
+                "SELECT * FROM unterschrift WHERE id = ? FOR UPDATE",
                 (unterschrift_id,)).fetchone()
             if (zeile is None or zeile["unterschrieben_am"]
                     or zeile["abgebrochen_am"]):

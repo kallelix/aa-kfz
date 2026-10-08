@@ -12,10 +12,8 @@ import http.client
 import os
 import re
 import socket
-import sqlite3
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.parse
 from datetime import timedelta
@@ -23,6 +21,8 @@ from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL))
+sys.path.insert(0, str(WURZEL.parent))
+from kern import testdb  # noqa: E402
 
 PYTHON = WURZEL.parent / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
@@ -58,9 +58,8 @@ def freier_hafen():
         return s.getsockname()[1]
 
 
-verzeichnis = Path(tempfile.mkdtemp(prefix="helfer-unterschrift-"))
-db_pfad = verzeichnis / "helfer.db"
-os.environ["DB_PATH"] = str(db_pfad)
+db_url = testdb.wegwerf("helfer_unterschrift")
+os.environ["DATABASE_URL"] = db_url
 os.environ["TAGE"] = "2026-08-28,2026-08-29,2026-08-30"
 
 from app import db, unterschriften  # noqa: E402
@@ -113,7 +112,7 @@ hafen = freier_hafen()
 prozess = subprocess.Popen(
     [str(PYTHON), "-m", "app"],
     cwd=str(WURZEL),
-    env={**os.environ, "DB_PATH": str(db_pfad), "BIND": f"127.0.0.1:{hafen}",
+    env={**os.environ, "DATABASE_URL": db_url, "BIND": f"127.0.0.1:{hafen}",
          "ADMIN_PASSWORD_HASH": HASH, "APP_SECRET_KEY": "test-schluessel",
          "COOKIE_SECURE": "0", "ZEITPLAN_SERIEN": "",
          "PYTHONIOENCODING": "utf-8"},
@@ -121,12 +120,7 @@ prozess = subprocess.Popen(
 
 
 def zeilen(sql, *parameter):
-    con = sqlite3.connect(db_pfad)
-    con.row_factory = sqlite3.Row
-    try:
-        return con.execute(sql, parameter).fetchall()
-    finally:
-        con.close()
+    return testdb.abfrage(db_url, "helfer", sql, parameter)
 
 
 try:
@@ -317,11 +311,8 @@ try:
         zeitpunkt = (db.jetzt_lokal()
                      - timedelta(minutes=minuten_zurueck)
                      ).strftime("%Y-%m-%d %H:%M:%S")
-        con = sqlite3.connect(db_pfad)
-        with con:
-            con.execute("UPDATE unterschrift SET laeuft_ab_am = ? WHERE id = ?",
-                        (zeitpunkt, nummer))
-        con.close()
+        zeilen("UPDATE unterschrift SET laeuft_ab_am = ? WHERE id = ?",
+               zeitpunkt, nummer)
 
     # Gerade eben abgelaufen: nicht mehr anzeigen, aber noch annehmen.
     ablauf_setzen(dritte, 1)
@@ -584,5 +575,4 @@ if fehler:
         print("  - " + eintrag)
 else:
     print("alle Pruefungen bestanden")
-print("Wegwerf-Datenbank lag in " + str(verzeichnis))
 sys.exit(1 if fehler else 0)

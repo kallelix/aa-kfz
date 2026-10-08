@@ -11,13 +11,13 @@ und in den Zellen steckt Markup.
 import os
 import pathlib
 import sys
-import tempfile
 
 WURZEL = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL))
+sys.path.insert(0, str(WURZEL.parent))
+from kern import testdb  # noqa: E402
 
-os.environ["DB_PATH"] = str(pathlib.Path(
-    tempfile.mkdtemp(prefix="helfer-zeitplan-")) / "helfer.db")
+os.environ["DATABASE_URL"] = testdb.wegwerf("helfer_zeitplan")
 os.environ.setdefault("TAGE", "2026-08-28,2026-08-29,2026-08-30")
 
 from app import config, db, zeitplan  # noqa: E402

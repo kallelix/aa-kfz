@@ -1,4 +1,4 @@
-"""Datenbankzugriff. sqlite3 aus der Standardbibliothek, kein ORM.
+"""Datenbankzugriff. PostgreSQL, Schema helfer – siehe kern/db.py. Kein ORM.
 
 Wie in den Schwester-Apps: eine Verbindung je Anfrage, Schreibvorgänge in
 einem `with con`-Block, damit sie ganz oder gar nicht passieren.
@@ -6,37 +6,15 @@ einem `with con`-Block, damit sie ganz oder gar nicht passieren.
 
 from __future__ import annotations
 
-import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from kern.db import Datenbank, IntegrityError, Verbindung, Zeile
+
 from . import config, normalisieren
 
-SCHEMA = Path(__file__).resolve().parent / "schema.sql"
-
-# Spalten, die nach dem ersten Ausrollen dazugekommen sind. Beim Start wird
-# jede fehlende per ALTER TABLE ergänzt – CREATE TABLE IF NOT EXISTS allein
-# würde eine bestehende Tabelle nicht anfassen.
-NACHTRAEGLICHE_SPALTEN: list[tuple[str, str, str]] = [
-    # (Tabelle, Spalte, vollständige Definition)
-    # Die Notiz kam mit dem Bearbeiten von Programmpunkten dazu. Bestehende
-    # Datenbanken haben die Spalte nicht, CREATE TABLE IF NOT EXISTS würde sie
-    # dort nicht ergänzen.
-    ("programm", "notiz", "notiz TEXT NOT NULL DEFAULT ''"),
-    # Versionszaehler fuer den Konfliktschutz, siehe aufgabe.version.
-    ("programm", "version", "version INTEGER NOT NULL DEFAULT 1"),
-    # T-Shirt-Ausgabe. Die ausgegebene Größe steht getrennt von der
-    # angekündigten: an der Ausgabe stellt sich oft heraus, dass es doch eine
-    # Nummer größer sein muss, und beide Angaben sind für die Nachbestellung
-    # etwas wert.
-    ("helfer", "tshirt_ausgegeben_am", "tshirt_ausgegeben_am TEXT"),
-    ("helfer", "tshirt_ausgegeben", "tshirt_ausgegeben TEXT"),
-    ("helfer", "tshirt_kuerzel", "tshirt_kuerzel TEXT NOT NULL DEFAULT ''"),
-    # Kam mit dem selbsttaetigen Abgleich dazu. Vorher wurden nur geglueckte
-    # Laeufe vermerkt - bei einem Lauf, dem niemand zusieht, muss auch das
-    # Scheitern sichtbar sein, sonst veraltet der Bestand still.
-    ("import_lauf", "erfolg", "erfolg INTEGER NOT NULL DEFAULT 1"),
-]
+_DATENBANK = Datenbank(lambda: config.DATABASE_URL, config.DB_SCHEMA,
+                       Path(__file__).resolve().parent / "migrationen")
 
 
 # --- Uhr -------------------------------------------------------------------
@@ -75,105 +53,26 @@ def marke(zeitpunkt: datetime) -> str:
 
 # --- Verbindung ------------------------------------------------------------
 
-def verbinden() -> sqlite3.Connection:
-    config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(config.DB_PATH, timeout=10)
-    con.row_factory = sqlite3.Row
-    con.execute("PRAGMA foreign_keys = ON")
-    con.create_function(
-        "suchtext", -1,
-        lambda *teile: normalisieren.suchtext(*[t or "" for t in teile]))
-    return con
-
-
-def _klammerspanne(sql: str, anfang: int) -> int:
-    """Ende der Klammer, die bei `anfang` aufgeht - Position hinter dem `)`."""
-    tiefe = 0
-    for stelle in range(anfang, len(sql)):
-        if sql[stelle] == "(":
-            tiefe += 1
-        elif sql[stelle] == ")":
-            tiefe -= 1
-            if tiefe == 0:
-                return stelle + 1
-    return -1
-
-
-# Die Groessenliste stand einmal doppelt: in normalisieren.GROESSEN und als
-# CHECK auf helfer.tshirt. Als 5XL dazukam, nahm das Auswahlfeld sie an und
-# die Datenbank wies sie ab - eine CHECK-Klausel laesst sich in SQLite nicht
-# aendern, nur die ganze Tabelle neu bauen.
-#
-# Sie faellt deshalb weg. Geprueft wird auf dem Weg dorthin: der Import laesst
-# nur durch, was normalisieren.tshirt() kennt, und die Formulare vergleichen
-# in _helfer_daten() gegen GROESSEN.
-_ALTE_GROESSENPRUEFUNG = "CHECK (tshirt IS NULL OR tshirt IN"
-
-
-def _groessenpruefung_loesen() -> list[str]:
-    """Baut helfer einmalig ohne die CHECK-Klausel auf tshirt neu."""
-    con = verbinden()
-    try:
-        zeile = con.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='helfer'"
-        ).fetchone()
-        if zeile is None or _ALTE_GROESSENPRUEFUNG not in (zeile["sql"] or ""):
-            return []
-
-        alt = zeile["sql"]
-        anfang = alt.index(_ALTE_GROESSENPRUEFUNG)
-        ende = _klammerspanne(alt, alt.index("(", anfang))
-        if ende < 0:
-            return []
-        # Der neue Bauplan ist der alte ohne die Klausel - so bleiben alle
-        # Spalten erhalten, auch die, die spaeter dazugekommen sind.
-        neu = (alt[:anfang] + alt[ende:]).replace(
-            "CREATE TABLE IF NOT EXISTS helfer", "CREATE TABLE helfer_neu", 1
-        ).replace("CREATE TABLE helfer ", "CREATE TABLE helfer_neu ", 1)
-        if "helfer_neu" not in neu:
-            return []
-
-        # Das dokumentierte Vorgehen: ohne Fremdschluessel, sonst raeumte das
-        # DROP ueber ON DELETE CASCADE alle Einteilungen und Ausleihen mit ab.
-        con.execute("PRAGMA foreign_keys = OFF")
-        con.execute("BEGIN")
-        con.execute(neu)
-        con.execute("INSERT INTO helfer_neu SELECT * FROM helfer")
-        con.execute("DROP TABLE helfer")
-        con.execute("ALTER TABLE helfer_neu RENAME TO helfer")
-        con.execute("COMMIT")
-        verletzt = con.execute("PRAGMA foreign_key_check").fetchall()
-        con.execute("PRAGMA foreign_keys = ON")
-        if verletzt:
-            raise RuntimeError(
-                "Nach dem Umbau von helfer zeigen Verweise ins Leere: "
-                + str(verletzt[:3]))
-        return ["helfer.tshirt ohne Groessenpruefung neu gebaut"]
-    finally:
-        con.close()
+def verbinden() -> Verbindung:
+    return _DATENBANK.verbinden()
 
 
 def init() -> list[str]:
-    """Legt das Schema an und trägt fehlende Spalten nach. Gibt zurück, was
-    nachgetragen wurde – der Start schreibt das ins Protokoll."""
-    nachgetragen = []
-    con = verbinden()
-    try:
-        with con:
-            con.executescript(SCHEMA.read_text(encoding="utf-8"))
-            for tabelle, spalte, definition in NACHTRAEGLICHE_SPALTEN:
-                vorhanden = {z["name"] for z in
-                             con.execute("PRAGMA table_info(" + tabelle + ")")}
-                if vorhanden and spalte not in vorhanden:
-                    con.execute("ALTER TABLE " + tabelle +
-                                " ADD COLUMN " + definition)
-                    nachgetragen.append(tabelle + "." + spalte)
-    finally:
-        con.close()
-    # Erst danach: der Umbau kopiert die Tabelle samt der Spalten, die eben
-    # nachgetragen wurden.
-    nachgetragen += _groessenpruefung_loesen()
-    return nachgetragen
+    """Spielt fehlende Migrationen ein und liefert ihre Namen fürs Protokoll."""
+    return _DATENBANK.init()
+
+
+def _mit_suche(zeilen, *felder):
+    """Hängt jeder Zeile ihren durchsuchbaren Text an, als `suche`.
+
+    Unter SQLite rechnete das eine SQL-Funktion, die Python registrierte.
+    PostgreSQL kann keine Python-Funktion aufrufen; die Regel bleibt deshalb
+    in kern/suchen.py, wo auch die Fassung für den Browser herkommt.
+    """
+    for zeile in zeilen:
+        zeile["suche"] = normalisieren.suchtext(
+            *(zeile[feld] or "" for feld in felder))
+    return zeilen
 
 
 class _offen:
@@ -215,7 +114,7 @@ def einstellung_setzen(schluessel: str, wert: str) -> None:
 
 # --- Helfer ----------------------------------------------------------------
 
-def helfer_anlegen(con: sqlite3.Connection, daten: dict) -> tuple[int, bool]:
+def helfer_anlegen(con: Verbindung, daten: dict) -> tuple[int, bool]:
     """Legt an oder ergänzt eine vorhandene Person. Gibt (id, neu) zurück.
 
     Ergänzen heißt: leere Felder werden gefüllt, gefüllte bleiben stehen. Ein
@@ -230,7 +129,7 @@ def helfer_anlegen(con: sqlite3.Connection, daten: dict) -> tuple[int, bool]:
         zeiger = con.execute(
             "INSERT INTO helfer (name, email, telefon, veggie, tshirt,"
             " tshirt_roh, bemerkung, schluessel, angelegt_am)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
             (normalisieren.text(daten.get("name")),
              normalisieren.text(daten.get("email")),
              normalisieren.text(daten.get("telefon")),
@@ -239,7 +138,7 @@ def helfer_anlegen(con: sqlite3.Connection, daten: dict) -> tuple[int, bool]:
              normalisieren.text(daten.get("tshirt_roh")),
              normalisieren.text(daten.get("bemerkung")),
              schluessel, jetzt()))
-        return int(zeiger.lastrowid), True
+        return int(zeiger.fetchone()[0]), True
 
     aenderungen, werte = [], []
     for spalte in ("telefon", "tshirt_roh", "bemerkung"):
@@ -260,20 +159,20 @@ def helfer_anlegen(con: sqlite3.Connection, daten: dict) -> tuple[int, bool]:
     return int(vorhanden["id"]), False
 
 
-def helfer_liste() -> list[sqlite3.Row]:
+def helfer_liste() -> list[Zeile]:
     con = verbinden()
     try:
-        return con.execute(
+        return _mit_suche(con.execute(
             "SELECT h.*,"
             " (SELECT COUNT(*) FROM einteilung e WHERE e.helfer_id = h.id)"
-            "   AS schichten,"
-            " suchtext(h.name, h.email, h.tshirt_roh) AS suche"
-            " FROM helfer h ORDER BY h.name COLLATE NOCASE").fetchall()
+            "   AS schichten"
+            " FROM helfer h ORDER BY lower(h.name)").fetchall(),
+            "name", "email", "tshirt_roh")
     finally:
         con.close()
 
 
-def helfer_laden(helfer_id: int) -> sqlite3.Row | None:
+def helfer_laden(helfer_id: int) -> Zeile | None:
     con = verbinden()
     try:
         return con.execute("SELECT * FROM helfer WHERE id = ?",
@@ -282,7 +181,7 @@ def helfer_laden(helfer_id: int) -> sqlite3.Row | None:
         con.close()
 
 
-def helfer_schichten(helfer_id: int) -> list[sqlite3.Row]:
+def helfer_schichten(helfer_id: int) -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
@@ -295,7 +194,7 @@ def helfer_schichten(helfer_id: int) -> list[sqlite3.Row]:
 
 # --- Schichten -------------------------------------------------------------
 
-def schicht_sichern(con: sqlite3.Connection, liste: str, beginn: str,
+def schicht_sichern(con: Verbindung, liste: str, beginn: str,
                     ende: str, datum: str,
                     bedarf: int | None = None) -> tuple[int, bool]:
     """Legt eine Schicht an oder aktualisiert sie. Gibt (id, neu) zurück.
@@ -310,9 +209,9 @@ def schicht_sichern(con: sqlite3.Connection, liste: str, beginn: str,
     if vorhanden is None:
         zeiger = con.execute(
             "INSERT INTO schicht (liste, beginn, ende, datum, bedarf, angelegt_am)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
+            " VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
             (liste, beginn, ende, datum, bedarf or 0, jetzt()))
-        return int(zeiger.lastrowid), True
+        return int(zeiger.fetchone()[0]), True
     if bedarf is not None:
         con.execute(
             "UPDATE schicht SET bedarf = ?, geaendert_am = ? WHERE id = ?",
@@ -325,14 +224,16 @@ def schicht_sichern(con: sqlite3.Connection, liste: str, beginn: str,
 _SCHICHT_SPALTEN = (
     "s.*,"
     " (SELECT COUNT(*) FROM einteilung e WHERE e.schicht_id = s.id) AS besetzt,"
-    " MAX(0, s.bedarf - (SELECT COUNT(*) FROM einteilung e"
-    "                    WHERE e.schicht_id = s.id)) AS fehlt,"
-    " suchtext(s.liste, s.ort) AS suche"
+    " GREATEST(0, s.bedarf - (SELECT COUNT(*) FROM einteilung e"
+    "                         WHERE e.schicht_id = s.id)) AS fehlt"
 )
+
+# Woraus `suche` für eine Schicht entsteht, siehe _mit_suche().
+_SCHICHT_SUCHE = ("liste", "ort")
 
 
 def schichten(liste: str = "", tag: str = "",
-              nur_luecken: bool = False) -> list[sqlite3.Row]:
+              nur_luecken: bool = False) -> list[Zeile]:
     bedingungen, werte = [], []
     if liste:
         bedingungen.append("s.liste = ?")
@@ -348,24 +249,26 @@ def schichten(liste: str = "", tag: str = "",
 
     con = verbinden()
     try:
-        return con.execute(
+        return _mit_suche(con.execute(
             "SELECT " + _SCHICHT_SPALTEN + " FROM schicht s" + wo +
-            " ORDER BY s.beginn, s.liste COLLATE NOCASE", werte).fetchall()
+            " ORDER BY s.beginn, lower(s.liste)", werte).fetchall(),
+            *_SCHICHT_SUCHE)
     finally:
         con.close()
 
 
-def schicht_laden(schicht_id: int) -> sqlite3.Row | None:
+def schicht_laden(schicht_id: int) -> Zeile | None:
     con = verbinden()
     try:
-        return con.execute(
+        zeile = con.execute(
             "SELECT " + _SCHICHT_SPALTEN + " FROM schicht s WHERE s.id = ?",
             (schicht_id,)).fetchone()
+        return _mit_suche([zeile], *_SCHICHT_SUCHE)[0] if zeile else None
     finally:
         con.close()
 
 
-def besetzung(schicht_id: int) -> list[sqlite3.Row]:
+def besetzung(schicht_id: int) -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
@@ -373,7 +276,7 @@ def besetzung(schicht_id: int) -> list[sqlite3.Row]:
             " e.eingeteilt_am, h.*"
             " FROM einteilung e JOIN helfer h ON h.id = e.helfer_id"
             " WHERE e.schicht_id = ?"
-            " ORDER BY h.name COLLATE NOCASE, e.id", (schicht_id,)).fetchall()
+            " ORDER BY lower(h.name), e.id", (schicht_id,)).fetchall()
     finally:
         con.close()
 
@@ -382,7 +285,7 @@ def listen() -> list[str]:
     con = verbinden()
     try:
         return [z["liste"] for z in con.execute(
-            "SELECT DISTINCT liste FROM schicht ORDER BY liste COLLATE NOCASE")]
+            "SELECT liste FROM schicht GROUP BY liste ORDER BY lower(liste)")]
     finally:
         con.close()
 
@@ -400,16 +303,18 @@ def tage() -> list[str]:
 
 def einteilen(schicht_id: int, helfer_id: int, quelle: str = "hand",
               kuerzel: str = "",
-              con: sqlite3.Connection | None = None) -> int:
+              con: Verbindung | None = None) -> int:
     eigene = con is None
     con = con or verbinden()
     try:
         with (con if eigene else _offen()):
             zeiger = con.execute(
                 "INSERT INTO einteilung (schicht_id, helfer_id, quelle,"
-                " kuerzel, eingeteilt_am) VALUES (?, ?, ?, ?, ?)",
+                " kuerzel, eingeteilt_am) VALUES (?, ?, ?, ?, ?)"
+                " RETURNING id",
                 (schicht_id, helfer_id, quelle, kuerzel, jetzt()))
-        return int(zeiger.lastrowid)
+            nummer = int(zeiger.fetchone()[0])
+        return nummer
     finally:
         if eigene:
             con.close()
@@ -460,7 +365,7 @@ def konflikte() -> list[dict]:
             " JOIN helfer h ON h.id = ea.helfer_id"
             " WHERE a.id < b.id AND a.beginn < b.ende AND b.beginn < a.ende"
             " GROUP BY h.id, a.id, b.id"
-            " ORDER BY a.beginn, h.name COLLATE NOCASE").fetchall()]
+            " ORDER BY a.beginn, lower(h.name)").fetchall()]
     finally:
         con.close()
 
@@ -477,8 +382,8 @@ def doppelt_besetzt() -> list[dict]:
             " FROM einteilung e"
             " JOIN helfer h ON h.id = e.helfer_id"
             " JOIN schicht s ON s.id = e.schicht_id"
-            " GROUP BY e.helfer_id, e.schicht_id HAVING COUNT(*) > 1"
-            " ORDER BY s.beginn, h.name COLLATE NOCASE").fetchall()]
+            " GROUP BY h.id, s.id HAVING COUNT(*) > 1"
+            " ORDER BY s.beginn, lower(h.name)").fetchall()]
     finally:
         con.close()
 
@@ -517,7 +422,7 @@ def zaehler() -> dict:
 # --- Programm der Rennserien -----------------------------------------------
 
 def programm(serie: str = "", tag: str = "",
-             mit_entfallenen: bool = True) -> list[sqlite3.Row]:
+             mit_entfallenen: bool = True) -> list[Zeile]:
     bedingungen, werte = [], []
     if serie:
         bedingungen.append("serie = ?")
@@ -535,13 +440,13 @@ def programm(serie: str = "", tag: str = "",
         # stünden sie wegen NULL am Anfang des Tages.
         return con.execute(
             "SELECT * FROM programm" + wo +
-            " ORDER BY datum, beginn IS NULL, beginn, titel COLLATE NOCASE",
+            " ORDER BY datum, beginn IS NULL, beginn, lower(titel)",
             werte).fetchall()
     finally:
         con.close()
 
 
-def programm_eintrag(programm_id: int) -> sqlite3.Row | None:
+def programm_eintrag(programm_id: int) -> Zeile | None:
     con = verbinden()
     try:
         return con.execute("SELECT * FROM programm WHERE id = ?",
@@ -564,7 +469,7 @@ def abruf_vermerken(serie: str, erfolg: bool, meldung: str = "",
         con.close()
 
 
-def abrufe(grenze: int = 20) -> list[sqlite3.Row]:
+def abrufe(grenze: int = 20) -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
@@ -574,7 +479,7 @@ def abrufe(grenze: int = 20) -> list[sqlite3.Row]:
         con.close()
 
 
-def letzter_erfolg(serie: str) -> sqlite3.Row | None:
+def letzter_erfolg(serie: str) -> Zeile | None:
     con = verbinden()
     try:
         return con.execute(
@@ -598,7 +503,7 @@ def import_vermerken(art: str, datei: str, zeilen: int, bericht: str,
         con.close()
 
 
-def letzter_import(nur_geglueckt: bool = True) -> sqlite3.Row | None:
+def letzter_import(nur_geglueckt: bool = True) -> Zeile | None:
     con = verbinden()
     try:
         return con.execute(
@@ -609,7 +514,7 @@ def letzter_import(nur_geglueckt: bool = True) -> sqlite3.Row | None:
         con.close()
 
 
-def importe() -> list[sqlite3.Row]:
+def importe() -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
@@ -665,7 +570,7 @@ def tablet_token_loeschen() -> None:
     einstellung_setzen(TABLET_SCHLUESSEL, "")
 
 
-def _schichten_mit_namen(con: sqlite3.Connection, bedingung: str,
+def _schichten_mit_namen(con: Verbindung, bedingung: str,
                          werte: tuple) -> list[dict]:
     """Schichten samt der Namen aller Eingeteilten.
 
@@ -673,9 +578,9 @@ def _schichten_mit_namen(con: sqlite3.Connection, bedingung: str,
     nicht in einer je Schicht – sonst wären es auf dem Monitor bei jedem
     Auffrischen zwei Dutzend Abfragen statt zwei.
     """
-    zeilen = [dict(z) for z in con.execute(
+    zeilen = _mit_suche([dict(z) for z in con.execute(
         "SELECT " + _SCHICHT_SPALTEN + " FROM schicht s WHERE " + bedingung +
-        " ORDER BY s.beginn, s.liste COLLATE NOCASE", werte)]
+        " ORDER BY s.beginn, lower(s.liste)", werte)], *_SCHICHT_SUCHE)
     if not zeilen:
         return []
 
@@ -685,7 +590,7 @@ def _schichten_mit_namen(con: sqlite3.Connection, bedingung: str,
             "SELECT e.schicht_id, h.name FROM einteilung e"
             " JOIN helfer h ON h.id = e.helfer_id"
             " WHERE e.schicht_id IN (" + platzhalter + ")"
-            " ORDER BY h.name COLLATE NOCASE",
+            " ORDER BY lower(h.name)",
             [z["id"] for z in zeilen]):
         namen[eintrag["schicht_id"]].append(eintrag["name"])
     for zeile in zeilen:
@@ -736,7 +641,7 @@ def tagesstand(datum: str, zeitpunkt: datetime) -> dict:
         schichten = _schichten_mit_namen(con, "s.datum = ?", (datum,))
         programm = [dict(z) for z in con.execute(
             "SELECT * FROM programm WHERE entfallen_am IS NULL AND datum = ?"
-            " ORDER BY beginn IS NULL, beginn, titel COLLATE NOCASE",
+            " ORDER BY beginn IS NULL, beginn, lower(titel)",
             (datum,))]
     finally:
         con.close()
@@ -855,7 +760,7 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
 # --- Aufgabenplan ----------------------------------------------------------
 
 def aufgaben(phase: str = "", status: str = "",
-             tag: str = "") -> list[sqlite3.Row]:
+             tag: str = "") -> list[Zeile]:
     bedingungen, werte = [], []
     for spalte, wert in (("phase", phase), ("status", status), ("datum", tag)):
         if wert:
@@ -867,16 +772,16 @@ def aufgaben(phase: str = "", status: str = "",
     try:
         # Der Pool (ohne Datum) ganz nach hinten: er hat keinen Platz im
         # Ablauf, soll aber nicht zwischen den Tagen verschwinden.
-        return con.execute(
-            "SELECT *, suchtext(titel, ort, verantwortlich, notiz) AS suche"
-            " FROM aufgabe" + wo +
+        return _mit_suche(con.execute(
+            "SELECT * FROM aufgabe" + wo +
             " ORDER BY datum IS NULL, datum, beginn IS NULL, beginn,"
-            " titel COLLATE NOCASE", werte).fetchall()
+            " lower(titel)", werte).fetchall(),
+            "titel", "ort", "verantwortlich", "notiz")
     finally:
         con.close()
 
 
-def aufgabe_laden(aufgabe_id: int) -> sqlite3.Row | None:
+def aufgabe_laden(aufgabe_id: int) -> Zeile | None:
     con = verbinden()
     try:
         return con.execute("SELECT * FROM aufgabe WHERE id = ?",
@@ -896,10 +801,12 @@ def aufgabe_anlegen(werte: dict, kuerzel: str = "") -> int:
             zeiger = con.execute(
                 "INSERT INTO aufgabe (" + ", ".join(_AUFGABE_SPALTEN) +
                 ", angelegt_am, geaendert_am, kuerzel) VALUES (" +
-                ", ".join("?" for _ in _AUFGABE_SPALTEN) + ", ?, ?, ?)",
+                ", ".join("?" for _ in _AUFGABE_SPALTEN) + ", ?, ?, ?)"
+                " RETURNING id",
                 (*[werte.get(s) for s in _AUFGABE_SPALTEN],
                  jetzt(), jetzt(), kuerzel))
-        return int(zeiger.lastrowid)
+            nummer = int(zeiger.fetchone()[0])
+        return nummer
     finally:
         con.close()
 
@@ -923,8 +830,10 @@ def aufgabe_speichern(aufgabe_id: int, werte: dict, stand,
     con = verbinden()
     try:
         with con:
+            # FOR UPDATE: ohne Sperre liest ein zweiter, gleichzeitiger
+            # Speichervorgang dieselbe Version, und beide gewinnen.
             vorhanden = con.execute(
-                "SELECT version FROM aufgabe WHERE id = ?",
+                "SELECT version FROM aufgabe WHERE id = ? FOR UPDATE",
                 (aufgabe_id,)).fetchone()
             if vorhanden is None:
                 return "weg"
@@ -999,9 +908,10 @@ def vorschlaege(spalte: str) -> list[str]:
     con = verbinden()
     try:
         return [z[0] for z in con.execute(
-            "SELECT DISTINCT " + spalte + " FROM aufgabe"
+            "SELECT " + spalte + " FROM aufgabe"
             " WHERE TRIM(" + spalte + ") <> ''"
-            " ORDER BY " + spalte + " COLLATE NOCASE LIMIT 50")]
+            " GROUP BY " + spalte +
+            " ORDER BY lower(" + spalte + ") LIMIT 50")]
     finally:
         con.close()
 
@@ -1019,7 +929,7 @@ def programm_speichern(programm_id: int, werte: dict, stand) -> str:
     try:
         with con:
             vorhanden = con.execute(
-                "SELECT version FROM programm WHERE id = ?",
+                "SELECT version FROM programm WHERE id = ? FOR UPDATE",
                 (programm_id,)).fetchone()
             if vorhanden is None:
                 return "weg"
@@ -1155,7 +1065,7 @@ def helfer_aendern(helfer_id: int, daten: dict) -> bool:
                  normalisieren.schluessel(name, daten.get("email", "")),
                  jetzt(), helfer_id))
         return zeiger.rowcount > 0
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         # Name und Mailadresse zusammen gibt es schon ein zweites Mal.
         return False
     finally:
@@ -1186,13 +1096,13 @@ def helfer_umbenennen(helfer_id: int, name: str) -> bool:
                 (sauber, normalisieren.schluessel(sauber, vorhanden["email"]),
                  jetzt(), helfer_id))
         return True
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return False
     finally:
         con.close()
 
 
-def ausleihe_laden(ausleihe_id: int) -> sqlite3.Row | None:
+def ausleihe_laden(ausleihe_id: int) -> Zeile | None:
     con = verbinden()
     try:
         return con.execute("SELECT * FROM ausleihe WHERE id = ?",
@@ -1288,10 +1198,11 @@ def ausleihen(helfer_id: int, mengen: dict, datum: str | None = None,
             zeiger = con.execute(
                 "INSERT INTO ausleihe (helfer_id, datum, funke, headset,"
                 " ersatzakku, bemerkung, ausgegeben_am, ausgegeben_von)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
                 (helfer_id, datum or None, *[menge(s) for s in MATERIAL],
                  normalisieren.text(bemerkung), jetzt(), kuerzel))
-        return int(zeiger.lastrowid)
+            nummer = int(zeiger.fetchone()[0])
+        return nummer
     finally:
         con.close()
 
@@ -1304,8 +1215,9 @@ def ausleihe_zurueck(ausleihe_id: int, mengen: dict | None = None,
     con = verbinden()
     try:
         with con:
-            zeile = con.execute("SELECT * FROM ausleihe WHERE id = ?",
-                                (ausleihe_id,)).fetchone()
+            zeile = con.execute(
+                "SELECT * FROM ausleihe WHERE id = ? FOR UPDATE",
+                (ausleihe_id,)).fetchone()
             if zeile is None:
                 return False
 
@@ -1345,20 +1257,19 @@ def ausleihe_loeschen(ausleihe_id: int) -> bool:
         con.close()
 
 
-def ausleihen_liste(nur_offen: bool = False) -> list[sqlite3.Row]:
+def ausleihen_liste(nur_offen: bool = False) -> list[Zeile]:
     con = verbinden()
     try:
-        return con.execute(
+        return _mit_suche(con.execute(
             "SELECT a.*, h.name, h.email, h.telefon,"
             " (a.funke - a.funke_zurueck) AS funke_offen,"
             " (a.headset - a.headset_zurueck) AS headset_offen,"
-            " (a.ersatzakku - a.ersatzakku_zurueck) AS ersatzakku_offen,"
-            " suchtext(h.name, a.bemerkung) AS suche"
+            " (a.ersatzakku - a.ersatzakku_zurueck) AS ersatzakku_offen"
             " FROM ausleihe a"
             " JOIN helfer h ON h.id = a.helfer_id" +
             (" WHERE a.zurueck_am IS NULL" if nur_offen else "") +
             " ORDER BY a.zurueck_am IS NOT NULL, a.ausgegeben_am DESC"
-        ).fetchall()
+        ).fetchall(), "name", "bemerkung")
     finally:
         con.close()
 
@@ -1404,11 +1315,12 @@ def fahrzeug_sichern(kennzeichen: str, name: str = "",
             if vorhanden is None:
                 zeiger = con.execute(
                     "INSERT INTO fahrzeug (kennzeichen, kennzeichen_norm,"
-                    " name, bemerkung, angelegt_am) VALUES (?, ?, ?, ?, ?)",
+                    " name, bemerkung, angelegt_am) VALUES (?, ?, ?, ?, ?)"
+                    " RETURNING id",
                     (normalisieren.kennzeichen_anzeige(kennzeichen), norm,
                      normalisieren.text(name), normalisieren.text(bemerkung),
                      jetzt()))
-                return int(zeiger.lastrowid), True
+                return int(zeiger.fetchone()[0]), True
 
             aenderungen, werte = [], []
             for spalte, wert in (("name", name), ("bemerkung", bemerkung)):
@@ -1426,7 +1338,7 @@ def fahrzeug_sichern(kennzeichen: str, name: str = "",
         con.close()
 
 
-def fahrzeuge() -> list[sqlite3.Row]:
+def fahrzeuge() -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
@@ -1435,7 +1347,7 @@ def fahrzeuge() -> list[sqlite3.Row]:
             "  AND s.zurueck_am IS NULL) AS draussen,"
             " (SELECT COUNT(*) FROM schluessel s WHERE s.fahrzeug_id = f.id)"
             "  AS ausgaben"
-            " FROM fahrzeug f ORDER BY f.kennzeichen COLLATE NOCASE").fetchall()
+            " FROM fahrzeug f ORDER BY lower(f.kennzeichen)").fetchall()
     finally:
         con.close()
 
@@ -1472,7 +1384,7 @@ def fahrzeug_loeschen(fahrzeug_id: int) -> str:
         con.close()
 
 
-def fahrzeug_suchen(kennzeichen: str) -> sqlite3.Row | None:
+def fahrzeug_suchen(kennzeichen: str) -> Zeile | None:
     norm = normalisieren.kennzeichen(kennzeichen)
     if not norm:
         return None
@@ -1491,10 +1403,12 @@ def schluessel_ausgeben(fahrzeug_id: int, name: str, bemerkung: str = "",
         with con:
             zeiger = con.execute(
                 "INSERT INTO schluessel (fahrzeug_id, name, bemerkung,"
-                " ausgegeben_am, ausgegeben_von) VALUES (?, ?, ?, ?, ?)",
+                " ausgegeben_am, ausgegeben_von) VALUES (?, ?, ?, ?, ?)"
+                " RETURNING id",
                 (fahrzeug_id, normalisieren.text(name),
                  normalisieren.text(bemerkung), jetzt(), kuerzel))
-        return int(zeiger.lastrowid)
+            nummer = int(zeiger.fetchone()[0])
+        return nummer
     finally:
         con.close()
 
@@ -1523,18 +1437,16 @@ def schluessel_loeschen(schluessel_id: int) -> bool:
         con.close()
 
 
-def schluessel_liste(nur_offen: bool = False) -> list[sqlite3.Row]:
+def schluessel_liste(nur_offen: bool = False) -> list[Zeile]:
     con = verbinden()
     try:
-        return con.execute(
+        return _mit_suche(con.execute(
             "SELECT s.*, f.kennzeichen, f.kennzeichen_norm,"
-            " f.name AS halter,"
-            " suchtext(f.kennzeichen, f.kennzeichen_norm, s.name,"
-            "          s.bemerkung) AS suche"
+            " f.name AS halter"
             " FROM schluessel s JOIN fahrzeug f ON f.id = s.fahrzeug_id" +
             (" WHERE s.zurueck_am IS NULL" if nur_offen else "") +
             " ORDER BY s.zurueck_am IS NOT NULL, s.ausgegeben_am DESC"
-        ).fetchall()
+        ).fetchall(), "kennzeichen", "kennzeichen_norm", "name", "bemerkung")
     finally:
         con.close()
 
@@ -1549,14 +1461,14 @@ def namen_vorschlaege() -> list[str]:
     con = verbinden()
     try:
         shuttle = [z["name"] for z in con.execute(
-            "SELECT DISTINCT h.name FROM helfer h"
+            "SELECT h.name FROM helfer h"
             " JOIN einteilung e ON e.helfer_id = h.id"
             " JOIN schicht s ON s.id = e.schicht_id"
-            " WHERE s.liste LIKE '%Shuttle%'"
-            " ORDER BY h.name COLLATE NOCASE")]
+            " WHERE s.liste ILIKE '%shuttle%'"
+            " GROUP BY h.name ORDER BY lower(h.name)")]
         gesehen = set(shuttle)
         rest = [z["name"] for z in con.execute(
-            "SELECT name FROM helfer ORDER BY name COLLATE NOCASE")
+            "SELECT name FROM helfer ORDER BY lower(name)")
             if z["name"] not in gesehen]
         return shuttle + rest
     finally:

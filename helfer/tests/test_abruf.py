@@ -13,17 +13,16 @@ dass er in keine Meldung gerät.
 """
 
 import os
-import sqlite3
 import sys
-import tempfile
 import uuid
 from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL))
+sys.path.insert(0, str(WURZEL.parent))
+from kern import testdb  # noqa: E402
 
-verzeichnis = Path(tempfile.mkdtemp(prefix="helfer-abruf-"))
-os.environ["DB_PATH"] = str(verzeichnis / "abruf.db")
+os.environ["DATABASE_URL"] = testdb.wegwerf("helfer_abruf")
 os.environ["APP_SECRET_KEY"] = "test-schluessel"
 os.environ["TAGE"] = "2026-08-28,2026-08-29,2026-08-30"
 
@@ -127,12 +126,7 @@ def stellen(login_url=LOGIN, vergeben_url=VERGEBEN, offen_url=OFFEN,
 
 
 def zeilen(sql, *parameter):
-    con = sqlite3.connect(os.environ["DB_PATH"])
-    con.row_factory = sqlite3.Row
-    try:
-        return con.execute(sql, parameter).fetchall()
-    finally:
-        con.close()
+    return testdb.abfrage(os.environ["DATABASE_URL"], "helfer", sql, parameter)
 
 
 db.init()
@@ -332,4 +326,3 @@ if fehler:
         print("  - " + eintrag)
     sys.exit(1)
 print("alle Pruefungen bestanden")
-print("Wegwerf-Datenbank lag in " + str(verzeichnis))

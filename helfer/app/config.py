@@ -81,9 +81,11 @@ BIND = _env("BIND", "127.0.0.1:8082")
 # Liegt der Reverse Proxy auf einem anderen Host, MUSS hier dessen IP stehen.
 FORWARDED_ALLOW_IPS = _env("FORWARDED_ALLOW_IPS", "127.0.0.1").strip()
 
-DB_PATH = Path(_env("DB_PATH", str(BASE_DIR / "data" / "helfer.db")))
-if not DB_PATH.is_absolute():
-    DB_PATH = BASE_DIR / DB_PATH
+# Die Datenbank: eine fuer den ganzen Dienst, dieser Bereich in seinem
+# eigenen Schema (kern/db.py). Im Betrieb steht die Verbindung in
+# dienst.env. Leer heisst: der Entwicklungs-Container aus compose.yaml.
+DATABASE_URL = _env("DATABASE_URL", "").strip()
+DB_SCHEMA = "helfer"
 
 BASIS_PFAD = "/" + _env("BASIS_PFAD", "/").strip("/")
 
