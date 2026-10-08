@@ -176,6 +176,12 @@ LOGIN_FENSTER_SEKUNDEN = int(_env("LOGIN_FENSTER_SEKUNDEN", "60"))
 # Optionales Bearbeiter-Kürzel bei der Anmeldung (offene Frage 5 im Plan).
 KUERZEL_ABFRAGEN = _flag("KUERZEL_ABFRAGEN")
 
+# Unter welchem Hostnamen das Backoffice liegt. Derselbe Wert, nach dem der
+# Dienst verteilt (dienst.env) - hier gebraucht für Verweise, die aus einer
+# öffentlichen Anfrage heraus ins Backoffice zeigen. Leer = das Backoffice
+# liegt unter derselben Adresse wie die Anfrage, etwa beim Einzelstart.
+HOST_ADMIN = _env("HOST_ADMIN", "").strip()
+
 
 # --- Kontingente (Schritt 5) ------------------------------------------------
 

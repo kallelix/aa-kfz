@@ -419,6 +419,11 @@ Unter `/kennzeichen/einstellungen` lässt sich eine Adresse hinterlegen, die bei
 eingegangenen Antrag eine kurze Nachricht bekommt – mit den Daten und einem
 Verweis in die Detailansicht. Leer lassen schaltet es ab.
 
+Der Verweis zeigt auf die Backoffice-Adresse aus `HOST_ADMIN`, obwohl der
+Antrag über die öffentliche hereinkam: unter `kennzeichen.example.de` gibt
+nginx für `/kennzeichen/…` 404. Ist `HOST_ADMIN` leer, etwa beim Einzelstart,
+bleibt es bei der Adresse der Anfrage.
+
 Die Adresse steht in der Tabelle `einstellung`, nicht in der Env: sie lässt sich
 damit ohne Neustart ändern. Die Nachricht läuft über dieselbe Queue wie alles
 andere, wird also nicht im Request verschickt.

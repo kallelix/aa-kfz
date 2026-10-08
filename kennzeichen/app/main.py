@@ -231,10 +231,25 @@ async def formular_absenden(request: Request):
     if orga and angelegt is not None:
         db.mail_einreihen(
             nummer,
-            mail.vorlage_orga(angelegt, orga, str(request.base_url).rstrip("/")),
+            mail.vorlage_orga(angelegt, orga, _backoffice_basis(request)),
         )
 
     return RedirectResponse(DANKE_PFAD + "?nr=" + str(nummer), status_code=303)
+
+
+def _backoffice_basis(request: Request) -> str:
+    """Wo das Backoffice liegt, von außen gesehen.
+
+    Das Formular kommt über kennzeichen.example.de, das Backoffice liegt
+    unter admin.example.de - und auf der öffentlichen Adresse beantwortet
+    nginx alles unter /kennzeichen mit 404. Ein Verweis aus der Anfrage
+    selbst führte also ins Leere. Schema und Port bleiben die der Anfrage,
+    nur der Hostname wechselt.
+    """
+    basis = request.base_url
+    if config.HOST_ADMIN:
+        basis = basis.replace(hostname=config.HOST_ADMIN)
+    return str(basis).rstrip("/")
 
 
 @app.get(DANKE_PFAD)

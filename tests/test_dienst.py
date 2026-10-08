@@ -10,6 +10,7 @@ je für sich schon prüfen.
 import http.client
 import os
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -200,6 +201,34 @@ try:
         zeile = seite[anfang:seite.index("</nav>", anfang)]
         pruefe(all(('"/%s"' % b) in zeile for b in ("kennzeichen", "presse", "helfer")),
                "und von jedem Bereich kommt man in die anderen beiden")
+
+    print("Verweise aus dem Formular zeigen ins Backoffice")
+    # Das Formular kommt ueber kennzeichen.test, die Meldung an die Orga
+    # verweist aber in die Detailansicht - und die liegt unter admin.test.
+    # Auf der oeffentlichen Adresse gaebe nginx dort 404.
+    status, _, seite, _ = ruf("admin.test", "/kennzeichen/einstellungen", keks=keks)
+    marke = seite.split('name="csrf" value="', 1)
+    csrf = marke[1].split('"', 1)[0] if len(marke) > 1 else ""
+    status, _, _, _ = ruf("admin.test", "/kennzeichen/einstellungen", "POST",
+                          {"csrf": csrf, "benachrichtigung": "orga@example.org"},
+                          keks=keks)
+    pruefe(status == 303, "die Orga-Adresse ist gepflegt")
+    status, _, _, _ = ruf("kennzeichen.test", "/", "POST", {
+        "vorname": "Vera", "nachname": "Verweis", "funktion": "Aufbau",
+        "kategorie": "camping", "kennzeichen": "KA-VV 1",
+        "email": "vera@example.org"})
+    pruefe(status == 303, "ein Antrag ueber die oeffentliche Adresse")
+    con = sqlite3.connect(str(verzeichnis / "kennzeichen.db"))
+    try:
+        zeile = con.execute(
+            "SELECT body FROM mail_out WHERE typ = 'orga'").fetchone()
+    finally:
+        con.close()
+    text = zeile[0] if zeile else ""
+    pruefe("http://admin.test/kennzeichen/antrag/" in text,
+           "die Meldung verweist auf admin.test")
+    pruefe("kennzeichen.test/kennzeichen" not in text,
+           "und nicht auf die oeffentliche Adresse")
 
     print("Ein falscher Keks kommt nirgends durch")
     kaputt = keks[:-4] + "xxxx"
