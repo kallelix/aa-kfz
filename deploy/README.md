@@ -240,7 +240,7 @@ jede Kopie mit `PRAGMA integrity_check` – eine kaputte Sicherung fällt sonst
 erst auf, wenn man sie braucht. Sicherungen älter als 30 Tage werden gelöscht.
 
 > Die Sicherungen enthalten Personendaten. Nach der Veranstaltung gehören sie
-> mit gelöscht, siehe Abschnitt 7 – sonst war der Löschlauf auf der Datenbank
+> mit gelöscht, siehe Abschnitt 8 – sonst war der Löschlauf auf der Datenbank
 > umsonst.
 
 ---
@@ -387,7 +387,7 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 | Monitor zeigt eine Uhrzeit, die nicht stimmt | Entweder steht `JETZT_FEST` noch gesetzt (Warnung im Journal), oder die Containeruhr geht falsch – `timedatectl`. Die Uhr auf dem Bildschirm kommt vom Server, nicht vom Bildschirmrechner. |
 | Monitor zeigt nichts, obwohl Schichten erfasst sind | `TAGE` oder die Daten in den CSV-Dateien liegen in einem anderen Jahr als die Containeruhr. Im Backoffice unter *Schichten* steht, für welche Tage etwas erfasst ist. |
 | Eine Adresse zeigt den falschen Bereich | Der Host-Kopf kommt nicht durch. `proxy_set_header Host $host;` fehlt im Schnipsel, oder der Name steht nicht in `HOST_…`. Ohne Treffer landet alles beim Pfad-Rückfall. |
-| Anmeldung gilt nur in einem Bereich | `APP_SECRET_KEY` steht noch in einer der drei Anwendungs-Dateien und überschreibt dort den gemeinsamen. Er gehört nur nach `dienst.env`. |
+| Anmeldung gilt nur in einem Bereich | `APP_SECRET_KEY` fehlt in `dienst.env`. Dann nimmt jeder Bereich den aus seiner eigenen Datei oder erzeugt sich beim Start einen – drei verschiedene Schlüssel. Er gehört nach `dienst.env`; die Umgebung schlägt die Dateien. |
 | Im Protokoll fehlt ein `starte Bereich …` | Die `.env` dieses Bereichs ist nicht lesbar oder ihr `DB_PATH` zeigt ins Leere. |
 
 ---

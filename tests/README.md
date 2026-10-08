@@ -1,11 +1,16 @@
 # Tests
 
 Keine Testbibliothek, nur Standardbibliothek – `python datei.py`, Rückgabewert 0
-heißt bestanden.
+heißt bestanden. Alle Aufrufe aus dem Hauptordner.
+
+Hier liegen die Tests für den Dienst, für `kern` und für den Kennzeichen-Bereich.
+Presse und Helfer haben ihre eigenen unter `presse/tests/` und `helfer/tests/`,
+beschrieben in deren README.
 
 ## Ohne Server
 
 ```bash
+.venv/Scripts/python.exe tests/test_dienst.py
 .venv/Scripts/python.exe tests/test_auth.py
 .venv/Scripts/python.exe tests/test_mail.py
 .venv/Scripts/python.exe tests/test_versand.py
@@ -19,6 +24,10 @@ node tests/test_suchen_js.js
 node tests/test_durchfahrt_js.js
 ```
 
+- `test_dienst.py` – startet den zusammengesetzten Dienst selbst: drei
+  Datenbanken in einem Prozess, Verteilung nach Hostname, Stilblatt und
+  Anmeldeseite in jedem Bereich, und dass eine Anmeldung alle drei Bereiche
+  öffnet – ein veränderter Keks aber keinen.
 - `test_auth.py` – Passwort-Hashing, Session-Token (Signatur, getauschte
   Nutzlast, Ablauf), CSRF-Bindung, Login-Rate-Limit.
 - `test_mail.py` – Vorlagen, Kopplung von Entscheidung und Mail, Fälligkeit,
@@ -75,12 +84,13 @@ DB=/tmp/test-abfahrt.db
 rm -f "$DB"*
 
 # 1. Server mit Testkonfiguration starten (eigenes Terminal)
+KENNZEICHEN_ENV=/dev/null \
 DB_PATH="$DB" \
 ADMIN_PASSWORD_HASH="$(.venv/Scripts/python.exe -m kern.passwort 'test-passwort-123' | cut -d= -f2-)" \
 APP_SECRET_KEY=test-schluessel \
 COOKIE_SECURE=0 \
 LOGIN_VERSUCHE=3 \
-.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8099 \
+.venv/Scripts/python.exe -m uvicorn kennzeichen.app.main:app --host 127.0.0.1 --port 8099 \
   --proxy-headers --forwarded-allow-ips 127.0.0.1
 
 # 2. Testdaten anlegen und Test laufen lassen (anderes Terminal)
@@ -88,8 +98,13 @@ LOGIN_VERSUCHE=3 \
 TEST_DB="$DB" .venv/Scripts/python.exe tests/test_http.py
 ```
 
-`COOKIE_SECURE=0` ist nötig, weil der Test über `http` läuft; `LOGIN_VERSUCHE=3`
-erwartet der Rate-Limit-Abschnitt.
+Gestartet wird nur die Kennzeichen-Anwendung, nicht der ganze Dienst – die
+Ablauftests gehen ohne Hostnamen direkt auf ihre Pfade.
+
+`KENNZEICHEN_ENV=/dev/null` hält die eigene `kennzeichen/.env` heraus: steht
+dort etwa `SMTP_HOST`, gingen beim Seeden echte Mails hinaus. `COOKIE_SECURE=0`
+ist nötig, weil der Test über `http` läuft; `LOGIN_VERSUCHE=3` erwartet der
+Rate-Limit-Abschnitt.
 
 `tests/test_http.py` sperrt am Ende die Anmeldung für die eigene IP. Danach
 entweder eine Minute warten oder den Server neu starten – der Zähler liegt im

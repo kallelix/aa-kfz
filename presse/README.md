@@ -1,20 +1,28 @@
 # Presse-Akkreditierung
 
-Schwesteranwendung zur Kennzeichen-App im selben Repository. Eigener Container,
-eigene Adresse, eigene Datenbank. Grundlage ist
+Einer der drei Bereiche im gemeinsamen Dienst – wie das Ganze zusammenhaengt,
+steht in der [Uebersicht](../README.md). Eigene Adresse, eigene Datenbank,
+Backoffice unter derselben Anmeldung wie die anderen beiden. Grundlage ist
 [../docs/plan-presse-akkreditierung.md](../docs/plan-presse-akkreditierung.md).
+
+| Adresse | was dort liegt |
+| --- | --- |
+| `presse.example.de/` | Anmeldeformular |
+| `admin.example.de/presse` | Backoffice: Anmeldungen, Abholliste, Bilder ausstehend |
 
 ## Starten
 
+Im Alltag als Teil des Dienstes, siehe [Uebersicht](../README.md#lokal-starten).
+Einzeln geht es weiterhin – so starten auch die Tests ihren Server:
+
 ```bash
+cp presse/.env.example presse/.env
+.venv/Scripts/python.exe -m kern.passwort      # Hash in presse/.env
 cd presse
-cp .env.example .env
-../.venv/Scripts/python.exe -m app.passwort      # Hash in die .env
 ../.venv/Scripts/python.exe -m app
 ```
 
-Die virtuelle Umgebung liegt im Wurzelverzeichnis und deckt beide Anwendungen
-ab. Vorgabeport ist 8081, damit beide nebeneinander laufen koennen.
+Vorgabeport ist dann 8081, Backoffice unter <http://127.0.0.1:8081/presse>.
 
 ## Was die App macht
 
@@ -40,7 +48,9 @@ Orga-Buero.
 
 ## Konfiguration
 
-Siehe [.env.example](.env.example). Erwaehnenswert:
+Siehe [.env.example](.env.example). Gelesen wird `presse/.env`, im Betrieb
+die Datei, auf die `PRESSE_ENV` zeigt. Was fuer alle drei Bereiche gilt,
+steht in der [Uebersicht](../README.md#konfiguration). Erwaehnenswert:
 
 - `GEBUEHR_BETRAG`, `GEBUEHR_WAEHRUNG` – Akkreditierungsgebuehr
 - `BILDER_ANZAHL` – Umfang der Bilderspende
@@ -80,4 +90,7 @@ Warteschlange.
 
 ## Deployment
 
-Abschnitt 7 in [../deploy/README.md](../deploy/README.md).
+Gemeinsam mit den anderen beiden Bereichen, siehe
+[../deploy/README.md](../deploy/README.md). Die eigenen Werte stehen in
+`/etc/abfahrt/presse.env`, Vorlage
+[../deploy/presse.env.example](../deploy/presse.env.example).

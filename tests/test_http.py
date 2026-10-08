@@ -135,7 +135,8 @@ pruefe(status == 303 and ort == "/kennzeichen", "richtiges Passwort -> 303 auf /
 kekse = [c for c in o.jar if c.name == "abfahrt_sitzung"]
 pruefe(len(kekse) == 1, "Session-Cookie wurde gesetzt")
 if kekse:
-    pruefe(kekse[0].path == "/kennzeichen", "Cookie-Pfad ist /kennzeichen (nicht /)")
+    # "/" mit Absicht: eine Anmeldung gilt fuer alle drei Bereiche des Dienstes.
+    pruefe(kekse[0].path == "/", "Cookie-Pfad ist / (gilt fuer alle drei Bereiche)")
     pruefe(kekse[0].has_nonstandard_attr("HttpOnly"), "Cookie ist HttpOnly")
 
 status, _, _ = hole(o, "/kennzeichen/login")

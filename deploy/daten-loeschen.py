@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Personendaten nach der Veranstaltung löschen.
 
-    python3 deploy/daten-loeschen.py --art helfer --db /var/lib/helfer/helfer.db
+    python3 deploy/daten-loeschen.py --art helfer --db /var/lib/abfahrt/helfer.db
     python3 deploy/daten-loeschen.py --art helfer --db … --wirklich
 
 Ohne ``--wirklich`` wird nichts geschrieben: der Aufruf zeigt nur, was

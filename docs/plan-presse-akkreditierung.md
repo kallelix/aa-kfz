@@ -288,7 +288,7 @@ wird.
 > bleiben; die drei Backoffices liegen unter einer Adresse mit einer
 > Anmeldung. Der Kern fiel dabei kleiner aus als gedacht: Wort für Wort gleich
 > waren nur 352 Zeilen. `worker.py`, `mail.py` und `db.py` tragen bloß
-> denselben Namen. Siehe `deploy/README.md`, Abschnitt 10.
+> denselben Namen. Siehe `README.md` und `deploy/README.md`.
 
 ---
 
