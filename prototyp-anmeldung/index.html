@@ -86,6 +86,7 @@ p { margin: .5rem 0; }
   padding: 1rem;
   margin: .75rem 0;
 }
+.karte > h3:first-child { margin-top: 0; }
 .knopf {
   display: block;
   width: 100%;
@@ -246,28 +247,29 @@ input[type="text"], input[type="email"], input[type="tel"], input[type="date"], 
 }
 .hinweis.gut { border-left-color: var(--ok); background: var(--ok-hell); }
 .hinweis.warn { border-left-color: var(--dringend); background: var(--dringend-hell); }
-.stempel { display: flex; gap: .5rem; flex-wrap: wrap; margin: .5rem 0; }
-.stempel div {
-  width: 3.6rem;
-  height: 3.6rem;
+/* Kudos: ein Kreis je Schicht, im Kreis steht kurz, was es dafür gibt. */
+.kudos { display: flex; gap: .5rem; flex-wrap: wrap; margin: .25rem 0 .5rem; }
+.kudos div {
+  width: 3.4rem;
+  height: 3.4rem;
   border: 2px dashed var(--rand);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: .72rem;
+  font-size: .78rem;
   text-align: center;
   line-height: 1.1;
   color: var(--gedaempft);
 }
-.stempel div.voll { border: 2px solid var(--ok); background: var(--ok-hell); color: var(--ok); font-weight: 700; font-size: 1.3rem; }
+.kudos div.voll { border: 2px solid var(--ok); background: var(--ok-hell); color: var(--ok); font-weight: 700; }
 .person { border-top: 1px solid var(--rand); margin-top: 1rem; padding-top: .5rem; }
 .fuss { margin-top: 2rem; font-size: .88rem; color: var(--gedaempft); text-align: center; }
 .fuss a { color: var(--text); }
 </style>
 </head>
 <body>
-<div class="prototyp">Prototyp zum Ausprobieren – nichts wird gespeichert oder verschickt. Beispieldaten. <a href="#start" data-aktion="neu">Von vorn</a></div>
+<div class="prototyp">Prototyp – nichts wird gespeichert oder verschickt. <a href="#start" data-aktion="neu">Von vorn</a></div>
 <main class="huelle" id="app"></main>
 <script>
 "use strict";
@@ -295,13 +297,13 @@ const TAGESZEITEN = [
 ];
 
 const BEREICHE = {
-  aufbau: { name: "Aufbau und Abbau", text: "Zelte, Zäune und Banner aufstellen und hinterher wieder abbauen. Draußen, im Team, mit anpacken.", treffpunkt: "Orgazelt", vorlieben: ["anpacken"] },
-  zeltplatz: { name: "Ordner Zeltplatz", text: "Auf dem Zeltplatz Ansprechpartner sein, Plätze zeigen und abends auf Ruhe achten.", treffpunkt: "Einfahrt Zeltplatz", vorlieben: ["menschen"] },
-  strecke: { name: "Streckenposten", text: "An der Strecke stehen, aufpassen, dass niemand über die Strecke läuft, und Stürze per Funk melden.", treffpunkt: "Orgazelt", vorlieben: ["strecke"] },
-  sperre: { name: "Straßensperre", text: "An der Zufahrt stehen und nur durchlassen, wer auf der Liste steht. Die Liste hast du auf dem Handy.", treffpunkt: "Straßensperre am Ortseingang", vorlieben: ["strecke", "menschen"] },
-  shuttle: { name: "Shuttle", text: "Fahrer und Gäste zwischen Parkplatz und Gelände fahren. Ab 18 Jahren und mit Führerschein.", treffpunkt: "Großer Parkplatz", vorlieben: ["fahren"], abAlter: 18 },
-  merch: { name: "Merchandise", text: "Shirts und Andenken verkaufen. Freundlich sein, Geld annehmen.", treffpunkt: "Merch-Stand am Zielbereich", vorlieben: ["menschen"] },
-  wiese: { name: "Absoluter Wiesenslalom", text: "Beim Spaßrennen für Kinder mithelfen: Start, Ziel und Tore.", treffpunkt: "Kinderwiese", vorlieben: ["menschen", "strecke"] },
+  aufbau: { name: "Aufbau und Abbau", text: "Zelte, Zäune, Banner – aufbauen und wieder abbauen.", treffpunkt: "Orgazelt", vorlieben: ["anpacken"] },
+  zeltplatz: { name: "Ordner Zeltplatz", text: "Plätze zeigen, Fragen beantworten, abends auf Ruhe achten.", treffpunkt: "Einfahrt Zeltplatz", vorlieben: ["menschen"] },
+  strecke: { name: "Streckenposten", text: "Zuschauer von der Strecke fernhalten, Stürze per Funk melden.", treffpunkt: "Orgazelt", vorlieben: ["strecke"] },
+  sperre: { name: "Straßensperre", text: "Nur durchlassen, wer auf der Liste steht.", treffpunkt: "Straßensperre am Ortseingang", vorlieben: ["strecke", "menschen"] },
+  shuttle: { name: "Shuttle", text: "Gäste zwischen Parkplatz und Gelände fahren. Mit Führerschein.", treffpunkt: "Großer Parkplatz", vorlieben: ["fahren"], abAlter: 18 },
+  merch: { name: "Merchandise", text: "Shirts und Andenken verkaufen.", treffpunkt: "Merch-Stand am Zielbereich", vorlieben: ["menschen"] },
+  wiese: { name: "Absoluter Wiesenslalom", text: "Kinderrennen: Start, Ziel und Tore.", treffpunkt: "Kinderwiese", vorlieben: ["menschen", "strecke"] },
 };
 
 const VORLIEBEN = [
@@ -349,9 +351,11 @@ const SCHICHTEN = [
   ({ id, bereich, tag, von, bis, soll, minimum, reserve, belegt }));
 
 // Belohnungen dieser Veranstaltung (G-02). Leer = keine Goodies (V-07).
+// Jede Schicht bringt Kudos; `kurz` steht im Kreis, `text` im Satz.
 const STUFEN = [
-  { ab: 1, text: "Helfershirt" },
-  { ab: 2, text: "Bier am Bierwagen", abAlter: 16, alternative: "Eis" },
+  { ab: 1, text: "Helfershirt", kurz: "Shirt" },
+  { ab: 2, text: "Bier am Bierwagen", kurz: "Bier", abAlter: 16, alternative: "Eis", alternativeKurz: "Eis" },
+  { ab: 4, text: "ILRC-Cap", kurz: "Cap" },
 ];
 
 const ERSTER_TAG = "2027-07-01";
@@ -459,15 +463,23 @@ function alter() {
   return alterDer(z.person);
 }
 
-function stufeText(stufe) {
-  // Solange das Alter unbekannt ist, beides nennen: „Bier am Bierwagen oder Eis“.
-  if (!stufe.abAlter) return stufe.text;
+function stufeText(stufe, kurz = false) {
+  // Solange das Alter unbekannt ist, beides nennen: „Bier am Bierwagen oder
+  // Eis“, im Kreis „Bier/Eis“.
+  const text = kurz ? stufe.kurz : stufe.text;
+  if (!stufe.abAlter) return text;
+  const alternative = kurz ? stufe.alternativeKurz : stufe.alternative;
   const a = alter();
-  if (a === null) return `${stufe.text} oder ${stufe.alternative}`;
-  return a < stufe.abAlter ? stufe.alternative : stufe.text;
+  if (a === null) return kurz ? `${text}/${alternative}` : `${text} oder ${alternative}`;
+  return a < stufe.abAlter ? alternative : text;
 }
 
-function stempelAnzahl() {
+function nochBis(stufe, anzahl, kurz) {
+  const fehlt = stufe.ab - anzahl;
+  return `Noch ${fehlt === 1 ? "eine Schicht" : `${fehlt} Schichten`} bis: ${esc(stufeText(stufe, kurz))}`;
+}
+
+function kudos() {
   return z.auswahl.length + (z.springer.length ? 1 : 0);
 }
 
@@ -570,7 +582,7 @@ function marken(s) {
     return `<span class="marke frei">Du bist dabei${l.art === "reserve" ? " – als Reserve" : ""}</span>`;
   }
   let m = "";
-  if (l.dringend) m += `<span class="marke dringend">Dringend – Schicht-Retter gesucht</span>`;
+  if (l.dringend) m += `<span class="marke dringend">Dringend gesucht</span>`;
   if (l.art === "frei") m += `<span class="marke frei">noch ${l.frei} frei</span>`;
   if (l.art === "reserve") m += `<span class="marke reserve">als Reserve</span>`;
   if (l.art === "voll") m += `<span class="marke voll">voll</span>`;
@@ -602,42 +614,35 @@ function schichtKarte(s, opt = {}) {
   </div>`;
 }
 
-function stempelkarte() {
+function kudosKarte() {
   if (!STUFEN.length) return "";
-  const anzahl = stempelAnzahl();
-  // Ein freies Feld mehr, als schon gestempelt ist – mindestens bis zur
-  // letzten Belohnung.
-  const felder = Math.max(anzahl + 1, STUFEN[STUFEN.length - 1].ab);
-  let html = `<div class="stempel">`;
+  const anzahl = kudos();
+  // Ein Kreis je Schicht bis zur letzten Belohnung, nicht mehr – sonst bricht
+  // die Reihe auf dem Handy um. Im Kreis steht, was es dafür gibt; was schon
+  // sicher ist, ist grün.
+  const felder = STUFEN[STUFEN.length - 1].ab;
+  let html = `<div class="kudos">`;
   for (let i = 1; i <= felder; i++) {
     const stufe = STUFEN.find(s => s.ab === i);
-    html += i <= anzahl ? `<div class="voll">✓</div>` : `<div>${stufe ? esc(stufeText(stufe)) : ""}</div>`;
+    const name = stufe ? esc(stufeText(stufe, true)) : "";
+    html += i <= anzahl ? `<div class="voll">${name || "✓"}</div>` : `<div>${name}</div>`;
   }
   html += `</div>`;
-  const sicher = STUFEN.filter(s => s.ab <= anzahl).map(stufeText);
-  if (sicher.length) html += `<p>Dir sicher: <strong>${sicher.map(esc).join(", ")}</strong>.</p>`;
   const naechste = STUFEN.find(s => s.ab > anzahl);
-  if (naechste) {
-    const fehlt = naechste.ab - anzahl;
-    html += `<p>Noch <strong>${fehlt} ${fehlt === 1 ? "Schicht" : "Schichten"}</strong> bis: ${esc(stufeText(naechste))}.</p>`;
-  } else if (anzahl) {
-    html += `<p>Mehr Goodies gibt es nicht – jede weitere Schicht hilft trotzdem enorm. Danke!</p>`;
-  }
+  html += naechste ? `<p>${nochBis(naechste, anzahl, false)}.</p>` : `<p>Alle Goodies sind deine. Danke!</p>`;
   return html;
 }
 
 function anreiz() {
-  // Kleine Stempel schon beim Auswählen: zeigt, dass mehr Schichten mehr
-  // bringen, bevor überhaupt jemand die Stempelkarte gesehen hat (G-10).
+  // Kleine Kreise schon beim Auswählen: zeigt, dass mehr Schichten mehr
+  // bringen, bevor überhaupt jemand die Kudos gesehen hat (G-10).
   if (!STUFEN.length) return "";
-  const anzahl = stempelAnzahl();
-  const felder = Math.max(anzahl + 1, STUFEN[STUFEN.length - 1].ab);
+  const anzahl = kudos();
+  const felder = STUFEN[STUFEN.length - 1].ab;
   let mini = "";
   for (let i = 1; i <= felder; i++) mini += `<i class="${i <= anzahl ? "voll" : ""}"></i>`;
   const naechste = STUFEN.find(s => s.ab > anzahl);
-  const text = naechste
-    ? `Noch ${naechste.ab - anzahl === 1 ? "eine Schicht" : `${naechste.ab - anzahl} Schichten`} bis: ${esc(stufeText(naechste))}`
-    : "Stark – jede weitere Schicht hilft trotzdem enorm";
+  const text = naechste ? nochBis(naechste, anzahl, true) : "Alle Goodies sind deine";
   return `<div class="anreiz"><span class="mini">${mini}</span><span>${text}</span></div>`;
 }
 
@@ -660,20 +665,19 @@ const SEITEN = {};
 SEITEN.start = () => {
   const balken = tagesbalken().map(({ t, soll, belegt }) => `
     <div class="balken">
-      <div class="balken-kopf"><span>${t.name}</span><span>${belegt} von ${soll} Plätzen besetzt</span></div>
+      <div class="balken-kopf"><span>${t.name}</span><span>${belegt} von ${soll} besetzt</span></div>
       <div class="balken-bahn"><div class="balken-fuellung" style="width:${Math.round(belegt / soll * 100)}%"></div></div>
     </div>`).join("");
+  // Die Kudos nur angedeutet: wie sie funktionieren, zeigt sich, sobald die
+  // erste Schicht gewählt ist.
   return `${kopf("Hilf mit bei der Absoluten Abfahrt!")}
-    <p>Ohne Helfer gibt es kein Rennen. Sei dabei – an der Strecke, am Zeltplatz, beim Auf- und Abbau. Schon eine Schicht hilft.</p>
-    <a class="weg" href="#zeit"><strong>Ich sage, wann ich Zeit habe</strong><span>Wir zeigen dir nur Schichten, die passen.</span></a>
+    <p>Ohne Helfer kein Rennen. Schon eine Schicht hilft.</p>
+    <a class="weg" href="#zeit"><strong>Ich sage, wann ich Zeit habe</strong><span>Wir zeigen dir, was passt.</span></a>
     <a class="weg" href="#liste"><strong>Ich suche mir Schichten aus</strong><span>Alle Schichten auf einen Blick.</span></a>
-    <div class="karte">
-      <div class="anreiz"><span class="mini"><i class="voll"></i><i class="voll"></i><i></i></span><strong>Jede Schicht ein Stempel</strong></div>
-      <p class="leise">Für jede Schicht bekommst du einen Stempel auf deine Stempelkarte – wer öfter mithilft, bekommt mehr Dankeschön. Und nach dem Rennen feiern wir zusammen.</p>
-    </div>
+    <p class="leise">Für jede Schicht gibt's Kudos – und nach dem Rennen feiern wir zusammen.</p>
     <h2>So weit sind wir</h2>
     <div class="karte">${balken}</div>
-    <p class="leise">Schon angemeldet? Den Link zu deinem Helferplatz findest du in deiner Mail.
+    <p class="leise">Schon angemeldet? Dein Link steht in der Mail.
       ${z.bestaetigt ? `<a href="#mein">Zu meinem Helferplatz</a>` : ""}</p>
     ${fuss()}`;
 };
@@ -696,7 +700,7 @@ SEITEN.zeit = () => {
       </div>`).join("");
   };
   return `${kopf("Wann hast du Zeit?", "#start")}
-    <p>Tippe alle Zeiträume an, in denen du helfen könntest. Du kannst später immer noch auswählen.</p>
+    <p>Tippe alles an, was bei dir geht.</p>
     ${gruppe("Aufbau")}${gruppe("Veranstaltung")}${gruppe("Abbau")}
     <button class="knopf" data-aktion="weiter-vorlieben" ${z.zeit.length ? "" : "disabled"}>Weiter</button>
     ${z.zeit.length ? "" : `<p class="leise">Tippe mindestens ein Feld an.</p>`}
@@ -704,7 +708,7 @@ SEITEN.zeit = () => {
 };
 
 SEITEN.vorlieben = () => `${kopf("Was machst du gern?", "#zeit")}
-  <p>Wähle aus, was dir liegt – gern mehreres.</p>
+  <p>Gern mehreres.</p>
   ${VORLIEBEN.map(v => {
     const an = z.vorlieben.includes(v.key);
     return `<button class="wahl vorliebe" aria-pressed="${an}" data-aktion="vorliebe" data-key="${v.key}">${an ? "✓ " : ""}${v.name}</button>`;
@@ -719,11 +723,11 @@ SEITEN.vorschlaege = () => {
     return `${tag(d).kurz} ${TAGESZEITEN.find(x => x.key === tz).name}`;
   }).join(", ");
   return `${kopf(liste.length ? "Das passt zu dir" : "Gerade passt nichts genau", "#vorlieben")}
-    ${liste.length ? `<p>Die Schichten, die am dringendsten gebraucht werden, stehen oben. Tippe auf „Eintragen“.</p>` : `<p>Zu deinen Zeiten ist gerade nichts frei, was dir liegt.</p>`}
+    ${liste.length ? `<p>Was am dringendsten fehlt, steht oben.</p>` : `<p>Zu deinen Zeiten ist gerade nichts frei, was dir liegt.</p>`}
     ${liste.map(s => schichtKarte(s, { mitText: true })).join("")}
     <div class="karte">
       <h3>Lieber flexibel?</h3>
-      <p>Als <strong>Springer</strong> bist du zu deinen Zeiten da und hilfst, wo gerade jemand fehlt.</p>
+      <p>Als <strong>Springer</strong> hilfst du, wo gerade jemand fehlt.</p>
       <p class="leise">Deine Zeiten: ${esc(springerZeit)}</p>
       ${z.springer.length
         ? `<p class="hinweis gut">Du bist als Springer eingetragen.</p><button class="knopf klein zweit" data-aktion="kein-springer">Doch nicht als Springer</button>`
@@ -766,9 +770,9 @@ function personFelder(p, praefix, mitKontakt) {
       <div><label for="${praefix}nachname">Nachname</label><input type="text" id="${praefix}nachname" data-feld="nachname" value="${esc(p.nachname)}" autocomplete="family-name"></div>
     </div>
     ${mitKontakt ? `
-      <label for="${praefix}email">E-Mail <span class="leise">– dahin schicken wir die Bestätigung</span></label>
+      <label for="${praefix}email">E-Mail</label>
       <input type="email" id="${praefix}email" data-feld="email" value="${esc(p.email)}" autocomplete="email" inputmode="email">
-      <label for="${praefix}handy">Handy <span class="leise">– freiwillig, aber hilfreich, falls am Tag etwas ist</span></label>
+      <label for="${praefix}handy">Handy <span class="leise">– freiwillig</span></label>
       <input type="tel" id="${praefix}handy" data-feld="handy" value="${esc(p.handy)}" autocomplete="tel" inputmode="tel">` : ""}
     <fieldset>
       <legend>${du ? "Bist du 18 oder älter?" : "Ist die Person 18 oder älter?"}</legend>
@@ -778,10 +782,10 @@ function personFelder(p, praefix, mitKontakt) {
       </div>
     </fieldset>
     ${p.volljaehrig === "nein" ? `
-      <label for="${praefix}geburt">Geburtsdatum <span class="leise">– für Helfer unter 18 brauchen wir es</span></label>
+      <label for="${praefix}geburt">Geburtsdatum</label>
       <input type="date" id="${praefix}geburt" data-feld="geburt" value="${esc(p.geburt)}" min="2000-01-01" max="2020-12-31">` : ""}
     ${p.volljaehrig === "nein" && a !== null && a < 18 && a >= 12 ? `
-      <div class="hinweis">Weil ${du ? "du noch nicht 18 bist" : "diese Person noch nicht 18 ist"}, fragen wir die Eltern. Sie bekommen eine Mail zum Bestätigen.</div>
+      <div class="hinweis">Unter 18: ${du ? "Deine" : "Die"} Eltern bestätigen per Mail.</div>
       <label for="${praefix}eltern">Name eines Elternteils</label>
       <input type="text" id="${praefix}eltern" data-feld="eltern" value="${esc(p.eltern)}">
       <label for="${praefix}elternmail">E-Mail der Eltern</label>
@@ -810,7 +814,7 @@ SEITEN.angaben = () => {
     ${z.weitere.map((p, i) => `
       <div class="karte person" data-person="${i}">
         <h3>Weitere Person ${i + 1}</h3>
-        <p class="leise">Kommt zu denselben Schichten mit. Du bleibst Ansprechpartner.</p>
+        <p class="leise">Kommt mit zu deinen Schichten.</p>
         ${personFelder(p, `p${i}-`, false)}
         <button class="knopf klein warnung" data-aktion="person-weg" data-i="${i}">Diese Person entfernen</button>
       </div>`).join("")}
@@ -819,11 +823,11 @@ SEITEN.angaben = () => {
     <textarea id="bemerkung" rows="2" data-feld-frei="bemerkung">${esc(z.person.bemerkung)}</textarea>
     ${alter() !== null && alter() < 13 ? "" : `
       <label class="haken"><input type="checkbox" id="whatsapp" ${z.whatsapp ? "checked" : ""}>
-        <span>Ladet mich in die WhatsApp-Helfergruppe ein. <span class="leise">Freiwillig. Dafür brauchen wir deine Handynummer. Dort gibt es Neuigkeiten und Hilferufe – alles Wichtige kommt trotzdem per Mail.</span></span></label>`}
+        <span>In die WhatsApp-Helfergruppe einladen <span class="leise">– News und Hilferufe, braucht deine Handynummer</span></span></label>`}
     ${z.bestaetigt ? "" : `
       <label class="haken"><input type="checkbox" id="stamm" ${z.stamm ? "checked" : ""}>
-        <span>Ihr dürft mich für künftige Veranstaltungen ansprechen. <span class="leise">Freiwillig. Ohne Haken löschen wir deine Daten nach der Veranstaltung.</span></span></label>
-      <p class="leise">Wir nutzen deine Angaben nur, um die Helfer einzuteilen. <a href="#angaben" data-aktion="datenschutz">Mehr zum Datenschutz</a></p>`}
+        <span>Auch für künftige Veranstaltungen fragen <span class="leise">– sonst löschen wir deine Daten danach</span></span></label>
+      <p class="leise">Deine Angaben nutzen wir nur für die Einteilung. <a href="#angaben" data-aktion="datenschutz">Datenschutz</a></p>`}
     <button class="knopf" data-aktion="absenden">${z.bestaetigt ? "Speichern" : "Anmelden"}</button>
     ${fuss()}`;
 };
@@ -831,14 +835,12 @@ SEITEN.angaben = () => {
 SEITEN.fertig = () => {
   const vorschlag = nochEine();
   return `${kopf("Danke! Jetzt noch die Mail")}
-    <div class="hinweis gut">Wir haben dir eine Mail an <strong>${esc(z.person.email)}</strong> geschickt.
-      Tippe dort auf „Ja, das bin ich“ – dann ist dein Platz fest.</div>
+    <div class="hinweis gut">Tippe in der Mail an <strong>${esc(z.person.email)}</strong> auf „Ja, das bin ich“ – dann ist dein Platz fest.</div>
     <button class="knopf zweit" data-aktion="mail-simulieren">So tun, als hätte ich in der Mail getippt</button>
-    ${z.whatsapp ? `<p class="leise">Die Einladung in die WhatsApp-Helfergruppe schicken wir dir an ${esc(z.person.handy)}.</p>` : ""}
-    <h2>Deine Stempelkarte</h2>
-    <div class="karte">${stempelkarte()}</div>
+    ${z.whatsapp ? `<p class="leise">Die WhatsApp-Einladung kommt an ${esc(z.person.handy)}.</p>` : ""}
+    ${STUFEN.length ? `<h2>Deine Kudos</h2>
+    <div class="karte">${kudosKarte()}</div>` : ""}
     ${vorschlag.length ? `<h2>Noch eine Schicht?</h2>
-      <p>Diese passen gut zu dem, was du schon hast:</p>
       ${vorschlag.map(s => schichtKarte(s)).join("")}` : ""}
     ${fuss()}`;
 };
@@ -856,7 +858,7 @@ SEITEN.mein = () => {
       <button class="knopf klein zweit" data-aktion="umbuchen" data-id="${s.id}">Umbuchen</button>
       <button class="knopf klein warnung" data-aktion="absagen-fragen" data-id="${s.id}">Absagen</button>`;
     if (z.offen === s.id) {
-      unten = `<div class="hinweis">Wirklich absagen? Das ist völlig in Ordnung – wir finden dann jemand anderen.</div>
+      unten = `<div class="hinweis">Wirklich absagen? Völlig okay – wir finden jemanden.</div>
         <button class="knopf klein warnung" data-aktion="absagen" data-id="${s.id}">Ja, absagen</button>
         <button class="knopf klein zweit" data-aktion="nicht">Doch nicht</button>`;
     }
@@ -871,8 +873,8 @@ SEITEN.mein = () => {
     return `<div class="karte schicht">
       <h3>${b.name}</h3>
       <div class="zeit">${zeitText(s)}</div>
-      <div class="ort">Treffpunkt: ${b.treffpunkt} · bitte 15 Minuten vorher da sein</div>
-      <div class="ort">Ansprechpartner: Bereichsleitung ${b.name}, ${ORGA_TELEFON}</div>
+      <div class="ort">Treffpunkt: ${b.treffpunkt} · 15 Min. vorher</div>
+      <div class="ort">Bereichsleitung: ${ORGA_TELEFON}</div>
       ${lage(s).art === "reserve" ? `<span class="marke reserve">Du bist Reserve – danke!</span>` : ""}
       <div>${unten}</div>
     </div>`;
@@ -882,25 +884,25 @@ SEITEN.mein = () => {
       <button class="knopf klein warnung" data-aktion="kein-springer">Nicht mehr als Springer</button></div>` : "";
   return `${kopf(`Hallo ${esc(z.person.vorname || "")}!`)}
     ${z.meldung ? `<div class="hinweis gut">${z.meldung}</div>` : ""}
-    ${z.abgemeldet && !eigene.length && !z.springer.length ? `<p>Du bist für diese Veranstaltung abgemeldet. Wenn du doch Zeit hast: einfach wieder Schichten dazunehmen.</p>` : ""}
+    ${z.abgemeldet && !eigene.length && !z.springer.length ? `<p>Du bist abgemeldet. Doch Zeit? Nimm einfach wieder Schichten dazu.</p>` : ""}
     <h2>Deine Schichten</h2>
     ${karten || springer ? karten + springer : `<p class="leise">Gerade keine.</p>`}
     <a class="knopf" href="#liste">Weitere Schicht dazunehmen</a>
-    <h2>Deine Stempelkarte</h2>
-    <div class="karte">${stempelkarte()}</div>
+    ${STUFEN.length ? `<h2>Deine Kudos</h2>
+    <div class="karte">${kudosKarte()}</div>` : ""}
     <div class="karte">
       <h3>WhatsApp-Helfergruppe</h3>
       ${alter() !== null && alter() < 13
-        ? `<p class="leise">WhatsApp ist erst ab 13 erlaubt.</p>`
+        ? `<p class="leise">WhatsApp erst ab 13.</p>`
         : z.whatsapp
-          ? `<p>Wir laden dich in die WhatsApp-Helfergruppe ein – die Einladung kommt an ${esc(z.person.handy)}.</p>
+          ? `<p>Die Einladung kommt an ${esc(z.person.handy)}.</p>
              <button class="knopf klein zweit" data-aktion="whatsapp-aus">Doch nicht einladen</button>`
-          : `<p>Neuigkeiten und Hilferufe gibt es auch in unserer WhatsApp-Helfergruppe. Freiwillig – alles Wichtige kommt trotzdem per Mail.</p>
+          : `<p class="leise">News und Hilferufe. Freiwillig – Wichtiges kommt auch per Mail.</p>
              <button class="knopf klein zweit" data-aktion="whatsapp-an">Ja, ladet mich ein</button>`}
     </div>
     <div class="karte">
       <h3>Kalender</h3>
-      <p class="leise">Deine Schichten im Kalender deines Handys – sie ändern sich mit, wenn du umbuchst.</p>
+      <p class="leise">Ändert sich mit, wenn du umbuchst.</p>
       <a class="knopf klein zweit" href="#mein" data-aktion="kalender">In meinen Kalender</a>
     </div>
     <h2>Und sonst</h2>
@@ -909,7 +911,7 @@ SEITEN.mein = () => {
         <button class="knopf warnung" data-aktion="ganz-abmelden">Ja, ganz abmelden</button>
         <button class="knopf zweit" data-aktion="nicht">Doch nicht</button>`
       : `<button class="knopf zweit" data-aktion="ganz-fragen" ${eigene.length || z.springer.length ? "" : "disabled"}>Ganz abmelden</button>`}
-    ${z.offen === "loeschen" ? `<div class="hinweis warn">Alles löschen? Deine Schichten werden abgesagt, und wir vergessen dich. Das geht nicht rückgängig.</div>
+    ${z.offen === "loeschen" ? `<div class="hinweis warn">Alles löschen? Deine Schichten werden abgesagt. Das geht nicht rückgängig.</div>
         <button class="knopf warnung" data-aktion="loeschen">Ja, alles löschen</button>
         <button class="knopf zweit" data-aktion="nicht">Doch nicht</button>`
       : `<button class="knopf warnung" data-aktion="loeschen-fragen">Alle meine Daten löschen</button>`}
@@ -1005,7 +1007,7 @@ const AKTIONEN = {
     const s = schicht(el.dataset.id);
     z.auswahl = z.auswahl.filter(id => id !== s.id);
     z.offen = "";
-    z.meldung = `Abgesagt: ${BEREICHE[s.bereich].name}, ${zeitText(s)}. Danke, dass du Bescheid sagst – so können wir umplanen.`;
+    z.meldung = `Abgesagt: ${BEREICHE[s.bereich].name}, ${zeitText(s)}. Danke fürs Bescheidsagen!`;
   },
   umbuchen: el => { z.umbuchen = el.dataset.id; z.offen = ""; },
   tauschen: el => {
@@ -1022,17 +1024,17 @@ const AKTIONEN = {
   "ganz-fragen": () => { z.offen = "alles"; },
   "ganz-abmelden": () => {
     z.auswahl = []; z.springer = []; z.offen = ""; z.abgemeldet = true;
-    z.meldung = "Du bist abgemeldet. Danke, dass du Bescheid sagst!";
+    z.meldung = "Du bist abgemeldet. Danke fürs Bescheidsagen!";
   },
   "loeschen-fragen": () => { z.offen = "loeschen"; },
   loeschen: () => { const leer = LEER(); leer.geloescht = true; z = leer; },
   "whatsapp-an": () => {
     z.whatsapp = true;
-    if (z.person.handy) { z.meldung = "Gern – die Einladung in die WhatsApp-Helfergruppe kommt an deine Handynummer."; return; }
+    if (z.person.handy) { z.meldung = "Gern – die WhatsApp-Einladung kommt an deine Handynummer."; return; }
     z.fehler = ["Für die Einladung in die WhatsApp-Gruppe brauchen wir deine Handynummer."];
     location.hash = "#angaben";
   },
-  "whatsapp-aus": () => { z.whatsapp = false; z.meldung = "Alles klar – keine Einladung in die WhatsApp-Gruppe."; },
+  "whatsapp-aus": () => { z.whatsapp = false; z.meldung = "Alles klar – keine WhatsApp-Einladung."; },
   kalender: () => { alert("Im echten Werkzeug wird hier dein Kalender-Abo eingerichtet – es aktualisiert sich, wenn du umbuchst."); },
 };
 
