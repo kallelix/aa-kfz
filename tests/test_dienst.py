@@ -2,7 +2,7 @@
 
     python tests/test_dienst.py
 
-Startet den Dienst selbst mit Wegwerf-Datenbanken und prüft das, was durch
+Startet den Dienst selbst mit einer Wegwerf-Datenbank und prüft das, was durch
 die Zusammenführung neu ist – nicht noch einmal, was die drei Anwendungen
 je für sich schon prüfen.
 """
@@ -10,7 +10,6 @@ je für sich schon prüfen.
 import http.client
 import os
 import socket
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -20,6 +19,7 @@ from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL))
+from kern import testdb  # noqa: E402
 
 PYTHON = WURZEL / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
@@ -50,13 +50,13 @@ HASH = subprocess.run(
 ).stdout.strip().split("=", 1)[1]
 
 verzeichnis = Path(tempfile.mkdtemp(prefix="dienst-"))
+DB = testdb.wegwerf("dienst")
 hafen = freier_hafen()
 
-# Je Anwendung eine eigene Datei mit eigener Datenbank - genau der Fall, der
-# in einem Prozess vorher nicht ging.
+# Je Anwendung eine eigene Datei mit eigenen Werten - genau der Fall, der in
+# einem Prozess vorher nicht ging. Die Datenbank teilen sich alle drei.
 for name in ("kennzeichen", "presse", "helfer"):
     (verzeichnis / (name + ".env")).write_text(
-        "DB_PATH=" + str(verzeichnis / (name + ".db")) + "\n"
         "COOKIE_SECURE=0\n"
         + ("TAGE=2026-08-28,2026-08-29,2026-08-30\n" if name == "helfer" else ""),
         encoding="utf-8")
@@ -72,12 +72,13 @@ umgebung = {
     "ADMIN_PASSWORD_HASH": HASH,
     "APP_SECRET_KEY": "gemeinsamer-test-schluessel",
     "COOKIE_SECURE": "0",
+    # Ausdruecklich setzen: ohne DATABASE_URL griffe jeder Bereich zur
+    # Entwicklungsdatenbank aus compose.yaml.
+    "DATABASE_URL": DB,
     "KENNZEICHEN_ENV": str(verzeichnis / "kennzeichen.env"),
     "PRESSE_ENV": str(verzeichnis / "presse.env"),
     "HELFER_ENV": str(verzeichnis / "helfer.env"),
 }
-# Nicht erben, sonst zeigte ein gesetztes DB_PATH alle drei auf dieselbe Datei.
-umgebung.pop("DB_PATH", None)
 umgebung.pop("JETZT_FEST", None)
 
 prozess = subprocess.Popen(
@@ -111,11 +112,16 @@ try:
     else:
         raise RuntimeError("Dienst ist nicht hochgekommen")
 
-    print("Jede Anwendung hat ihre eigene Datenbank")
-    # Der Kern der Zusammenfuehrung: drei Konfigurationen in einem Prozess.
+    print("Jede Anwendung hat ihr eigenes Schema")
+    # Eine Datenbank, drei Bereiche darin. Jeder spielt beim Start seine
+    # Migrationen selbst ein.
+    schemas = {z[0] for z in testdb.abfrage(
+        DB, "public", "SELECT table_schema FROM information_schema.tables"
+        " WHERE table_name = 'migration'")}
     for name in ("kennzeichen", "presse", "helfer"):
-        pruefe((verzeichnis / (name + ".db")).exists(),
-               name + ".db ist angelegt")
+        pruefe(name in schemas, "Schema " + name + " ist angelegt")
+    pruefe(testdb.abfrage(DB, "helfer", "SELECT COUNT(*) FROM schicht")[0][0] == 0,
+           "und die Tabellen liegen im richtigen")
 
     print("Oeffentliche Seiten haengen am Hostnamen")
     status, _, seite, _ = ruf("kennzeichen.test", "/")
@@ -218,13 +224,9 @@ try:
         "kategorie": "camping", "kennzeichen": "KA-VV 1",
         "email": "vera@example.org"})
     pruefe(status == 303, "ein Antrag ueber die oeffentliche Adresse")
-    con = sqlite3.connect(str(verzeichnis / "kennzeichen.db"))
-    try:
-        zeile = con.execute(
-            "SELECT body FROM mail_out WHERE typ = 'orga'").fetchone()
-    finally:
-        con.close()
-    text = zeile[0] if zeile else ""
+    zeilen = testdb.abfrage(DB, "kennzeichen",
+                            "SELECT body FROM mail_out WHERE typ = 'orga'")
+    text = zeilen[0][0] if zeilen else ""
     pruefe("http://admin.test/kennzeichen/antrag/" in text,
            "die Meldung verweist auf admin.test")
     pruefe("kennzeichen.test/kennzeichen" not in text,
@@ -263,4 +265,3 @@ if fehler:
         print("  - " + eintrag)
     sys.exit(1)
 print("alle Pruefungen bestanden")
-print("Wegwerf-Verzeichnis lag in " + str(verzeichnis))
