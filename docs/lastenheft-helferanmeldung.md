@@ -318,7 +318,7 @@ Orga pro Hilferuf zehn Sekunden und erspart jede Abhängigkeit.
 | Nr. | Anforderung | Prio | Phase |
 | --- | --- | --- | --- |
 | C-01 | **E-Mail ist der Pflichtkanal**: Bestätigung, Änderungen, Erinnerung, Hilferuf, Dank. Alles Wichtige kommt per Mail, auch wenn es zusätzlich in WhatsApp steht. | M | 2 |
-| C-02 | Erinnerung zwei Tage vor der ersten Schicht: Treffpunkt, Ansprechpartner mit Nummer, was mitzubringen ist, Link auf Mein Helferplatz – und die Bitte, **15 Minuten vor Beginn** am Treffpunkt einzuchecken (T-01). | S | 3 |
+| C-02 | Erinnerung zwei Tage vor der ersten Schicht: Treffpunkt, Ansprechpartner mit Nummer, was mitzubringen ist, Link auf Mein Helferplatz – und die Bitte, **15 Minuten vor Beginn** am Treffpunkt zu sein und sich bei der Bereichsleitung einzuchecken; den QR-Code dafür enthält die Mail (T-01). | S | 3 |
 | C-03 | **Hilferuf**: das Backoffice zeigt Schichten unter Minimum bzw. Soll. Ein Klick erzeugt (a) eine Mail an Stamm-Helfer, deren Verfügbarkeit und Vorlieben passen und die zu der Zeit noch frei sind – mehrere knappe Schichten in einer Mail, **Zusagen direkt per Link aus der Mail** –, und (b) einen fertigen Text mit Direktlink (A-12) für die Ankündigungsgruppe der Community, zum Kopieren oder als `wa.me`-Link, der WhatsApp mit dem Text öffnet. | S | 3 |
 | C-04 | Je Schicht höchstens ein Hilferuf in 24 Stunden; wer Hilferufe abbestellt hat, bekommt keine. | M | 3 |
 | C-05 | Nach der Anmeldung – **nicht** auf öffentlichen Seiten – erscheint der Einladungslink zur Community und ggf. zur Gruppe des Bereichs. WhatsApp rät ausdrücklich davon ab, Einladungslinks öffentlich zu posten; Beitrittsanfragen bestätigt ein Admin. | S | 3 |
@@ -347,7 +347,7 @@ Ankündigungsgruppe niemanden mit @ erwähnen: das zeigt dessen Nummer allen.
 
 | Nr. | Anforderung | Prio | Phase |
 | --- | --- | --- | --- |
-| T-01 | **Selbst-Check-in** per QR-Aushang am Treffpunkt: der Helfer scannt mit dem eigenen Handy und tippt seinen Namen an – in der Liste der Schichten, die hier in Kürze beginnen, nur Vorname und Initial. Hat er Mein Helferplatz auf diesem Handy schon einmal geöffnet, erkennt ihn die Seite, und ein Tipp genügt. Rückfallebene: die Bereichsleitung hakt ab oder scannt den QR-Code aus Mein Helferplatz; zur Not die Papierliste. | M | 4 |
+| T-01 | **Check-in bei der Bereichsleitung**: sie hat auf ihrem Handy die Liste derer, die an ihrem Treffpunkt in Kürze beginnen, und hakt ab – per Scan des QR-Codes, den jeder Helfer in der Mail und in Mein Helferplatz hat, auf dem Handy oder ausgedruckt, oder per Tipp auf den Namen, wenn jemand nichts dabeihat. Bei schlechtem Netz merkt sich das Gerät die Häkchen und reicht sie nach. Wo niemand von der Orga steht, etwa an einer Straßensperre, erscheint in Mein Helferplatz ab 30 Minuten vor Beginn ein Knopf *Ich bin da*. **Kein QR-Aushang**: nicht jeder hat ein Handy mit Netz dabei, ein abfotografierter Aushang ginge herum, und vergessenes Scannen löste bei T-02 Fehlalarme aus. Zur Not die Papierliste. | M | 4 |
 | T-02 | Wer **15 Minuten vor Schichtbeginn** noch nicht eingecheckt ist, erscheint im Dashboard als *noch nicht da* – früh genug, um anzurufen oder einen Springer zu schicken (R-06). Die Bereichsleitung sieht es zuerst. | M | 4 |
 | T-03 | Check-in und Ausgabe hängen zusammen: wer seine erste Schicht angetreten hat, ist für Shirt und Goodies freigegeben – sofern die Veranstaltung sie ausgibt (V-07), und bei Goodies mit Altersgrenze mit der passenden Alternative. Ausgegeben und abgehakt wird wie heute beim Shirt. | S | 4 |
 | T-04 | Monitor zeigt neben den Schichten die verfügbaren Springer (R-06). | M | 2 |
@@ -707,14 +707,14 @@ Phase Vorrang.
 
 | # | Schritt | Aufwand |
 | --- | --- | --- |
-| 4.1 | **Selbst-Check-in** per QR-Aushang, *noch nicht da* ab 15 Minuten vor Beginn, Springer einsetzen | 7 h |
+| 4.1 | **Check-in bei der Bereichsleitung**: Liste je Treffpunkt, QR-Scan, Häkchen bei schlechtem Netz nachreichen, *Ich bin da* für Posten ohne Orga; *noch nicht da* ab 15 Minuten vor Beginn, Springer einsetzen | 9 h |
 | 4.2 | Ausgabe von Shirt und Goodies an den Check-in koppeln, Altersgrenze je Goodie | 2 h |
 | 4.3 | Stempelkarte, Belohnungsstufen, Abzeichen | 6 h |
 | 4.4 | Helferparty: Einladung, Zusagen, Begleitpersonen | 3 h |
 | 4.5 | Freunde mitbringen | 3 h |
 
-Der Selbst-Check-in steht vorn: er entlastet die Bereichsleitungen am
-Veranstaltungstag am meisten.
+Der Check-in steht vorn: erst mit ihm ist *noch nicht da* verlässlich, und
+am Veranstaltungstag ersetzt er die Papierliste.
 
 **Ab Mitte Juni 2027, zwei Wochen vor dem Aufbau: Stillstand.** Nur noch
 Fehler beheben, nichts Neues.
@@ -726,12 +726,12 @@ Fehler beheben, nichts Neues.
 | 1 Fundament | ~20 h, davon ~10 h erledigt |
 | 2 Öffnung | ~50 h |
 | 3 Assistent, Helferstamm, Backoffice-Konten | ~39 h |
-| 4 Veranstaltungstag, Anerkennung | ~21 h |
-| **gesamt** | **~130 h** |
+| 4 Veranstaltungstag, Anerkennung | ~23 h |
+| **gesamt** | **~132 h** |
 
 Phase 1 und 2 sind die Öffnung. Fällt die Zeit knapp aus, wird Phase 4
-verschoben, nicht Phase 2 gekürzt – bis auf den Selbst-Check-in (4.1), der
-zur AA stehen sollte.
+verschoben, nicht Phase 2 gekürzt – bis auf den Check-in (4.1), der zur AA
+stehen sollte.
 
 Kommt eine andere Veranstaltung des ILRC vor der AA, ändert sich an der
 Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
@@ -785,8 +785,10 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
   Nachbereitung – zwei Monate früher als 2026 (Abschnitt 9).
 - **Weitere Veranstaltungen 2027 sind noch unklar.** Geplant wird auf die AA
   hin; kommt eine davor dazu, ist sie der Probelauf (Abschnitt 8).
-- **Selbst-Check-in** per QR-Aushang; *noch nicht da* ab 15 Minuten vor
-  Schichtbeginn (T-01, T-02).
+- **Check-in bei der Bereichsleitung**: sie scannt den QR-Code des Helfers
+  oder hakt ihn per Namen ab; *noch nicht da* ab 15 Minuten vor
+  Schichtbeginn (T-01, T-02). Am 09.10.2026 umgedreht – vorher war ein
+  Selbst-Check-in per QR-Aushang geplant.
 
 ### Offen
 
@@ -884,7 +886,7 @@ Abgerufen am 08.10.2026. Je Muster, wo es im Lastenheft gelandet ist.
 | Bestätigungslink statt Passwort, mehrere Profile je Adresse | VolunteerHub, Inzetrooster | 7.4, A-08 |
 | Dublettenvorschläge, Haushalte ausgenommen | Planning Center | I-05 |
 | QR-Check-in, automatisch „nicht erschienen" | Rosterfy | T-01, T-02 |
-| QR-Aushang, Selbst-Check-in | Bloomerang Volunteer | T-01 |
+| QR-Aushang, Selbst-Check-in | Bloomerang Volunteer | verworfen, siehe T-01 |
 | Vorjahreshelfer mit einem Klick einladen | Helferstube, FestivalPro | C-08 |
 | Mehrere offene Schichten in einer Mail, Zusage aus der Mail | Bloomerang Volunteer | C-03 |
 | Kalender-Abo, das sich selbst aktualisiert | Engelsystem | A-10 |
