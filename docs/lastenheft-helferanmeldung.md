@@ -757,7 +757,8 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
 - **PostgreSQL** (7.3).
 - **Die Anmeldung öffnet im Dezember 2026**, geplant auf Mitte Dezember –
   für die AA 2027 und für andere Veranstaltungen des ILRC, die Helfer
-  brauchen (Abschnitt 9).
+  brauchen (Abschnitt 9). Die nötigen rund 8 Stunden Bauzeit pro Woche sind
+  realistisch.
 - **Mindestalter 12**, für Shuttle-Fahrer 18 (D-06, D-07).
 - **Ausschank**: bei der AA bisher nicht, bei anderen Veranstaltungen schon
   (Bier und Radler beim XCO) – Vorgabe ab 18 (D-07).
@@ -782,17 +783,13 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
 
 ### Offen
 
-Frage 1 bestimmt den Zeitplan, die übrigen lassen sich nebenher klären.
+Keine davon hält den Zeitplan auf; sie lassen sich nebenher klären.
 
-1. **Sind rund 8 Stunden Bauzeit pro Woche bis Mitte Dezember realistisch?**
-   Wenn nicht: hat der Termin Vorrang – dann wird Phase 2 weiter
-   geschnitten – oder der Umfang – dann öffnet die Anmeldung Anfang März
-   (Abschnitt 9).
-2. Sind die **Personendaten 2026 auf dem Server** gelöscht (Abschnitt 8)?
-3. **Wer betreut die WhatsApp-Community** – und gibt es eine Vereinsnummer?
+1. Sind die **Personendaten 2026 auf dem Server** gelöscht (Abschnitt 8)?
+2. **Wer betreut die WhatsApp-Community** – und gibt es eine Vereinsnummer?
    Sollen die zwei bestehenden Gruppen darin aufgehen?
-4. **Bereichsleitungen**: wer, für welche Bereiche? Sie bekommen Konten (B-02).
-5. **Wer ist Verantwortlicher** im Sinne der DSGVO (Verein, vertreten durch
+3. **Bereichsleitungen**: wer, für welche Bereiche? Sie bekommen Konten (B-02).
+4. **Wer ist Verantwortlicher** im Sinne der DSGVO (Verein, vertreten durch
    …), und wer prüft die Datenschutzerklärung (D-09)?
 
 ---
