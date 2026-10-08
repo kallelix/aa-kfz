@@ -96,7 +96,8 @@ Aus dem Hauptordner:
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen
-sich eine Wegwerf-Datenbank an. Es geht nichts nach draußen: die Seiten der
+sich eine Wegwerf-Datenbank an, im PostgreSQL aus `compose.yaml`. Es geht
+nichts nach draußen: die Seiten der
 Rennserien und des Registrierungstools sind nachgebaut.
 
 ## Deployment

@@ -7,10 +7,17 @@ Hier liegen die Tests für den Dienst, für `kern` und für den Kennzeichen-Bere
 Presse und Helfer haben ihre eigenen unter `presse/tests/` und `helfer/tests/`,
 beschrieben in deren README.
 
+Alle brauchen den PostgreSQL aus `compose.yaml` (`docker compose up -d`). Jeder
+Test legt sich darin eine eigene Wegwerf-Datenbank an und räumt sie am Ende
+wieder ab; was ein abgebrochener Lauf liegen lässt, entfernt
+`python -m kern.testdb`. Ein anderer Server geht über `TEST_DATABASE_URL`.
+
 ## Ohne Server
 
 ```bash
 .venv/Scripts/python.exe tests/test_dienst.py
+.venv/Scripts/python.exe tests/test_kern_db.py
+.venv/Scripts/python.exe tests/test_uebernahme.py
 .venv/Scripts/python.exe tests/test_auth.py
 .venv/Scripts/python.exe tests/test_mail.py
 .venv/Scripts/python.exe tests/test_versand.py
@@ -25,14 +32,21 @@ node tests/test_durchfahrt_js.js
 ```
 
 - `test_dienst.py` – startet den zusammengesetzten Dienst selbst: drei
-  Datenbanken in einem Prozess, Verteilung nach Hostname, Stilblatt und
-  Anmeldeseite in jedem Bereich, und dass eine Anmeldung alle drei Bereiche
-  öffnet – ein veränderter Keks aber keinen.
+  Bereiche in einem Prozess, jeder in seinem Schema, Verteilung nach
+  Hostname, Stilblatt und Anmeldeseite in jedem Bereich, und dass eine
+  Anmeldung alle drei Bereiche öffnet – ein veränderter Keks aber keinen.
+- `test_kern_db.py` – der gemeinsame Datenbankzugriff: `?` als Platzhalter,
+  Zeilen wie `sqlite3.Row`, Migrationen (einmal, ganz oder gar nicht), Schemas
+  getrennt.
+- `test_uebernahme.py` – `deploy/sqlite-uebernehmen.py`: Probelauf ohne
+  Wirkung, Nummern und Verweise bleiben, die nächste neue Nummer passt, ein
+  zweiter Lauf verdoppelt nichts, ein Regelverstoß rollt alle drei Bereiche
+  zurück.
 - `test_auth.py` – Passwort-Hashing, Session-Token (Signatur, getauschte
   Nutzlast, Ablauf), CSRF-Bindung, Login-Rate-Limit.
 - `test_mail.py` – Vorlagen, Kopplung von Entscheidung und Mail, Fälligkeit,
-  Backoff, erneutes Anstoßen, Telefonliste, Spalten-Migration einer alten
-  Datenbank.
+  Backoff, erneutes Anstoßen, Telefonliste, und dass ein zweiter Start keine
+  Migration mehr einspielt.
 - `test_versand.py` – echter smtplib-Weg gegen einen Wegwerf-SMTP-Server im
   selben Prozess: Kopfzeilen, Umlaute, Fehlerfall, Start und Stopp der
   Worker-Schleife. Es geht nichts nach draußen.
@@ -68,10 +82,7 @@ node tests/test_durchfahrt_js.js
 
 - `test_einstellungen.py` – die im Backoffice gepflegte Benachrichtigungs-
   adresse: speichern, prüfen, abschalten, und dass bei einem neuen Antrag genau
-  eine Meldung entsteht. Dazu der Umbau von `mail_out` auf einer alten
-  Datenbank (Daten, Index und neuer Typ).
-
-Die legen sich eigene Wegwerf-Datenbanken unter dem Temp-Verzeichnis an.
+  eine Meldung entsteht.
 
 ## Mit Server
 
@@ -80,12 +91,12 @@ eigene IP. **Nur gegen eine Wegwerf-Datenbank laufen lassen**, nie gegen die
 echte.
 
 ```bash
-DB=/tmp/test-abfahrt.db
-rm -f "$DB"*
+# Eine Wegwerf-Datenbank, die den Aufruf überdauert
+DB="$(.venv/Scripts/python.exe -m kern.testdb neu)"
 
 # 1. Server mit Testkonfiguration starten (eigenes Terminal)
 KENNZEICHEN_ENV=/dev/null \
-DB_PATH="$DB" \
+DATABASE_URL="$DB" \
 ADMIN_PASSWORD_HASH="$(.venv/Scripts/python.exe -m kern.passwort 'test-passwort-123' | cut -d= -f2-)" \
 APP_SECRET_KEY=test-schluessel \
 COOKIE_SECURE=0 \
@@ -99,7 +110,10 @@ TEST_DB="$DB" .venv/Scripts/python.exe tests/test_http.py
 ```
 
 Gestartet wird nur die Kennzeichen-Anwendung, nicht der ganze Dienst – die
-Ablauftests gehen ohne Hostnamen direkt auf ihre Pfade.
+Ablauftests gehen ohne Hostnamen direkt auf ihre Pfade. `TEST_DB` ist dieselbe
+Verbindungsangabe wie `DATABASE_URL` des Servers; die Tests sehen darüber
+nach, was er geschrieben hat. Am Ende räumt `python -m kern.testdb` die
+Datenbank wieder ab.
 
 `KENNZEICHEN_ENV=/dev/null` hält die eigene `kennzeichen/.env` heraus: steht
 dort etwa `SMTP_HOST`, gingen beim Seeden echte Mails hinaus. `COOKIE_SECURE=0`

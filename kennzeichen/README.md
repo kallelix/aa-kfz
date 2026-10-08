@@ -99,9 +99,9 @@ kennzeichen/
     config.py       Env-Konfiguration, .env-Loader
     mail.py         Vorlagen (reiner Text) und SMTP-Versand
     worker.py       Hintergrund-Task, arbeitet die Queue mit Backoff ab
-    db.py           SQLite-Verbindung, Schema, Migration, Abfragen
+    db.py           Abfragen; Verbindung und Migrationen über kern/db.py
     validation.py   Feldprüfung inkl. Kontaktregel und Honeypot
-    schema.sql      Tabellen antrag, mail_out, einstellung
+    migrationen/    Tabellen antrag, mail_out, einstellung (Schema kennzeichen)
     __main__.py     Einzelstart: python -m app (aus kennzeichen/)
     templates/      Jinja2, serverseitig gerendert
     static/         CSS und durchfahrt.js, keine externen Fonts
@@ -129,7 +129,7 @@ node tests/test_durchfahrt_js.js                  # Filterlogik der Durchfahrtsl
 ```
 
 Diese laufen ohne vorbereiteten Server und legen sich eigene
-Wegwerf-Datenbanken an. Die HTTP-Ablauftests brauchen einen Server mit
+Wegwerf-Datenbanken an, im PostgreSQL aus `compose.yaml`. Die HTTP-Ablauftests brauchen einen Server mit
 Testkonfiguration – Aufruf und Umgebung stehen in
 [tests/README.md](../tests/README.md).
 

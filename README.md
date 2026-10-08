@@ -29,9 +29,12 @@ Das Backoffice liegt umgekehrt unter **einer** Adresse, weil dieselben paar
 Leute alle drei betreuen: `admin.example.de/kennzeichen`, `/presse`,
 `/helfer`, oben eine Zeile zum Wechseln. Eine Anmeldung öffnet alle drei.
 
-Die Datenbanken bleiben getrennt, eine SQLite-Datei je Bereich. Die Bereiche
-haben gleichnamige Tabellen (`einstellung`, `mail_out`), und SQLite lässt je
-Datei nur einen Schreiber zu.
+Die Daten liegen in **einer PostgreSQL-Datenbank**, jeder Bereich in seinem
+eigenen Schema: `kennzeichen`, `presse`, `helfer`. Die Bereiche haben
+gleichnamige Tabellen (`einstellung`, `mail_out`), die Schemas halten sie
+auseinander. Jeder Bereich bringt seine Tabellen beim Start selbst auf Stand –
+nummerierte Dateien in `<bereich>/app/migrationen/`, eingespielt von
+[kern/db.py](kern/db.py).
 
 Der Dienst spricht **nur HTTP**. TLS, Weiterleitung und Zertifikate macht der
 Reverse Proxy davor, siehe [deploy/](deploy/).
@@ -41,17 +44,18 @@ Reverse Proxy davor, siehe [deploy/](deploy/).
 ```text
 dienst/        setzt die drei zusammen und verteilt nach Hostname
 kern/          was alle drei teilen: Anmeldung, Backoffice-Rahmen,
-               Stilblatt, Suche, python -m kern.passwort
+               Stilblatt, Suche, Datenbankzugriff, python -m kern.passwort
 kennzeichen/   Kennzeichen-Anträge     ┐
 presse/        Presse-Akkreditierung   ├ je app/, .env.example, README.md
 helfer/        Helfer-Dashboard        ┘
 deploy/        Unit, nginx, Sicherung, Löschwerkzeug, Vorlagen für den Betrieb
-docs/          die drei Projektpläne
+docs/          die Projektpläne
 tests/         Tests für Kennzeichen, kern und den Dienst
+compose.yaml   PostgreSQL für die Entwicklung
 ```
 
 Jeder Bereich ist ein eigenes Paket – `kennzeichen.app`, `presse.app`,
-`helfer.app` – mit eigener Datenbank und eigener Konfiguration. In `kern/`
+`helfer.app` – mit eigenem Schema und eigener Konfiguration. In `kern/`
 liegt nur, was wirklich Wort für Wort gleich war. `worker.py`, `mail.py` und
 `db.py` in Kennzeichen und Presse tragen bloß denselben Namen und gehen um
 Hunderte Zeilen auseinander; sie bleiben, wo sie sind.
@@ -62,7 +66,12 @@ danebenlegt, ohne `kern` anzufassen.
 
 ## Lokal starten
 
+Erst die Datenbank. [compose.yaml](compose.yaml) startet einen PostgreSQL in
+Docker, erreichbar unter `127.0.0.1:55432` (Benutzer, Passwort und Datenbank
+heißen `abfahrt`). Ohne `DATABASE_URL` nehmen alle drei Bereiche genau diesen.
+
 ```bash
+docker compose up -d
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt   # Linux: .venv/bin/python
 cp kennzeichen/.env.example kennzeichen/.env
@@ -136,21 +145,22 @@ Ausschließlich über Env-Variablen, auf zwei Ebenen.
 | --- | --- |
 | `BIND` | Adresse und Port. Liegt der Proxy auf einem anderen Host, die eigene IP – und der Port per Firewall auf den Proxy beschränkt. |
 | `FORWARDED_ALLOW_IPS` | die IP des Reverse Proxys. Nur von dort werden `X-Forwarded-For` und `X-Forwarded-Proto` geglaubt. |
+| `DATABASE_URL` | die PostgreSQL-Datenbank, für alle drei dieselbe. Leer heißt: der Entwicklungs-Container aus `compose.yaml`. |
 | `HOST_KENNZEICHEN`, `HOST_PRESSE`, `HOST_HELFER`, `HOST_ADMIN` | welcher Hostname zu welchem Bereich gehört |
 | `ADMIN_PASSWORD_HASH` | ohne ihn bleibt das Backoffice geschlossen (503 mit Anleitung), die öffentlichen Seiten laufen weiter. Erzeugen mit `python -m kern.passwort`. |
 | `APP_SECRET_KEY` | signiert die Sitzung. Ohne ihn erzeugt **jeder Bereich** beim Start seinen eigenen – dann gilt eine Anmeldung nur in dem Bereich, in dem sie geschah, und endet mit dem nächsten Neustart. |
 | `KENNZEICHEN_ENV`, `PRESSE_ENV`, `HELFER_ENV` | wo die drei ihre eigenen Werte finden |
 
 **Je Bereich** eine Datei – lokal `<bereich>/.env`, im Betrieb
-`/etc/abfahrt/<bereich>.env`, worauf die drei Zeiger oben zeigen. Darin vor
-allem `DB_PATH`, dazu Veranstaltung, Kontakt, Mailversand und alles Fachliche.
+`/etc/abfahrt/<bereich>.env`, worauf die drei Zeiger oben zeigen. Darin
+Veranstaltung, Kontakt, Mailversand und alles Fachliche.
 Was jeweils drinsteht, erklärt die README des Bereichs.
 
 Die Regel dazwischen: **die Umgebung schlägt die Datei.** Eine dort gesetzte
 Variable gilt also für alle drei. Genau deshalb stehen Hash und Schlüssel in
 der Umgebung – daran hängt, dass eine Anmeldung alle drei Bereiche öffnet.
-Und genau deshalb gehört `DB_PATH` **nie** in die Umgebung: sonst schrieben
-alle drei in dieselbe Datei.
+Dasselbe gilt für `DATABASE_URL`: eine Datenbank, die Schemas trennen die
+Bereiche.
 
 ## Tests
 
@@ -159,6 +169,8 @@ Rückgabewert 0 heißt bestanden. Alles aus dem Hauptordner:
 
 ```bash
 .venv/Scripts/python.exe tests/test_dienst.py     # drei Bereiche in einem Prozess, Verteilung, eine Anmeldung
+.venv/Scripts/python.exe tests/test_kern_db.py    # Datenbankzugriff und Migrationen
+.venv/Scripts/python.exe tests/test_uebernahme.py # SQLite-Bestände nach PostgreSQL übernehmen
 .venv/Scripts/python.exe tests/test_auth.py       # Anmeldung, Token, CSRF, Rate Limit
 .venv/Scripts/python.exe tests/test_suchen.py     # Suche mit Umlauten, Python gegen JavaScript
 node tests/test_suchen_js.js
@@ -170,8 +182,10 @@ Dazu die Tests der Bereiche:
 - Presse: [presse/tests/](presse/tests/), siehe [presse/README.md](presse/README.md#tests)
 - Helfer: [helfer/tests/](helfer/tests/), siehe [helfer/README.md](helfer/README.md#tests)
 
-Alle legen sich eigene Wegwerf-Datenbanken an; wo ein Server nötig ist,
-starten sie ihn selbst. Ausnahme sind die HTTP-Ablauftests der
+Die Tests brauchen den PostgreSQL aus `compose.yaml`. Jeder legt sich darin
+eine eigene Wegwerf-Datenbank an und räumt sie am Ende wieder ab; was ein
+abgebrochener Lauf liegen lässt, entfernt `python -m kern.testdb`. Wo ein
+Server nötig ist, starten die Tests ihn selbst. Ausnahme sind die HTTP-Ablauftests der
 Kennzeichen-App, die einen vorbereiteten Server brauchen – Aufruf und
 Umgebung stehen in [tests/README.md](tests/README.md).
 

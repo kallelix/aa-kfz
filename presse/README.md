@@ -1,8 +1,9 @@
 # Presse-Akkreditierung
 
 Einer der drei Bereiche im gemeinsamen Dienst – wie das Ganze zusammenhaengt,
-steht in der [Uebersicht](../README.md). Eigene Adresse, eigene Datenbank,
-Backoffice unter derselben Anmeldung wie die anderen beiden. Grundlage ist
+steht in der [Uebersicht](../README.md). Eigene Adresse, eigenes Schema in der
+gemeinsamen Datenbank, Backoffice unter derselben Anmeldung wie die anderen
+beiden. Grundlage ist
 [../docs/plan-presse-akkreditierung.md](../docs/plan-presse-akkreditierung.md).
 
 | Adresse | was dort liegt |
@@ -84,7 +85,8 @@ lit. a DSGVO verlangt genau das – Dauer *oder* die Kriterien ihrer Festlegung.
 ../.venv/Scripts/python.exe tests/test_export.py      # CSV
 ```
 
-Alle vier starten den Server selbst und legen sich eine Wegwerf-Datenbank an.
+Alle vier starten den Server selbst und legen sich eine Wegwerf-Datenbank an,
+im PostgreSQL aus `compose.yaml`.
 Es geht nichts nach draussen: ohne `SMTP_HOST` sammeln sich die Mails in der
 Warteschlange.
 

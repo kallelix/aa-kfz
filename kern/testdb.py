@@ -10,6 +10,14 @@ Gegenstück hier: eine frisch angelegte Datenbank auf dem Entwicklungsserver
 Welcher Server, sagt TEST_DATABASE_URL; die Vorgabe ist der Container aus
 compose.yaml. Der Benutzer braucht das Recht, Datenbanken anzulegen – der
 Container-Benutzer hat es.
+
+Von der Kommandozeile:
+
+    python -m kern.testdb          # liegengebliebene Wegwerf-Datenbanken entfernen
+    python -m kern.testdb neu      # eine anlegen, die bleibt, und ihre URL ausgeben
+
+Die zweite Form ist für die Ablauftests, deren Server man selbst startet:
+der Aufruf endet sofort, die Datenbank muss ihn überdauern.
 """
 
 from __future__ import annotations
@@ -17,12 +25,23 @@ from __future__ import annotations
 import atexit
 import os
 import secrets
+import sys
 
 import psycopg
 from psycopg import conninfo, sql
 
 VERWALTUNG_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql://abfahrt:abfahrt@127.0.0.1:55432/postgres")
+
+# Vor jedem Namen, damit das Aufräumen alle findet und nichts anderes.
+VORSILBE = "wegwerf_"
+
+
+def _anlegen(praefix: str) -> tuple[str, str]:
+    name = f"{VORSILBE}{praefix}_{secrets.token_hex(5)}"
+    with psycopg.connect(VERWALTUNG_URL, autocommit=True, connect_timeout=10) as con:
+        con.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    return name, conninfo.make_conninfo(VERWALTUNG_URL, dbname=name)
 
 
 def wegwerf(praefix: str = "test") -> str:
@@ -32,11 +51,9 @@ def wegwerf(praefix: str = "test") -> str:
     scheitert. Bricht er hart ab, bleibt sie liegen; `aufraeumen()` entfernt
     solche Reste.
     """
-    name = f"{praefix}_{secrets.token_hex(5)}"
-    with psycopg.connect(VERWALTUNG_URL, autocommit=True, connect_timeout=10) as con:
-        con.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    name, url = _anlegen(praefix)
     atexit.register(_entfernen, name)
-    return conninfo.make_conninfo(VERWALTUNG_URL, dbname=name)
+    return url
 
 
 def abfrage(url: str, schema: str, sql_text: str, parameter=()):
@@ -70,16 +87,19 @@ def _entfernen(name: str) -> None:
         pass
 
 
-def aufraeumen(praefix: str = "test") -> int:
+def aufraeumen() -> int:
     """Entfernt liegengebliebene Wegwerf-Datenbanken. Gibt ihre Zahl zurück."""
     with psycopg.connect(VERWALTUNG_URL, autocommit=True, connect_timeout=10) as con:
         namen = [zeile[0] for zeile in con.execute(
-            "SELECT datname FROM pg_database WHERE datname LIKE %s",
-            (praefix + "\\_%",))]
+            "SELECT datname FROM pg_database WHERE starts_with(datname, %s)",
+            (VORSILBE,))]
     for name in namen:
         _entfernen(name)
     return len(namen)
 
 
 if __name__ == "__main__":
-    print(f"{aufraeumen()} liegengebliebene Testdatenbanken entfernt")
+    if sys.argv[1:] == ["neu"]:
+        print(_anlegen("hand")[1])
+    else:
+        print(f"{aufraeumen()} liegengebliebene Testdatenbanken entfernt")

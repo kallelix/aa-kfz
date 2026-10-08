@@ -67,16 +67,16 @@ auffallen, wenn man sie beim Aufsetzen übersieht:
 
 ```bash
 apt update
-apt install -y python3 python3-venv sqlite3 git
+apt install -y python3 python3-venv postgresql git
 
 adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin abfahrt
 
-mkdir -p /var/lib/abfahrt /etc/abfahrt /var/backups/abfahrt
-chown abfahrt:abfahrt /var/lib/abfahrt /var/backups/abfahrt
-chmod 750 /var/lib/abfahrt /var/backups/abfahrt
+mkdir -p /etc/abfahrt /var/backups/abfahrt
+chown abfahrt:abfahrt /var/backups/abfahrt
+chmod 750 /var/backups/abfahrt
 ```
 
-**Dem Dienstbenutzer gehören nur diese beiden Verzeichnisse.** `/opt/abfahrt`
+**Dem Dienstbenutzer gehört nur das Sicherungsverzeichnis.** `/opt/abfahrt`
 bleibt bei root: der Dienst liest seinen Code nur, und die systemd-Unit setzt
 `ProtectSystem=strict`, macht `/opt` für ihn also ohnehin schreibgeschützt. Root
 als Eigentümer ist zusätzlich sicherer, weil der Dienstbenutzer sein eigenes
@@ -96,7 +96,29 @@ Alles bleibt root:root mit den Standardrechten – `abfahrt` darf lesen und
 ausführen, das genügt. **Kein `chown` auf `/opt/abfahrt`.**
 
 `.venv/` und `data/` stehen in `.gitignore`, ein späteres `git pull` fasst sie
-also nicht an. Die Datenbank liegt ohnehin unter `/var/lib/abfahrt`.
+also nicht an. Die Daten liegen ohnehin in PostgreSQL.
+
+### Datenbank
+
+Eine Datenbank für alle drei Bereiche; jeder legt darin beim Start sein
+eigenes Schema an (`kennzeichen`, `presse`, `helfer`). Rolle und Datenbank
+heißen wie der Systembenutzer:
+
+```bash
+runuser -u postgres -- createuser abfahrt
+runuser -u postgres -- createdb --owner=abfahrt abfahrt
+
+# Probe: als abfahrt, ohne Passwort
+runuser -u abfahrt -- psql -d abfahrt -c 'SELECT current_user'
+```
+
+**Kein Passwort.** Der Dienst verbindet sich über den Unix-Socket, und
+PostgreSQL prüft dort nur, ob der Systembenutzer so heißt wie die Rolle
+(`peer`, unter Debian und Ubuntu voreingestellt). Es gibt also kein
+Datenbankpasswort, das in einer Datei stehen oder durchsickern könnte, und
+`DATABASE_URL` in `dienst.env` enthält keins. PostgreSQL lauscht von Haus aus
+nur auf `localhost` – von außen ist nichts zu erreichen, und das soll so
+bleiben.
 
 ### Konfiguration
 
@@ -116,13 +138,13 @@ editor /etc/abfahrt/dienst.env
 ```
 
 In **`dienst.env`** steht, was für alle gilt: `BIND`,
-`FORWARDED_ALLOW_IPS`, die vier `HOST_…`, `ADMIN_PASSWORD_HASH`,
-`APP_SECRET_KEY` und die drei Zeiger `KENNZEICHEN_ENV`, `PRESSE_ENV`,
-`HELFER_ENV`.
+`FORWARDED_ALLOW_IPS`, `DATABASE_URL`, die vier `HOST_…`,
+`ADMIN_PASSWORD_HASH`, `APP_SECRET_KEY` und die drei Zeiger
+`KENNZEICHEN_ENV`, `PRESSE_ENV`, `HELFER_ENV`.
 
-In den **drei anderen** steht, was sich unterscheidet – vor allem `DB_PATH`,
-dazu `BASIS_URL`, die Mailkonfiguration (Kennzeichen und Presse) und beim
-Helfer der Abruf der Helferliste.
+In den **drei anderen** steht, was sich unterscheidet – vor allem
+`BASIS_URL`, die Mailkonfiguration (Kennzeichen und Presse) und beim Helfer
+der Abruf der Helferliste.
 
 > `ADMIN_PASSWORD_HASH` und `APP_SECRET_KEY` gehören **nur** in `dienst.env`.
 > Die Umgebung schlägt die Datei, also gälten sie ohnehin für alle drei –
@@ -150,8 +172,9 @@ journalctl -u abfahrt -f
 ```
 
 Im Protokoll muss **dreimal `starte Bereich …`** stehen – Kennzeichen,
-Presse, Helfer. Fehlt einer, hat seine `.env` oder sein `DB_PATH` nicht
-gepasst. Die Datenbanken legt der Dienst beim ersten Start selbst an.
+Presse, Helfer. Fehlt einer, ist seine `.env` nicht lesbar. Die Tabellen legt
+der Dienst beim ersten Start selbst an; dann steht je Bereich
+`Migrationen eingespielt: 0001_anfang.sql` im Protokoll.
 
 Prüfen, dass wirklich nur der gewünschte Port offen ist:
 
@@ -221,9 +244,8 @@ systemctl reload nginx
 
 ## 3. Sicherung
 
-Ein Lauf für alle drei Datenbanken. Ohne `DB_PATH` sichert das Skript
-**jede** `.db` in `/var/lib/abfahrt` – vorher waren das drei Cron-Einträge in
-drei Containern.
+Ein Lauf, eine Datei: `pg_dump` sichert die ganze Datenbank, also alle drei
+Bereiche.
 
 ```bash
 crontab -u abfahrt -e
@@ -233,11 +255,15 @@ crontab -u abfahrt -e
 15 3 * * * /opt/abfahrt/deploy/backup.sh >> /var/log/abfahrt-backup.log 2>&1
 ```
 
-Das Skript nutzt `sqlite3 ".backup"` statt `cp`. Die Datenbanken laufen im
-WAL-Modus; ein blosses Kopieren der `.db` erwischt die noch nicht
-eingearbeiteten Änderungen aus der `-wal`-Datei nicht. Anschliessend prüft es
-jede Kopie mit `PRAGMA integrity_check` – eine kaputte Sicherung fällt sonst
-erst auf, wenn man sie braucht. Sicherungen älter als 30 Tage werden gelöscht.
+Die Datei heißt `abfahrt-JJJJ-MM-TT-HHMM.dump` und ist im Custom-Format von
+`pg_dump`: komprimiert, und mit `pg_restore` lässt sich auch nur ein Bereich
+zurückholen. Das Skript prüft jede Datei mit `pg_restore --list` – eine
+kaputte Sicherung fällt sonst erst auf, wenn man sie braucht. Sicherungen
+älter als 30 Tage werden gelöscht.
+
+Es läuft als `abfahrt` und meldet sich wie der Dienst ohne Passwort an. Von
+root aufgerufen, wechselt es selbst dorthin – `deploy/backup.sh` von Hand
+geht also auch als root.
 
 > Die Sicherungen enthalten Personendaten. Nach der Veranstaltung gehören sie
 > mit gelöscht, siehe Abschnitt 8 – sonst war der Löschlauf auf der Datenbank
@@ -291,7 +317,9 @@ Im Browser:
       GMX und Outlook
 - [ ] CSV-Export öffnet in Excel ohne Nachfrage und mit korrekten Umlauten
 - [ ] Monitor-Link erzeugt und auf dem Bildschirmrechner geprüft
-- [ ] Eine Sicherung von Hand angestoßen, **drei** Dateien im Zielordner
+- [ ] `runuser -u abfahrt -- psql -d abfahrt -c '\dn'` zeigt die drei
+      Schemas `kennzeichen`, `presse`, `helfer`
+- [ ] Eine Sicherung von Hand angestoßen, eine `.dump`-Datei im Zielordner
 
 ---
 
@@ -314,26 +342,21 @@ systemctl status abfahrt --no-pager
 journalctl -u abfahrt -n 30 --no-pager
 ```
 
-Dieselben vier Schritte gelten in jedem der drei Container, nur mit dem
-Dienstnamen `abfahrt`. Der Container
-hat seinen eigenen Klon von `/opt/abfahrt` und wird einzeln aktualisiert – ein
-`git pull` im einen ändert am anderen nichts.
-
 Im Protokoll gehören nach dem Start keine Warnungen zu `FORWARDED_ALLOW_IPS`,
-`APP_SECRET_KEY` oder `ADMIN_PASSWORD_HASH` zu sehen. Im Helfer-Container
-zusätzlich keine zu `JETZT_FEST`. Steht dort eine Zeile
-`Datenbank ergaenzt: …`, hat die App ein Schema-Update selbst erledigt – das ist
-normal und gewollt.
+`APP_SECRET_KEY`, `ADMIN_PASSWORD_HASH` oder `JETZT_FEST` zu sehen. Steht dort
+eine Zeile `Migrationen eingespielt: …`, hat ein Bereich seine Tabellen auf den
+neuen Stand gebracht – das ist normal und gewollt.
 
 Danach einmal im Browser: Formular lädt, Backoffice lädt, ein Antrag lässt sich
 öffnen.
 
 ### Schema-Änderungen
 
-Die App zieht fehlende Spalten und geänderte Tabellen beim Start selbst nach und
-schreibt es ins Protokoll. Ein Datenbankumbau (etwa als `mail_out.typ` um den
-Typ `orga` erweitert wurde) läuft in einer Transaktion: entweder ganz oder gar
-nicht. Trotzdem gilt Schritt 1 – eine Sicherung kostet zwei Sekunden.
+Jede Änderung am Aufbau der Tabellen liegt als nummerierte Datei im Ordner
+`migrationen/` ihres Bereichs. Beim Start spielt jeder Bereich ein, was ihm
+noch fehlt, und vermerkt es in seiner Tabelle `migration`. Alle fehlenden
+laufen in **einer** Transaktion: entweder ganz oder gar nicht. Trotzdem gilt
+Schritt 1 – eine Sicherung kostet ein paar Sekunden.
 
 ### Wenn das Update schiefgeht
 
@@ -348,19 +371,73 @@ systemctl restart abfahrt
 
 Zurück auf die aktuelle Spitze geht es mit `git checkout main`.
 
-Ist die **Datenbank** das Problem, hilft der Code-Rollback allein nicht – dann
-die Sicherung aus Schritt 1 zurückspielen:
+Ist die **Datenbank** das Problem, hilft der Code-Rollback allein nicht: eine
+Migration, die der neue Stand eingespielt hat, bleibt eingespielt. Dann die
+Sicherung aus Schritt 1 zurückspielen:
 
 ```bash
 systemctl stop abfahrt
-cp /var/backups/abfahrt/antraege-JJJJ-MM-TT.db /var/lib/abfahrt/antraege.db
-rm -f /var/lib/abfahrt/antraege.db-wal /var/lib/abfahrt/antraege.db-shm
-chown abfahrt:abfahrt /var/lib/abfahrt/antraege.db
+runuser -u abfahrt -- pg_restore --clean --if-exists --dbname=abfahrt \
+    /var/backups/abfahrt/abfahrt-JJJJ-MM-TT-HHMM.dump
 systemctl start abfahrt
 ```
 
-Die beiden `-wal`- und `-shm`-Dateien müssen weg: sie gehören zur alten
-Datenbank und passen nicht zur zurückgespielten.
+`--clean` räumt vorher ab, was in der Sicherung steht – Tabellen, Zähler,
+Schemas – und baut es aus der Datei neu auf. Nur einen Bereich zurückholen
+geht mit zusätzlich `--schema=helfer`.
+
+### Einmalig: von SQLite nach PostgreSQL
+
+Bis Oktober 2026 lagen die Daten in drei SQLite-Dateien unter
+`/var/lib/abfahrt`. Ein Server mit diesem Stand zieht so um:
+
+```bash
+# 1. Sichern - noch mit dem alten Skript, es sichert die drei .db-Dateien
+/opt/abfahrt/deploy/backup.sh
+
+# 2. Dienst anhalten: ab hier schreibt niemand mehr in die SQLite-Dateien
+systemctl stop abfahrt
+
+# 3. PostgreSQL einrichten, wie in Abschnitt 1 unter "Datenbank"
+apt install -y postgresql
+runuser -u postgres -- createuser abfahrt
+runuser -u postgres -- createdb --owner=abfahrt abfahrt
+
+# 4. Neuer Stand
+cd /opt/abfahrt
+git pull
+.venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# 5. Probelauf: liest alles, schreibt alles, rollt am Ende zurück
+runuser -u abfahrt -- .venv/bin/python deploy/sqlite-uebernehmen.py \
+    --kennzeichen /var/lib/abfahrt/antraege.db \
+    --presse      /var/lib/abfahrt/presse.db \
+    --helfer      /var/lib/abfahrt/helfer.db
+
+# 6. Stimmen die Zahlen, dasselbe mit --wirklich hintendran
+
+# 7. DATABASE_URL in /etc/abfahrt/dienst.env eintragen (siehe
+#    deploy/dienst.env.example) und die neue Unit installieren
+editor /etc/abfahrt/dienst.env
+install -m 644 deploy/dienst.service /etc/systemd/system/abfahrt.service
+systemctl daemon-reload
+systemctl start abfahrt
+```
+
+Die Übernahme behält alle Nummern – Antrags-, Helfer- und Schichtnummern,
+auf die Mails, Karten und Einteilungen zeigen – und damit auch die Links für
+Monitor, Tablet und Durchfahrtsliste. Sie läuft für alle drei Bereiche in
+einer Transaktion und verweigert sich, wenn in PostgreSQL schon etwas steht:
+ein zweiter Lauf verdoppelt nichts.
+
+Danach im Backoffice nachsehen, ob alles da ist. Dann:
+
+- die Zeilen `DB_PATH=` aus den drei `.env`-Dateien nehmen – sie wirken
+  nicht mehr;
+- die SQLite-Dateien unter `/var/lib/abfahrt` löschen und das Verzeichnis
+  dazu. **Sie enthalten Personendaten**; liegen lassen hieße, sie beim
+  Löschlauf nach der Veranstaltung zu vergessen. Die alten `.db`-Sicherungen
+  unter `/var/backups/abfahrt` laufen nach 30 Tagen von selbst aus.
 
 ### Lokale Änderungen am Server
 
@@ -388,7 +465,9 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 | Monitor zeigt nichts, obwohl Schichten erfasst sind | `TAGE` oder die Daten in den CSV-Dateien liegen in einem anderen Jahr als die Containeruhr. Im Backoffice unter *Schichten* steht, für welche Tage etwas erfasst ist. |
 | Eine Adresse zeigt den falschen Bereich | Der Host-Kopf kommt nicht durch. `proxy_set_header Host $host;` fehlt im Schnipsel, oder der Name steht nicht in `HOST_…`. Ohne Treffer landet alles beim Pfad-Rückfall. |
 | Anmeldung gilt nur in einem Bereich | `APP_SECRET_KEY` fehlt in `dienst.env`. Dann nimmt jeder Bereich den aus seiner eigenen Datei oder erzeugt sich beim Start einen – drei verschiedene Schlüssel. Er gehört nach `dienst.env`; die Umgebung schlägt die Dateien. |
-| Im Protokoll fehlt ein `starte Bereich …` | Die `.env` dieses Bereichs ist nicht lesbar oder ihr `DB_PATH` zeigt ins Leere. |
+| Im Protokoll fehlt ein `starte Bereich …` | Die `.env` dieses Bereichs ist nicht lesbar. |
+| Dienst startet nicht, im Journal `connection failed` mit `/var/run/postgresql` | PostgreSQL läuft nicht: `systemctl status postgresql`. |
+| Im Journal `role "abfahrt" does not exist` oder `Peer authentication failed` | Rolle oder Datenbank fehlen (Abschnitt 1, *Datenbank*), oder `DATABASE_URL` nennt einen anderen Benutzer als den, unter dem der Dienst läuft. |
 
 ---
 
@@ -471,7 +550,7 @@ Ein selbsttätiger Lauf ist vorsichtiger als der Knopf:
 Was der Dienst dabei tut, steht auch im Journal:
 
 ```bash
-journalctl -u abfahrt-helfer -g Helferabgleich --no-pager | tail -20
+journalctl -u abfahrt -g Helferabgleich --no-pager | tail -20
 ```
 
 ### Helfer: Daten ausführen
@@ -521,7 +600,7 @@ Energiesparen aus. Die Seite hält sich selbst aktuell und braucht kein F5.
 
 
 
-> `helfer.db` ist die einzige der drei, die sich **nicht** aus dem
+> Der Helfer-Bereich ist der einzige der drei, der sich **nicht** aus dem
 > wiederherstellen lässt, was die Leute eingereicht haben: Schichten und
 > Helfer kommen zwar aus den Listen des Registrierungstools, jede Einteilung
 > von Hand aber nur von hier. Vor der Veranstaltung lohnt sich ein zweiter
@@ -575,16 +654,18 @@ nichts und zeigt nur, was verschwinden würde:
 ```bash
 cd /opt/abfahrt
 for a in kennzeichen presse helfer; do
-    case $a in kennzeichen) d=antraege;; *) d=$a;; esac
-    python3 deploy/daten-loeschen.py --art "$a" --db "/var/lib/abfahrt/$d.db"
+    runuser -u abfahrt -- .venv/bin/python deploy/daten-loeschen.py --art "$a"
 done
 ```
 
-Sieht die Aufstellung richtig aus, denselben Aufruf mit `--wirklich`. Der
-Dienst sollte dabei stehen (`systemctl stop …`), sonst schreibt er
-möglicherweise gerade mit. Es wird vorher eine Sicherung neben die Datenbank
-gelegt – **die gehört anschließend auch gelöscht**, sonst war der Lauf
-umsonst.
+Mit der Python aus `.venv`, nicht mit `python3`: nur dort liegt der
+Datenbanktreiber. Sieht die Aufstellung richtig aus, denselben Aufruf mit
+`--wirklich`. Der Dienst sollte dabei stehen (`systemctl stop abfahrt`), sonst
+schreibt er möglicherweise gerade mit. Vorher legt das Skript eine Sicherung
+des Bereichs nach `/var/backups/abfahrt/<bereich>-vor-loeschung-<datum>.dump`
+– **die gehört anschließend auch gelöscht**, sonst war der Lauf umsonst.
+Danach schreibt es die betroffenen Tabellen mit `VACUUM FULL` neu, damit die
+gelöschten Zeilen nicht als freier Platz in den Dateien stehenbleiben.
 
 Was verschwindet: Anträge, Akkreditierungen, Helfer samt Einteilungen und
 Ausleihen, Schlüsselvorgänge, Fahrzeugstamm, Unterschriften, alle Mails samt

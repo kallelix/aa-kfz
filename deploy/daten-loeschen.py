@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Personendaten nach der Veranstaltung löschen.
 
-    python3 deploy/daten-loeschen.py --art helfer --db /var/lib/abfahrt/helfer.db
-    python3 deploy/daten-loeschen.py --art helfer --db … --wirklich
+    cd /opt/abfahrt
+    runuser -u abfahrt -- .venv/bin/python deploy/daten-loeschen.py --art helfer
+    runuser -u abfahrt -- .venv/bin/python deploy/daten-loeschen.py --art helfer --wirklich
 
 Ohne ``--wirklich`` wird nichts geschrieben: der Aufruf zeigt nur, was
 verschwinden würde. Das ist Absicht – ein Löschlauf lässt sich nicht
@@ -17,16 +18,31 @@ Was bleibt, steht unten bei jeder Anwendung dabei. Grundsatz: weg muss, was
 eine Person benennt oder erreichbar macht. Was rein sachlich ist – die
 Schichtzeiten, der Zeitplan der Rennserien, die Aufgabenliste ohne die Namen
 dahinter – kann stehenbleiben und ist nächstes Jahr eine Vorlage.
+
+Mit der venv-Python aufrufen, nicht mit python3: psycopg liegt nur dort.
+Und als Benutzer abfahrt – der meldet sich ohne Passwort an, wie der Dienst.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
-import sqlite3
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
+
+WURZEL = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(WURZEL))
+
+import psycopg  # noqa: E402
+
+from kern.db import Verbindung, verbinden  # noqa: E402
+
+# Wie in dienst.env: über den Unix-Socket, als der Systembenutzer, der das
+# Skript aufruft.
+BETRIEB_URL = "postgresql://abfahrt@/abfahrt?host=/var/run/postgresql"
 
 # Je Anwendung: (SQL, was es in Worten ist). Reihenfolge zählt – zuerst die
 # Tabellen, die auf andere zeigen.
@@ -76,51 +92,81 @@ BLEIBT: dict[str, str] = {
 }
 
 
-def zaehlen(con: sqlite3.Connection, sql: str) -> int:
-    """Wie viele Zeilen der Schritt anfassen würde – ohne ihn auszuführen."""
-    rest = sql.split(" FROM ", 1)[1] if " FROM " in sql else ""
+def _tabelle_und_bedingung(sql: str) -> str:
+    """'antrag' oder 'einstellung WHERE …' – das, worüber gezählt wird."""
     if sql.startswith("UPDATE "):
         tabelle = sql.split()[1]
         wo = sql.split(" WHERE ", 1)
-        bedingung = (" WHERE " + wo[1]) if len(wo) > 1 else ""
-        rest = tabelle + bedingung
+        return tabelle + ((" WHERE " + wo[1]) if len(wo) > 1 else "")
+    return sql.split(" FROM ", 1)[1]
+
+
+def zaehlen(con: Verbindung, sql: str) -> int:
+    """Wie viele Zeilen der Schritt anfassen würde – ohne ihn auszuführen."""
     try:
-        return con.execute("SELECT COUNT(*) FROM " + rest).fetchone()[0]
-    except sqlite3.Error as fehler:
-        print("   ! Zählen ging nicht (" + str(fehler) + ")", file=sys.stderr)
+        return con.execute(
+            "SELECT COUNT(*) FROM " + _tabelle_und_bedingung(sql)).fetchone()[0]
+    except psycopg.Error as fehler:
+        # Nach einem Fehler nimmt PostgreSQL in dieser Transaktion nichts mehr
+        # an; ohne das Zurückrollen scheiterte jede weitere Zeile mit.
+        con.rollback()
+        print("   ! Zählen ging nicht (" + str(fehler).strip() + ")",
+              file=sys.stderr)
         return -1
+
+
+def sichern(url: str, schema: str, ordner: Path) -> Path | None:
+    """Ein pg_dump nur dieses Bereichs, bevor gelöscht wird."""
+    if shutil.which("pg_dump") is None:
+        print("pg_dump fehlt – erst deploy/backup.sh laufen lassen und dann "
+              "mit --ohne-sicherung aufrufen.", file=sys.stderr)
+        return None
+    ziel = ordner / (schema + "-vor-loeschung-" + date.today().isoformat() + ".dump")
+    if ziel.exists():
+        print("Es gibt schon " + str(ziel) + " – erst wegräumen.", file=sys.stderr)
+        return None
+    ordner.mkdir(parents=True, exist_ok=True)
+    alte_maske = os.umask(0o077)
+    try:
+        subprocess.run(["pg_dump", "--format=custom", "--schema=" + schema,
+                        "--dbname=" + url, "--file=" + str(ziel)], check=True)
+    except subprocess.CalledProcessError:
+        print("pg_dump ist gescheitert, es wurde nichts gelöscht.", file=sys.stderr)
+        return None
+    finally:
+        os.umask(alte_maske)
+    return ziel
 
 
 def main() -> int:
     zerleger = argparse.ArgumentParser(
         description="Personendaten nach der Veranstaltung löschen.")
     zerleger.add_argument("--art", required=True, choices=sorted(PLAENE),
-                          help="welche Anwendung")
-    zerleger.add_argument("--db", required=True, type=Path,
-                          help="Pfad zur Datenbank")
+                          help="welcher Bereich")
+    zerleger.add_argument("--url", default=os.environ.get("DATABASE_URL") or BETRIEB_URL,
+                          help="Verbindung zur Datenbank (Vorgabe: DATABASE_URL "
+                               "oder der Unix-Socket wie im Betrieb)")
     zerleger.add_argument("--wirklich", action="store_true",
                           help="tatsächlich löschen (sonst nur zeigen)")
+    zerleger.add_argument("--sicherung-nach", type=Path,
+                          default=Path("/var/backups/abfahrt"),
+                          help="wohin die Sicherung vor dem Löschen geht")
     zerleger.add_argument("--ohne-sicherung", action="store_true",
-                          help="keine Kopie anlegen – nur, wenn es schon eine gibt")
+                          help="keine Sicherung anlegen – nur, wenn es schon eine gibt")
     werte = zerleger.parse_args()
 
-    if not werte.db.exists():
-        print("Es gibt keine Datenbank unter " + str(werte.db), file=sys.stderr)
+    plan = PLAENE[werte.art]
+    try:
+        con = verbinden(werte.url, werte.art)
+    except psycopg.OperationalError as fehler:
+        print("Keine Verbindung zur Datenbank: " + str(fehler).strip(),
+              file=sys.stderr)
         return 1
 
-    plan = PLAENE[werte.art]
-    con = sqlite3.connect(werte.db)
-    # CASCADE muss greifen, sonst blieben Einteilungen und Ausleihen stehen.
-    con.execute("PRAGMA foreign_keys = ON")
-    # Gelöschte Inhalte mit Nullen überschreiben statt nur freizugeben.
-    con.execute("PRAGMA secure_delete = ON")
-
-    print(werte.art + " – " + str(werte.db))
+    print(werte.art + " – Schema " + werte.art)
     print()
-    betroffen = 0
     for sql, worte in plan:
         anzahl = zaehlen(con, sql)
-        betroffen += max(0, anzahl)
         print("   %6s  %s" % (anzahl if anzahl >= 0 else "?", worte))
     print()
     print("   bleibt: " + BLEIBT[werte.art])
@@ -132,34 +178,33 @@ def main() -> int:
         return 0
 
     if not werte.ohne_sicherung:
-        ziel = werte.db.with_suffix(
-            werte.db.suffix + ".vor-loeschung-" + date.today().isoformat())
-        if ziel.exists():
-            print("Es gibt schon " + str(ziel) + " – erst wegräumen.",
-                  file=sys.stderr)
+        ziel = sichern(werte.url, werte.art, werte.sicherung_nach)
+        if ziel is None:
             con.close()
             return 1
-        # Über die Datenbank selbst, nicht über das Dateisystem: ein laufender
-        # Dienst könnte gerade mitten in einer Schreibung stecken.
-        sicherung = sqlite3.connect(ziel)
-        with sicherung:
-            con.backup(sicherung)
-        sicherung.close()
         print("Sicherung: " + str(ziel))
 
+    # Alles in einer Transaktion: geht ein Schritt schief, bleibt alles stehen.
     with con:
         for sql, worte in plan:
             zeiger = con.execute(sql)
             print("   %6d  %s" % (zeiger.rowcount, worte))
-    # VACUUM erst nach der Transaktion, und es braucht Platz für eine zweite
-    # Fassung der Datei. Ohne das blieben die geloeschten Seiten als freier
-    # Raum in der Datei stehen.
-    con.execute("VACUUM")
+
+    # PostgreSQL gibt gelöschte Zeilen nur zum Überschreiben frei. VACUUM FULL
+    # schreibt die Tabellen neu, und die alten Dateien gehen ans Dateisystem
+    # zurück. Geht nicht in einer Transaktion, deshalb danach und einzeln.
+    con.roh.autocommit = True
+    tabellen = sorted({_tabelle_und_bedingung(sql).split()[0] for sql, _ in plan})
+    if werte.art == "helfer":
+        tabellen += ["einteilung", "ausleihe"]
+    for tabelle in tabellen:
+        con.execute("VACUUM FULL " + tabelle)
     con.close()
 
     print()
     print("Fertig. Die Sicherung liegt getrennt – wer sie nicht mehr braucht,")
-    print("löscht sie auch, sonst war der Lauf umsonst.")
+    print("löscht sie auch, sonst war der Lauf umsonst. Dasselbe gilt für die")
+    print("nächtlichen Sicherungen aus der Zeit der Veranstaltung.")
     return 0
 
 

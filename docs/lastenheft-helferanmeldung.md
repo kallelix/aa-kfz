@@ -46,7 +46,7 @@ Assistent folgt im Januar, der Rest wächst bis zum Frühjahr nach.
 
 ```text
 helferliste.online ──CSV──▶ Abruf/Import ──▶ Helferbereich ──▶ Dashboard, Monitor,
- (Anmeldung)                (stündlich)       (SQLite)          Material, Unterschriften
+ (Anmeldung)                (stündlich)     (PostgreSQL)        Material, Unterschriften
 ```
 
 Der Helferbereich kann schon viel: Schichten mit Bedarf und Lücken, Einteilen
@@ -510,14 +510,19 @@ Bereich und eines für `kern`.** Die Gründe, alle aus diesem Projekt:
 
 **Was es kostet**, ehrlich: ein Dienst mehr im Container (Updates, Sicherung
 mit `pg_dump` statt `.backup`), und die Tests brauchen eine laufende
-PostgreSQL – heute legen sie sich einfach eine Wegwerf-Datei an. Das ist der
-größte Einschnitt; Abhilfe ist eine lokale Installation und eine frische
-Datenbank je Testlauf.
+PostgreSQL. Lokal kommt sie aus `compose.yaml` in Docker, und jeder Test legt
+sich darin eine frische Datenbank an.
 
 Umsetzung im Stil des Hauses: **psycopg 3 mit SQL von Hand, kein ORM**,
-Migrationen als nummerierte SQL-Dateien. Der Helferbereich zieht zuerst um;
-Kennzeichen und Presse folgen, wenn sie ohnehin angefasst werden – oder
-bleiben auf SQLite, solange sie niemanden stören.
+Migrationen als nummerierte SQL-Dateien.
+
+**Stand Oktober 2026: umgesetzt, für alle drei Bereiche.** Statt erst den
+Helferbereich umzuziehen, sind Kennzeichen und Presse gleich mitgegangen –
+sie sind klein, und zwei Arten Datenbank im selben Dienst hätten Sicherung,
+Löschlauf und Tests doppelt gebraucht. `deploy/sqlite-uebernehmen.py`
+übernimmt die bisherigen SQLite-Bestände samt aller Nummern; an den echten
+Beständen lokal erprobt. Das gemeinsame `kern`-Schema für Personen und
+Benutzer kommt mit Phase 1.2.
 
 ### 7.4 Anmeldung der Helfer
 
@@ -630,8 +635,8 @@ gebaut ist.
 
 | # | Schritt | Aufwand |
 | --- | --- | --- |
-| 1.1 | PostgreSQL im Container, Verbindung, Migrationen, frische Testdatenbank je Lauf | 6 h |
-| 1.2 | Veranstaltungen als eigene Größe; Helferbereich auf PostgreSQL samt Datenübernahme | 10 h |
+| 1.1 | PostgreSQL im Container, Verbindung, Migrationen, frische Testdatenbank je Lauf | **erledigt** |
+| 1.2 | Veranstaltungen als eigene Größe (der Umzug auf PostgreSQL samt Datenübernahme ist schon erledigt) | 6 h |
 | 1.3 | Mailversand nach `kern` ziehen; **DKIM für die Absenderdomain fertigstellen** | 4 h |
 
 1.3 ist kein Nebenschauplatz: ohne verlässliche Zustellung landet der
@@ -665,7 +670,9 @@ Selbstbedienung.
 Bestehendes umgebaut.
 
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
-für Prototyp, Phase 1 und 2 – rund 74 Stunden.
+für Prototyp, Phase 1 und 2 – rund 74 Stunden. Davon sind der Prototyp (0.2)
+und der Umzug auf PostgreSQL (1.1 und ein Teil von 1.2) schon erledigt; es
+bleiben rund 60 Stunden, die 8 Stunden pro Woche haben also etwas Luft.
 
 | Öffnung | Bauzeit pro Woche ab 12. Oktober |
 | --- | --- |
@@ -716,7 +723,7 @@ Fehler beheben, nichts Neues.
 
 | Phase | Aufwand |
 | --- | --- |
-| 1 Fundament | ~20 h |
+| 1 Fundament | ~20 h, davon ~10 h erledigt |
 | 2 Öffnung | ~50 h |
 | 3 Assistent, Helferstamm, Backoffice-Konten | ~39 h |
 | 4 Veranstaltungstag, Anerkennung | ~21 h |
