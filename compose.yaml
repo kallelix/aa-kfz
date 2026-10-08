@@ -1,0 +1,28 @@
+# PostgreSQL fuer die Entwicklung und die Tests – nicht fuer den Betrieb.
+#
+#   docker compose up -d
+#
+# Lauscht nur auf 127.0.0.1 und auf einem eigenen Port, damit er sich nicht
+# mit einem anderen PostgreSQL auf 5432 in die Quere kommt. Die Daten liegen
+# in einem Docker-Volume und ueberleben ein `docker compose down`; weg sind
+# sie erst mit `docker compose down -v`.
+#
+# Das Passwort steht hier offen, weil die Datenbank nur auf dem eigenen
+# Rechner erreichbar ist. Im Betrieb kommt die Verbindung aus dienst.env.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: abfahrt-postgres
+    environment:
+      POSTGRES_USER: abfahrt
+      POSTGRES_PASSWORD: abfahrt
+      POSTGRES_DB: abfahrt
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - abfahrt-postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  abfahrt-postgres:
