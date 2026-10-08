@@ -15,7 +15,7 @@ def _werte_lesen(pfad: Path) -> dict[str, str]:
 
     Der Unterschied ist der Kern der Zusammenführung: die drei Anwendungen
     laufen jetzt in EINEM Prozess und benutzen mit Absicht dieselben Namen –
-    DB_PATH, APP_SECRET_KEY, ADMIN_PASSWORD_HASH. In os.environ gäbe es davon
+    VERANSTALTUNG, KONTAKT_MAIL, CSV_TRENNER. In os.environ gäbe es davon
     nur einen Satz, und es gewänne, wer zuerst lädt. Jede Anwendung hält ihre
     Werte deshalb für sich.
     """

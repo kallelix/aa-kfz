@@ -1,18 +1,17 @@
-"""SQLite-Zugriff. Eine Datei, ein `cp` als Backup."""
+"""Datenbankzugriff. PostgreSQL, Schema presse – siehe kern/db.py."""
 
 from __future__ import annotations
 
-import secrets
-import sqlite3
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
 from kern import suchen
+from kern.db import Datenbank, Verbindung
 
 from . import config
 
-SCHEMA = Path(__file__).resolve().parent / "schema.sql"
+_DATENBANK = Datenbank(lambda: config.DATABASE_URL, config.DB_SCHEMA,
+                       Path(__file__).resolve().parent / "migrationen")
 
 
 def jetzt() -> str:
@@ -20,63 +19,18 @@ def jetzt() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def _lower_u(wert):
-    """SQLite kennt nur ASCII-Gross/Kleinschreibung; fuer "Müller" brauchen wir
-    Pythons Unicode-Variante."""
-    return wert.lower() if isinstance(wert, str) else wert
+def verbinden() -> Verbindung:
+    return _DATENBANK.verbinden()
 
 
-def verbinden() -> sqlite3.Connection:
-    con = sqlite3.connect(config.DB_PATH, timeout=10)
-    con.row_factory = sqlite3.Row
-    con.execute("PRAGMA foreign_keys = ON")
-    con.execute("PRAGMA busy_timeout = 5000")
-    con.create_function("lower_u", 1, _lower_u, deterministic=True)
-    # Dieselbe Umformung wie im Browser (kern/static/suchtext.js):
-    # "Mueller", "Muller" und "Müller" sollen einander finden.
-    con.create_function(
-        "suchtext", 1,
-        lambda wert: suchen.suchtext(wert or ""), deterministic=True)
-    return con
-
-
-@contextmanager
 def transaktion():
     """Verbindung mit Commit bei Erfolg, Rollback bei Ausnahme."""
-    con = verbinden()
-    try:
-        with con:
-            yield con
-    finally:
-        con.close()
-
-
-# Spalten, die nach dem ersten Ausliefern dazugekommen sind.
-NACHTRAEGLICHE_SPALTEN: tuple = ()
-
-
-def _migrieren(con: sqlite3.Connection) -> list:
-    ergaenzt = []
-    for tabelle, spalte, typ in NACHTRAEGLICHE_SPALTEN:
-        vorhanden = {z["name"] for z in con.execute(f"PRAGMA table_info({tabelle})")}
-        if spalte not in vorhanden:
-            con.execute(f"ALTER TABLE {tabelle} ADD COLUMN {spalte} {typ}")
-            ergaenzt.append(f"{tabelle}.{spalte}")
-    return ergaenzt
+    return _DATENBANK.transaktion()
 
 
 def init() -> list:
-    """Legt Verzeichnis, Datei und Schema an und zieht fehlende Spalten nach."""
-    config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = verbinden()
-    try:
-        # WAL, damit der Mail-Worker nebenläufig lesen kann.
-        con.execute("PRAGMA journal_mode = WAL")
-        with con:
-            con.executescript(SCHEMA.read_text(encoding="utf-8"))
-            return _migrieren(con)
-    finally:
-        con.close()
+    """Spielt fehlende Migrationen ein und liefert ihre Namen fürs Protokoll."""
+    return _DATENBANK.init()
 
 
 # --- Anmeldungen ------------------------------------------------------------
@@ -100,8 +54,8 @@ STATUS_WERTE = ("neu", "ausgegeben")
 SORTIERUNGEN = {
     "neueste": "created_at DESC, id DESC",
     "aelteste": "created_at ASC, id ASC",
-    "name": "nachname COLLATE NOCASE, vorname COLLATE NOCASE",
-    "firma": "firma COLLATE NOCASE, nachname COLLATE NOCASE",
+    "name": "lower(nachname), lower(vorname)",
+    "firma": "lower(firma), lower(nachname)",
 }
 
 _SUCHFELDER = ("vorname", "nachname", "firma", "email", "telefon",
@@ -126,6 +80,7 @@ def anmeldung_anlegen(werte: dict, remote_ip: str | None) -> int:
                 gegenleistung, verlinkung, social_media, bemerkung, status,
                 sicherheit_ok_am, bildrechte_ok_am, created_at, remote_ip
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'neu', ?, ?, ?, ?)
+            RETURNING id
             """,
             (
                 werte["vorname"],
@@ -144,7 +99,7 @@ def anmeldung_anlegen(werte: dict, remote_ip: str | None) -> int:
                 remote_ip,
             ),
         )
-        return int(cur.lastrowid)
+        return int(cur.fetchone()[0])
 
 
 def anmeldung_laden(anmeldung_id: int):
@@ -174,26 +129,23 @@ def anmeldungen_suchen(
     elif gegenleistung:
         bedingungen.append("gegenleistung = ?")
         parameter.append(gegenleistung)
-    if suche:
-        heuhaufen = " || ' ' || ".join(f"COALESCE({feld}, '')" for feld in _SUCHFELDER)
-        # Siehe kennzeichen/app/db.py: eine Schreibweise davon muss vorkommen.
-        teile = []
-        for variante in suchen.varianten(suche):
-            teile.append(f"INSTR(suchtext({heuhaufen}), ?) > 0")
-            parameter.append(variante)
-        if teile:
-            bedingungen.append("(" + " OR ".join(teile) + ")")
 
     wo = f"WHERE {' AND '.join(bedingungen)}" if bedingungen else ""
     ordnung = SORTIERUNGEN.get(sortierung, SORTIERUNGEN["neueste"])
 
     con = verbinden()
     try:
-        return con.execute(
+        zeilen = con.execute(
             f"SELECT * FROM anmeldung {wo} ORDER BY {ordnung}", parameter
         ).fetchall()
     finally:
         con.close()
+    if suche and suche.strip():
+        # Die Suche laeuft in Python, wie in kennzeichen/app/db.py: dieselbe
+        # Regel wie im Browser, an einer Stelle (kern/suchen.py).
+        zeilen = [zeile for zeile in zeilen if suchen.passt(
+            suchen.suchtext(*(zeile[feld] or "" for feld in _SUCHFELDER)), suche)]
+    return zeilen
 
 
 def anmeldung_aktualisieren(anmeldung_id: int, werte: dict) -> bool:
@@ -414,7 +366,7 @@ def anmeldungen_abholung() -> list:
     try:
         return con.execute(
             "SELECT * FROM anmeldung"
-            " ORDER BY nachname COLLATE NOCASE, vorname COLLATE NOCASE"
+            " ORDER BY lower(nachname), lower(vorname)"
         ).fetchall()
     finally:
         con.close()
@@ -477,7 +429,7 @@ def anmeldungen_bilder_offen() -> list:
             " WHERE gegenleistung = 'bilderspende'"
             "   AND status = 'ausgegeben'"
             "   AND bilder_erhalten_am IS NULL"
-            " ORDER BY erinnerung_am IS NOT NULL, erinnerung_am, nachname COLLATE NOCASE"
+            " ORDER BY erinnerung_am IS NOT NULL, erinnerung_am, lower(nachname)"
         ).fetchall()
     finally:
         con.close()

@@ -20,7 +20,7 @@ def _werte_lesen(pfad: Path) -> dict[str, str]:
 
     Der Unterschied ist der Kern der Zusammenführung: die drei Anwendungen
     laufen jetzt in EINEM Prozess und benutzen mit Absicht dieselben Namen –
-    DB_PATH, APP_SECRET_KEY, ADMIN_PASSWORD_HASH. In os.environ gäbe es davon
+    VERANSTALTUNG, KONTAKT_MAIL, CSV_TRENNER. In os.environ gäbe es davon
     nur einen Satz, und es gewänne, wer zuerst lädt. Jede Anwendung hält ihre
     Werte deshalb für sich.
     """
@@ -73,9 +73,11 @@ BIND = _env("BIND", "127.0.0.1:8081")
 # Liegt der Reverse Proxy auf einem anderen Host, MUSS hier dessen IP stehen.
 FORWARDED_ALLOW_IPS = _env("FORWARDED_ALLOW_IPS", "127.0.0.1").strip()
 
-DB_PATH = Path(_env("DB_PATH", str(BASE_DIR / "data" / "presse.db")))
-if not DB_PATH.is_absolute():
-    DB_PATH = BASE_DIR / DB_PATH
+# Die Datenbank: eine fuer den ganzen Dienst, dieser Bereich in seinem
+# eigenen Schema (kern/db.py). Im Betrieb steht die Verbindung in
+# dienst.env. Leer heisst: der Entwicklungs-Container aus compose.yaml.
+DATABASE_URL = _env("DATABASE_URL", "").strip()
+DB_SCHEMA = "presse"
 
 FORM_PATH = "/" + _env("FORM_PATH", "/").strip("/")
 

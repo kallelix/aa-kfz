@@ -9,16 +9,16 @@ Vorbereitung nötig.
 import http.client
 import os
 import socket
-import sqlite3
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.parse
 from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL))
+sys.path.insert(0, str(WURZEL.parent))
+from kern import testdb  # noqa: E402
 
 PYTHON = WURZEL.parent / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
@@ -103,14 +103,13 @@ def freier_hafen():
         return s.getsockname()[1]
 
 
-verzeichnis = Path(tempfile.mkdtemp(prefix="presse-test-"))
-db = verzeichnis / "presse.db"
+db = testdb.wegwerf("presse_anm")
 hafen = freier_hafen()
 
 prozess = subprocess.Popen(
     [str(PYTHON), "-m", "app"],
     cwd=str(WURZEL),
-    env={**os.environ, "DB_PATH": str(db), "BIND": f"127.0.0.1:{hafen}",
+    env={**os.environ, "DATABASE_URL": db, "BIND": f"127.0.0.1:{hafen}",
          "APP_SECRET_KEY": "test", "SMTP_HOST": "", "MAIL_FROM": "",
          "BADGES_GESAMT": "3", "PYTHONIOENCODING": "utf-8"},
     stdout=subprocess.DEVNULL,
@@ -119,12 +118,7 @@ prozess = subprocess.Popen(
 
 
 def zeilen(sql, *parameter):
-    con = sqlite3.connect(db)
-    con.row_factory = sqlite3.Row
-    try:
-        return con.execute(sql, parameter).fetchall()
-    finally:
-        con.close()
+    return testdb.abfrage(db, "presse", sql, parameter)
 
 
 try:
@@ -269,5 +263,4 @@ if fehler:
         print("  - " + eintrag)
 else:
     print("alle Pruefungen bestanden")
-print("Wegwerf-Datenbank lag in " + str(verzeichnis))
 sys.exit(1 if fehler else 0)
