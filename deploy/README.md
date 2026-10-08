@@ -130,8 +130,7 @@ install -o root -g root -m 600 deploy/kennzeichen.env.example /etc/abfahrt/kennz
 install -o root -g root -m 600 deploy/presse.env.example      /etc/abfahrt/presse.env
 install -o root -g root -m 600 deploy/helfer.env.example      /etc/abfahrt/helfer.env
 
-# Passwort-Hash und Session-Schluessel - EINMAL, sie gelten fuer alle drei
-/opt/abfahrt/.venv/bin/python -m kern.passwort
+# Session-Schluessel - EINMAL, er gilt fuer alle drei
 /opt/abfahrt/.venv/bin/python -c "import secrets; print('APP_SECRET_KEY=' + secrets.token_urlsafe(32))"
 
 editor /etc/abfahrt/dienst.env
@@ -139,18 +138,17 @@ editor /etc/abfahrt/dienst.env
 
 In **`dienst.env`** steht, was für alle gilt: `BIND`,
 `FORWARDED_ALLOW_IPS`, `DATABASE_URL`, die vier `HOST_…`,
-`ADMIN_PASSWORD_HASH`, `APP_SECRET_KEY` und die drei Zeiger
-`KENNZEICHEN_ENV`, `PRESSE_ENV`, `HELFER_ENV`.
+`APP_SECRET_KEY` und die drei Zeiger `KENNZEICHEN_ENV`, `PRESSE_ENV`,
+`HELFER_ENV`.
 
 In den **drei anderen** steht, was sich unterscheidet – vor allem
 `BASIS_URL`, die Mailkonfiguration (Kennzeichen und Presse) und beim Helfer
 der Abruf der Helferliste.
 
-> `ADMIN_PASSWORD_HASH` und `APP_SECRET_KEY` gehören **nur** in `dienst.env`.
-> Die Umgebung schlägt die Datei, also gälten sie ohnehin für alle drei –
-> aber genau daran hängt, dass eine Anmeldung alle drei Bereiche öffnet.
-> Stünden dort verschiedene Schlüssel, läge zwar ein Keks im Browser, seine
-> Unterschrift passte im nächsten Bereich aber nicht.
+> `APP_SECRET_KEY` gehört **nur** in `dienst.env`. Die Umgebung schlägt die
+> Datei, also gälte er ohnehin für alle drei – aber daran hängen die
+> CSRF-Token, und stünden in den Bereichen verschiedene Schlüssel, passte das
+> Token eines Formulars nicht zum Bereich, an den es geht.
 
 Alle vier gehören **root und sind 0600**. systemd liest `dienst.env`, bevor
 es die Rechte auf den Benutzer `abfahrt` fallen lässt; die drei anderen liest
@@ -175,6 +173,47 @@ Im Protokoll muss **dreimal `starte Bereich …`** stehen – Kennzeichen,
 Presse, Helfer. Fehlt einer, ist seine `.env` nicht lesbar. Die Tabellen legt
 der Dienst beim ersten Start selbst an; dann steht je Bereich
 `Migrationen eingespielt: 0001_anfang.sql` im Protokoll.
+
+### Das erste Admin-Konto
+
+Ins Backoffice meldet sich jeder mit seinem **eigenen Konto** an:
+Mailadresse und Passwort. Ein Admin lädt die anderen unter
+`admin.example.de/konten` ein; sie bekommen eine Mail mit einem Link, über
+den sie ihr Passwort festlegen. Jedes Konto hat eine Rolle – *Admin*, *Orga*
+oder *Lesend* – und die Bereiche, die es sehen darf. Sein Kürzel landet als
+„bearbeitet von“ in den Daten.
+
+Den ersten Admin legt man auf dem Server an:
+
+```bash
+cd /opt/abfahrt
+runuser -u abfahrt -- env DATABASE_URL='postgresql://abfahrt@/abfahrt?host=/var/run/postgresql' \
+    .venv/bin/python -m kern.konto admin
+```
+
+Das fragt Mailadresse, Name, Kürzel und Passwort. Danach unter
+`admin.example.de` anmelden und unter **Konten** die anderen einladen.
+
+Die Einladungen gehen über das **Postfach des Kennzeichen-Bereichs**
+(`SMTP_…` und `MAIL_FROM` in `kennzeichen.env`). Kommt eine nicht hinaus,
+zeigt die Seite den Link an; dann gibt ihn der Admin selbst weiter.
+
+> **Gemeinsames Passwort.** Wer schon mit `ADMIN_PASSWORD_HASH` gearbeitet
+> hat, kann auch so umsteigen: mit dem gemeinsamen Passwort anmelden, unter
+> **Konten** das eigene Konto als Admin anlegen und die Einladung einlösen.
+> Ab diesem Moment gilt das gemeinsame Passwort nicht mehr – für niemanden,
+> auch nicht für schon angemeldete Browser. Die Zeile kann dann aus
+> `dienst.env` heraus.
+
+Kommt niemand mehr hinein – der einzige Admin hat sein Passwort vergessen,
+und die Mail kommt nicht an –, hilft dasselbe Werkzeug:
+
+```bash
+runuser -u abfahrt -- env DATABASE_URL='postgresql://abfahrt@/abfahrt?host=/var/run/postgresql' \
+    .venv/bin/python -m kern.konto passwort ada@example.org
+```
+
+`python -m kern.konto liste` zeigt alle Konten.
 
 Prüfen, dass wirklich nur der gewünschte Port offen ist:
 
@@ -305,8 +344,13 @@ Im Browser:
 - [ ] Antrag absenden, Bestätigungsseite erscheint
 - [ ] Presse-Anmeldung absenden, Bestätigungsseite erscheint
 - [ ] `admin.example.de` zeigt die Startseite mit drei Kacheln
-- [ ] **Eine** Anmeldung öffnet alle drei Bereiche
-- [ ] Abmelden in einem Bereich meldet aus allen dreien ab
+- [ ] Admin-Konto angelegt, ein zweites Konto per Mail eingeladen – die
+      Einladung kommt an, der Link setzt das Passwort
+- [ ] **Eine** Anmeldung öffnet alle Bereiche des Kontos; ein Konto nur für
+      die Presse sieht Kennzeichen und Helfer **nicht**
+- [ ] Das gemeinsame Passwort wird abgewiesen, `ADMIN_PASSWORD_HASH` ist aus
+      `dienst.env` heraus
+- [ ] Abmelden in einem Bereich meldet aus allen ab
 - [ ] Cookie hat `Secure`, `HttpOnly` und `Path=/`
       (Entwicklertools → Anwendung → Cookies)
 - [ ] `journalctl -u abfahrt` zeigt beim Antrag die **echte** Client-IP,
@@ -343,7 +387,7 @@ journalctl -u abfahrt -n 30 --no-pager
 ```
 
 Im Protokoll gehören nach dem Start keine Warnungen zu `FORWARDED_ALLOW_IPS`,
-`APP_SECRET_KEY`, `ADMIN_PASSWORD_HASH` oder `JETZT_FEST` zu sehen. Steht dort
+`APP_SECRET_KEY` oder `JETZT_FEST` zu sehen. Steht dort
 eine Zeile `Migrationen eingespielt: …`, hat ein Bereich seine Tabellen auf den
 neuen Stand gebracht – das ist normal und gewollt.
 
@@ -464,7 +508,10 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 | Monitor zeigt eine Uhrzeit, die nicht stimmt | Entweder steht `JETZT_FEST` noch gesetzt (Warnung im Journal), oder die Containeruhr geht falsch – `timedatectl`. Die Uhr auf dem Bildschirm kommt vom Server, nicht vom Bildschirmrechner. |
 | Monitor zeigt nichts, obwohl Schichten erfasst sind | `TAGE` oder die Daten in den CSV-Dateien liegen in einem anderen Jahr als die Containeruhr. Im Backoffice unter *Schichten* steht, für welche Tage etwas erfasst ist. |
 | Eine Adresse zeigt den falschen Bereich | Der Host-Kopf kommt nicht durch. `proxy_set_header Host $host;` fehlt im Schnipsel, oder der Name steht nicht in `HOST_…`. Ohne Treffer landet alles beim Pfad-Rückfall. |
-| Anmeldung gilt nur in einem Bereich | `APP_SECRET_KEY` fehlt in `dienst.env`. Dann nimmt jeder Bereich den aus seiner eigenen Datei oder erzeugt sich beim Start einen – drei verschiedene Schlüssel. Er gehört nach `dienst.env`; die Umgebung schlägt die Dateien. |
+| Anmeldung gilt nur in einem Bereich | Das Konto ist nur für diesen Bereich freigegeben – unter **Konten** nachsehen. Sonst: `APP_SECRET_KEY` fehlt in `dienst.env`, und jeder Bereich hat einen eigenen. |
+| Das gemeinsame Passwort geht nicht mehr | So gewollt: es gibt einen Admin mit eigenem Konto. Jeder meldet sich mit seinem eigenen an. |
+| Niemand kommt mehr hinein | `python -m kern.konto passwort <mail>` auf dem Server, siehe Abschnitt 1, *Das erste Admin-Konto*. |
+| Einladung kommt nicht an | `SMTP_…` und `MAIL_FROM` in `kennzeichen.env` prüfen; die Einladungen gehen über dieses Postfach. Bis dahin zeigt die Kontenseite den Link zum Weitergeben. |
 | Im Protokoll fehlt ein `starte Bereich …` | Die `.env` dieses Bereichs ist nicht lesbar. |
 | Dienst startet nicht, im Journal `connection failed` mit `/var/run/postgresql` | PostgreSQL läuft nicht: `systemctl status postgresql`. |
 | Im Journal `role "abfahrt" does not exist` oder `Peer authentication failed` | Rolle oder Datenbank fehlen (Abschnitt 1, *Datenbank*), oder `DATABASE_URL` nennt einen anderen Benutzer als den, unter dem der Dienst läuft. |

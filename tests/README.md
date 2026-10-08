@@ -16,6 +16,8 @@ wieder ab; was ein abgebrochener Lauf liegen lässt, entfernt
 
 ```bash
 .venv/Scripts/python.exe tests/test_dienst.py
+.venv/Scripts/python.exe tests/test_konten.py
+.venv/Scripts/python.exe tests/test_kern_konten.py
 .venv/Scripts/python.exe tests/test_kern_db.py
 .venv/Scripts/python.exe tests/test_uebernahme.py
 .venv/Scripts/python.exe tests/test_auth.py
@@ -35,6 +37,12 @@ node tests/test_durchfahrt_js.js
   Bereiche in einem Prozess, jeder in seinem Schema, Verteilung nach
   Hostname, Stilblatt und Anmeldeseite in jedem Bereich, und dass eine
   Anmeldung alle drei Bereiche öffnet – ein veränderter Keks aber keinen.
+- `test_konten.py` – startet den Dienst mit einem SMTP-Nachbau und spielt die
+  Backoffice-Konten durch: Umstieg vom gemeinsamen Passwort, Einladung per
+  Mail, Rechte je Bereich und Rolle, das Kürzel aus dem Konto in den Daten,
+  Sperren, Passwort vergessen, der letzte Admin, Fehlversuche.
+- `test_kern_konten.py` – dieselben Konten eine Ebene tiefer, ohne Server:
+  Anlegen, Einladungslinks, Anmelden, Sitzungen, Sperren.
 - `test_kern_db.py` – der gemeinsame Datenbankzugriff: `?` als Platzhalter,
   Zeilen wie `sqlite3.Row`, Migrationen (einmal, ganz oder gar nicht), Schemas
   getrennt.

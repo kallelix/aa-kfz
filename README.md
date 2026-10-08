@@ -43,8 +43,8 @@ Reverse Proxy davor, siehe [deploy/](deploy/).
 
 ```text
 dienst/        setzt die drei zusammen und verteilt nach Hostname
-kern/          was alle drei teilen: Anmeldung, Backoffice-Rahmen,
-               Stilblatt, Suche, Datenbankzugriff, python -m kern.passwort
+kern/          was alle drei teilen: Konten und Anmeldung, Backoffice-Rahmen,
+               Stilblatt, Suche, Datenbank, Mailversand, python -m kern.konto
 kennzeichen/   Kennzeichen-Anträge     ┐
 presse/        Presse-Akkreditierung   ├ je app/, .env.example, README.md
 helfer/        Helfer-Dashboard        ┘
@@ -77,14 +77,13 @@ python -m venv .venv
 cp kennzeichen/.env.example kennzeichen/.env
 cp presse/.env.example      presse/.env
 cp helfer/.env.example      helfer/.env
-.venv/Scripts/python.exe -m kern.passwort                    # gibt ADMIN_PASSWORD_HASH=… aus
+.venv/Scripts/python.exe -m kern.konto admin                  # das eigene Admin-Konto
 ```
 
-Passwort-Hash, Schlüssel und Hostnamen gelten für alle drei und gehören
-deshalb in die Umgebung, nicht in die drei `.env`:
+Schlüssel und Hostnamen gelten für alle drei und gehören deshalb in die
+Umgebung, nicht in die drei `.env`:
 
 ```bash
-export ADMIN_PASSWORD_HASH='$2b$12$…'      # einfache Anführungszeichen, der Hash enthält $
 export APP_SECRET_KEY=lokal-irgendwas
 export HOST_KENNZEICHEN=kennzeichen.localhost HOST_PRESSE=presse.localhost \
        HOST_HELFER=helfer.localhost HOST_ADMIN=admin.localhost
@@ -147,8 +146,8 @@ Ausschließlich über Env-Variablen, auf zwei Ebenen.
 | `FORWARDED_ALLOW_IPS` | die IP des Reverse Proxys. Nur von dort werden `X-Forwarded-For` und `X-Forwarded-Proto` geglaubt. |
 | `DATABASE_URL` | die PostgreSQL-Datenbank, für alle drei dieselbe. Leer heißt: der Entwicklungs-Container aus `compose.yaml`. |
 | `HOST_KENNZEICHEN`, `HOST_PRESSE`, `HOST_HELFER`, `HOST_ADMIN` | welcher Hostname zu welchem Bereich gehört |
-| `ADMIN_PASSWORD_HASH` | ohne ihn bleibt das Backoffice geschlossen (503 mit Anleitung), die öffentlichen Seiten laufen weiter. Erzeugen mit `python -m kern.passwort`. |
-| `APP_SECRET_KEY` | signiert die Sitzung. Ohne ihn erzeugt **jeder Bereich** beim Start seinen eigenen – dann gilt eine Anmeldung nur in dem Bereich, in dem sie geschah, und endet mit dem nächsten Neustart. |
+| `APP_SECRET_KEY` | signiert die CSRF-Token. Ohne ihn erzeugt **jeder Bereich** beim Start seinen eigenen – dann passen Formulare nicht zum Bereich, an den sie gehen, und nach jedem Neustart nicht mehr. |
+| `ADMIN_PASSWORD_HASH` | nur für den Übergang, siehe *Konten* unten. Erzeugen mit `python -m kern.passwort`. |
 | `KENNZEICHEN_ENV`, `PRESSE_ENV`, `HELFER_ENV` | wo die drei ihre eigenen Werte finden |
 
 **Je Bereich** eine Datei – lokal `<bereich>/.env`, im Betrieb
@@ -157,10 +156,31 @@ Veranstaltung, Kontakt, Mailversand und alles Fachliche.
 Was jeweils drinsteht, erklärt die README des Bereichs.
 
 Die Regel dazwischen: **die Umgebung schlägt die Datei.** Eine dort gesetzte
-Variable gilt also für alle drei. Genau deshalb stehen Hash und Schlüssel in
-der Umgebung – daran hängt, dass eine Anmeldung alle drei Bereiche öffnet.
-Dasselbe gilt für `DATABASE_URL`: eine Datenbank, die Schemas trennen die
-Bereiche.
+Variable gilt also für alle drei. Genau deshalb steht der Schlüssel in der
+Umgebung, und dasselbe gilt für `DATABASE_URL`: eine Datenbank, die Schemas
+trennen die Bereiche.
+
+## Konten
+
+Ins Backoffice meldet sich jeder mit seinem **eigenen Konto** an:
+Mailadresse und Passwort, eine Anmeldung für alle Bereiche, die das Konto
+sehen darf. Ein Konto hat
+
+- eine **Rolle**: *Admin* (alles, dazu die Konten), *Orga* (darf in seinen
+  Bereichen alles bearbeiten) oder *Lesend* (sieht, ändert nichts);
+- seine **Bereiche**: Kennzeichen, Presse, Helfer – einzeln freizugeben;
+- ein **Kürzel**, das als „bearbeitet von“ in den Daten landet.
+
+Admins laden unter `admin.example.de/konten` ein: die Person bekommt eine
+Mail mit einem Link und legt damit ihr Passwort fest. Vergessene Passwörter
+setzt jeder selbst über *Passwort vergessen* zurück. Konten, Sitzungen und
+Links stehen im Schema `kern` ([kern/konten.py](kern/konten.py)); die Seiten
+dazu in [kern/konten_app.py](kern/konten_app.py).
+
+Den ersten Admin legt `python -m kern.konto admin` an. Wer bisher mit dem
+gemeinsamen Passwort (`ADMIN_PASSWORD_HASH`) gearbeitet hat, kann sich damit
+auch weiter anmelden und unter **Konten** sein eigenes anlegen – bis ein
+Admin seine Einladung eingelöst hat. Ab dann gilt es nicht mehr.
 
 ## Tests
 
@@ -169,6 +189,8 @@ Rückgabewert 0 heißt bestanden. Alles aus dem Hauptordner:
 
 ```bash
 .venv/Scripts/python.exe tests/test_dienst.py     # drei Bereiche in einem Prozess, Verteilung, eine Anmeldung
+.venv/Scripts/python.exe tests/test_konten.py     # Konten: Einladung, Rechte, Sperren, Passwort vergessen
+.venv/Scripts/python.exe tests/test_kern_konten.py # Konten, Sitzungen und Links in der Datenbank
 .venv/Scripts/python.exe tests/test_kern_db.py    # Datenbankzugriff und Migrationen
 .venv/Scripts/python.exe tests/test_uebernahme.py # SQLite-Bestände nach PostgreSQL übernehmen
 .venv/Scripts/python.exe tests/test_auth.py       # Anmeldung, Token, CSRF, Rate Limit

@@ -363,6 +363,12 @@ Ankündigungsgruppe niemanden mit @ erwähnen: das zeigt dessen Nummer allen.
 | B-05 | **Protokoll**: wer hat wann wen eingeteilt, ausgetragen, zusammengeführt, gelöscht. | S | 2 |
 | B-06 | Eine Bereichsleitung kann für ihren Bereich einen Hilferuf auslösen (C-*). | S | 3 |
 
+**Stand 09.10.2026:** B-01, B-03 und B-04 sind umgesetzt, vorgezogen vor die
+Öffnung. B-02 mit *Admin*, *Orga* und *Lesend*, jeweils für einzelne der drei
+Backoffice-Bereiche; die *Bereichsleitung* für einzelne Helferbereiche folgt,
+sobald es die Bereiche im Datenmodell gibt (1.2). Offen: Passkeys (B-03),
+das Protokoll (B-05).
+
 ### 5.12 Datenschutz und Recht (D)
 
 Kein Rechtsrat – die Recherche zeigt, worauf es ankommt; die
@@ -637,15 +643,16 @@ gebaut ist.
 | --- | --- | --- |
 | 1.1 | PostgreSQL im Container, Verbindung, Migrationen, frische Testdatenbank je Lauf | **erledigt** |
 | 1.2 | Veranstaltungen als eigene Größe (der Umzug auf PostgreSQL samt Datenübernahme ist schon erledigt) | 6 h |
-| 1.3 | Mailversand nach `kern` ziehen; **DKIM für die Absenderdomain fertigstellen** | 4 h |
+| 1.3 | ~~Mailversand nach `kern` ziehen~~ (erledigt); **DKIM für die Absenderdomain fertigstellen** | 2 h |
 
 1.3 ist kein Nebenschauplatz: ohne verlässliche Zustellung landet der
 Bestätigungslink im Spam, und die ganze Anmeldung hängt daran. In der
 Kennzeichen-README steht DKIM noch als offen.
 
-Die **persönlichen Backoffice-Konten** kommen erst nach der Öffnung (3.7).
-Bis dahin trägt das gemeinsame Passwort mit Kürzel wie heute; das spart vor
-dem Dezember rund neun Stunden.
+Die **persönlichen Backoffice-Konten** (3.7) sollten erst nach der Öffnung
+kommen. Sie sind im Oktober 2026 vorgezogen worden und fertig: Konten mit
+Rolle und Bereichen, Einladung per Mail, das gemeinsame Passwort nur noch für
+den Übergang.
 
 ### Phase 2 – Öffnung (November bis Mitte Dezember 2026)
 
@@ -701,7 +708,7 @@ Phase Vorrang.
 | 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | 5 h |
 | 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | 3 h |
 | 3.6 | Warteliste mit Nachrücken | 3 h |
-| 3.7 | Persönliche Backoffice-Konten mit Rollen und Einladen – für alle drei Bereiche | 9 h |
+| 3.7 | Persönliche Backoffice-Konten mit Rollen und Einladen – für alle drei Bereiche | **erledigt** |
 
 ### Phase 4 – Veranstaltungstag und Anerkennung (März bis Ende April 2027)
 
@@ -723,9 +730,9 @@ Fehler beheben, nichts Neues.
 
 | Phase | Aufwand |
 | --- | --- |
-| 1 Fundament | ~20 h, davon ~10 h erledigt |
+| 1 Fundament | ~20 h, davon ~12 h erledigt |
 | 2 Öffnung | ~50 h |
-| 3 Assistent, Helferstamm, Backoffice-Konten | ~39 h |
+| 3 Assistent, Helferstamm, Backoffice-Konten | ~39 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~132 h** |
 
@@ -749,7 +756,7 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
 | Ein Entwickler, viel Wissen | Dokumentation wie bisher, Tests, einfache Technik |
 | Umfang wächst während des Baus | Ideenspeicher (Abschnitt 6) statt Sofortumsetzung; Phase 4 ist verschiebbar |
 | Spam-Anmeldungen | Bestätigungslink, Rate Limit, Honeypot |
-| Das Dezember-Ziel ist ehrgeizig: rund 8 Stunden Bauzeit pro Woche ab sofort | Backoffice-Konten erst nach der Öffnung; Rückfallebene Anfang März, dann reichen rund 4 Stunden pro Woche (Abschnitt 9) |
+| Das Dezember-Ziel ist ehrgeizig: rund 8 Stunden Bauzeit pro Woche ab sofort | Umzug auf PostgreSQL und Backoffice-Konten sind schon fertig; Rückfallebene Anfang März, dann reichen rund 4 Stunden pro Woche (Abschnitt 9) |
 | Die Öffnung verzögert sich | Phase 2 ist bewusst schmal, der Assistent kommt danach. Notfalls läuft eine Veranstaltung noch einmal über helferliste.online – der Abruf ist ja noch da |
 | Jemand bemerkt seine Einsatzgrenze und fühlt sich ausgegrenzt | K-06: dieselbe neutrale Antwort wie bei jeder nicht buchbaren Schicht; nichts auf Monitor, Ausdrucken, in Mails |
 | Kurzfristige Absagen am Veranstaltungstag gehen unter | S-07: oben im Dashboard und auf dem Monitor, mit den Springern, die einspringen könnten |
@@ -789,6 +796,10 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
   oder hakt ihn per Namen ab; *noch nicht da* ab 15 Minuten vor
   Schichtbeginn (T-01, T-02). Am 09.10.2026 umgedreht – vorher war ein
   Selbst-Check-in per QR-Aushang geplant.
+- **Backoffice-Konten** (09.10.2026): Anmeldung mit Mailadresse und
+  Passwort; Rollen *Admin*, *Orga*, *Lesend* und je Konto die freigegebenen
+  Bereiche; Einladung per Mail über den vorhandenen Versand. Das gemeinsame
+  Passwort gilt nur, bis ein Admin sein eigenes Konto hat (B-01 bis B-04).
 
 ### Offen
 

@@ -81,7 +81,8 @@ Was für alle drei Bereiche gilt – `BIND`, `FORWARDED_ALLOW_IPS`,
 - `KONTINGENTE` – **wird nicht genutzt.** Kontingente werden nicht verwaltet
   (offene Frage 1 ist damit beantwortet), deshalb bleibt der Wert leer und es
   warnt nichts. Falls es doch einmal eng wird: `camping:120,vip:40` genügt.
-- `KUERZEL_ABFRAGEN=0` – lässt das Bearbeiter-Kürzel bei der Anmeldung weg (offene Frage 5)
+- `KUERZEL_ABFRAGEN=0` – lässt das Bearbeiter-Kürzel bei der Anmeldung mit dem
+  gemeinsamen Passwort weg. Mit Konten kommt es aus dem Konto.
 - `FORM_PATH=/antrag/abfahrt30` – legt das Formular auf einen nicht geratenen Pfad;
   die Bestätigungsseite wandert mit, das Backoffice bleibt wo es ist
 - `IP_SPEICHERN=0` – erhebt die Client-IP gar nicht erst (das Login-Rate-Limit
@@ -154,18 +155,21 @@ die Bestätigungsseite (kein doppeltes Absenden beim Neuladen).
 
 ## Anmeldung
 
-Gemeinsames Passwort (Variante A im Plan), eine Anmeldung für alle drei
-Bereiche. Der Ablauf steckt vollständig in [kern/auth.py](../kern/auth.py),
-damit ein Magic Link später nachrüstbar bleibt, ohne Cookie- und
-CSRF-Handling anzufassen.
+Persönliche Konten für alle drei Bereiche, siehe *Konten* in der
+[Übersicht](../README.md#konten). Der Ablauf steckt in
+[kern/auth.py](../kern/auth.py) und [kern/anmeldung.py](../kern/anmeldung.py);
+der Bereich prüft nur noch, ob das Konto ihn sehen darf.
 
-- bcrypt-Hash aus `ADMIN_PASSWORD_HASH`, nie im Code
-- Session-Token: HMAC-signiert, enthält Kürzel und Ablaufzeit, keine Serverdaten
+- Passwörter als bcrypt-Hash im Schema `kern`, nie im Code
+- Sitzung in der Datenbank, im Keks nur ein Zufallswert – sperren oder ein
+  neues Passwort wirken sofort
+- Lesekonten schicken nichts ab; das prüft `sitzung_erforderlich` für jede
+  Anfrage, die kein GET ist
 - Cookie `HttpOnly`, `SameSite=Lax`, `Secure` je nach `COOKIE_SECURE`, Pfad `/` –
   damit gilt er in allen drei Bereichen. Auf den öffentlichen Adressen kommt er
   trotzdem nicht an: er gehört zu `admin.example.de`.
-- Rate Limit: `LOGIN_VERSUCHE` Fehlversuche pro `LOGIN_FENSTER_SEKUNDEN` und IP,
-  danach 429. Der Zähler liegt im Prozessspeicher, je Bereich eigen – ein
+- Rate Limit: `LOGIN_VERSUCHE` Fehlversuche pro `LOGIN_FENSTER_SEKUNDEN`, je IP
+  und je Mailadresse, danach 429. Der Zähler liegt im Prozessspeicher, je Bereich eigen – ein
   Neustart setzt zurück. Davor bremst nginx alle drei Anmeldeseiten gemeinsam.
 - Alle ändernden Aktionen (Löschen, Abmelden) verlangen einen an die Sitzung
   gebundenen CSRF-Token
@@ -205,7 +209,7 @@ nicht überholen.
   der Genehmigung bleiben stehen. Der Knopf erscheint nur bei `genehmigt`.
 
 Zeitpunkt und Kürzel werden bei jeder Entscheidung festgehalten, das Kürzel
-kommt aus der Sitzung (siehe `KUERZEL_ABFRAGEN`).
+kommt aus dem Konto, mit dem jemand angemeldet ist.
 
 ### Fahrzeug erfassen
 
