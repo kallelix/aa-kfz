@@ -5,16 +5,17 @@
 
 {% block inhalt %}
   <p class="hinweis hinweis-fehler">
-    Es ist kein <code>ADMIN_PASSWORD_HASH</code> gesetzt. Das Backoffice bleibt
-    geschlossen, bis eines konfiguriert ist – ein offenes Backoffice wäre
-    schlimmer als gar keines.
+    Es gibt noch kein Admin-Konto und kein gemeinsames Passwort. Das Backoffice
+    bleibt geschlossen, bis eines von beiden eingerichtet ist – ein offenes
+    Backoffice wäre schlimmer als gar keines.
   </p>
 
-  <p>Hash erzeugen und in die Umgebung übernehmen:</p>
-  <pre><code>python -m app.passwort</code></pre>
+  <p>Den ersten Admin auf dem Server anlegen:</p>
+  <pre><code>python -m kern.konto admin</code></pre>
 
   <p class="hilfe">
-    Die Ausgabe beginnt mit <code>ADMIN_PASSWORD_HASH=</code> und gehört in die
-    <code>.env</code> bzw. in die systemd-Unit. Danach die App neu starten.
+    Oder übergangsweise ein gemeinsames Passwort setzen: <code>python -m kern.passwort</code>
+    erzeugt <code>ADMIN_PASSWORD_HASH=…</code> für die Umgebung. Damit kommt man unter
+    <strong>Konten</strong> hinein und legt dort die eigenen an. Danach den Dienst neu starten.
   </p>
 {% endblock %}

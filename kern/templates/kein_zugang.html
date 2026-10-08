@@ -1,0 +1,23 @@
+{% extends "admin_base.html" %}
+{% block titel %}Kein Zugang{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}Kein Zugang{% endblock %}
+
+{% block inhalt %}
+  <p class="hinweis hinweis-fehler" role="alert">
+    {% if grund == "lesend" %}
+      Dein Konto darf hier nur lesen, nicht ändern.
+    {% elif grund == "admin" %}
+      Die Konten verwaltet nur ein Admin.
+    {% else %}
+      Dieser Bereich ist für dein Konto nicht freigegeben.
+    {% endif %}
+  </p>
+  <p>Wenn du das brauchst, sag einem Admin Bescheid – er kann es unter
+    <strong>Konten</strong> freigeben.</p>
+  {% if bereiche %}
+    <p>Für dich offen:
+      {% for b in bereiche %}<a href="{{ b.ziel }}">{{ b.name }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+    </p>
+  {% endif %}
+{% endblock %}

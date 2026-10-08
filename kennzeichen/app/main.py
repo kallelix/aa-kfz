@@ -14,7 +14,6 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote
 
 import segno
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -28,7 +27,7 @@ from . import config, db, mail, validation, worker
 from . import WURZEL as _WURZELPFAD
 _WURZEL = str(_WURZELPFAD)
 
-from kern import navigation, suchen
+from kern import anmeldung, navigation, suchen
 from kern.auth import Auth
 
 WURZEL_STATIC = Path(_WURZEL) / "kern" / "static"
@@ -37,7 +36,7 @@ BASIS = Path(__file__).resolve().parent
 # Eine Instanz je Anwendung: die drei laufen in einem Prozess und haben
 # verschiedene Schluessel, Passwoerter und Sitzungsdauern. Sie heisst `auth`,
 # damit jede Aufrufstelle bleibt, wie sie war.
-auth = Auth(config)
+auth = Auth(config, bereich="kennzeichen")
 
 # Zwei Sucher: erst die eigenen Vorlagen, dann die gemeinsamen aus kern. So
 # kann jede Anwendung eine gemeinsame Vorlage ueberschreiben, indem sie eine
@@ -70,6 +69,8 @@ protokoll = logging.getLogger("uvicorn.error")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Erst kern: die Konten gehören allen Bereichen.
+    auth.init()
     eingespielt = db.init()
     if eingespielt:
         protokoll.info("Migrationen eingespielt: %s", ", ".join(eingespielt))
@@ -262,20 +263,6 @@ async def danke(request: Request, nr: str = ""):
 # --- Anmeldung --------------------------------------------------------------
 
 
-@app.exception_handler(auth.NichtAngemeldet)
-async def _nicht_angemeldet(request: Request, ausnahme):
-    return RedirectResponse(
-        "/kennzeichen/login?weiter=" + quote(ausnahme.ziel), status_code=303
-    )
-
-
-@app.exception_handler(auth.NichtEingerichtet)
-async def _nicht_eingerichtet(request: Request, ausnahme):
-    return templates.TemplateResponse(
-        "admin_nicht_eingerichtet.html", _kontext(request), status_code=503
-    )
-
-
 def _weiter_pfad(roh: str) -> str:
     """Nur eigene Backoffice-Pfade zulassen – sonst wäre das eine offene
     Weiterleitung."""
@@ -284,71 +271,10 @@ def _weiter_pfad(roh: str) -> str:
     return "/kennzeichen"
 
 
-@app.get("/kennzeichen/login")
-async def login_formular(request: Request, weiter: str = "/kennzeichen"):
-    if not auth.eingerichtet():
-        raise auth.NichtEingerichtet()
-    if auth.sitzung_lesen(request) is not None:
-        return RedirectResponse(_weiter_pfad(weiter), status_code=303)
-    return templates.TemplateResponse(
-        "admin_login.html",
-        _kontext(
-            request,
-            fehler="",
-            weiter=_weiter_pfad(weiter),
-            kuerzel_abfragen=config.KUERZEL_ABFRAGEN,
-            kuerzel="",
-        ),
-    )
-
-
-@app.post("/kennzeichen/login")
-async def login_absenden(request: Request):
-    if not auth.eingerichtet():
-        raise auth.NichtEingerichtet()
-
-    daten = await request.form()
-    weiter = _weiter_pfad(str(daten.get("weiter") or "/kennzeichen"))
-    kuerzel = str(daten.get("kuerzel") or "").strip()[:20]
-    ip = _remote_ip(request, immer=True) or "unbekannt"
-
-    def abweisen(meldung, code=401):
-        return templates.TemplateResponse(
-            "admin_login.html",
-            _kontext(
-                request,
-                fehler=meldung,
-                weiter=weiter,
-                kuerzel_abfragen=config.KUERZEL_ABFRAGEN,
-                kuerzel=kuerzel,
-            ),
-            status_code=code,
-        )
-
-    if auth.login_gesperrt(ip):
-        return abweisen("Zu viele Fehlversuche. Bitte eine Minute warten.", 429)
-
-    if not auth.passwort_pruefen(str(daten.get("passwort") or "")):
-        auth.login_fehlversuch(ip)
-        return abweisen("Passwort stimmt nicht.")
-
-    auth.login_zuruecksetzen(ip)
-    antwort = RedirectResponse(weiter, status_code=303)
-    auth.cookie_setzen(antwort, request, auth.token_erzeugen(kuerzel))
-    return antwort
-
-
-@app.post("/kennzeichen/logout")
-async def logout(request: Request):
-    sitzung = auth.sitzung_lesen(request)
-    daten = await request.form()
-    if sitzung is not None and not auth.csrf_pruefen(
-        sitzung, str(daten.get("csrf") or "")
-    ):
-        raise auth.NichtAngemeldet("/kennzeichen")
-    antwort = RedirectResponse("/kennzeichen/login", status_code=303)
-    auth.cookie_loeschen(antwort)
-    return antwort
+# Anmelden, Abmelden und die Fehlerseiten dazu liegen in kern/anmeldung.py,
+# für alle drei Bereiche gleich.
+anmeldung.einrichten(app, auth=auth, templates=templates, kontext=_kontext,
+                     bereich="kennzeichen")
 
 
 # --- Backoffice -------------------------------------------------------------
@@ -376,7 +302,7 @@ def _admin_kontext(request: Request, sitzung, **extra) -> dict:
     return _kontext(
         request,
         sitzung=sitzung,
-        bereiche=navigation.bereiche(request.url.path),
+        bereiche=navigation.bereiche(request.url.path, sitzung),
         gemeinsam="/kennzeichen/gemeinsam",
         bereichsnav=_navigation(request.url.path, offen),
         csrf=auth.csrf_token(sitzung.token),

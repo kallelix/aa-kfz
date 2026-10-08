@@ -40,7 +40,13 @@
            der, in dem man gerade steht. #}
         <form method="post" action="/{{ bereich }}/logout" class="abmelden">
           <input type="hidden" name="csrf" value="{{ csrf }}">
-          {% if sitzung.kuerzel %}<span class="kuerzel">{{ sitzung.kuerzel }}</span>{% endif %}
+          {% if sitzung.kuerzel %}<span class="kuerzel" title="{{ sitzung.name }}">{{ sitzung.kuerzel }}</span>{% endif %}
+          {% if not sitzung.darf_aendern %}<span class="kuerzel">nur lesen</span>{% endif %}
+          {# Die Kontenverwaltung gibt es nur im gemeinsamen Dienst. #}
+          {% if sitzung.verwaltung %}
+            {% if sitzung.konto_id %}<a class="knopf-schlicht" href="/konto">Mein Konto</a>{% endif %}
+            {% if sitzung.ist_admin %}<a class="knopf-schlicht" href="/konten">Konten</a>{% endif %}
+          {% endif %}
           <button type="submit" class="knopf-schlicht">Abmelden</button>
         </form>
       {% endif %}

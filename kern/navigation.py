@@ -53,8 +53,10 @@ def punkte(eintraege, pfad: str) -> list:
     return gemacht
 
 
-def bereiche(pfad: str) -> list:
-    """Die drei Bereiche, der offene markiert."""
+def bereiche(pfad: str, sitzung=None) -> list:
+    """Die Bereiche, die das Konto sehen darf, der offene markiert. Ohne
+    Sitzung alle drei."""
     erstes = pfad.strip("/").split("/")[0] if pfad.strip("/") else ""
     return [{"schluessel": s, "name": n, "ziel": z, "hier": s == erstes}
-            for s, n, z in BEREICHE]
+            for s, n, z in BEREICHE
+            if sitzung is None or sitzung.darf(s)]
