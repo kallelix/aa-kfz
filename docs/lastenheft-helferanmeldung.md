@@ -32,11 +32,11 @@ Die neue Anmeldung wird Teil des Helferbereichs, den es schon gibt. Sechs Dinge
 6. **Echte Benutzer im Backoffice** statt eines gemeinsamen Passworts, und
    beliebig viele Veranstaltungen statt nur der Absoluten Abfahrt.
 
-Ziel ist, dass die Anmeldung **so früh wie möglich** auf dem neuen System
+Ziel ist, dass die Anmeldung **im Dezember 2026** auf dem neuen System
 öffnet – für die Absolute Abfahrt 2027 (1.–4. Juli, mit Auf- und Abbau
 davor und danach) und für jede andere Veranstaltung des ILRC, die Helfer
 braucht. Dafür reichen Phase 1 und 2 aus Abschnitt 9; der
-Assistent folgt kurz nach der Öffnung, der Rest wächst nach.
+Assistent folgt im Januar, der Rest wächst bis zum Frühjahr nach.
 
 ---
 
@@ -356,11 +356,11 @@ Ankündigungsgruppe niemanden mit @ erwähnen: das zeigt dessen Nummer allen.
 
 | Nr. | Anforderung | Prio | Phase |
 | --- | --- | --- | --- |
-| B-01 | **Persönliche Konten** statt eines gemeinsamen Passworts – für alle drei Bereiche, also in `kern`. | M | 1 |
-| B-02 | Rollen: *Admin*, *Orga*, *Bereichsleitung* (nur ihre Bereiche), *Lesend*. | M | 1 |
-| B-03 | Einladen per Mail; der Eingeladene setzt sein Passwort selbst. Optional Passkey. | M | 1 |
-| B-04 | Das Kürzel ergibt sich aus dem Konto – die Abfrage bei der Anmeldung entfällt. | M | 1 |
-| B-05 | **Protokoll**: wer hat wann wen eingeteilt, ausgetragen, zusammengeführt, gelöscht. | S | 1 |
+| B-01 | **Persönliche Konten** statt eines gemeinsamen Passworts – für alle drei Bereiche, also in `kern`. | M | 3 |
+| B-02 | Rollen: *Admin*, *Orga*, *Bereichsleitung* (nur ihre Bereiche), *Lesend*. | M | 3 |
+| B-03 | Einladen per Mail; der Eingeladene setzt sein Passwort selbst. Optional Passkey. | M | 3 |
+| B-04 | Das Kürzel ergibt sich aus dem Konto – die Abfrage bei der Anmeldung entfällt. | M | 3 |
+| B-05 | **Protokoll**: wer hat wann wen eingeteilt, ausgetragen, zusammengeführt, gelöscht. | S | 2 |
 | B-06 | Eine Bereichsleitung kann für ihren Bereich einen Hilferuf auslösen (C-*). | S | 3 |
 
 ### 5.12 Datenschutz und Recht (D)
@@ -613,33 +613,36 @@ nimmt Reserve, Warteliste, Absage und Check-in mit auf.
 
 Aufwände wie in den anderen Plänen: reine Bauzeit, grob geschätzt.
 
-### Phase 0 – Klären und ausprobieren (bis Ende November 2026)
+### Phase 0 – Klären und ausprobieren (bis Ende Oktober 2026)
 
 | # | Schritt | Aufwand |
 | --- | --- | --- |
 | 0.1 | Die restlichen offenen Fragen aus Abschnitt 11 entscheiden | Orga |
 | 0.2 | **Klickbarer Prototyp** der Anmeldung (Assistent und Liste, fünf Bildschirme, statisches HTML) | 4 h |
 | 0.3 | Prototyp mit **3–5 Helfern testen, die nicht IT-affin sind** – ihnen das Handy in die Hand geben und zuschauen | Orga, 2 h |
-| 0.4 | Bereiche, Schichten und Belohnungsstufen 2027 grob festlegen | Orga |
+| 0.4 | Bereiche, Schichten und Belohnungsstufen 2027 festlegen – bis Ende November, denn zur Öffnung stehen sie in der Anmeldung | Orga |
 
 Der Test in 0.3 ist der wichtigste Schritt des ganzen Plans. Er kostet einen
 Abend und zeigt, ob Liste und Assistent tragen – bevor eine Zeile davon
 gebaut ist.
 
-### Phase 1 – Fundament
+### Phase 1 – Fundament (Ende Oktober bis Anfang November 2026)
 
 | # | Schritt | Aufwand |
 | --- | --- | --- |
 | 1.1 | PostgreSQL im Container, Verbindung, Migrationen, frische Testdatenbank je Lauf | 6 h |
 | 1.2 | Veranstaltungen als eigene Größe; Helferbereich auf PostgreSQL samt Datenübernahme | 10 h |
-| 1.3 | Persönliche Backoffice-Konten mit Rollen, Einladen, Protokoll – für alle drei Bereiche | 10 h |
-| 1.4 | Mailversand nach `kern` ziehen; **DKIM für die Absenderdomain fertigstellen** | 4 h |
+| 1.3 | Mailversand nach `kern` ziehen; **DKIM für die Absenderdomain fertigstellen** | 4 h |
 
-1.4 ist kein Nebenschauplatz: ohne verlässliche Zustellung landet der
+1.3 ist kein Nebenschauplatz: ohne verlässliche Zustellung landet der
 Bestätigungslink im Spam, und die ganze Anmeldung hängt daran. In der
 Kennzeichen-README steht DKIM noch als offen.
 
-### Phase 2 – Öffnung
+Die **persönlichen Backoffice-Konten** kommen erst nach der Öffnung (3.7).
+Bis dahin trägt das gemeinsame Passwort mit Kürzel wie heute; das spart vor
+dem Dezember rund neun Stunden.
+
+### Phase 2 – Öffnung (November bis Mitte Dezember 2026)
 
 So schmal, dass die Anmeldung früh öffnen kann – aber mit allem, was die
 Daten sauber hält: Pflichtfelder, Konfliktsperre, Bestätigung,
@@ -651,7 +654,7 @@ Selbstbedienung.
 | 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten | 9 h |
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | 3 h |
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 7 h |
-| 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; Meldung kurzfristiger Absagen | 7 h |
+| 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; Meldung kurzfristiger Absagen; Protokoll | 8 h |
 | 2.6 | „Noch eine Schicht?" nach dem Eintragen, Tagesbalken auf der Startseite | 3 h |
 | 2.7 | Dashboard und Monitor: Stufen statt Bedarf, Reserve, Springer, kurzfristige Absagen | 4 h |
 | 2.8 | Druckansichten und Notfallmappe | 3 h |
@@ -661,20 +664,21 @@ Selbstbedienung.
 **Meilenstein:** Anmeldung öffnet. Ab hier wird nur noch ergänzt, nichts
 Bestehendes umgebaut.
 
-**Wann das ist**, hängt an der Bauzeit pro Woche. Die AA 2027 ist vom
-1. bis 4. Juli, der Aufbau beginnt Ende Juni – Stillstand also ab Mitte Juni.
-Phase 1 und 2 sind rund 79 Stunden, Phase 3 und 4 rund 51.
+**Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
+für Prototyp, Phase 1 und 2 – rund 74 Stunden.
 
-| Öffnung | bis dahin, ab Dezember | danach bis Mitte Juni |
-| --- | --- | --- |
-| Anfang März 2027 | ~7 h pro Woche | ~3,5 h pro Woche |
-| Anfang April 2027 | ~5 h pro Woche | ~5 h pro Woche |
+| Öffnung | Bauzeit pro Woche ab 12. Oktober |
+| --- | --- |
+| Anfang Dezember 2026 | ~10 h |
+| **Mitte Dezember 2026** | **~8 h** |
+| Rückfallebene: Anfang März 2027 | ~4 h |
 
-Gerechnet ab 1. Dezember, mit zwei Wochen um Weihnachten ohne Bauzeit.
-**Empfehlung: Anfang März.** Dann bleiben knapp vier Monate zum Anmelden,
-und die Hilferufe aus Phase 3 stehen, bevor es eng wird.
+Danach entspannt es sich: Phase 3 und 4 sind rund 60 Stunden, von Januar bis
+Ende April etwa 3,5 Stunden pro Woche – mit sechs Wochen Puffer bis zum
+Stillstand Mitte Juni. Und die Helfer haben über sechs Monate Zeit, sich bis
+zur AA am 1.–4. Juli anzumelden.
 
-### Phase 3 – Assistent und Helferstamm (nach der Öffnung, bis Anfang Mai 2027)
+### Phase 3 – Assistent, Helferstamm, Backoffice-Konten (Januar bis Ende Februar 2027)
 
 Der Assistent kommt bewusst erst nach der Öffnung. Annahme dahinter: in den
 ersten Wochen melden sich vor allem die, die schon wissen, was sie wollen –
@@ -690,8 +694,9 @@ Phase Vorrang.
 | 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | 5 h |
 | 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | 3 h |
 | 3.6 | Warteliste mit Nachrücken | 3 h |
+| 3.7 | Persönliche Backoffice-Konten mit Rollen und Einladen – für alle drei Bereiche | 9 h |
 
-### Phase 4 – Veranstaltungstag und Anerkennung (bis Mitte Juni 2027)
+### Phase 4 – Veranstaltungstag und Anerkennung (März bis Ende April 2027)
 
 | # | Schritt | Aufwand |
 | --- | --- | --- |
@@ -711,9 +716,9 @@ Fehler beheben, nichts Neues.
 
 | Phase | Aufwand |
 | --- | --- |
-| 1 Fundament | ~30 h |
-| 2 Öffnung | ~49 h |
-| 3 Assistent, Helferstamm | ~30 h |
+| 1 Fundament | ~20 h |
+| 2 Öffnung | ~50 h |
+| 3 Assistent, Helferstamm, Backoffice-Konten | ~39 h |
 | 4 Veranstaltungstag, Anerkennung | ~21 h |
 | **gesamt** | **~130 h** |
 
@@ -732,12 +737,12 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
 | Risiko | Gegenmittel |
 | --- | --- |
 | Ältere Helfer kommen mit der Anmeldung nicht zurecht | Test in 0.3; Telefonnummer der Orga auf jeder Seite; Orga kann im Backoffice für jemanden anmelden |
-| Bestätigungsmails landen im Spam | DKIM vor dem Start (1.4), Absender ist ein echtes Postfach, Testmails an die großen Anbieter |
+| Bestätigungsmails landen im Spam | DKIM vor dem Start (1.3), Absender ist ein echtes Postfach, Testmails an die großen Anbieter |
 | Server fällt am Veranstaltungstag aus | Notfallmappe (L-03) am Vorabend drucken; Wiederherstellung geübt |
 | Ein Entwickler, viel Wissen | Dokumentation wie bisher, Tests, einfache Technik |
 | Umfang wächst während des Baus | Ideenspeicher (Abschnitt 6) statt Sofortumsetzung; Phase 4 ist verschiebbar |
 | Spam-Anmeldungen | Bestätigungslink, Rate Limit, Honeypot |
-| Die AA liegt zwei Monate früher als 2026, der Plan ist eng | Öffnung Anfang März als Ziel (Abschnitt 9); Phase 4 außer dem Selbst-Check-in notfalls nach der AA |
+| Das Dezember-Ziel ist ehrgeizig: rund 8 Stunden Bauzeit pro Woche ab sofort | Backoffice-Konten erst nach der Öffnung; Rückfallebene Anfang März, dann reichen rund 4 Stunden pro Woche (Abschnitt 9) |
 | Die Öffnung verzögert sich | Phase 2 ist bewusst schmal, der Assistent kommt danach. Notfalls läuft eine Veranstaltung noch einmal über helferliste.online – der Abruf ist ja noch da |
 | Jemand bemerkt seine Einsatzgrenze und fühlt sich ausgegrenzt | K-06: dieselbe neutrale Antwort wie bei jeder nicht buchbaren Schicht; nichts auf Monitor, Ausdrucken, in Mails |
 | Kurzfristige Absagen am Veranstaltungstag gehen unter | S-07: oben im Dashboard und auf dem Monitor, mit den Springern, die einspringen könnten |
@@ -750,8 +755,9 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
 
 - **Selbst bauen**, nicht Engelsystem oder Helfertool einsetzen (7.1).
 - **PostgreSQL** (7.3).
-- **Öffnung so früh wie möglich**, für die AA 2027 und für andere
-  Veranstaltungen des ILRC, die Helfer brauchen (Abschnitt 9).
+- **Die Anmeldung öffnet im Dezember 2026**, geplant auf Mitte Dezember –
+  für die AA 2027 und für andere Veranstaltungen des ILRC, die Helfer
+  brauchen (Abschnitt 9).
 - **Mindestalter 12**, für Shuttle-Fahrer 18 (D-06, D-07).
 - **Ausschank**: bei der AA bisher nicht, bei anderen Veranstaltungen schon
   (Bier und Radler beim XCO) – Vorgabe ab 18 (D-07).
@@ -778,9 +784,10 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
 
 Frage 1 bestimmt den Zeitplan, die übrigen lassen sich nebenher klären.
 
-1. **Wie viel Bauzeit pro Woche ist realistisch – und bis wann muss die
-   Anmeldung spätestens öffnen?** Anfang März braucht ab Dezember rund
-   7 Stunden pro Woche, Anfang April rund 5 (Abschnitt 9).
+1. **Sind rund 8 Stunden Bauzeit pro Woche bis Mitte Dezember realistisch?**
+   Wenn nicht: hat der Termin Vorrang – dann wird Phase 2 weiter
+   geschnitten – oder der Umfang – dann öffnet die Anmeldung Anfang März
+   (Abschnitt 9).
 2. Sind die **Personendaten 2026 auf dem Server** gelöscht (Abschnitt 8)?
 3. **Wer betreut die WhatsApp-Community** – und gibt es eine Vereinsnummer?
    Sollen die zwei bestehenden Gruppen darin aufgehen?
