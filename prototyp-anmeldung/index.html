@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Mithelfen – Absolute Abfahrt 2027 (Prototyp)</title>
+<!--
+  Klickbarer Prototyp der Helferanmeldung – Schritt 0.2 im Lastenheft
+  (docs/lastenheft-helferanmeldung.md). Zum Ausprobieren mit Helfern, die
+  nicht IT-affin sind (Schritt 0.3, siehe testleitfaden.md daneben).
+
+  Eine Datei, keine Abhängigkeiten, nichts geht ins Netz: einfach im Browser
+  öffnen oder aufs Handy schicken. Alles bleibt im Speicher dieses Tabs.
+  Die Schichten sind Beispieldaten auf die Tage der AA 2027.
+
+  Bewusst NICHT wie das echte Werkzeug gebaut: hier steuert JavaScript alles,
+  das echte soll im Kernweg ohne auskommen (N-04). Es geht um die
+  Bedienung, nicht um die Technik.
+-->
+<style>
+/* Ruhiges Schieferblau statt des hellen Formular-Blaus: es trägt Knöpfe
+   und Auswahl, Überschriften bleiben in Textfarbe. */
+:root {
+  --grund: #ffffff;
+  --flaeche: #f4f5f7;
+  --rand: #d6d9de;
+  --text: #1c1f23;
+  --gedaempft: #5b6169;
+  --akzent: #3a5a74;
+  --akzent-hell: #edf1f5;
+  --dringend: #b3261e;
+  --dringend-hell: #fdecea;
+  --ok: #1a7f37;
+  --ok-hell: #e6f4ea;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grund: #16181c;
+    --flaeche: #1f2227;
+    --rand: #343a42;
+    --text: #e8eaed;
+    --gedaempft: #a2a9b3;
+    --akzent: #9db6cb;
+    --akzent-hell: #232d36;
+    --dringend: #ff8f86;
+    --dringend-hell: #3a1f1d;
+    --ok: #6fcf8b;
+    --ok-hell: #17301f;
+  }
+}
+* { box-sizing: border-box; }
+html { font-size: 17px; }
+body {
+  margin: 0;
+  background: var(--flaeche);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+.prototyp {
+  background: #fff4ce;
+  color: #4d3800;
+  font-size: .82rem;
+  padding: .45rem 1rem;
+  text-align: center;
+}
+.prototyp a { color: inherit; font-weight: 600; }
+.huelle { max-width: 34rem; margin: 0 auto; padding: 1rem 1rem 3rem; }
+.kopf { margin: .5rem 0 1rem; }
+.veranstaltung {
+  margin: 0;
+  font-size: .78rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--gedaempft);
+}
+h1 { font-size: 1.45rem; line-height: 1.25; margin: .2rem 0 0; }
+h2 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; }
+p { margin: .5rem 0; }
+.leise { color: var(--gedaempft); font-size: .9rem; }
+.karte {
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 12px;
+  padding: 1rem;
+  margin: .75rem 0;
+}
+.knopf {
+  display: block;
+  width: 100%;
+  min-height: 3.2rem;
+  margin: .6rem 0;
+  padding: .7rem 1rem;
+  border: 2px solid var(--akzent);
+  border-radius: 12px;
+  background: var(--akzent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.knopf.zweit { background: var(--grund); color: var(--text); border-color: var(--rand); }
+.knopf.klein {
+  display: inline-block;
+  width: auto;
+  min-height: 2.6rem;
+  padding: .4rem .9rem;
+  margin: .3rem .4rem .3rem 0;
+  font-size: .92rem;
+}
+.knopf.warnung { border-color: var(--dringend); background: var(--grund); color: var(--dringend); }
+.knopf:disabled { opacity: .45; cursor: not-allowed; }
+.weg {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--grund);
+  border: 2px solid var(--rand);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  margin: .75rem 0;
+}
+.weg strong { display: block; font-size: 1.1rem; }
+.weg strong::after { content: " ›"; color: var(--gedaempft); }
+.weg span { color: var(--gedaempft); font-size: .92rem; }
+.zurueck {
+  display: inline-block;
+  margin: .25rem 0 0;
+  color: var(--gedaempft);
+  text-decoration: none;
+  font-size: .95rem;
+}
+a { color: var(--text); }
+.balken { margin: .4rem 0; }
+.balken-kopf { display: flex; justify-content: space-between; font-size: .9rem; }
+.balken-bahn { height: .7rem; border-radius: 99px; background: var(--rand); overflow: hidden; }
+.balken-fuellung { height: 100%; background: var(--ok); }
+.tag { margin: .2rem 0 .7rem; }
+.tagname { font-size: .92rem; margin-bottom: .25rem; }
+.drei { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; }
+.wahl {
+  width: 100%;
+  min-height: 2.9rem;
+  border: 2px solid var(--rand);
+  border-radius: 10px;
+  background: var(--grund);
+  color: var(--text);
+  font: inherit;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.wahl[aria-pressed="true"] { border-color: var(--akzent); background: var(--akzent-hell); font-weight: 600; }
+.wahl .name { display: block; font-size: .9rem; }
+.wahl .spanne { display: block; font-size: .76rem; color: var(--gedaempft); font-weight: 400; }
+.anreiz { display: flex; align-items: center; gap: .6rem; font-size: .9rem; margin: 0 0 .1rem; }
+.mini { display: inline-flex; gap: .2rem; }
+.mini i {
+  width: .9rem; height: .9rem; border-radius: 50%;
+  border: 2px dashed var(--rand);
+}
+.mini i.voll { border: 2px solid var(--ok); background: var(--ok); }
+fieldset { border: 0; padding: 0; margin: .9rem 0 0; }
+legend { font-weight: 600; padding: 0; margin-bottom: .25rem; }
+.knopfwahl { display: flex; gap: .5rem; }
+.knopfwahl label {
+  flex: 1;
+  margin: 0;
+  font-weight: 400;
+  border: 2px solid var(--rand);
+  border-radius: 10px;
+  padding: .6rem .8rem;
+  background: var(--grund);
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+  cursor: pointer;
+}
+.knopfwahl input { width: 1.2rem; height: 1.2rem; }
+.vorliebe { text-align: left; padding: .7rem 1rem; margin: .4rem 0; display: block; }
+.schicht { position: relative; }
+.schicht h3 { margin: 0; font-size: 1rem; }
+.schicht .zeit { font-weight: 600; }
+.schicht .ort { color: var(--gedaempft); font-size: .9rem; }
+.marke {
+  display: inline-block;
+  font-size: .8rem;
+  font-weight: 600;
+  border-radius: 99px;
+  padding: .1rem .55rem;
+  margin: .35rem .3rem 0 0;
+}
+.marke.dringend { background: var(--dringend-hell); color: var(--dringend); }
+.marke.frei { background: var(--ok-hell); color: var(--ok); }
+.marke.reserve { background: var(--akzent-hell); color: var(--akzent); }
+.marke.voll { background: var(--flaeche); color: var(--gedaempft); border: 1px solid var(--rand); }
+.schicht.gewaehlt { border: 2px solid var(--akzent); background: var(--akzent-hell); }
+.schicht.gesperrt { opacity: .55; }
+.grund { font-size: .85rem; color: var(--gedaempft); margin-top: .35rem; }
+.filter { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .3rem; }
+.filter button {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  border: 2px solid var(--rand);
+  border-radius: 99px;
+  background: var(--grund);
+  color: var(--text);
+  font: inherit;
+  font-size: .9rem;
+  padding: .2rem .9rem;
+  cursor: pointer;
+}
+.filter button[aria-pressed="true"] { border-color: var(--akzent); background: var(--akzent-hell); font-weight: 600; }
+.leiste {
+  position: sticky;
+  bottom: 0;
+  background: var(--flaeche);
+  padding: .5rem 0 .75rem;
+  border-top: 1px solid var(--rand);
+}
+label { display: block; font-weight: 600; margin: .9rem 0 .25rem; }
+label .leise { font-weight: 400; }
+input[type="text"], input[type="email"], input[type="tel"], input[type="date"], select, textarea {
+  width: 100%;
+  min-height: 3rem;
+  padding: .55rem .7rem;
+  border: 2px solid var(--rand);
+  border-radius: 10px;
+  background: var(--grund);
+  color: var(--text);
+  font: inherit;
+}
+.zeile { display: flex; gap: .6rem; }
+.zeile > div { flex: 1; }
+.haken { display: flex; gap: .6rem; align-items: flex-start; font-weight: 400; }
+.haken input { width: 1.4rem; height: 1.4rem; margin-top: .15rem; flex: 0 0 auto; }
+.fehler { color: var(--dringend); font-size: .9rem; margin: .25rem 0 0; }
+.hinweis {
+  border-left: 4px solid var(--akzent);
+  background: var(--akzent-hell);
+  border-radius: 8px;
+  padding: .7rem .9rem;
+  margin: .75rem 0;
+}
+.hinweis.gut { border-left-color: var(--ok); background: var(--ok-hell); }
+.hinweis.warn { border-left-color: var(--dringend); background: var(--dringend-hell); }
+.stempel { display: flex; gap: .5rem; flex-wrap: wrap; margin: .5rem 0; }
+.stempel div {
+  width: 3.6rem;
+  height: 3.6rem;
+  border: 2px dashed var(--rand);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .72rem;
+  text-align: center;
+  line-height: 1.1;
+  color: var(--gedaempft);
+}
+.stempel div.voll { border: 2px solid var(--ok); background: var(--ok-hell); color: var(--ok); font-weight: 700; font-size: 1.3rem; }
+.person { border-top: 1px solid var(--rand); margin-top: 1rem; padding-top: .5rem; }
+.fuss { margin-top: 2rem; font-size: .88rem; color: var(--gedaempft); text-align: center; }
+.fuss a { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="prototyp">Prototyp zum Ausprobieren – nichts wird gespeichert oder verschickt. Beispieldaten. <a href="#start" data-aktion="neu">Von vorn</a></div>
+<main class="huelle" id="app"></main>
+<script>
+"use strict";
+
+// --- Beispieldaten ----------------------------------------------------------
+
+const VERANSTALTUNG = "Absolute Abfahrt 2027";
+
+const TAGE = [
+  { datum: "2027-06-29", name: "Dienstag", kurz: "Di 29.6.", art: "Aufbau" },
+  { datum: "2027-06-30", name: "Mittwoch", kurz: "Mi 30.6.", art: "Aufbau" },
+  { datum: "2027-07-01", name: "Donnerstag", kurz: "Do 1.7.", art: "Veranstaltung" },
+  { datum: "2027-07-02", name: "Freitag", kurz: "Fr 2.7.", art: "Veranstaltung" },
+  { datum: "2027-07-03", name: "Samstag", kurz: "Sa 3.7.", art: "Veranstaltung" },
+  { datum: "2027-07-04", name: "Sonntag", kurz: "So 4.7.", art: "Veranstaltung" },
+  { datum: "2027-07-05", name: "Montag", kurz: "Mo 5.7.", art: "Abbau" },
+];
+
+// Fenster in Minuten ab Mitternacht des Tages. Sie überlappen mit Absicht:
+// eine Schicht von 8 bis 14 Uhr soll auch zu „Früh“ allein passen.
+const TAGESZEITEN = [
+  { key: "frueh", name: "Vormittag", spanne: "bis 13 Uhr", fenster: [300, 780] },
+  { key: "mittag", name: "Nachmittag", spanne: "12 bis 18 Uhr", fenster: [720, 1080] },
+  { key: "abend", name: "Abend", spanne: "ab 17 Uhr", fenster: [1020, 1620] },
+];
+
+const BEREICHE = {
+  aufbau: { name: "Aufbau und Abbau", text: "Zelte, Zäune und Banner aufstellen und hinterher wieder abbauen. Draußen, im Team, mit anpacken.", treffpunkt: "Orgazelt", vorlieben: ["anpacken"] },
+  zeltplatz: { name: "Ordner Zeltplatz", text: "Auf dem Zeltplatz Ansprechpartner sein, Plätze zeigen und abends auf Ruhe achten.", treffpunkt: "Einfahrt Zeltplatz", vorlieben: ["menschen"] },
+  strecke: { name: "Streckenposten", text: "An der Strecke stehen, aufpassen, dass niemand über die Strecke läuft, und Stürze per Funk melden.", treffpunkt: "Orgazelt", vorlieben: ["strecke"] },
+  sperre: { name: "Straßensperre", text: "An der Zufahrt stehen und nur durchlassen, wer auf der Liste steht. Die Liste hast du auf dem Handy.", treffpunkt: "Straßensperre am Ortseingang", vorlieben: ["strecke", "menschen"] },
+  shuttle: { name: "Shuttle", text: "Fahrer und Gäste zwischen Parkplatz und Gelände fahren. Ab 18 Jahren und mit Führerschein.", treffpunkt: "Großer Parkplatz", vorlieben: ["fahren"], abAlter: 18 },
+  merch: { name: "Merchandise", text: "Shirts und Andenken verkaufen. Freundlich sein, Geld annehmen.", treffpunkt: "Merch-Stand am Zielbereich", vorlieben: ["menschen"] },
+  wiese: { name: "Absoluter Wiesenslalom", text: "Beim Spaßrennen für Kinder mithelfen: Start, Ziel und Tore.", treffpunkt: "Kinderwiese", vorlieben: ["menschen", "strecke"] },
+};
+
+const VORLIEBEN = [
+  { key: "strecke", name: "Draußen an der Strecke" },
+  { key: "menschen", name: "Mit Menschen" },
+  { key: "anpacken", name: "Anpacken – Auf- und Abbau" },
+  { key: "fahren", name: "Fahren – Shuttle, ab 18" },
+  { key: "egal", name: "Egal – setzt mich ein, wo es brennt" },
+];
+
+// id, Bereich, Tag, von, bis, Soll, Minimum, Reserve, schon belegt
+const SCHICHTEN = [
+  ["a1", "aufbau", "2027-06-29", "08:00", "14:00", 10, 6, 2, 4],
+  ["a2", "aufbau", "2027-06-30", "08:00", "14:00", 10, 6, 2, 7],
+  ["a3", "aufbau", "2027-06-30", "14:00", "20:00", 8, 5, 2, 8],
+  ["a4", "aufbau", "2027-07-05", "08:00", "14:00", 12, 8, 2, 3],
+  ["z1", "zeltplatz", "2027-07-01", "14:00", "20:00", 4, 3, 1, 4],
+  ["z2", "zeltplatz", "2027-07-02", "08:00", "14:00", 4, 3, 1, 2],
+  ["z3", "zeltplatz", "2027-07-02", "14:00", "20:00", 5, 3, 1, 5],
+  ["z4", "zeltplatz", "2027-07-02", "20:00", "02:00", 3, 2, 1, 1],
+  ["z5", "zeltplatz", "2027-07-03", "08:00", "14:00", 4, 3, 1, 3],
+  ["z6", "zeltplatz", "2027-07-03", "14:00", "20:00", 5, 3, 1, 6],
+  ["z7", "zeltplatz", "2027-07-03", "20:00", "02:00", 3, 2, 1, 0],
+  ["z8", "zeltplatz", "2027-07-04", "08:00", "14:00", 4, 3, 1, 2],
+  ["s1", "strecke", "2027-07-02", "08:00", "13:00", 12, 10, 2, 9],
+  ["s2", "strecke", "2027-07-03", "08:00", "13:00", 18, 15, 3, 16],
+  ["s3", "strecke", "2027-07-03", "13:00", "18:00", 18, 15, 3, 11],
+  ["s4", "strecke", "2027-07-04", "08:00", "13:00", 18, 15, 3, 18],
+  ["s5", "strecke", "2027-07-04", "13:00", "18:00", 18, 15, 3, 14],
+  ["p1", "sperre", "2027-07-02", "06:00", "12:00", 4, 3, 1, 4],
+  ["p2", "sperre", "2027-07-02", "12:00", "18:00", 4, 3, 1, 2],
+  ["p3", "sperre", "2027-07-03", "06:00", "12:00", 4, 3, 1, 3],
+  ["p4", "sperre", "2027-07-03", "12:00", "18:00", 4, 3, 1, 1],
+  ["p5", "sperre", "2027-07-04", "06:00", "12:00", 4, 3, 1, 4],
+  ["p6", "sperre", "2027-07-04", "12:00", "18:00", 4, 3, 1, 3],
+  ["f1", "shuttle", "2027-07-02", "07:00", "13:00", 3, 2, 1, 2],
+  ["f2", "shuttle", "2027-07-03", "07:00", "13:00", 3, 2, 1, 1],
+  ["f3", "shuttle", "2027-07-03", "13:00", "19:00", 3, 2, 1, 3],
+  ["f4", "shuttle", "2027-07-04", "07:00", "13:00", 3, 2, 1, 0],
+  ["m1", "merch", "2027-07-03", "10:00", "14:00", 2, 1, 1, 2],
+  ["m2", "merch", "2027-07-03", "14:00", "18:00", 2, 1, 1, 1],
+  ["m3", "merch", "2027-07-04", "10:00", "14:00", 2, 1, 1, 0],
+  ["w1", "wiese", "2027-07-03", "15:00", "18:00", 5, 3, 1, 2],
+].map(([id, bereich, tag, von, bis, soll, minimum, reserve, belegt]) =>
+  ({ id, bereich, tag, von, bis, soll, minimum, reserve, belegt }));
+
+// Belohnungen dieser Veranstaltung (G-02). Leer = keine Goodies (V-07).
+const STUFEN = [
+  { ab: 1, text: "Helfershirt" },
+  { ab: 2, text: "Bier am Bierwagen", abAlter: 16, alternative: "Eis" },
+];
+
+const ERSTER_TAG = "2027-07-01";
+const ORGA_TELEFON = "0123 456789";
+
+// --- Zustand ----------------------------------------------------------------
+
+const LEER = () => ({
+  auswahl: [],        // Schicht-ids
+  zeit: [],           // "datum|tageszeit"
+  vorlieben: [],
+  springer: [],       // "datum|tageszeit", wenn als Springer eingetragen
+  person: {},
+  weitere: [],
+  stamm: false,
+  whatsapp: false,    // Opt-in: in die WhatsApp-Helfergruppe einladen
+  bestaetigt: false,
+  abgemeldet: false,
+  geloescht: false,
+  meldung: "",
+  filterTag: "",
+  filterBereich: "",
+  offen: "",          // id der Schicht, deren Rückfrage gerade offen ist
+  umbuchen: "",       // id der Schicht, die umgebucht wird
+});
+
+let z = laden();
+
+function laden() {
+  try {
+    const roh = sessionStorage.getItem("prototyp-anmeldung");
+    if (roh) return Object.assign(LEER(), JSON.parse(roh));
+  } catch (e) { /* privater Modus o. Ä. – dann eben ohne */ }
+  return LEER();
+}
+
+function sichern() {
+  try { sessionStorage.setItem("prototyp-anmeldung", JSON.stringify(z)); } catch (e) { /* egal */ }
+}
+
+// --- Hilfen -----------------------------------------------------------------
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const tag = datum => TAGE.find(t => t.datum === datum);
+const schicht = id => SCHICHTEN.find(s => s.id === id);
+const minuten = hhmm => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+const uhr = hhmm => String(Number(hhmm.slice(0, 2)));
+
+function spanne(s) {
+  // Absolute Minuten ab dem ersten Tag; Nachtschichten enden am Folgetag.
+  const basis = TAGE.findIndex(t => t.datum === s.tag) * 1440;
+  const von = basis + minuten(s.von);
+  let bis = basis + minuten(s.bis);
+  if (bis <= von) bis += 1440;
+  return [von, bis];
+}
+
+function zeitText(s) {
+  const nacht = minuten(s.bis) <= minuten(s.von);
+  return `${tag(s.tag).kurz} · ${uhr(s.von)}–${uhr(s.bis)} Uhr${nacht ? " (Nacht)" : ""}`;
+}
+
+function stunden(s) {
+  const [von, bis] = spanne(s);
+  return (bis - von) / 60;
+}
+
+function lage(s) {
+  const frei = s.soll - s.belegt;
+  const reserveFrei = s.soll + s.reserve - s.belegt;
+  if (frei > 0) return { art: "frei", frei, dringend: s.belegt < s.minimum };
+  if (reserveFrei > 0) return { art: "reserve", frei: reserveFrei, dringend: false };
+  return { art: "voll", frei: 0, dringend: false };
+}
+
+function ueberschneidung(s, ohne) {
+  // Welche gewählte Schicht sich mit s überschneidet – ohne die, die gerade
+  // umgebucht wird (S-02).
+  const [a, b] = spanne(s);
+  return z.auswahl
+    .filter(id => id !== s.id && id !== ohne)
+    .map(schicht)
+    .find(t => { const [c, d] = spanne(t); return a < d && c < b; });
+}
+
+function alterVon(g) {
+  const [j, m, t] = g.split("-").map(Number);
+  const [ej, em, et] = ERSTER_TAG.split("-").map(Number);
+  let a = ej - j;
+  if (em < m || (em === m && et < t)) a -= 1;
+  return a;
+}
+
+// Das Geburtsdatum fragen wir nur bei Minderjährigen. Wer „18 oder älter“
+// sagt, gilt als volljährig – für alle Altersgrenzen genügt das.
+function alterDer(p) {
+  if (p.volljaehrig === "ja") return 99;
+  if (p.volljaehrig === "nein" && p.geburt) return alterVon(p.geburt);
+  return null;
+}
+
+function alter() {
+  return alterDer(z.person);
+}
+
+function stufeText(stufe) {
+  // Solange das Alter unbekannt ist, beides nennen: „Bier am Bierwagen oder Eis“.
+  if (!stufe.abAlter) return stufe.text;
+  const a = alter();
+  if (a === null) return `${stufe.text} oder ${stufe.alternative}`;
+  return a < stufe.abAlter ? stufe.alternative : stufe.text;
+}
+
+function stempelAnzahl() {
+  return z.auswahl.length + (z.springer.length ? 1 : 0);
+}
+
+function zuJung(s) {
+  const a = alter();
+  const grenze = BEREICHE[s.bereich].abAlter;
+  return grenze && a !== null && a < grenze;
+}
+
+function waehlbar(s, ohne) {
+  if (z.auswahl.includes(s.id)) return { ok: false, grund: "" };
+  const kollision = ueberschneidung(s, ohne);
+  if (kollision) return { ok: false, grund: `Überschneidet sich mit ${BEREICHE[kollision.bereich].name}, ${zeitText(kollision)}.` };
+  if (lage(s).art === "voll") return { ok: false, grund: "Voll – auch die Reserveplätze sind vergeben." };
+  if (zuJung(s)) return { ok: false, grund: `Erst ab ${BEREICHE[s.bereich].abAlter} Jahren.` };
+  return { ok: true, grund: "" };
+}
+
+function passtZurZeit(s) {
+  // Mindestens drei Viertel der Schicht liegen in angetippten Zeiten. Eine
+  // Nachtschicht gehört zum Abend ihres ersten Tages.
+  const basis = TAGE.findIndex(t => t.datum === s.tag) * 1440;
+  const fenster = TAGESZEITEN
+    .filter(tz => z.zeit.includes(`${s.tag}|${tz.key}`))
+    .map(tz => [basis + tz.fenster[0], basis + tz.fenster[1]])
+    .sort((a, b) => a[0] - b[0]);
+  const vereint = [];
+  fenster.forEach(f => {
+    const letztes = vereint[vereint.length - 1];
+    if (letztes && f[0] <= letztes[1]) letztes[1] = Math.max(letztes[1], f[1]);
+    else vereint.push(f.slice());
+  });
+  const [von, bis] = spanne(s);
+  const drin = vereint.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, bis) - Math.max(a, von)), 0);
+  return drin >= 0.75 * (bis - von);
+}
+
+function passtZuVorlieben(s) {
+  if (!z.vorlieben.length || z.vorlieben.includes("egal")) return true;
+  return BEREICHE[s.bereich].vorlieben.some(v => z.vorlieben.includes(v));
+}
+
+function dringlichkeit(s) {
+  const l = lage(s);
+  if (l.dringend) return 0;
+  if (l.art === "frei") return 1;
+  return 2;
+}
+
+function vorschlaege() {
+  return SCHICHTEN
+    .filter(s => passtZurZeit(s) && passtZuVorlieben(s))
+    .filter(s => waehlbar(s).ok || z.auswahl.includes(s.id))
+    .sort((a, b) => dringlichkeit(a) - dringlichkeit(b) || spanne(a)[0] - spanne(b)[0]);
+}
+
+function nochEine() {
+  // G-03: am liebsten direkt davor oder danach am selben Ort, dann derselbe
+  // Tag, dann was dringend gebraucht wird.
+  const gewaehlt = z.auswahl.map(schicht);
+  const nah = s => gewaehlt.some(g => g.bereich === s.bereich && g.tag === s.tag &&
+    (g.bis === s.von || g.von === s.bis));
+  const gleicherTag = s => gewaehlt.some(g => g.tag === s.tag);
+  // Nichts vorschlagen, was den Tag über 10 Stunden bringt (K-03).
+  const amTag = s => gewaehlt.filter(g => g.tag === s.tag).reduce((n, g) => n + stunden(g), 0);
+  return SCHICHTEN
+    .filter(s => waehlbar(s).ok && amTag(s) + stunden(s) <= 10)
+    .sort((a, b) =>
+      (nah(b) - nah(a)) || (gleicherTag(b) - gleicherTag(a)) ||
+      (dringlichkeit(a) - dringlichkeit(b)) || (spanne(a)[0] - spanne(b)[0]))
+    .slice(0, 3);
+}
+
+function tagesbalken() {
+  return TAGE.filter(t => t.art === "Veranstaltung").map(t => {
+    const liste = SCHICHTEN.filter(s => s.tag === t.datum);
+    const soll = liste.reduce((n, s) => n + s.soll, 0);
+    const belegt = liste.reduce((n, s) => n + Math.min(s.belegt + (z.auswahl.includes(s.id) ? 1 : 0), s.soll), 0);
+    return { t, soll, belegt };
+  });
+}
+
+// --- Bausteine --------------------------------------------------------------
+
+function kopf(titel, zurueck) {
+  return `<div class="kopf">
+    ${zurueck ? `<a class="zurueck" href="${zurueck}">‹ Zurück</a>` : ""}
+    <p class="veranstaltung">${VERANSTALTUNG} · 1. bis 4. Juli</p>
+    <h1>${titel}</h1>
+  </div>`;
+}
+
+function fuss() {
+  return `<p class="fuss">Fragen? Ruf uns an: <a href="tel:${ORGA_TELEFON.replace(/ /g, "")}">${ORGA_TELEFON}</a></p>`;
+}
+
+function marken(s) {
+  const l = lage(s);
+  if (z.auswahl.includes(s.id)) {
+    return `<span class="marke frei">Du bist dabei${l.art === "reserve" ? " – als Reserve" : ""}</span>`;
+  }
+  let m = "";
+  if (l.dringend) m += `<span class="marke dringend">Dringend – Schicht-Retter gesucht</span>`;
+  if (l.art === "frei") m += `<span class="marke frei">noch ${l.frei} frei</span>`;
+  if (l.art === "reserve") m += `<span class="marke reserve">als Reserve</span>`;
+  if (l.art === "voll") m += `<span class="marke voll">voll</span>`;
+  if (BEREICHE[s.bereich].abAlter) m += `<span class="marke voll">ab ${BEREICHE[s.bereich].abAlter}</span>`;
+  return m;
+}
+
+function schichtKarte(s, opt = {}) {
+  const gewaehlt = z.auswahl.includes(s.id);
+  const w = waehlbar(s, opt.ohne);
+  const gesperrt = !gewaehlt && !w.ok;
+  const b = BEREICHE[s.bereich];
+  let knopf = "";
+  if (opt.knopf === "tauschen") {
+    knopf = `<button class="knopf klein" data-aktion="tauschen" data-id="${s.id}">Diese nehmen</button>`;
+  } else if (gewaehlt) {
+    knopf = `<button class="knopf klein zweit" data-aktion="abwaehlen" data-id="${s.id}">✓ Gewählt – abwählen</button>`;
+  } else if (w.ok) {
+    knopf = `<button class="knopf klein" data-aktion="waehlen" data-id="${s.id}">${lage(s).art === "reserve" ? "Als Reserve eintragen" : "Eintragen"}</button>`;
+  }
+  return `<div class="karte schicht${gewaehlt ? " gewaehlt" : ""}${gesperrt ? " gesperrt" : ""}">
+    <h3>${b.name}</h3>
+    <div class="zeit">${zeitText(s)}</div>
+    <div class="ort">Treffpunkt: ${b.treffpunkt}</div>
+    ${opt.mitText ? `<p class="leise">${b.text}</p>` : ""}
+    <div>${marken(s)}</div>
+    ${gesperrt && w.grund ? `<div class="grund">${w.grund}</div>` : ""}
+    ${knopf}
+  </div>`;
+}
+
+function stempelkarte() {
+  if (!STUFEN.length) return "";
+  const anzahl = stempelAnzahl();
+  // Ein freies Feld mehr, als schon gestempelt ist – mindestens bis zur
+  // letzten Belohnung.
+  const felder = Math.max(anzahl + 1, STUFEN[STUFEN.length - 1].ab);
+  let html = `<div class="stempel">`;
+  for (let i = 1; i <= felder; i++) {
+    const stufe = STUFEN.find(s => s.ab === i);
+    html += i <= anzahl ? `<div class="voll">✓</div>` : `<div>${stufe ? esc(stufeText(stufe)) : ""}</div>`;
+  }
+  html += `</div>`;
+  const sicher = STUFEN.filter(s => s.ab <= anzahl).map(stufeText);
+  if (sicher.length) html += `<p>Dir sicher: <strong>${sicher.map(esc).join(", ")}</strong>.</p>`;
+  const naechste = STUFEN.find(s => s.ab > anzahl);
+  if (naechste) {
+    const fehlt = naechste.ab - anzahl;
+    html += `<p>Noch <strong>${fehlt} ${fehlt === 1 ? "Schicht" : "Schichten"}</strong> bis: ${esc(stufeText(naechste))}.</p>`;
+  } else if (anzahl) {
+    html += `<p>Mehr Goodies gibt es nicht – jede weitere Schicht hilft trotzdem enorm. Danke!</p>`;
+  }
+  return html;
+}
+
+function anreiz() {
+  // Kleine Stempel schon beim Auswählen: zeigt, dass mehr Schichten mehr
+  // bringen, bevor überhaupt jemand die Stempelkarte gesehen hat (G-10).
+  if (!STUFEN.length) return "";
+  const anzahl = stempelAnzahl();
+  const felder = Math.max(anzahl + 1, STUFEN[STUFEN.length - 1].ab);
+  let mini = "";
+  for (let i = 1; i <= felder; i++) mini += `<i class="${i <= anzahl ? "voll" : ""}"></i>`;
+  const naechste = STUFEN.find(s => s.ab > anzahl);
+  const text = naechste
+    ? `Noch ${naechste.ab - anzahl === 1 ? "eine Schicht" : `${naechste.ab - anzahl} Schichten`} bis: ${esc(stufeText(naechste))}`
+    : "Stark – jede weitere Schicht hilft trotzdem enorm";
+  return `<div class="anreiz"><span class="mini">${mini}</span><span>${text}</span></div>`;
+}
+
+function leiste() {
+  const n = z.auswahl.length;
+  if (!n && !z.springer.length) return "";
+  const ziel = z.bestaetigt ? "#mein" : "#angaben";
+  const text = z.bestaetigt ? "Fertig – zu meinem Helferplatz"
+    : n ? `Weiter mit ${n} ${n === 1 ? "Schicht" : "Schichten"}` : "Weiter als Springer";
+  return `<div class="leiste">
+    ${anreiz()}
+    <a class="knopf" href="${ziel}">${text}</a>
+  </div>`;
+}
+
+// --- Seiten -----------------------------------------------------------------
+
+const SEITEN = {};
+
+SEITEN.start = () => {
+  const balken = tagesbalken().map(({ t, soll, belegt }) => `
+    <div class="balken">
+      <div class="balken-kopf"><span>${t.name}</span><span>${belegt} von ${soll} Plätzen besetzt</span></div>
+      <div class="balken-bahn"><div class="balken-fuellung" style="width:${Math.round(belegt / soll * 100)}%"></div></div>
+    </div>`).join("");
+  return `${kopf("Hilf mit bei der Absoluten Abfahrt!")}
+    <p>Ohne Helfer gibt es kein Rennen. Sei dabei – an der Strecke, am Zeltplatz, beim Auf- und Abbau. Schon eine Schicht hilft.</p>
+    <a class="weg" href="#zeit"><strong>Ich sage, wann ich Zeit habe</strong><span>Wir zeigen dir nur Schichten, die passen.</span></a>
+    <a class="weg" href="#liste"><strong>Ich suche mir Schichten aus</strong><span>Alle Schichten auf einen Blick.</span></a>
+    <div class="karte">
+      <div class="anreiz"><span class="mini"><i class="voll"></i><i class="voll"></i><i></i></span><strong>Jede Schicht ein Stempel</strong></div>
+      <p class="leise">Für jede Schicht bekommst du einen Stempel auf deine Stempelkarte – wer öfter mithilft, bekommt mehr Dankeschön. Und nach dem Rennen feiern wir zusammen.</p>
+    </div>
+    <h2>So weit sind wir</h2>
+    <div class="karte">${balken}</div>
+    <p class="leise">Schon angemeldet? Den Link zu deinem Helferplatz findest du in deiner Mail.
+      ${z.bestaetigt ? `<a href="#mein">Zu meinem Helferplatz</a>` : ""}</p>
+    ${fuss()}`;
+};
+
+SEITEN.zeit = () => {
+  // Je Tag eine Zeile mit drei breiten Knöpfen – in einer Tabelle mit
+  // Tagesspalte wurden die Knöpfe auf dem Handy zu schmal.
+  const gruppe = art => {
+    const tage = TAGE.filter(t => t.art === art);
+    return `<h2>${art === "Veranstaltung" ? "Rennwochenende" : art}</h2>` + tage.map(t => `
+      <div class="tag">
+        <div class="tagname">${t.name}, ${t.kurz.slice(3)}</div>
+        <div class="drei">
+        ${TAGESZEITEN.map(tz => {
+          const key = `${t.datum}|${tz.key}`;
+          const an = z.zeit.includes(key);
+          return `<button class="wahl" aria-pressed="${an}" data-aktion="zeit" data-key="${key}" aria-label="${t.name} ${tz.name}, ${tz.spanne}"><span class="name">${an ? "✓ " : ""}${tz.name}</span><span class="spanne">${tz.spanne}</span></button>`;
+        }).join("")}
+        </div>
+      </div>`).join("");
+  };
+  return `${kopf("Wann hast du Zeit?", "#start")}
+    <p>Tippe alle Zeiträume an, in denen du helfen könntest. Du kannst später immer noch auswählen.</p>
+    ${gruppe("Aufbau")}${gruppe("Veranstaltung")}${gruppe("Abbau")}
+    <button class="knopf" data-aktion="weiter-vorlieben" ${z.zeit.length ? "" : "disabled"}>Weiter</button>
+    ${z.zeit.length ? "" : `<p class="leise">Tippe mindestens ein Feld an.</p>`}
+    ${fuss()}`;
+};
+
+SEITEN.vorlieben = () => `${kopf("Was machst du gern?", "#zeit")}
+  <p>Wähle aus, was dir liegt – gern mehreres.</p>
+  ${VORLIEBEN.map(v => {
+    const an = z.vorlieben.includes(v.key);
+    return `<button class="wahl vorliebe" aria-pressed="${an}" data-aktion="vorliebe" data-key="${v.key}">${an ? "✓ " : ""}${v.name}</button>`;
+  }).join("")}
+  <button class="knopf" data-aktion="weiter-vorschlaege">Passende Schichten zeigen</button>
+  ${fuss()}`;
+
+SEITEN.vorschlaege = () => {
+  const liste = vorschlaege();
+  const springerZeit = z.zeit.map(k => {
+    const [d, tz] = k.split("|");
+    return `${tag(d).kurz} ${TAGESZEITEN.find(x => x.key === tz).name}`;
+  }).join(", ");
+  return `${kopf(liste.length ? "Das passt zu dir" : "Gerade passt nichts genau", "#vorlieben")}
+    ${liste.length ? `<p>Die Schichten, die am dringendsten gebraucht werden, stehen oben. Tippe auf „Eintragen“.</p>` : `<p>Zu deinen Zeiten ist gerade nichts frei, was dir liegt.</p>`}
+    ${liste.map(s => schichtKarte(s, { mitText: true })).join("")}
+    <div class="karte">
+      <h3>Lieber flexibel?</h3>
+      <p>Als <strong>Springer</strong> bist du zu deinen Zeiten da und hilfst, wo gerade jemand fehlt.</p>
+      <p class="leise">Deine Zeiten: ${esc(springerZeit)}</p>
+      ${z.springer.length
+        ? `<p class="hinweis gut">Du bist als Springer eingetragen.</p><button class="knopf klein zweit" data-aktion="kein-springer">Doch nicht als Springer</button>`
+        : `<button class="knopf klein zweit" data-aktion="springer">Als Springer eintragen</button>`}
+    </div>
+    <p><a href="#liste">Lieber alle Schichten sehen</a></p>
+    ${leiste()}
+    ${fuss()}`;
+};
+
+SEITEN.liste = () => {
+  const tage = TAGE.filter(t => !z.filterTag || t.datum === z.filterTag);
+  const filterTage = `<div class="filter">
+    <button data-aktion="filter-tag" data-key="" aria-pressed="${!z.filterTag}">Alle Tage</button>
+    ${TAGE.map(t => `<button data-aktion="filter-tag" data-key="${t.datum}" aria-pressed="${z.filterTag === t.datum}">${t.kurz}</button>`).join("")}
+  </div>`;
+  const filterBereiche = `<div class="filter">
+    <button data-aktion="filter-bereich" data-key="" aria-pressed="${!z.filterBereich}">Alle Bereiche</button>
+    ${Object.entries(BEREICHE).map(([k, b]) => `<button data-aktion="filter-bereich" data-key="${k}" aria-pressed="${z.filterBereich === k}">${b.name}</button>`).join("")}
+  </div>`;
+  const inhalt = tage.map(t => {
+    const liste = SCHICHTEN.filter(s => s.tag === t.datum && (!z.filterBereich || s.bereich === z.filterBereich));
+    if (!liste.length) return "";
+    return `<h2>${t.name}, ${t.kurz.slice(3)} <span class="leise">· ${t.art}</span></h2>` +
+      liste.map(s => schichtKarte(s)).join("");
+  }).join("");
+  return `${kopf("Alle Schichten", "#start")}
+    ${filterTage}${filterBereiche}
+    ${inhalt || `<p>Für diese Auswahl gibt es keine Schichten.</p>`}
+    ${leiste()}
+    ${fuss()}`;
+};
+
+function personFelder(p, praefix, mitKontakt) {
+  const a = alterDer(p);
+  const du = mitKontakt;
+  return `
+    <div class="zeile">
+      <div><label for="${praefix}vorname">Vorname</label><input type="text" id="${praefix}vorname" data-feld="vorname" value="${esc(p.vorname)}" autocomplete="given-name"></div>
+      <div><label for="${praefix}nachname">Nachname</label><input type="text" id="${praefix}nachname" data-feld="nachname" value="${esc(p.nachname)}" autocomplete="family-name"></div>
+    </div>
+    ${mitKontakt ? `
+      <label for="${praefix}email">E-Mail <span class="leise">– dahin schicken wir die Bestätigung</span></label>
+      <input type="email" id="${praefix}email" data-feld="email" value="${esc(p.email)}" autocomplete="email" inputmode="email">
+      <label for="${praefix}handy">Handy <span class="leise">– freiwillig, aber hilfreich, falls am Tag etwas ist</span></label>
+      <input type="tel" id="${praefix}handy" data-feld="handy" value="${esc(p.handy)}" autocomplete="tel" inputmode="tel">` : ""}
+    <fieldset>
+      <legend>${du ? "Bist du 18 oder älter?" : "Ist die Person 18 oder älter?"}</legend>
+      <div class="knopfwahl">
+        <label><input type="radio" name="${praefix}vj" data-feld="volljaehrig" value="ja" ${p.volljaehrig === "ja" ? "checked" : ""}> Ja</label>
+        <label><input type="radio" name="${praefix}vj" data-feld="volljaehrig" value="nein" ${p.volljaehrig === "nein" ? "checked" : ""}> Nein, jünger</label>
+      </div>
+    </fieldset>
+    ${p.volljaehrig === "nein" ? `
+      <label for="${praefix}geburt">Geburtsdatum <span class="leise">– für Helfer unter 18 brauchen wir es</span></label>
+      <input type="date" id="${praefix}geburt" data-feld="geburt" value="${esc(p.geburt)}" min="2000-01-01" max="2020-12-31">` : ""}
+    ${p.volljaehrig === "nein" && a !== null && a < 18 && a >= 12 ? `
+      <div class="hinweis">Weil ${du ? "du noch nicht 18 bist" : "diese Person noch nicht 18 ist"}, fragen wir die Eltern. Sie bekommen eine Mail zum Bestätigen.</div>
+      <label for="${praefix}eltern">Name eines Elternteils</label>
+      <input type="text" id="${praefix}eltern" data-feld="eltern" value="${esc(p.eltern)}">
+      <label for="${praefix}elternmail">E-Mail der Eltern</label>
+      <input type="email" id="${praefix}elternmail" data-feld="elternmail" value="${esc(p.elternmail)}" inputmode="email">` : ""}
+    ${STUFEN.length ? `
+      <label for="${praefix}shirt">T-Shirt</label>
+      <div class="zeile">
+        <div><select id="${praefix}schnitt" data-feld="schnitt" aria-label="Schnitt">
+          ${["", "Herren", "Damen"].map(o => `<option value="${o}" ${p.schnitt === o ? "selected" : ""}>${o || "Schnitt"}</option>`).join("")}
+        </select></div>
+        <div><select id="${praefix}shirt" data-feld="shirt">
+          ${["", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL", "kein Shirt"].map(o => `<option value="${o}" ${p.shirt === o ? "selected" : ""}>${o || "Größe"}</option>`).join("")}
+        </select></div>
+      </div>` : ""}
+    <label for="${praefix}essen">Essen</label>
+    <select id="${praefix}essen" data-feld="essen">
+      ${["", "mit Fleisch", "vegetarisch"].map(o => `<option value="${o}" ${p.essen === o ? "selected" : ""}>${o || "Bitte wählen"}</option>`).join("")}
+    </select>`;
+}
+
+SEITEN.angaben = () => {
+  const fehler = z.fehler || [];
+  return `${kopf(z.bestaetigt ? "Meine Angaben" : "Fast geschafft – wer bist du?", z.bestaetigt ? "#mein" : "#start")}
+    ${fehler.length ? `<div class="hinweis warn">${fehler.map(esc).join("<br>")}</div>` : ""}
+    <div class="karte" data-person="ich">${personFelder(z.person, "ich-", true)}</div>
+    ${z.weitere.map((p, i) => `
+      <div class="karte person" data-person="${i}">
+        <h3>Weitere Person ${i + 1}</h3>
+        <p class="leise">Kommt zu denselben Schichten mit. Du bleibst Ansprechpartner.</p>
+        ${personFelder(p, `p${i}-`, false)}
+        <button class="knopf klein warnung" data-aktion="person-weg" data-i="${i}">Diese Person entfernen</button>
+      </div>`).join("")}
+    ${z.bestaetigt ? "" : `<button class="knopf zweit" data-aktion="person-dazu">+ Weitere Person mitanmelden</button>`}
+    <label for="bemerkung">Noch etwas? <span class="leise">– freiwillig</span></label>
+    <textarea id="bemerkung" rows="2" data-feld-frei="bemerkung">${esc(z.person.bemerkung)}</textarea>
+    ${alter() !== null && alter() < 13 ? "" : `
+      <label class="haken"><input type="checkbox" id="whatsapp" ${z.whatsapp ? "checked" : ""}>
+        <span>Ladet mich in die WhatsApp-Helfergruppe ein. <span class="leise">Freiwillig. Dafür brauchen wir deine Handynummer. Dort gibt es Neuigkeiten und Hilferufe – alles Wichtige kommt trotzdem per Mail.</span></span></label>`}
+    ${z.bestaetigt ? "" : `
+      <label class="haken"><input type="checkbox" id="stamm" ${z.stamm ? "checked" : ""}>
+        <span>Ihr dürft mich für künftige Veranstaltungen ansprechen. <span class="leise">Freiwillig. Ohne Haken löschen wir deine Daten nach der Veranstaltung.</span></span></label>
+      <p class="leise">Wir nutzen deine Angaben nur, um die Helfer einzuteilen. <a href="#angaben" data-aktion="datenschutz">Mehr zum Datenschutz</a></p>`}
+    <button class="knopf" data-aktion="absenden">${z.bestaetigt ? "Speichern" : "Anmelden"}</button>
+    ${fuss()}`;
+};
+
+SEITEN.fertig = () => {
+  const vorschlag = nochEine();
+  return `${kopf("Danke! Jetzt noch die Mail")}
+    <div class="hinweis gut">Wir haben dir eine Mail an <strong>${esc(z.person.email)}</strong> geschickt.
+      Tippe dort auf „Ja, das bin ich“ – dann ist dein Platz fest.</div>
+    <button class="knopf zweit" data-aktion="mail-simulieren">So tun, als hätte ich in der Mail getippt</button>
+    ${z.whatsapp ? `<p class="leise">Die Einladung in die WhatsApp-Helfergruppe schicken wir dir an ${esc(z.person.handy)}.</p>` : ""}
+    <h2>Deine Stempelkarte</h2>
+    <div class="karte">${stempelkarte()}</div>
+    ${vorschlag.length ? `<h2>Noch eine Schicht?</h2>
+      <p>Diese passen gut zu dem, was du schon hast:</p>
+      ${vorschlag.map(s => schichtKarte(s)).join("")}` : ""}
+    ${fuss()}`;
+};
+
+SEITEN.mein = () => {
+  if (z.geloescht) {
+    return `${kopf("Deine Daten sind gelöscht")}
+      <p>Schade, dass du nicht dabei bist. Alles, was wir über dich wussten, ist weg.</p>
+      <a class="knopf zweit" href="#start" data-aktion="neu">Zur Startseite</a>${fuss()}`;
+  }
+  const eigene = z.auswahl.map(schicht).sort((a, b) => spanne(a)[0] - spanne(b)[0]);
+  const karten = eigene.map(s => {
+    const b = BEREICHE[s.bereich];
+    let unten = `
+      <button class="knopf klein zweit" data-aktion="umbuchen" data-id="${s.id}">Umbuchen</button>
+      <button class="knopf klein warnung" data-aktion="absagen-fragen" data-id="${s.id}">Absagen</button>`;
+    if (z.offen === s.id) {
+      unten = `<div class="hinweis">Wirklich absagen? Das ist völlig in Ordnung – wir finden dann jemand anderen.</div>
+        <button class="knopf klein warnung" data-aktion="absagen" data-id="${s.id}">Ja, absagen</button>
+        <button class="knopf klein zweit" data-aktion="nicht">Doch nicht</button>`;
+    }
+    if (z.umbuchen === s.id) {
+      const andere = SCHICHTEN.filter(x => x.id !== s.id && waehlbar(x, s.id).ok)
+        .sort((x, y) => ((y.tag === s.tag) - (x.tag === s.tag)) || ((y.bereich === s.bereich) - (x.bereich === s.bereich)) || (spanne(x)[0] - spanne(y)[0]))
+        .slice(0, 4);
+      unten = `<p><strong>Wohin möchtest du wechseln?</strong></p>
+        ${andere.map(x => schichtKarte(x, { knopf: "tauschen", ohne: s.id })).join("") || "<p>Gerade ist nichts Passendes frei.</p>"}
+        <button class="knopf klein zweit" data-aktion="nicht">Doch nicht umbuchen</button>`;
+    }
+    return `<div class="karte schicht">
+      <h3>${b.name}</h3>
+      <div class="zeit">${zeitText(s)}</div>
+      <div class="ort">Treffpunkt: ${b.treffpunkt} · bitte 15 Minuten vorher da sein</div>
+      <div class="ort">Ansprechpartner: Bereichsleitung ${b.name}, ${ORGA_TELEFON}</div>
+      ${lage(s).art === "reserve" ? `<span class="marke reserve">Du bist Reserve – danke!</span>` : ""}
+      <div>${unten}</div>
+    </div>`;
+  }).join("");
+  const springer = z.springer.length ? `<div class="karte"><h3>Springer</h3>
+      <p>Du hilfst, wo gerade jemand fehlt: ${esc(z.springer.map(k => { const [d, tz] = k.split("|"); return `${tag(d).kurz} ${TAGESZEITEN.find(x => x.key === tz).name}`; }).join(", "))}</p>
+      <button class="knopf klein warnung" data-aktion="kein-springer">Nicht mehr als Springer</button></div>` : "";
+  return `${kopf(`Hallo ${esc(z.person.vorname || "")}!`)}
+    ${z.meldung ? `<div class="hinweis gut">${z.meldung}</div>` : ""}
+    ${z.abgemeldet && !eigene.length && !z.springer.length ? `<p>Du bist für diese Veranstaltung abgemeldet. Wenn du doch Zeit hast: einfach wieder Schichten dazunehmen.</p>` : ""}
+    <h2>Deine Schichten</h2>
+    ${karten || springer ? karten + springer : `<p class="leise">Gerade keine.</p>`}
+    <a class="knopf" href="#liste">Weitere Schicht dazunehmen</a>
+    <h2>Deine Stempelkarte</h2>
+    <div class="karte">${stempelkarte()}</div>
+    <div class="karte">
+      <h3>WhatsApp-Helfergruppe</h3>
+      ${alter() !== null && alter() < 13
+        ? `<p class="leise">WhatsApp ist erst ab 13 erlaubt.</p>`
+        : z.whatsapp
+          ? `<p>Wir laden dich in die WhatsApp-Helfergruppe ein – die Einladung kommt an ${esc(z.person.handy)}.</p>
+             <button class="knopf klein zweit" data-aktion="whatsapp-aus">Doch nicht einladen</button>`
+          : `<p>Neuigkeiten und Hilferufe gibt es auch in unserer WhatsApp-Helfergruppe. Freiwillig – alles Wichtige kommt trotzdem per Mail.</p>
+             <button class="knopf klein zweit" data-aktion="whatsapp-an">Ja, ladet mich ein</button>`}
+    </div>
+    <div class="karte">
+      <h3>Kalender</h3>
+      <p class="leise">Deine Schichten im Kalender deines Handys – sie ändern sich mit, wenn du umbuchst.</p>
+      <a class="knopf klein zweit" href="#mein" data-aktion="kalender">In meinen Kalender</a>
+    </div>
+    <h2>Und sonst</h2>
+    <a class="knopf zweit" href="#angaben">Meine Angaben ändern</a>
+    ${z.offen === "alles" ? `<div class="hinweis">Von allen Schichten abmelden? Danke, dass du Bescheid sagst.</div>
+        <button class="knopf warnung" data-aktion="ganz-abmelden">Ja, ganz abmelden</button>
+        <button class="knopf zweit" data-aktion="nicht">Doch nicht</button>`
+      : `<button class="knopf zweit" data-aktion="ganz-fragen" ${eigene.length || z.springer.length ? "" : "disabled"}>Ganz abmelden</button>`}
+    ${z.offen === "loeschen" ? `<div class="hinweis warn">Alles löschen? Deine Schichten werden abgesagt, und wir vergessen dich. Das geht nicht rückgängig.</div>
+        <button class="knopf warnung" data-aktion="loeschen">Ja, alles löschen</button>
+        <button class="knopf zweit" data-aktion="nicht">Doch nicht</button>`
+      : `<button class="knopf warnung" data-aktion="loeschen-fragen">Alle meine Daten löschen</button>`}
+    ${fuss()}`;
+};
+
+// --- Prüfen beim Absenden ---------------------------------------------------
+
+function personLesen(karte) {
+  const p = {};
+  karte.querySelectorAll("[data-feld]").forEach(el => {
+    if (el.type === "radio") { if (el.checked) p[el.dataset.feld] = el.value; }
+    else p[el.dataset.feld] = el.value.trim();
+  });
+  // Volljährig: Geburtsdatum und Eltern gar nicht erst behalten.
+  if (p.volljaehrig === "ja") Object.assign(p, { geburt: "", eltern: "", elternmail: "" });
+  return p;
+}
+
+function pruefen() {
+  const f = [];
+  const wer = (p, ich) => ich ? "Du" : `${p.vorname || "Die weitere Person"}`;
+  const alle = [{ p: z.person, ich: true }].concat(z.weitere.map(p => ({ p, ich: false })));
+  alle.forEach(({ p, ich }) => {
+    if (!p.vorname || !p.nachname) f.push(ich ? "Bitte Vor- und Nachnamen angeben." : "Bitte für jede weitere Person Vor- und Nachnamen angeben.");
+    if (!p.volljaehrig) f.push(ich ? "Bitte sag uns, ob du 18 oder älter bist." : `Bitte angeben, ob ${wer(p, ich)} 18 oder älter ist.`);
+    if (p.volljaehrig === "nein" && !p.geburt) f.push(ich ? "Bitte dein Geburtsdatum angeben." : `Bitte das Geburtsdatum von ${wer(p, ich)} angeben.`);
+    const a = alterDer(p);
+    if (a !== null && a < 12) f.push(`${wer(p, ich)} ${ich ? "bist" : "ist"} leider noch zu jung – mithelfen geht ab 12 Jahren.`);
+    if (a !== null && a >= 12 && a < 18 && (!p.eltern || !/^\S+@\S+\.\S+$/.test(p.elternmail || ""))) f.push(`Bitte Namen und Mail eines Elternteils angeben${ich ? "" : ` (für ${wer(p, ich)})`}.`);
+    if (a !== null && a < 18 && z.auswahl.some(id => BEREICHE[schicht(id).bereich].abAlter)) f.push(`Shuttle geht erst ab 18. Bitte wähle dafür eine andere Schicht.`);
+  });
+  if (!/^\S+@\S+\.\S+$/.test(z.person.email || "")) f.push("Bitte eine E-Mail-Adresse angeben, an die wir die Bestätigung schicken können.");
+  if (z.whatsapp && !z.person.handy) f.push("Für die Einladung in die WhatsApp-Gruppe brauchen wir deine Handynummer.");
+  return [...new Set(f)];
+}
+
+// --- Aktionen ---------------------------------------------------------------
+
+function formularLesen() {
+  const ich = document.querySelector('[data-person="ich"]');
+  if (!ich) return;
+  z.person = Object.assign({}, z.person, personLesen(ich));
+  z.weitere = z.weitere.map((p, i) => {
+    const k = document.querySelector(`[data-person="${i}"]`);
+    return k ? Object.assign({}, p, personLesen(k)) : p;
+  });
+  const bem = $("#bemerkung");
+  if (bem) z.person.bemerkung = bem.value.trim();
+  const stamm = $("#stamm");
+  if (stamm) z.stamm = stamm.checked;
+  const whatsapp = $("#whatsapp");
+  if (whatsapp) z.whatsapp = whatsapp.checked;
+  if (alter() !== null && alter() < 13) z.whatsapp = false;   // WhatsApp erst ab 13
+}
+
+const AKTIONEN = {
+  neu: () => { z = LEER(); },
+  zeit: el => {
+    const k = el.dataset.key;
+    z.zeit = z.zeit.includes(k) ? z.zeit.filter(x => x !== k) : z.zeit.concat(k);
+  },
+  "weiter-vorlieben": () => { location.hash = "#vorlieben"; },
+  vorliebe: el => {
+    const k = el.dataset.key;
+    z.vorlieben = z.vorlieben.includes(k) ? z.vorlieben.filter(x => x !== k) : z.vorlieben.concat(k);
+  },
+  "weiter-vorschlaege": () => { location.hash = "#vorschlaege"; },
+  waehlen: el => {
+    const s = schicht(el.dataset.id);
+    if (waehlbar(s).ok) z.auswahl = z.auswahl.concat(s.id);
+    if (z.bestaetigt) z.meldung = `Eingetragen: ${BEREICHE[s.bereich].name}, ${zeitText(s)}.`;
+  },
+  abwaehlen: el => { z.auswahl = z.auswahl.filter(id => id !== el.dataset.id); },
+  springer: () => { z.springer = z.zeit.slice(); },
+  "kein-springer": () => { z.springer = []; },
+  "filter-tag": el => { z.filterTag = el.dataset.key; },
+  "filter-bereich": el => { z.filterBereich = el.dataset.key; },
+  "person-dazu": () => { formularLesen(); z.weitere = z.weitere.concat({}); },
+  "person-weg": el => { formularLesen(); z.weitere = z.weitere.filter((_, i) => i !== Number(el.dataset.i)); },
+  absenden: () => {
+    formularLesen();
+    if (!z.auswahl.length && !z.springer.length) { z.fehler = ["Du hast noch keine Schicht gewählt."]; return; }
+    z.fehler = pruefen();
+    if (z.fehler.length) { window.scrollTo(0, 0); return; }
+    if (z.bestaetigt) { z.meldung = "Deine Angaben sind gespeichert."; location.hash = "#mein"; return; }
+    location.hash = "#fertig";
+  },
+  datenschutz: () => { alert("Im echten Werkzeug steht hier der Datenschutzhinweis: wer wir sind, wofür wir deine Daten nutzen, wie lange und welche Rechte du hast."); },
+  "mail-simulieren": () => { z.bestaetigt = true; z.meldung = "Dein Platz ist fest. Schön, dass du dabei bist!"; location.hash = "#mein"; },
+  "absagen-fragen": el => { z.offen = el.dataset.id; z.umbuchen = ""; },
+  absagen: el => {
+    const s = schicht(el.dataset.id);
+    z.auswahl = z.auswahl.filter(id => id !== s.id);
+    z.offen = "";
+    z.meldung = `Abgesagt: ${BEREICHE[s.bereich].name}, ${zeitText(s)}. Danke, dass du Bescheid sagst – so können wir umplanen.`;
+  },
+  umbuchen: el => { z.umbuchen = el.dataset.id; z.offen = ""; },
+  tauschen: el => {
+    const neu = schicht(el.dataset.id);
+    const alt = schicht(z.umbuchen);
+    // Erst die neue nehmen, dann die alte freigeben (S-02).
+    if (waehlbar(neu, alt.id).ok) {
+      z.auswahl = z.auswahl.filter(id => id !== alt.id).concat(neu.id);
+      z.meldung = `Umgebucht: jetzt ${BEREICHE[neu.bereich].name}, ${zeitText(neu)} – statt ${BEREICHE[alt.bereich].name}, ${zeitText(alt)}.`;
+    }
+    z.umbuchen = "";
+  },
+  nicht: () => { z.offen = ""; z.umbuchen = ""; },
+  "ganz-fragen": () => { z.offen = "alles"; },
+  "ganz-abmelden": () => {
+    z.auswahl = []; z.springer = []; z.offen = ""; z.abgemeldet = true;
+    z.meldung = "Du bist abgemeldet. Danke, dass du Bescheid sagst!";
+  },
+  "loeschen-fragen": () => { z.offen = "loeschen"; },
+  loeschen: () => { const leer = LEER(); leer.geloescht = true; z = leer; },
+  "whatsapp-an": () => {
+    z.whatsapp = true;
+    if (z.person.handy) { z.meldung = "Gern – die Einladung in die WhatsApp-Helfergruppe kommt an deine Handynummer."; return; }
+    z.fehler = ["Für die Einladung in die WhatsApp-Gruppe brauchen wir deine Handynummer."];
+    location.hash = "#angaben";
+  },
+  "whatsapp-aus": () => { z.whatsapp = false; z.meldung = "Alles klar – keine Einladung in die WhatsApp-Gruppe."; },
+  kalender: () => { alert("Im echten Werkzeug wird hier dein Kalender-Abo eingerichtet – es aktualisiert sich, wenn du umbuchst."); },
+};
+
+document.addEventListener("click", ev => {
+  const el = ev.target.closest("[data-aktion]");
+  if (!el) return;
+  const aktion = AKTIONEN[el.dataset.aktion];
+  if (!aktion) return;
+  if (el.tagName === "BUTTON") ev.preventDefault();
+  aktion(el);
+  sichern();
+  zeigen();
+});
+
+document.addEventListener("change", ev => {
+  // Volljährig ja/nein und Geburtsdatum ändern, welche Felder gebraucht
+  // werden (Geburtsdatum, Eltern, WhatsApp erst ab 13).
+  if (ev.target.matches('[data-feld="geburt"], [data-feld="volljaehrig"]')) { formularLesen(); sichern(); zeigen(); }
+});
+
+// --- Anzeigen ---------------------------------------------------------------
+
+let letzteSeite = "";
+
+function zeigen() {
+  const seite = (location.hash || "#start").slice(1);
+  const bauen = SEITEN[seite] || SEITEN.start;
+  if (seite !== letzteSeite) {
+    // Meldungen gelten für die Seite, auf der sie entstanden sind.
+    if (letzteSeite === "mein" && seite !== "mein") z.meldung = "";
+    if (seite !== "angaben") z.fehler = [];
+    z.offen = ""; z.umbuchen = "";
+  }
+  $("#app").innerHTML = bauen();
+  if (seite !== letzteSeite) window.scrollTo(0, 0);
+  letzteSeite = seite;
+  sichern();
+}
+
+window.addEventListener("hashchange", zeigen);
+zeigen();
+</script>
+</body>
+</html>
