@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Backoffice-Navigation AA</title>
+</head>
+<body>
+<style>
+/* Layout: der Kopf des echten Backoffice, darunter drei Ebenen – Reiter (Bereich),
+   Gruppen (Ablauf), Punkte (Seiten) – und die Seite in derselben weißen Karte. */
+:root {
+  --grund: #ffffff;
+  --flaeche: #f4f5f7;
+  --rand: #d6d9de;
+  --text: #1c1f23;
+  --gedaempft: #5b6169;
+  --akzent: #1f6feb;
+  --akzent-zart: #e7effd;
+  --fehler: #b3261e;
+  --warn: #8a5a00;
+  --ok: #1a7f37;
+  --notiz: #fff7e0;
+  --notiz-rand: #c99a1e;
+  --leiste: #23272e;
+  --leiste-text: #eef0f3;
+  --schrift: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --grund: #16181c; --flaeche: #1f2227; --rand: #343a42; --text: #e8eaed;
+    --gedaempft: #a2a9b3; --akzent: #6aa4ff; --akzent-zart: #1c2a42; --fehler: #ff8f86;
+    --warn: #e3b341; --ok: #6fcf8b; --notiz: #2a2410; --notiz-rand: #a07c1c;
+    --leiste: #0e1013; --leiste-text: #e8eaed; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --grund: #16181c; --flaeche: #1f2227; --rand: #343a42; --text: #e8eaed;
+  --gedaempft: #a2a9b3; --akzent: #6aa4ff; --akzent-zart: #1c2a42; --fehler: #ff8f86;
+  --warn: #e3b341; --ok: #6fcf8b; --notiz: #2a2410; --notiz-rand: #a07c1c;
+  --leiste: #0e1013; --leiste-text: #e8eaed; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; padding-block: 0 3rem; padding-inline: 16px;
+  background: var(--flaeche); color: var(--text);
+  font-family: var(--schrift); font-size: 1rem; line-height: 1.5;
+}
+a { color: var(--akzent); }
+button { font: inherit; }
+:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
+
+/* --- Leiste des Entwurfs: gehört nicht zur App ------------------------------ */
+.entwurf {
+  margin-inline: -16px; padding: .55rem 16px; margin-bottom: 1.25rem;
+  background: var(--leiste); color: var(--leiste-text);
+  display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center;
+  font-size: .85rem;
+}
+.entwurf strong { letter-spacing: .04em; }
+.entwurf .rolle { display: inline-flex; gap: .25rem; align-items: center; }
+.entwurf .rolle button {
+  border: 1px solid #5b6169; background: transparent; color: var(--leiste-text);
+  border-radius: 999px; padding: .1rem .7rem; cursor: pointer; font-size: .82rem;
+}
+.entwurf .rolle button[aria-pressed="true"] { background: var(--leiste-text); color: var(--leiste); border-color: var(--leiste-text); }
+.entwurf .hinweis-leiste { opacity: .75; }
+
+/* --- Die App ------------------------------------------------------------------ */
+.huelle {
+  max-width: 64rem; margin: 0 auto; background: var(--grund);
+  border: 1px solid var(--rand); border-radius: 12px; padding: 1.5rem 1.75rem 2rem;
+}
+.kopf { display: flex; flex-wrap: wrap; gap: .75rem 1rem; align-items: flex-start; justify-content: space-between; }
+.marke { display: flex; gap: .8rem; align-items: center; min-width: 0; }
+.zeichen {
+  width: 44px; height: 44px; border-radius: 10px; flex: none;
+  display: grid; place-items: center; font-weight: 800; font-size: .8rem; letter-spacing: .04em;
+  background: var(--akzent-zart); color: var(--akzent); border: 1px solid var(--rand);
+}
+.ueber { margin: 0; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--gedaempft); display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+h1 { margin: .15rem 0 0; font-size: 1.45rem; line-height: 1.2; text-wrap: balance; }
+.wer { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.kuerzel { font-size: .78rem; font-weight: 700; border: 1px solid var(--rand); border-radius: 999px; padding: .1rem .5rem; color: var(--gedaempft); }
+.knopf-schlicht {
+  border: 1px solid var(--rand); background: var(--flaeche); color: var(--text);
+  border-radius: 8px; padding: .35rem .8rem; font-size: .9rem; cursor: pointer; text-decoration: none;
+}
+.knopf { border: 0; background: var(--akzent); color: #fff; border-radius: 8px; padding: .5rem 1rem; font-weight: 600; cursor: pointer; }
+
+/* Auswahl der Veranstaltung: steht im Kopf, weil sie für alles im Helferbereich gilt. */
+.va { position: relative; }
+.va summary {
+  list-style: none; cursor: pointer; display: inline-flex; gap: .3rem; align-items: center;
+  font-weight: 700; color: var(--akzent); text-transform: none; letter-spacing: 0; font-size: .9rem;
+  border: 1px solid var(--rand); border-radius: 999px; padding: .05rem .6rem; background: var(--grund);
+}
+.va summary::-webkit-details-marker { display: none; }
+.va summary::after { content: "▾"; font-size: .75rem; }
+.va .klappe {
+  position: absolute; z-index: 5; top: calc(100% + .35rem); left: 0; min-width: 16rem;
+  background: var(--grund); border: 1px solid var(--rand); border-radius: 10px; padding: .35rem;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .14); text-transform: none; letter-spacing: 0;
+}
+.va .klappe a { display: flex; justify-content: space-between; gap: .5rem; padding: .45rem .6rem; border-radius: 6px; color: var(--text); text-decoration: none; font-size: .92rem; }
+.va .klappe a:hover, .va .klappe a.gewaehlt { background: var(--akzent-zart); }
+.va .klappe .klein { color: var(--gedaempft); font-size: .8rem; }
+.va .klappe hr { border: 0; border-top: 1px solid var(--rand); margin: .3rem 0; }
+
+/* Ebene 1: Bereiche (wie heute) */
+.reiter { display: flex; gap: .35rem; margin-top: 1.2rem; overflow-x: auto; padding-bottom: .1rem; }
+.reiter a {
+  white-space: nowrap; text-decoration: none; color: var(--gedaempft); font-weight: 600;
+  padding: .4rem .95rem; border-radius: 999px;
+}
+.reiter a.hier { background: var(--akzent); color: #fff; }
+.reiter a:not(.hier):hover { background: var(--flaeche); color: var(--text); }
+
+/* Ebene 2: Gruppen nach dem Ablauf */
+.gruppen {
+  display: flex; gap: 1.4rem; margin-top: .9rem; border-bottom: 1px solid var(--rand);
+  overflow-x: auto; scrollbar-width: thin;
+}
+.gruppen a {
+  white-space: nowrap; text-decoration: none; color: var(--gedaempft); font-weight: 700;
+  padding: .45rem 0 .55rem; border-bottom: 3px solid transparent; margin-bottom: -1px;
+}
+.gruppen a.hier { color: var(--text); border-bottom-color: var(--akzent); }
+.gruppen a:hover { color: var(--text); }
+
+/* Ebene 3: Seiten der Gruppe */
+.punkte {
+  display: flex; gap: .3rem; padding: .5rem 0; overflow-x: auto; scrollbar-width: thin;
+}
+.punkte a {
+  white-space: nowrap; text-decoration: none; color: var(--text); font-size: .92rem;
+  padding: .3rem .75rem; border-radius: 8px; display: inline-flex; gap: .35rem; align-items: center;
+}
+.punkte a.hier { background: var(--akzent-zart); color: var(--akzent); font-weight: 700; }
+.punkte a:not(.hier):hover { background: var(--flaeche); }
+.punkte a.spaeter { color: var(--gedaempft); }
+.ab { font-size: .68rem; font-weight: 700; border: 1px dashed var(--gedaempft); border-radius: 999px; padding: 0 .35rem; color: var(--gedaempft); }
+
+main { margin-top: 1.1rem; min-width: 0; }
+.notiz {
+  background: var(--notiz); border: 1px dashed var(--notiz-rand); border-radius: 8px;
+  padding: .55rem .8rem; font-size: .88rem; margin-bottom: 1.1rem;
+}
+.notiz b { color: var(--warn); }
+.unterzeile { color: var(--gedaempft); margin: 0 0 1rem; }
+h2 { font-size: 1.05rem; margin: 1.4rem 0 .5rem; }
+
+.ansichten { display: inline-flex; border: 1px solid var(--rand); border-radius: 8px; overflow: hidden; margin-bottom: 1rem; }
+.ansichten button { border: 0; background: var(--grund); padding: .35rem .85rem; cursor: pointer; color: var(--text); font-size: .9rem; }
+.ansichten button + button { border-left: 1px solid var(--rand); }
+.ansichten button[aria-pressed="true"] { background: var(--akzent-zart); color: var(--akzent); font-weight: 700; }
+
+.zeilen { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: 1rem; }
+.tabelle { overflow-x: auto; border: 1px solid var(--rand); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th { text-align: left; font-size: .72rem; letter-spacing: .07em; text-transform: uppercase; color: var(--gedaempft); padding: .55rem .7rem; border-bottom: 1px solid var(--rand); white-space: nowrap; }
+td { padding: .55rem .7rem; border-top: 1px solid var(--rand); vertical-align: top; }
+tr:first-child td { border-top: 0; }
+.rechts { text-align: right; font-variant-numeric: tabular-nums; }
+.nowrap { white-space: nowrap; }
+.gedaempft { color: var(--gedaempft); }
+.marke-klein { font-size: .74rem; font-weight: 700; border: 1px solid var(--rand); border-radius: 999px; padding: 0 .45rem; white-space: nowrap; }
+.luecke { color: var(--fehler); border-color: var(--fehler); }
+.voll { color: var(--ok); border-color: var(--ok); }
+tr.klickbar { cursor: pointer; }
+tr.klickbar:hover td { background: var(--flaeche); }
+
+.kacheln { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .75rem; }
+.kachel { border: 1px solid var(--rand); border-radius: 10px; padding: .75rem .9rem; }
+.kachel .zahl { font-size: 1.7rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.kachel .was { color: var(--gedaempft); font-size: .85rem; }
+
+.leer {
+  border: 1px dashed var(--rand); border-radius: 10px; padding: 1.4rem; color: var(--gedaempft);
+}
+.leer strong { color: var(--text); }
+.formular { display: grid; gap: .75rem; max-width: 36rem; }
+.formular label { display: flex; gap: .55rem; align-items: flex-start; }
+.feld { display: grid; gap: .25rem; }
+.feld span { font-weight: 600; font-size: .92rem; }
+.feld input, .feld select { font: inherit; padding: .45rem .6rem; border: 1px solid var(--rand); border-radius: 8px; background: var(--grund); color: var(--text); }
+
+.band { display: grid; gap: .4rem; }
+.spur { position: relative; height: 2rem; border-radius: 6px; background: var(--flaeche); }
+.balken { position: absolute; top: .2rem; bottom: .2rem; border-radius: 5px; padding: 0 .4rem; font-size: .75rem; display: flex; align-items: center; overflow: hidden; white-space: nowrap; color: var(--text); border: 1px solid var(--rand); background: var(--grund); }
+.balken.programm { background: var(--akzent-zart); border-color: var(--akzent); }
+.skala { display: flex; justify-content: space-between; font-size: .72rem; color: var(--gedaempft); font-variant-numeric: tabular-nums; }
+
+.uebersicht-neu { max-width: 64rem; margin: 1.5rem auto 0; font-size: .92rem; }
+.uebersicht-neu details { background: var(--grund); border: 1px solid var(--rand); border-radius: 12px; padding: .9rem 1.2rem; }
+.uebersicht-neu summary { cursor: pointer; font-weight: 700; }
+.uebersicht-neu ul { margin: .6rem 0 0; padding-left: 1.2rem; }
+.uebersicht-neu li { margin-bottom: .3rem; }
+
+@media (max-width: 40rem) {
+  .huelle { padding: .9rem .9rem 1.5rem; border-radius: 10px; }
+  .wer .knopf-schlicht.lang { display: none; }
+  .reiter a { padding: .35rem .7rem; }
+  .gruppen { gap: .95rem; font-size: .95rem; }
+  .punkte a { padding: .3rem .6rem; }
+  /* Was nicht in die Zeile passt, läuft zur Seite weg; der Verlauf zeigt, dass
+     es dort weitergeht. */
+  .reiter, .gruppen, .punkte {
+    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, #000 88%, transparent);
+    padding-right: 1.5rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="entwurf" role="region" aria-label="Steuerung des Entwurfs">
+  <strong>KLICKENTWURF · NAVIGATION</strong>
+  <span class="rolle">Ansicht als
+    <button type="button" id="rolle-admin" aria-pressed="true">Admin</button>
+    <button type="button" id="rolle-bl" aria-pressed="false">Bereichsleitung</button>
+  </span>
+  <span class="hinweis-leiste">Inhalte sind Beispiele aus der Demo. Gelb gestrichelt: was sich gegenüber heute ändert.</span>
+</div>
+
+<div class="huelle">
+  <header class="kopf">
+    <div class="marke">
+      <div class="zeichen" aria-hidden="true">ILRC</div>
+      <div>
+        <p class="ueber"><span id="ueber-text">Backoffice</span><span id="va-platz"></span></p>
+        <h1 id="titel">Übersicht</h1>
+      </div>
+    </div>
+    <div class="wer">
+      <span class="kuerzel" id="kuerzel">KK</span>
+      <a class="knopf-schlicht" href="#konto" id="mein-konto">Mein Konto</a>
+      <button type="button" class="knopf-schlicht lang">Abmelden</button>
+    </div>
+  </header>
+
+  <nav class="reiter" id="reiter" aria-label="Bereiche"></nav>
+  <nav class="gruppen" id="gruppen" aria-label="Gruppen"></nav>
+  <nav class="punkte" id="punkte" aria-label="Seiten"></nav>
+
+  <main id="inhalt"></main>
+</div>
+
+<section class="uebersicht-neu">
+  <details>
+    <summary>Was sich gegenüber heute ändert</summary>
+    <ul>
+      <li><b>Die Veranstaltung ist der Ausgangspunkt.</b> Gewählt wird sie im Kopf, und sie gilt für alles. Die Reiter zeigen nur, was die gewählte Veranstaltung nutzt – beim XCO 2027 etwa nur Helfer.</li>
+      <li><b>Was eine Veranstaltung nutzt, legt sie selbst fest:</b> Kennzeichen, Presse, Helfer – drei Häkchen unter Verwaltung › Veranstaltungen › Allgemein.</li>
+      <li><b>Einrichten gehört zur Veranstaltung:</b> Goodies, Verpflegung, Import und Zeitplan-Abruf stehen unter Verwaltung › Veranstaltungen › Helfer, Material und Tablet unter … › Ausgabe – nicht mehr im Helferbereich.</li>
+      <li><b>Goodies mit klarem Schalter:</b> „keine Goodies“ oder „Goodies ausgeben“ – erst dann gibt es Shirt und Liste. Beim Shirt: ein Schnitt für alle oder Damen- und Herrenschnitt.</li>
+      <li><b>Materialausgabe als eigener Bereich:</b> ob es sie gibt, legt die Veranstaltung fest, und was ausgegeben wird auch – mit oder ohne Rückgabe, Unterschrift, Nummer oder Kennzeichen. Heute sind Funk und Schlüssel fest eingebaut und hängen am Helferbereich.</li>
+      <li><b>Drei Ebenen statt einer langen Leiste:</b> Bereich → Gruppe nach dem Ablauf (Übersicht, Planen, Leute, Vor Ort) → Seite.</li>
+      <li><b>Bereiche und Schichten an einer Stelle</b> (Planen), mit den Ansichten „Bereiche“, „Alle Schichten“ und „Nur Lücken“. Heute: Bereiche unter Einstellungen, Schichten in der Hauptleiste.</li>
+      <li><b>Shirts & Goodies</b> gibt der Helferbereich aus (Vor Ort), nur wenn die Veranstaltung Goodies hat. Heute steht die T-Shirt-Ausgabe in der Helferliste.</li>
+      <li><b>Verwaltung als eigener Reiter:</b> Veranstaltungen und Konten mit derselben Navigation wie alles andere.</li>
+      <li><b>Was noch kommt, hat schon seinen Platz</b> (gestrichelt, mit Schrittnummer): Anmeldungen, Warteliste, Check-in, Ausdrucke.</li>
+      <li><b>Bereichsleitung:</b> nur der Reiter Helfer, nur „Meine Bereiche“ und „Vor Ort“.</li>
+    </ul>
+  </details>
+</section>
+
+<script>
+(function () {
+  "use strict";
+
+  // --- Beispieldaten (aus der Demo, alles ausgedacht) ---------------------------
+  const MODULE = [
+    ["kennzeichen", "Kennzeichen", "Anträge auf Durchfahrt, Karten, Liste für die Straßensperre"],
+    ["presse", "Presse", "Akkreditierung, Abholliste, Bilder"],
+    ["helfer", "Helfer", "Bereiche, Schichten, Anmeldung, Shirts und Goodies"],
+    ["ausgabe", "Ausgabe", "Material gegen Unterschrift: Funkgeräte, Schlüssel, Westen …"]
+  ];
+  // Was ausgegeben wird, je Veranstaltung. rueckgabe/unterschrift: ja oder nein;
+  // erfasst: was zum Stück notiert wird.
+  const MATERIAL_AA = [
+    { name: "Funkgerät", rueckgabe: true, unterschrift: true, erfasst: "Gerätenummer" },
+    { name: "Headset", rueckgabe: true, unterschrift: false, erfasst: "" },
+    { name: "Schlüssel", rueckgabe: true, unterschrift: true, erfasst: "Kennzeichen" }
+  ];
+  const VERANSTALTUNGEN = [
+    { id: "aa27", kurz: "AA 2027", name: "Die absolute Abfahrt 2027", tage: "1.–4. Juli 2027", status: "in Planung",
+      module: ["kennzeichen", "presse", "helfer", "ausgabe"], goodies: true, schnitte: true,
+      material: MATERIAL_AA.map((m) => ({ ...m })) },
+    { id: "xco27", kurz: "XCO 2027", name: "Cross-Country 2027", tage: "15. Mai 2027", status: "angekündigt",
+      module: ["helfer", "ausgabe"], goodies: false, schnitte: false,
+      material: [{ name: "Warnweste", rueckgabe: true, unterschrift: false, erfasst: "" }] },
+    { id: "aa26", kurz: "AA 2026", name: "Die absolute Abfahrt 2026", tage: "28.–30. Aug. 2026", status: "archiviert",
+      module: ["kennzeichen", "presse", "helfer", "ausgabe"], goodies: true, schnitte: true,
+      material: MATERIAL_AA.map((m) => ({ ...m })) }
+  ];
+  const BEREICHE = [
+    { id: 1, name: "Orgabüro", intern: true, treff: "Container am Start", leitung: [["Kristian (Demo)", "0160 1111111"]], schichten: 1, soll: 2, besetzt: 0 },
+    { id: 2, name: "Shuttle", ab: 18, treff: "Parkplatz Talstation", leitung: [["Kalle Beispiel", "0151 0000000"]], schichten: 4, soll: 10, besetzt: 4 },
+    { id: 3, name: "Streckenposten", ab: 14, treff: "Zelt am Ziel", leitung: [["Sabine Muster", "0160 2222222"]], schichten: 3, soll: 24, besetzt: 1 },
+    { id: 4, name: "Wiesenslalom", treff: "Wiese hinter dem Ziel", leitung: [], schichten: 1, soll: 4, besetzt: 0 }
+  ];
+  const SCHICHTEN = [
+    { b: 1, tag: "Do 01.07.", zeit: "09:00–18:00", min: 2, soll: 2, res: 0, besetzt: 0 },
+    { b: 2, tag: "Fr 02.07.", zeit: "07:00–12:00", min: 2, soll: 3, res: 1, besetzt: 2 },
+    { b: 2, tag: "Fr 02.07.", zeit: "12:00–17:00", min: 2, soll: 3, res: 1, besetzt: 2 },
+    { b: 2, tag: "Fr 02.07.", zeit: "20:00–02:00 (+1)", min: 1, soll: 1, res: 0, besetzt: 0, ab: 21 },
+    { b: 2, tag: "Sa 03.07.", zeit: "07:00–12:00", min: 2, soll: 3, res: 0, besetzt: 0 },
+    { b: 3, tag: "Fr 02.07.", zeit: "08:00–13:00", min: 6, soll: 8, res: 2, besetzt: 1 },
+    { b: 3, tag: "Fr 02.07.", zeit: "13:00–18:00", min: 6, soll: 8, res: 2, besetzt: 0 },
+    { b: 3, tag: "Sa 03.07.", zeit: "08:00–13:00", min: 6, soll: 8, res: 2, besetzt: 0 },
+    { b: 4, tag: "Sa 03.07.", zeit: "10:00–14:00", min: 3, soll: 4, res: 1, besetzt: 0 }
+  ];
+  const HELFER = [
+    ["Anna Berg", "M", "vegetarisch", 1], ["Bert Klein", "XL", "Fleisch", 1],
+    ["Clara Wiese", "S", "vegetarisch", 1], ["Dieter Hang", "L", "Fleisch", 1],
+    ["Emil Kurve", "M", "Fleisch", 1]
+  ];
+
+  // --- Navigation ----------------------------------------------------------------
+  // Jede Seite: id, Name, Gruppe; "ab" = kommt mit diesem Schritt; "bl" = sieht auch
+  // eine Bereichsleitung.
+  const NAV = {
+    kennzeichen: { name: "Kennzeichen", gruppen: [] },
+    presse: { name: "Presse", gruppen: [] },
+    helfer: {
+      name: "Helfer",
+      gruppen: [
+        { id: "start", name: "Übersicht", punkte: [{ id: "uebersicht", name: "Übersicht" }] },
+        { id: "planen", name: "Planen", blName: "Meine Bereiche", punkte: [
+          { id: "bereiche", name: "Bereiche & Schichten", bl: true },
+          { id: "aufgaben", name: "Aufgaben" },
+          { id: "zeitplan", name: "Zeitplan" } ] },
+        { id: "leute", name: "Leute", punkte: [
+          { id: "helfer", name: "Helfer" },
+          { id: "anmeldungen", name: "Anmeldungen", ab: "2.2" },
+          { id: "warteliste", name: "Warteliste", ab: "2.5" } ] },
+        { id: "vorort", name: "Vor Ort", punkte: [
+          { id: "shirts", name: "Shirts & Goodies", wenn: () => gewaehlt().goodies },
+          { id: "checkin", name: "Check-in", ab: "4.1", bl: true },
+          { id: "monitor", name: "Monitor" },
+          { id: "ausdrucke", name: "Ausdrucke", ab: "2.8", bl: true } ] }
+      ]
+    },
+    ausgabe: {
+      name: "Ausgabe",
+      gruppen: [
+        { id: "ausgabe-g", name: "Ausgabe", punkte: [
+          { id: "ausgabetisch", name: "Ausgabetisch" },
+          { id: "draussen", name: "Noch draußen" },
+          { id: "fahrzeuge", name: "Fahrzeuge", wenn: () => gewaehlt().material.some((m) => m.erfasst === "Kennzeichen") } ] }
+      ]
+    },
+    verwaltung: {
+      name: "Verwaltung",
+      gruppen: [
+        { id: "verwaltung", name: "Verwaltung", punkte: [
+          { id: "veranstaltungen", name: "Veranstaltungen" },
+          { id: "konten", name: "Konten" } ] }
+      ]
+    }
+  };
+
+  const zustand = {
+    rolle: "admin", va: "aa27", seite: "uebersicht", ansicht: "bereiche", tisch: "tshirt",
+    bereich: null, vaDetail: null, vaReiter: "allgemein"
+  };
+
+  function lesen(schluessel, vorgabe) {
+    try { return localStorage.getItem("navi-" + schluessel) || vorgabe; } catch (e) { return vorgabe; }
+  }
+  function merken(schluessel, wert) {
+    try { localStorage.setItem("navi-" + schluessel, wert); } catch (e) { /* egal */ }
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (z) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[z]));
+  const istBL = () => zustand.rolle === "bl";
+  const gewaehlt = () => VERANSTALTUNGEN.find((v) => v.id === zustand.va);
+  const nutzt = (modul) => gewaehlt().module.includes(modul);
+
+  function sichtbareGruppen(bereichsSchluessel) {
+    // Seiten mit Bedingung (Shirts nur mit Goodies, Fahrzeuge nur mit Schlüsseln).
+    const gruppen = NAV[bereichsSchluessel].gruppen
+      .map((g) => ({ ...g, punkte: g.punkte.filter((p) => !p.wenn || p.wenn()) }))
+      .filter((g) => g.punkte.length);
+    if (!istBL()) return gruppen;
+    return gruppen
+      .map((g) => ({ ...g, name: g.blName || g.name, punkte: g.punkte.filter((p) => p.bl) }))
+      .filter((g) => g.punkte.length);
+  }
+
+  function finde(seite) {
+    for (const [schluessel, bereich] of Object.entries(NAV)) {
+      for (const g of bereich.gruppen) {
+        for (const p of g.punkte) {
+          if (p.id === seite) return { bereich: schluessel, gruppe: g, punkt: p };
+        }
+      }
+    }
+    if (seite === "kennzeichen" || seite === "presse") return { bereich: seite, gruppe: null, punkt: { id: seite, name: NAV[seite].name } };
+    if (seite === "konto") return { bereich: null, gruppe: null, punkt: { id: "konto", name: "Mein Konto" } };
+    return null;
+  }
+
+  function erlaubt(seite) {
+    const f = finde(seite);
+    if (!f) return false;
+    if (seite === "konto") return true;
+    // Was die gewählte Veranstaltung nicht nutzt, hat keinen Reiter.
+    if (["kennzeichen", "presse", "helfer", "ausgabe"].includes(f.bereich) && !nutzt(f.bereich)) return false;
+    if (f.punkt.wenn && !f.punkt.wenn()) return false;
+    if (!istBL()) return true;
+    return f.bereich === "helfer" && !!f.punkt.bl;
+  }
+
+  function startseite() {
+    if (istBL()) return nutzt("helfer") ? "bereiche" : "konto";
+    if (nutzt("helfer")) return "uebersicht";
+    const erstes = gewaehlt().module[0];
+    return erstes === "ausgabe" ? "ausgabetisch" : erstes || "veranstaltungen";
+  }
+
+  // --- Seiten --------------------------------------------------------------------
+  const notiz = (text) => `<div class="notiz"><b>Neu:</b> ${text}</div>`;
+  const kommt = (schritt, titel, text) =>
+    `<div class="leer"><strong>${titel}</strong> kommt mit Schritt ${schritt}.<br>${text}</div>`;
+
+  function leitungText(b) {
+    if (!b.leitung.length) return '<span class="gedaempft">–</span>';
+    return b.leitung.map(([n, t]) => `${esc(n)} <span class="gedaempft nowrap">${esc(t)}</span>`).join("<br>");
+  }
+  function fehltMarke(s) {
+    const fehlt = Math.max(0, s.soll - s.besetzt);
+    return fehlt ? `<span class="marke-klein luecke">${fehlt} offen</span>` : '<span class="marke-klein voll">voll</span>';
+  }
+  function eigeneBereiche() {
+    return istBL() ? BEREICHE.filter((b) => b.name === "Shuttle") : BEREICHE;
+  }
+  function ansichten(liste, aktiv, attribut) {
+    return `<div class="ansichten" role="group">` +
+      liste.map(([id, name]) => `<button type="button" data-${attribut}="${id}" aria-pressed="${aktiv === id}">${name}</button>`).join("") +
+      `</div>`;
+  }
+
+  function seiteBereiche() {
+    if (zustand.bereich) return seiteEinBereich(BEREICHE.find((b) => b.id === zustand.bereich));
+    let html = istBL()
+      ? notiz("So sieht Kalle (Bereichsleitung) das Backoffice: nur Helfer, nur sein Bereich.")
+      : notiz("Bereiche und Schichten an einer Stelle. Heute: Bereiche unter <i>Einstellungen</i>, die Schichtliste als eigener Punkt in der Hauptleiste.");
+    html += ansichten([["bereiche", "Bereiche"], ["schichten", "Alle Schichten"], ["luecken", "Nur Lücken"]], zustand.ansicht, "ansicht");
+    const bereiche = eigeneBereiche();
+    const ids = new Set(bereiche.map((b) => b.id));
+    if (zustand.ansicht === "bereiche") {
+      if (!istBL()) html += `<div class="zeilen"><button type="button" class="knopf">Neuer Bereich</button><span class="gedaempft">oder aus einer früheren Veranstaltung übernehmen</span></div>`;
+      html += `<div class="tabelle"><table><thead><tr><th>Bereich</th><th>Treffpunkt</th><th>Leitung</th><th class="rechts">Schichten</th><th class="rechts">besetzt</th></tr></thead><tbody>` +
+        bereiche.map((b) => `<tr class="klickbar" data-bereich="${b.id}"><td><a href="#bereiche" data-bereich="${b.id}">${esc(b.name)}</a>` +
+          (b.ab ? ` <span class="marke-klein">ab ${b.ab}</span>` : "") + (b.intern ? ` <span class="marke-klein">intern</span>` : "") +
+          `</td><td>${esc(b.treff)}</td><td>${leitungText(b)}</td><td class="rechts">${b.schichten}</td><td class="rechts nowrap">${b.besetzt} / ${b.soll}</td></tr>`).join("") +
+        `</tbody></table></div>`;
+    } else {
+      const zeilen = SCHICHTEN.filter((s) => ids.has(s.b) && (zustand.ansicht !== "luecken" || s.besetzt < s.soll));
+      html += `<div class="tabelle"><table><thead><tr><th>Tag</th><th>Zeit</th><th>Bereich</th><th class="rechts">Min / Soll / Res</th><th class="rechts">besetzt</th><th></th></tr></thead><tbody>` +
+        zeilen.map((s) => {
+          const b = BEREICHE.find((x) => x.id === s.b);
+          return `<tr><td class="nowrap">${s.tag}</td><td class="nowrap">${s.zeit}${s.ab ? ` <span class="marke-klein">ab ${s.ab}</span>` : ""}</td>` +
+            `<td>${esc(b.name)}${b.intern ? ' <span class="marke-klein">intern</span>' : ""}</td>` +
+            `<td class="rechts nowrap">${s.min} / ${s.soll} / ${s.res}</td><td class="rechts">${s.besetzt}</td><td class="rechts">${fehltMarke(s)}</td></tr>`;
+        }).join("") + `</tbody></table></div>`;
+    }
+    return html;
+  }
+
+  function seiteEinBereich(b) {
+    const zeilen = SCHICHTEN.filter((s) => s.b === b.id);
+    return `<p class="unterzeile"><a href="#bereiche" data-zurueck="1">‹ ${istBL() ? "Meine Bereiche" : "Alle Bereiche"}</a> · ${esc(b.treff)}${b.ab ? " · ab " + b.ab : ""}</p>` +
+      `<div class="tabelle"><table><thead><tr><th>Tag</th><th>Zeit</th><th class="rechts">Min / Soll / Res</th><th class="rechts">besetzt</th><th></th></tr></thead><tbody>` +
+      zeilen.map((s) => `<tr><td class="nowrap">${s.tag}</td><td class="nowrap">${s.zeit}</td><td class="rechts">${s.min} / ${s.soll} / ${s.res}</td><td class="rechts">${s.besetzt}</td><td class="rechts nowrap"><button type="button" class="knopf-schlicht">einteilen</button> <button type="button" class="knopf-schlicht">ändern</button></td></tr>`).join("") +
+      `</tbody></table></div><div class="zeilen" style="margin-top:1rem"><button type="button" class="knopf">Neue Schicht</button></div>` +
+      `<h2>Angaben zum Bereich</h2><p class="gedaempft">Beschreibung, Treffpunkt, Leitung, Mindestalter, Voraussetzungen – wie heute.</p>`;
+  }
+
+  // --- Verwaltung: Veranstaltungen ----------------------------------------------
+  function seiteVeranstaltungen() {
+    if (zustand.vaDetail) return seiteEineVeranstaltung(VERANSTALTUNGEN.find((v) => v.id === zustand.vaDetail));
+    return notiz("Ein Klick auf eine Veranstaltung öffnet sie: Stammdaten, was sie nutzt, und alles, was man für sie einrichtet.") +
+      `<div class="zeilen"><button type="button" class="knopf">Neue Veranstaltung</button></div>
+      <div class="tabelle"><table><thead><tr><th>Veranstaltung</th><th>Tage</th><th>nutzt</th><th>Status</th></tr></thead><tbody>` +
+      VERANSTALTUNGEN.map((v) => `<tr class="klickbar" data-va-detail="${v.id}"><td><a href="#veranstaltungen" data-va-detail="${v.id}">${esc(v.name)}</a></td>` +
+        `<td class="nowrap">${v.tage}</td><td>${v.module.map((m) => `<span class="marke-klein">${MODULE.find((x) => x[0] === m)[1]}</span>`).join(" ")}</td>` +
+        `<td><span class="marke-klein">${v.status}</span></td></tr>`).join("") +
+      `</tbody></table></div>`;
+  }
+
+  function seiteEineVeranstaltung(v) {
+    const reiter = [["allgemein", "Allgemein"]].concat(MODULE.filter(([m]) => v.module.includes(m)).map(([m, name]) => [m, name]));
+    if (!reiter.some(([id]) => id === zustand.vaReiter)) zustand.vaReiter = "allgemein";
+    let html = `<p class="unterzeile"><a href="#veranstaltungen" data-va-liste="1">‹ Alle Veranstaltungen</a> · ${v.tage} · ${v.status}</p>`;
+    html += ansichten(reiter, zustand.vaReiter, "va-reiter");
+    if (zustand.vaReiter === "allgemein") {
+      html += `<div class="formular">
+        <div class="feld"><span>Name</span><input id="va-name" value="${esc(v.name)}"></div>
+        <div class="feld"><span>Kurzname</span><input id="va-kurz" value="${esc(v.kurz)}"></div>
+        <div class="feld"><span>Tage</span><input id="va-tage" value="${esc(v.tage)}"></div>
+        <div class="feld"><span>Status</span><select id="va-status"><option>${esc(v.status)}</option></select></div>
+      </div>
+      <h2>Was diese Veranstaltung nutzt</h2>` +
+      notiz("Hier legt die Veranstaltung fest, welche Bereiche sie hat. Die Reiter oben folgen dem – probier es aus.") +
+      `<div class="formular">` +
+      MODULE.map(([m, name, text]) => `<label><input type="checkbox" id="va-modul-${m}" data-modul="${m}" ${v.module.includes(m) ? "checked" : ""}> <span><b>${name}</b><br><span class="gedaempft">${text}</span></span></label>`).join("") +
+      `</div>`;
+    } else if (zustand.vaReiter === "helfer") {
+      html += notiz("Was heute im Helferbereich unter <i>Einstellungen</i> verteilt ist, steht hier bei der Veranstaltung.");
+      html += `<h2>Dank an die Helfer</h2>
+        <div class="formular">
+          <label><input type="radio" name="goodies" id="va-goodies-nein" data-goodies="nein" ${v.goodies ? "" : "checked"}> <span><b>Keine Goodies</b><br><span class="gedaempft">Die Anmeldung fragt nicht nach der Shirtgröße und zeigt keine Belohnungen.</span></span></label>
+          <label><input type="radio" name="goodies" id="va-goodies-ja" data-goodies="ja" ${v.goodies ? "checked" : ""}> <span><b>Goodies ausgeben</b></span></label>
+        </div>`;
+      if (v.goodies) {
+        html += `<div class="formular" style="margin-top:.6rem"><label><input type="checkbox" id="va-shirt" checked> <span><b>Helfershirt</b> ab der ersten Schicht</span></label></div>
+          <div class="formular" style="margin:.4rem 0 0 1.6rem">
+            <label><input type="radio" name="schnitt" id="va-schnitt-ein" data-schnitte="nein" ${v.schnitte ? "" : "checked"}> <span>Ein Schnitt für alle <span class="gedaempft">– die Anmeldung fragt nur die Größe</span></span></label>
+            <label><input type="radio" name="schnitt" id="va-schnitt-zwei" data-schnitte="ja" ${v.schnitte ? "checked" : ""}> <span>Damen- und Herrenschnitt <span class="gedaempft">– die Anmeldung fragt Schnitt und Größe</span></span></label>
+          </div>
+          <div class="tabelle" style="margin-top:.6rem"><table><thead><tr><th>ab</th><th>Goodie</th><th>Altersgrenze</th></tr></thead><tbody>
+            <tr><td class="nowrap">2 Schichten</td><td>Ein Bier am Bierwagen</td><td class="gedaempft">ab 16, sonst eine Eistüte</td></tr>
+            <tr><td class="nowrap">4 Schichten</td><td>ILRC-Cap</td><td class="gedaempft">–</td></tr>
+          </tbody></table></div>
+          <div class="zeilen" style="margin-top:.6rem"><button type="button" class="knopf-schlicht">Goodie hinzufügen</button></div>`;
+      }
+      html += `<h2>Verpflegung und Party</h2>
+        <div class="formular">
+          <label><input type="checkbox" id="va-verpflegung" checked> <span><b>Verpflegung</b> – die Anmeldung fragt, was jemand isst</span></label>
+          <label><input type="checkbox" id="va-party" ${v.id === "xco27" ? "" : "checked"}> <span><b>Helferparty</b> nach der Veranstaltung</span></label>
+        </div>
+        <h2>Import aus helferliste.online</h2>
+        <div class="zeilen"><button type="button" class="knopf-schlicht">Jetzt abrufen</button><button type="button" class="knopf-schlicht">Dateien hochladen</button></div>
+        <h2>Zeitplan der Rennserien</h2>
+        <div class="zeilen"><button type="button" class="knopf-schlicht">Jetzt abrufen</button><span class="gedaempft">zuletzt heute 05:00, geklappt</span></div>`;
+    } else if (zustand.vaReiter === "ausgabe") {
+      html += notiz("Was ausgegeben wird, legt die Veranstaltung fest. Heute sind Funkgeräte und Schlüssel fest eingebaut.");
+      html += `<h2>Was ausgegeben wird</h2>`;
+      html += v.material.length
+        ? `<div class="tabelle"><table><thead><tr><th>Material</th><th>Rückgabe</th><th>Unterschrift</th><th>erfasst</th></tr></thead><tbody>` +
+          v.material.map((m) => `<tr><td><b>${esc(m.name)}</b></td><td>${m.rueckgabe ? "ja" : "nein"}</td><td>${m.unterschrift ? "auf dem Tablet" : "nein"}</td><td>${m.erfasst || '<span class="gedaempft">nur Anzahl</span>'}</td></tr>`).join("") +
+          `</tbody></table></div>`
+        : `<div class="leer">Noch kein Material.</div>`;
+      html += `<div class="zeilen" style="margin-top:.6rem"><button type="button" class="knopf-schlicht" data-material-neu="1">Material hinzufügen</button><span class="gedaempft">z. B. Warnweste, Absperrband, Megafon</span></div>
+        <h2>Tablet für Unterschriften</h2>
+        <div class="zeilen"><button type="button" class="knopf-schlicht">Tablet-Link erzeugen</button><span class="gedaempft">heute: <i>Unterschriften</i> im Helferbereich</span></div>`;
+    } else {
+      const name = zustand.vaReiter === "kennzeichen" ? "Kennzeichen" : "Presse";
+      const was = zustand.vaReiter === "kennzeichen" ? "Kategorien, Kontingente und Benachrichtigung" : "Fristen, Bilder und Benachrichtigung";
+      html += `<div class="leer"><strong>${name}</strong> hängt noch an keiner Veranstaltung. Sobald es das tut, ziehen ${was} hierher – heute stehen sie unter ${name} › Einstellungen.</div>`;
+    }
+    return html;
+  }
+
+  const SEITEN = {
+    uebersicht: () => notiz("Ein Klick auf <i>Helfer</i> führt hierher. Die Übersicht ist die einzige Gruppe ohne Unterpunkte.") +
+      `<div class="kacheln">
+        <div class="kachel"><div class="zahl">9</div><div class="was">Schichten</div></div>
+        <div class="kachel"><div class="zahl">40</div><div class="was">Plätze nach Soll</div></div>
+        <div class="kachel"><div class="zahl">5</div><div class="was">besetzt</div></div>
+        <div class="kachel"><div class="zahl" style="color:var(--fehler)">8</div><div class="was">Schichten mit Lücke</div></div>
+      </div>
+      <h2>Größte Lücken</h2>
+      <div class="tabelle"><table><tbody>
+        <tr><td class="nowrap">Fr 02.07. 13:00–18:00</td><td>Streckenposten</td><td class="rechts"><span class="marke-klein luecke">8 offen</span></td></tr>
+        <tr><td class="nowrap">Sa 03.07. 08:00–13:00</td><td>Streckenposten</td><td class="rechts"><span class="marke-klein luecke">8 offen</span></td></tr>
+        <tr><td class="nowrap">Fr 02.07. 08:00–13:00</td><td>Streckenposten</td><td class="rechts"><span class="marke-klein luecke">7 offen</span></td></tr>
+      </tbody></table></div>
+      <p class="gedaempft">Mit Schritt 2.7 färbt sich das nach Minimum, Soll und Reserve.</p>`,
+    bereiche: seiteBereiche,
+    aufgaben: () => `<div class="zeilen"><button type="button" class="knopf">Neue Aufgabe</button></div>
+      <div class="tabelle"><table><thead><tr><th>Tag</th><th>Was</th><th>Wer</th><th>Status</th></tr></thead><tbody>
+        <tr><td class="nowrap">Mi 30.06.</td><td>Zelt am Ziel aufbauen</td><td>Kalle</td><td><span class="marke-klein">offen</span></td></tr>
+        <tr><td class="nowrap">Do 01.07.</td><td>Strom zum Bierwagen legen</td><td>Sabine</td><td><span class="marke-klein">in Arbeit</span></td></tr>
+        <tr><td class="gedaempft">ohne Tag</td><td>Pokale besorgen</td><td></td><td><span class="marke-klein voll">erledigt</span></td></tr>
+      </tbody></table></div>`,
+    zeitplan: () => `<p class="unterzeile">Fr 02.07. · Programm der Rennserien, darunter die Schichten</p>
+      <div class="band">
+        <div class="spur"><div class="balken programm" style="left:12%;width:22%">Training DH</div><div class="balken programm" style="left:45%;width:25%">Rennlauf</div></div>
+        <div class="spur"><div class="balken" style="left:0%;width:42%">Shuttle 3/3</div><div class="balken" style="left:42%;width:42%">Shuttle 2/3</div></div>
+        <div class="spur"><div class="balken" style="left:8%;width:42%">Streckenposten 1/8</div><div class="balken" style="left:50%;width:42%">Streckenposten 0/8</div></div>
+        <div class="skala"><span>07:00</span><span>10:00</span><span>13:00</span><span>16:00</span><span>19:00</span></div>
+      </div>`,
+    helfer: () => `<div class="tabelle"><table><thead><tr><th>Name</th><th>T-Shirt</th><th>Verpflegung</th><th class="rechts">Schichten</th></tr></thead><tbody>` +
+      HELFER.map(([n, g, v, s]) => `<tr><td><a href="#helfer">${n}</a></td><td>${gewaehlt().goodies ? g : '<span class="gedaempft">–</span>'}</td><td>${v}</td><td class="rechts">${s}</td></tr>`).join("") +
+      `</tbody></table></div><p class="gedaempft">Die T-Shirt-Ausgabe ist von hier nach <i>Vor Ort › Shirts & Goodies</i> gezogen.</p>`,
+    anmeldungen: () => kommt("2.2", "Anmeldungen", "Wer sich öffentlich eingetragen hat, mit Bestätigung, Mitangemeldeten und dem Hinweis „Bist du das?“ bei Dubletten (2.4)."),
+    warteliste: () => kommt("2.5", "Die Warteliste", "Wer auf eine volle Schicht wartet, und wer nachgerückt ist."),
+    shirts: () => {
+      const v = gewaehlt();
+      const groessen = ["S", "M", "L", "XL"];
+      const optionen = v.schnitte
+        ? ["Damen", "Herren"].flatMap((s) => groessen.map((g) => `<option>${s} ${g}</option>`)).join("")
+        : groessen.map((g) => `<option>${g}</option>`).join("");
+      return notiz("Shirt und Goodies gibt der Helferbereich aus, nur wenn die Veranstaltung welche hat. Heute steht die T-Shirt-Ausgabe in der Helferliste. Mit Schritt 4.2 hängt sie am Check-in.") +
+        `<div class="formular"><div class="feld"><span>Name</span><input id="f-shirt-name" placeholder="Name tippen …"></div>` +
+        `<div class="feld"><span>Größe${v.schnitte ? " und Schnitt" : ""}</span><select id="f-shirt-groesse">${optionen}</select></div>` +
+        `<div><button type="button" class="knopf">Shirt ausgegeben</button></div></div>` +
+        `<h2>Goodies</h2><p class="gedaempft">Bier am Bierwagen ab 2 Schichten, ILRC-Cap ab 4 – abhaken, wenn ausgegeben.</p>`;
+    },
+    ausgabetisch: () => {
+      const material = gewaehlt().material;
+      if (!material.some((m) => m.name === zustand.tisch)) zustand.tisch = material.length ? material[0].name : "";
+      const m = material.find((x) => x.name === zustand.tisch);
+      let html = notiz("Die Materialausgabe ist ein eigener Bereich. Was es gibt, legt die Veranstaltung fest (Verwaltung › Veranstaltungen › Ausgabe). Heute sind Funk und Schlüssel fest eingebaut und Punkte des Helferbereichs.");
+      if (!m) return html + `<div class="leer">Für ${gewaehlt().kurz} ist noch kein Material eingerichtet.</div>`;
+      html += ansichten(material.map((x) => [x.name, x.name]), zustand.tisch, "tisch");
+      html += `<div class="formular"><div class="feld"><span>An wen</span><input id="f-aus-name" placeholder="Name tippen – Helfer werden vorgeschlagen"></div>` +
+        (m.erfasst ? `<div class="feld"><span>${m.erfasst}</span><input id="f-aus-nummer"></div>` : `<div class="feld"><span>Anzahl</span><input id="f-aus-anzahl" value="1"></div>`) +
+        `<div><button type="button" class="knopf">Ausgeben</button></div>` +
+        `<p class="gedaempft">${m.unterschrift ? "Unterschrift auf dem Tablet. " : ""}${m.rueckgabe ? "Wird zurückerwartet." : "Bleibt beim Empfänger."}</p></div>`;
+      return html;
+    },
+    draussen: () => `<div class="tabelle"><table><thead><tr><th>Was</th><th>Bei wem</th><th>seit</th><th></th></tr></thead><tbody>` +
+      gewaehlt().material.filter((m) => m.rueckgabe).slice(0, 2).map((m, i) =>
+        `<tr><td>${m.name}${m.erfasst ? ` <span class="gedaempft">${m.erfasst === "Kennzeichen" ? "IK-AA 27" : "Nr. 07"}</span>` : ""}</td><td>${["Anna Berg", "Bert Klein"][i]}</td><td class="nowrap">Fr 07:12</td><td class="rechts"><button type="button" class="knopf-schlicht">zurück</button></td></tr>`).join("") +
+      `</tbody></table></div>`,
+    fahrzeuge: () => `<p>Der Fahrzeugstamm baut sich bei der Schlüsselausgabe nebenbei auf – wie heute.</p>
+      <div class="tabelle"><table><thead><tr><th>Kennzeichen</th><th>Fahrzeug</th></tr></thead><tbody>
+        <tr><td>IK-AA 27</td><td>Kleinbus Shuttle 1</td></tr><tr><td>IK-AA 28</td><td>Kleinbus Shuttle 2</td></tr>
+      </tbody></table></div>`,
+    checkin: () => kommt("4.1", "Der Check-in", "Die Bereichsleitung hat hier die Liste derer, die an ihrem Treffpunkt in Kürze beginnen, und scannt den QR-Code oder tippt auf den Namen."),
+    monitor: () => `<p>Der Monitor-Link ist <b>aktiv</b>. Er zeigt die laufende und die nächste Schicht, ohne Anmeldung.</p>
+      <div class="zeilen"><button type="button" class="knopf-schlicht">Link kopieren</button><button type="button" class="knopf-schlicht">Neuen Link erzeugen</button></div>`,
+    ausdrucke: () => kommt("2.8", "Die Ausdrucke", "Je Bereich und Treffpunkt die Liste für den Tag, mit Bereichsleitung und Nummer im Kopf – und die Notfallmappe."),
+    veranstaltungen: seiteVeranstaltungen,
+    konten: () => notiz("Heute ein Knopf oben rechts.") +
+      `<div class="zeilen"><button type="button" class="knopf">Konto anlegen</button></div>
+      <div class="tabelle"><table><thead><tr><th>Name</th><th>Rolle</th><th>Bereiche</th></tr></thead><tbody>
+        <tr><td>Kristian (Demo)<br><span class="gedaempft">0160 1111111</span></td><td>Admin</td><td>alle</td></tr>
+        <tr><td>Kalle Beispiel<br><span class="gedaempft">0151 0000000</span></td><td>Bereichsleitung</td><td>Helfer</td></tr>
+        <tr><td>Sabine Muster<br><span class="gedaempft">0160 2222222</span></td><td>Bereichsleitung</td><td>Helfer</td></tr>
+      </tbody></table></div>`,
+    konto: () => `<p>Name, Kürzel, Rolle, die eigene Nummer und das Passwort – wie heute.</p>` +
+      (istBL() && !nutzt("helfer") ? `<p class="gedaempft">${gewaehlt().kurz} hat keinen Helferbereich – für dich gibt es hier nichts.</p>` : ""),
+    kennzeichen: () => `<div class="leer"><strong>Kennzeichen</strong> behält seine Punkte: Anträge, Karten, Durchfahrtsliste. Neu sind der Kopf und dass der Reiter nur erscheint, wenn die Veranstaltung Kennzeichen nutzt.</div>`,
+    presse: () => `<div class="leer"><strong>Presse</strong> behält seine Punkte: Akkreditierungen, Abholliste, Bilder. Wie bei Kennzeichen erscheint der Reiter nur, wenn die Veranstaltung Presse nutzt.</div>`
+  };
+
+  // --- Zeichnen ------------------------------------------------------------------
+  const $ = (id) => document.getElementById(id);
+
+  function zeichnen() {
+    if (!erlaubt(zustand.seite)) { zustand.seite = startseite(); zustand.bereich = null; zustand.vaDetail = null; }
+    const f = finde(zustand.seite) || finde("konto");
+    const bereich = f.bereich;
+
+    // Reiter: was die gewählte Veranstaltung nutzt, dazu die Verwaltung.
+    const reiter = istBL()
+      ? (nutzt("helfer") ? ["helfer"] : [])
+      : ["kennzeichen", "presse", "helfer", "ausgabe"].filter(nutzt).concat(["verwaltung"]);
+    $("reiter").innerHTML = reiter.map((r) => {
+      const ziel = { helfer: istBL() ? "bereiche" : "uebersicht", verwaltung: "veranstaltungen",
+                     ausgabe: "ausgabetisch" }[r] || r;
+      return `<a href="#${ziel}" class="${bereich === r ? "hier" : ""}" ${bereich === r ? 'aria-current="true"' : ""}>${NAV[r].name}</a>`;
+    }).join("");
+    $("reiter").hidden = !reiter.length;
+
+    // Gruppen und Punkte – nur, wo der Bereich welche hat.
+    const gruppen = bereich && NAV[bereich] ? sichtbareGruppen(bereich) : [];
+    $("gruppen").hidden = gruppen.length < 2;
+    $("gruppen").innerHTML = gruppen.map((g) => {
+      const hier = f.gruppe && g.id === f.gruppe.id;
+      return `<a href="#${g.punkte[0].id}" class="${hier ? "hier" : ""}" ${hier ? 'aria-current="true"' : ""}>${g.name}</a>`;
+    }).join("");
+    const aktiv = gruppen.find((g) => f.gruppe && g.id === f.gruppe.id);
+    const punkte = aktiv ? aktiv.punkte : [];
+    $("punkte").hidden = punkte.length < 2;
+    $("punkte").innerHTML = punkte.map((p) => {
+      const hier = p.id === zustand.seite;
+      return `<a href="#${p.id}" class="${hier ? "hier" : ""}${p.ab ? " spaeter" : ""}" ${hier ? 'aria-current="page"' : ""}>${p.name}${p.ab ? ` <span class="ab" title="kommt mit Schritt ${p.ab}">${p.ab}</span>` : ""}</a>`;
+    }).join("");
+
+    // Kopf: die Veranstaltung gilt für alles.
+    let titel = f.punkt.name;
+    if (zustand.seite === "bereiche" && zustand.bereich) titel = BEREICHE.find((b) => b.id === zustand.bereich).name;
+    if (zustand.seite === "bereiche" && !zustand.bereich && istBL()) titel = "Meine Bereiche";
+    if (zustand.seite === "veranstaltungen" && zustand.vaDetail) titel = VERANSTALTUNGEN.find((v) => v.id === zustand.vaDetail).kurz;
+    $("titel").textContent = titel;
+    $("kuerzel").textContent = istBL() ? "KB" : "KK";
+    $("va-platz").innerHTML = vaWahl();
+    $("ueber-text").textContent = "Backoffice ·";
+
+    // Seite
+    $("inhalt").innerHTML = (SEITEN[zustand.seite] || SEITEN.konto)();
+
+    $("rolle-admin").setAttribute("aria-pressed", String(!istBL()));
+    $("rolle-bl").setAttribute("aria-pressed", String(istBL()));
+  }
+
+  function vaWahl() {
+    const aktuell = gewaehlt();
+    return `<details class="va"><summary aria-label="Veranstaltung wechseln">${aktuell.kurz}</summary><div class="klappe">` +
+      VERANSTALTUNGEN.map((v) => `<a href="#" data-va="${v.id}" class="${v.id === zustand.va ? "gewaehlt" : ""}"><span>${v.kurz}</span><span class="klein">${v.status}</span></a>`).join("") +
+      (istBL() ? "" : `<hr><a href="#veranstaltungen" data-va-einrichten="1"><span>${aktuell.kurz} einrichten …</span></a>` +
+        `<a href="#veranstaltungen" data-va-liste="1"><span>Alle Veranstaltungen …</span></a>`) +
+      `</div></details>`;
+  }
+
+  // --- Bedienung -------------------------------------------------------------------
+  function gehe(seite) {
+    zustand.seite = seite;
+    zustand.bereich = null;
+    zustand.vaDetail = null;
+    zeichnen();
+  }
+  function adresse(ziel) {
+    try { history.replaceState(null, "", "#" + ziel); } catch (e) { /* egal */ }
+  }
+  function klappeZu(el) {
+    const d = el.closest("details");
+    if (d) d.open = false;
+  }
+
+  window.addEventListener("hashchange", () => {
+    const ziel = location.hash.slice(1);
+    if (ziel && (SEITEN[ziel] || finde(ziel))) gehe(ziel);
+  });
+
+  document.addEventListener("click", (ereignis) => {
+    const el = ereignis.target.closest("[data-ansicht],[data-tisch],[data-bereich],[data-va],[data-zurueck],[data-va-detail],[data-va-reiter],[data-va-liste],[data-va-einrichten],[data-material-neu]");
+    if (!el) {
+      // Ein Link auf eine Seite des Entwurfs: auch dann wechseln, wenn die
+      // Adresse schon dieselbe ist (sonst bliebe man in einem Bereich stecken).
+      const a = ereignis.target.closest('a[href^="#"]');
+      const ziel = a ? a.getAttribute("href").slice(1) : "";
+      if (ziel && (SEITEN[ziel] || finde(ziel))) {
+        ereignis.preventDefault();
+        gehe(ziel);
+        adresse(ziel);
+      }
+      return;
+    }
+    const d = el.dataset;
+    if (d.ansicht) { zustand.ansicht = d.ansicht; zeichnen(); return; }
+    if (d.materialNeu) {
+      const v = VERANSTALTUNGEN.find((x) => x.id === zustand.vaDetail);
+      const vorrat = ["Warnweste", "Absperrband", "Megafon", "Erste-Hilfe-Tasche"];
+      const neu = vorrat.find((n) => !v.material.some((m) => m.name === n));
+      if (neu) v.material.push({ name: neu, rueckgabe: neu !== "Absperrband", unterschrift: false, erfasst: "" });
+      zeichnen(); return;
+    }
+    if (d.tisch) { zustand.tisch = d.tisch; zeichnen(); return; }
+    if (d.vaReiter) { zustand.vaReiter = d.vaReiter; zeichnen(); return; }
+    if (d.va) { ereignis.preventDefault(); klappeZu(el); zustand.va = d.va; zustand.bereich = null; zeichnen(); return; }
+    if (d.zurueck) { ereignis.preventDefault(); zustand.bereich = null; zeichnen(); return; }
+    if (d.vaListe) { ereignis.preventDefault(); klappeZu(el); gehe("veranstaltungen"); adresse("veranstaltungen"); return; }
+    if (d.vaEinrichten) {
+      ereignis.preventDefault(); klappeZu(el);
+      zustand.seite = "veranstaltungen"; zustand.vaDetail = zustand.va; zustand.vaReiter = "allgemein";
+      adresse("veranstaltungen"); zeichnen(); return;
+    }
+    if (d.vaDetail) { ereignis.preventDefault(); zustand.seite = "veranstaltungen"; zustand.vaDetail = d.vaDetail; zustand.vaReiter = "allgemein"; zeichnen(); return; }
+    if (d.bereich) { ereignis.preventDefault(); zustand.seite = "bereiche"; zustand.bereich = Number(d.bereich); zeichnen(); }
+  });
+
+  // Häkchen und Schalter auf der Seite einer Veranstaltung wirken sofort.
+  document.addEventListener("change", (ereignis) => {
+    const el = ereignis.target;
+    const v = VERANSTALTUNGEN.find((x) => x.id === zustand.vaDetail);
+    if (!v) return;
+    if (el.dataset.modul) {
+      const modul = el.dataset.modul;
+      v.module = el.checked ? MODULE.map(([m]) => m).filter((m) => m === modul || v.module.includes(m))
+                            : v.module.filter((m) => m !== modul);
+      zeichnen();
+    } else if (el.dataset.goodies) {
+      v.goodies = el.dataset.goodies === "ja";
+      zeichnen();
+    } else if (el.dataset.schnitte) {
+      v.schnitte = el.dataset.schnitte === "ja";
+      zeichnen();
+    }
+  });
+
+  // Klick außerhalb schließt die Auswahl der Veranstaltung.
+  document.addEventListener("click", (ereignis) => {
+    document.querySelectorAll("details.va[open]").forEach((d) => { if (!d.contains(ereignis.target)) d.open = false; });
+  });
+
+  function rolle(neu) {
+    zustand.rolle = neu;
+    merken("rolle", neu);
+    zustand.bereich = null;
+    zustand.vaDetail = null;
+    zustand.seite = startseite();
+    try { if (location.hash) history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* egal */ }
+    zeichnen();
+  }
+  $("rolle-admin").addEventListener("click", () => rolle("admin"));
+  $("rolle-bl").addEventListener("click", () => rolle("bl"));
+
+  zustand.rolle = lesen("rolle", "admin") === "bl" ? "bl" : "admin";
+  const start = location.hash.slice(1);
+  zustand.seite = start && (SEITEN[start] || finde(start)) ? start : startseite();
+  zeichnen();
+})();
+</script>
+
+</body>
+</html>
