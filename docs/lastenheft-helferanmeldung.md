@@ -439,6 +439,16 @@ Link direkt zu den Schichten, Name, Größe und Verpflegung sind vorbelegt.
 Niemand bekommt dieselbe Einladung zweimal. „Bleibst du dabei?“ (D-04) steht
 noch aus; bis dahin sagt jede Einladung, wo man sie abstellt.
 
+**Stand 09.10.2026, Schritt 3.4:** C-03, C-04, C-09 und A-12 sind umgesetzt.
+Der Hilferuf zeigt die Schichten unter Soll mit der Zahl passender Leute aus
+dem Helferstamm; ausgewählt, entsteht der Text für die Ankündigungsgruppe –
+mit kurzem Link je Schicht (`…/s/k7`) und als `wa.me`-Link – und je passender
+Person eine Mail mit allen Schichten, die zu ihr passen, und einem Link je
+Schicht, der die Zusage vorbereitet. Passend: zu der Zeit frei, Zeiten und
+Vorlieben (dieses Jahr, sonst zuletzt), Alter und Einsatzgrenzen. Je Schicht
+geht höchstens eine Mail-Runde in 24 Stunden. Hilferufe und Einladungen
+bestellt man mit einem Klick ab, aus der Mail oder in Mein Helferplatz.
+
 ### 5.9 Listen und Ausdrucke (L)
 
 | Nr. | Anforderung | Prio | Phase |
@@ -890,7 +900,7 @@ Phase Vorrang.
 | 3.1 | **Assistent**: Verfügbarkeit, Vorlieben, Vorschläge nach Dringlichkeit, Springer | **erledigt** |
 | 3.2 | Dubletten zusammenführen (I-06); das Erkennen kommt mit 2.4 | **erledigt** |
 | 3.3 | Mail bei Anmeldestart an die Vorgemerkten (C-08); das Vormerken kommt mit 2.2 | **erledigt** |
-| 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | 5 h |
+| 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | **erledigt** |
 | 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | 3 h |
 | 3.6 | ~~Warteliste mit Nachrücken~~ – vorgezogen in 2.5 | – |
 | 3.8 | **Materialausgabe verallgemeinern** (V-09): Materialien je Veranstaltung, eine Ausgabe für alles mit Rückgabe, Unterschrift und Nummer; Funk und Schlüssel ziehen um | 8 h |
@@ -918,7 +928,7 @@ Fehler beheben, nichts Neues.
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
-| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~24 h erledigt |
+| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~29 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |
 

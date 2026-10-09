@@ -151,6 +151,31 @@ zu Mein Helferplatz, wo man die Einladungen abstellt. Wer eine Einladung hat,
 bekommt keine zweite; die Seite zeigt vorher, wer sie bekommt und wie sie
 lautet.
 
+## Hilferuf
+
+Unter Leute → Hilferuf (Lastenheft 3.4, C-03) stehen die knappen Schichten –
+unter Soll, öffentlich, noch nicht begonnen, unter Minimum zuerst –, je mit der
+Zahl derer aus dem Helferstamm, die passen würden. Wer ausgewählt hat, bekommt
+zweierlei:
+
+- **Den Text für die Community**, zum Kopieren oder als `wa.me`-Link, der
+  WhatsApp mit dem Text öffnet. Je Schicht steht ein kurzer Link darin
+  (`/s/<nummer>`, A-12): er führt in die Liste, die Schicht schon
+  angekreuzt. Ist sie inzwischen voll, vorbei oder intern, kommt dieselbe
+  neutrale Antwort wie bei jeder anderen Schicht, die nicht geht.
+- **Mails an den Helferstamm**: je Person eine, mit allen gewählten
+  Schichten, die zu ihr passen, und je Schicht einem Link, der die Zusage in
+  Mein Helferplatz vorbereitet. Passend heißt: zu der Zeit frei und nicht
+  schon auf der Schicht oder ihrer Warteliste; ihre Zeiten (sofern sie hier
+  welche angegeben hat) und Vorlieben (dieses Jahr, sonst zuletzt) passen;
+  alt genug; keine Einsatzgrenze dagegen.
+
+Je Schicht geht höchstens eine Mail-Runde in 24 Stunden (C-04); in den Text
+für die Community darf sie trotzdem. Hilferufe und Einladungen lassen sich mit
+einem Klick abbestellen (C-09), aus jeder solchen Mail oder in Mein
+Helferplatz – getrennt von den Mails zu den eigenen Schichten, die immer
+kommen.
+
 ## Datenschutz und Jugendschutz
 
 Seit Lastenheft 2.9 (D-01 bis D-07):
@@ -399,6 +424,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_assistent.py    # Zeit, Vorlieben, Vorschläge, Springer
 .venv/Scripts/python.exe helfer/tests/test_dubletten.py    # zusammenführen, auseinanderhalten
 .venv/Scripts/python.exe helfer/tests/test_einladen.py     # Anmeldestart, Helferstamm einladen
+.venv/Scripts/python.exe helfer/tests/test_hilferuf.py     # passende Stamm-Helfer, Text, 24 Stunden, abbestellen
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

@@ -1230,14 +1230,18 @@ def interesse_benachrichtigen(interesse_id: int, mail: tuple) -> None:
 
 # --- Den Helferstamm einladen (Lastenheft 3.3: C-08) ------------------------
 
+# Wen Einladungen und Hilferufe erreichen: der Helferstamm (D-03), mit
+# Adresse, nicht auf dem Weg hinaus, und nicht abbestellt (C-09).
+_AUFRUFBAR = ("h.stamm_einwilligung_am IS NOT NULL AND h.email <> '' AND h.aktiv = 1"
+              " AND h.loeschen_beantragt_am IS NULL AND h.aufrufe_abbestellt_am IS NULL")
+
 def stamm_einzuladen(vid: int) -> list[Zeile]:
     """Wer aus dem Helferstamm (D-03) zu dieser Veranstaltung noch keine
     Einladung hat und nicht ohnehin schon dabei ist."""
     con = verbinden()
     try:
         return con.execute(
-            "SELECT h.* FROM helfer h WHERE h.stamm_einwilligung_am IS NOT NULL"
-            " AND h.email <> '' AND h.aktiv = 1 AND h.loeschen_beantragt_am IS NULL"
+            "SELECT h.* FROM helfer h WHERE " + _AUFRUFBAR +
             " AND NOT EXISTS (SELECT 1 FROM teilnahme t WHERE t.helfer_id = h.id"
             "                 AND t.veranstaltung_id = ?)"
             " AND NOT EXISTS (SELECT 1 FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
@@ -1478,11 +1482,133 @@ def moegliche_dubletten(helfer_id: int | None = None) -> list[dict]:
     return [dict(z) for z in paare if _gleicher_name(z["a_name"], z["b_name"])]
 
 
+# --- Hilferuf (Lastenheft 3.4: C-03, C-04, C-09) ---------------------------
+
+def aufrufe_setzen(helfer_id: int, ja: bool) -> bool:
+    """C-09: Hilferufe und Einladungen bestellen oder abbestellen. True, wenn
+    sich etwas geändert hat."""
+    con = verbinden()
+    try:
+        with con:
+            if ja:
+                return con.execute("UPDATE helfer SET aufrufe_abbestellt_am = NULL WHERE id = ?"
+                                   " AND aufrufe_abbestellt_am IS NOT NULL",
+                                   (helfer_id,)).rowcount > 0
+            if con.execute("UPDATE helfer SET aufrufe_abbestellt_am = ? WHERE id = ?"
+                           " AND aufrufe_abbestellt_am IS NULL",
+                           (jetzt(), helfer_id)).rowcount:
+                _protokollieren(con, helfer_id, "selbst", "Hilferufe und Einladungen abbestellt")
+                return True
+            return False
+    finally:
+        con.close()
+
+
+def hilferuf_kandidaten(vid: int) -> list[dict]:
+    """Wer einen Hilferuf bekommen kann (C-03) – je Person, was für die
+    Auswahl zählt: ihre Einteilungen und Wartelisten in dieser
+    Veranstaltung, ihre Zeiten hier, ihre zuletzt genannten Vorlieben und
+    was ihr nicht angeboten wird (K-06). Fünf Abfragen statt fünf je Person."""
+    con = verbinden()
+    try:
+        personen = con.execute("SELECT h.* FROM helfer h WHERE " + _AUFRUFBAR +
+                               " ORDER BY h.id").fetchall()
+        kandidaten = {p["id"]: {"person": p, "belegt": [], "warteliste": set(), "fenster": [],
+                                "vorlieben": [], "gesperrt": set()} for p in personen}
+
+        def zu(zeile):
+            return kandidaten.get(zeile["helfer_id"])
+
+        for z in con.execute("SELECT e.helfer_id, s.id, s.beginn, s.ende FROM einteilung e"
+                             " JOIN schicht s ON s.id = e.schicht_id"
+                             " WHERE s.veranstaltung_id = ?", (vid,)).fetchall():
+            if zu(z):
+                zu(z)["belegt"].append((z["beginn"], z["ende"], z["id"]))
+        for z in con.execute("SELECT w.helfer_id, w.schicht_id FROM warteliste w"
+                             " JOIN schicht s ON s.id = w.schicht_id"
+                             " WHERE s.veranstaltung_id = ?", (vid,)).fetchall():
+            if zu(z):
+                zu(z)["warteliste"].add(z["schicht_id"])
+        for z in con.execute("SELECT helfer_id, beginn, ende FROM verfuegbarkeit"
+                             " WHERE veranstaltung_id = ?", (vid,)).fetchall():
+            if zu(z):
+                zu(z)["fenster"].append((z["beginn"], z["ende"]))
+        # Die Vorlieben dieser Veranstaltung, sonst die der letzten davor.
+        for z in con.execute(
+                "SELECT DISTINCT ON (t.helfer_id) t.helfer_id, t.vorlieben FROM teilnahme t"
+                " JOIN kern.veranstaltung v ON v.id = t.veranstaltung_id"
+                " WHERE cardinality(t.vorlieben) > 0"
+                " ORDER BY t.helfer_id, (t.veranstaltung_id = ?) DESC, v.beginn DESC",
+                (vid,)).fetchall():
+            if zu(z):
+                zu(z)["vorlieben"] = list(z["vorlieben"])
+        for z in con.execute(
+                "SELECT g.helfer_id, s.id FROM schicht s JOIN einsatzgrenze g"
+                " ON g.art = 'nicht_anbieten'"
+                " AND (g.schicht_id = s.id OR g.bereich_id = s.bereich_id)"
+                " WHERE s.veranstaltung_id = ?", (vid,)).fetchall():
+            if zu(z):
+                zu(z)["gesperrt"].add(z["id"])
+        return list(kandidaten.values())
+    finally:
+        con.close()
+
+
+def letzte_hilferufe(vid: int) -> dict[int, str]:
+    """Je Schicht, wann zuletzt per Mail gerufen wurde (C-04)."""
+    con = verbinden()
+    try:
+        return {z["schicht_id"]: z["am"] for z in con.execute(
+            "SELECT schicht_id, max(am) AS am FROM hilferuf WHERE veranstaltung_id = ?"
+            " GROUP BY schicht_id", (vid,)).fetchall()}
+    finally:
+        con.close()
+
+
+def hilferuf_senden(vid: int, mails: list[tuple[int, list[int], tuple]], wer: str,
+                    seit: str) -> int | None:
+    """Vermerkt den Hilferuf je Schicht und reiht die Mails ein (C-03, C-04).
+    `mails`: je Person (helfer_id, ihre Schichten, Mail). Unter Sperre wird
+    noch einmal geprüft, ob für eine der Schichten seit `seit` schon gerufen
+    wurde – dann geht nichts raus (None), und die Seite rechnet neu."""
+    zahl: dict[int, int] = {}
+    for _, schicht_ids, _ in mails:
+        for schicht_id in schicht_ids:
+            zahl[schicht_id] = zahl.get(schicht_id, 0) + 1
+    con = verbinden()
+    try:
+        with con:
+            _sperren(con, list(zahl))
+            if zahl and con.execute("SELECT 1 FROM hilferuf WHERE schicht_id = ANY(?)"
+                                    " AND am >= ?", (list(zahl), seit)).fetchone():
+                return None
+            for schicht_id, anzahl in sorted(zahl.items()):
+                con.execute("INSERT INTO hilferuf (veranstaltung_id, schicht_id, empfaenger,"
+                            " wer, am) VALUES (?, ?, ?, ?, ?)",
+                            (vid, schicht_id, anzahl, wer, jetzt()))
+            for helfer_id, _, mail in mails:
+                mail_einreihen(helfer_id, mail, con)
+            return len(mails)
+    finally:
+        con.close()
+
+
+def schicht_veranstaltung(schicht_id: int) -> int | None:
+    """Zu welcher Veranstaltung eine Schicht gehört – für den kurzen Link."""
+    con = verbinden()
+    try:
+        zeile = con.execute("SELECT veranstaltung_id FROM schicht WHERE id = ?",
+                            (schicht_id,)).fetchone()
+        return zeile["veranstaltung_id"] if zeile else None
+    finally:
+        con.close()
+
+
 # --- Dubletten zusammenführen (Lastenheft 3.2: I-06) ------------------------
 
 # Was die bleibende Person von der anderen übernimmt, wenn es ihr fehlt.
 _ERGAENZEN = ("vorname", "nachname", "email", "telefon", "veggie", "tshirt", "tshirt_roh",
-              "volljaehrig", "geburtsdatum", "stamm_einwilligung_am")
+              "volljaehrig", "geburtsdatum", "stamm_einwilligung_am", "aufrufe_abbestellt_am")
 # Was nur zusammen übernommen wird – sonst passte das eine nicht zum anderen.
 _ERGAENZEN_ZUSAMMEN = (("tshirt_ausgegeben_am", "tshirt_ausgegeben", "tshirt_kuerzel"),
                        ("eltern_email", "eltern_name", "eltern_bestaetigt_am"))

@@ -35,7 +35,7 @@
       <h2 class="tagkopf" data-tag="{{ datum }}">{{ datum|tag_lang }}</h2>
       {% for s in liste %}
         {% set gewaehlt = s.id in auswahl %}
-        <div class="karte schicht{% if gewaehlt %} gewaehlt{% endif %}" data-schicht
+        <div class="karte schicht{% if gewaehlt %} gewaehlt{% endif %}" id="s{{ s.id }}" data-schicht
              data-tag="{{ s.datum }}" data-bereich="{{ s.bereich }}"
              data-beginn="{{ s.beginn }}" data-ende="{{ s.ende }}"
              data-text="{{ s.bereich }} {{ s|spanne }}">

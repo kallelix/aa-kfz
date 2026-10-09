@@ -1,0 +1,23 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Abbestellen{% endblock %}
+{% block ueberschrift %}Keine Hilferufe und Einladungen mehr?{% endblock %}
+
+{# C-09: ein Klick, getrennt von den Mails zu den eigenen Schichten. Der
+   Link aus der Mail zeigt nur diese Seite – erst der Knopf ändert etwas. #}
+{% block inhalt %}
+  {% if erledigt %}
+    <div class="hinweis gut">Erledigt – wir schicken dir keine Hilferufe und Einladungen mehr.</div>
+    <p>Mails zu deinen eigenen Schichten bekommst du weiter. Wieder bestellen kannst du in
+      <a href="{{ platz_link }}">Mein Helferplatz</a> unter „Angaben ändern“.</p>
+  {% elif schon %}
+    <p>Du hast Hilferufe und Einladungen schon abbestellt. Mails zu deinen eigenen Schichten
+      bekommst du weiter.</p>
+  {% else %}
+    <p>Hallo {{ person.vorname or person.name }}, wir schreiben dir, wenn irgendwo Helfer
+      fehlen oder eine neue Anmeldung startet. Mails zu deinen eigenen Schichten bekommst du
+      auf jeden Fall weiter.</p>
+    <form method="post" action="/abbestellen/{{ tok }}">
+      <button type="submit" class="knopf">Abbestellen</button>
+    </form>
+  {% endif %}
+{% endblock %}

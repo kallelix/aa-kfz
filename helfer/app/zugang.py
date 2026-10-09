@@ -27,6 +27,8 @@ KALENDER = "kalender"
 EMAIL = "email"
 # Das Einverständnis der Eltern (D-06) – gebunden an deren Adresse.
 ELTERN = "eltern"
+# Hilferufe und Einladungen abbestellen (C-09) – kann nur das.
+ABBESTELLEN = "abbestellen"
 
 # Ab so vielen falschen Codes gilt nur noch der Link aus der Mail.
 CODE_VERSUCHE = 5

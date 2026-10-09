@@ -90,6 +90,13 @@
            {% if eingabe.get('stamm') %}checked{% endif %}>
       <span>Ihr dürft mich für künftige Veranstaltungen ansprechen. <span class="leise">Ohne
         Häkchen löschen wir die Angaben nach der Veranstaltung.</span></span></label>
+    {# C-09: Hilferufe und Einladungen – getrennt von den Mails zu den eigenen
+       Schichten, die immer kommen. #}
+    <input type="hidden" name="aufrufe_feld" value="1">
+    <label class="haken"><input type="checkbox" name="aufrufe" value="1"
+           {% if eingabe.get('aufrufe') %}checked{% endif %}>
+      <span>Schreibt mir, wenn irgendwo Helfer fehlen oder eine neue Anmeldung startet.
+        <span class="leise">Mails zu deinen eigenen Schichten bekommst du immer.</span></span></label>
     <button type="submit" class="knopf">Speichern</button>
   </form>
 {% endblock %}

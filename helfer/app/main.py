@@ -17,7 +17,7 @@ import io
 import logging
 import re
 from contextlib import asynccontextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -29,9 +29,9 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader
 from starlette.convertors import StringConvertor, register_url_convertor
 
-from . import (band, config, csv_import, db, eintraege, ical, mail, normalisieren,
-               planung, selbstanmeldung, unterschriften, versand, worker, zeitplan,
-               zugang)
+from . import (band, config, csv_import, db, eintraege, hilferuf, ical, mail,
+               normalisieren, planung, selbstanmeldung, unterschriften, versand, worker,
+               zeitplan, zugang)
 
 # Die Repo-Wurzel steht schon auf dem Suchpfad - siehe __init__.py.
 from . import WURZEL as _WURZELPFAD
@@ -355,6 +355,9 @@ def _eigen(sitzung, pruefung, nummer: int) -> None:
 MELDUNGEN = {
     'zusammengefuehrt': 'Zusammengeführt. Was zur anderen Person gehörte, steht jetzt hier.',
     'eingeladen': 'Die Einladungen sind unterwegs.',
+    'hilferuf': 'Der Hilferuf ist unterwegs.',
+    'hilferuf-leer': 'Wähle mindestens eine Schicht, zu der jemand passt.',
+    'hilferuf-schon': 'Für eine der Schichten wurde gerade schon gerufen – hier ist der neue Stand.',
     'einladen-zu': 'Einladen geht erst, wenn die Anmeldung offen ist.',
     'verschieden': 'Vermerkt: zwei verschiedene Menschen.',
     'zusammen-nr': 'Diese Person gibt es nicht – bitte die Nummer prüfen.',
@@ -427,7 +430,8 @@ def _helfer_gruppen(aktuell) -> list:
             ("/helfer/aufgaben", "Aufgaben", ("/helfer/aufgabe",)),
             ("/helfer/band", "Zeitplan", ())]),
         ("Leute", [("/helfer/helfer", "Helfer", ()),
-                   ("/helfer/einladen", "Einladen", ())]),
+                   ("/helfer/einladen", "Einladen", ()),
+                   ("/helfer/hilferuf", "Hilferuf", ())]),
         ("Vor Ort", vor_ort),
     ]
 
@@ -1256,7 +1260,12 @@ def _einladung(request: Request, v, person) -> tuple:
     tok = zugang.token(zugang.PLATZ, person)
     adresse = normalisieren.kurzadresse(v["kurz"])
     return mail.einladung(person, selbstanmeldung.va_text(v),
-                          f"{basis}/platz/{tok}/{adresse}/schichten", f"{basis}/platz/{tok}")
+                          f"{basis}/platz/{tok}/{adresse}/schichten", _abbestellen(request, person))
+
+
+def _abbestellen(request: Request, person) -> str:
+    """C-09: der Link, mit dem man Hilferufe und Einladungen abbestellt."""
+    return _basis(request) + "/abbestellen/" + zugang.token(zugang.ABBESTELLEN, person)
 
 
 @app.get("/helfer/einladen")
@@ -1267,7 +1276,7 @@ async def einladen_seite(request: Request, hinweis: str = "",
     liste = db.stamm_einzuladen(v["id"])
     beispiel = mail.einladung({"vorname": "Lena", "name": "Lena", "email": ""},
                               selbstanmeldung.va_text(v), "(Link zu den Schichten)",
-                              "(Link zu Mein Helferplatz)")[3]
+                              "(Link zum Abbestellen)")[3]
     return templates.TemplateResponse(
         "admin_einladen.html",
         _admin(request, sitzung, hinweis=hinweis, liste=liste, offen=_zustand(v) == "offen",
@@ -1289,6 +1298,97 @@ async def einladen(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
     db.einladen(v["id"], [(p["id"], _einladung(request, v, p))
                           for p in db.stamm_einzuladen(v["id"])], sitzung.kuerzel)
     return _zurueck("/helfer/einladen", "eingeladen")
+
+
+# --- Hilferuf (Lastenheft 3.4: C-03, C-04, A-12) ---------------------------
+
+def _hilferuf_lage(v, gewaehlt: set[int]) -> dict:
+    """Die knappen Schichten (unter Soll, öffentlich, noch nicht begonnen),
+    wann für sie zuletzt gerufen wurde, und wer aus dem Helferstamm zu den
+    gewählten passt."""
+    seit = db.marke(db.jetzt_lokal() - timedelta(hours=hilferuf.SPERRE_STUNDEN))
+    letzte = db.letzte_hilferufe(v["id"])
+    schichten = sorted((s for s in db.oeffentliche_schichten(v["id"]) if s["lage"] == "frei"),
+                       key=lambda s: (not s["dringend"], s["beginn"]))
+    for s in schichten:
+        s["gerufen"] = letzte.get(s["id"], "")
+        s["gesperrt"] = s["gerufen"] >= seit
+    offen = [s for s in schichten if not s["gesperrt"]]
+    passend = [(k["person"], hilferuf.passend(k, offen, v["beginn"]))
+               for k in db.hilferuf_kandidaten(v["id"])]
+    for s in schichten:
+        s["passend"] = sum(1 for _, treffer in passend if any(t["id"] == s["id"] for t in treffer))
+    empfaenger = []
+    for person, treffer in passend:
+        treffer = [t for t in treffer if t["id"] in gewaehlt]
+        if treffer:
+            empfaenger.append((person, treffer))
+    return {"schichten": schichten, "gewaehlte": [s for s in schichten if s["id"] in gewaehlt],
+            "empfaenger": empfaenger, "seit": seit}
+
+
+def _hilferuf_mail(request: Request, v, person, treffer) -> tuple:
+    """Je Schicht eine Zeile und ein Link, der die Zusage in Mein Helferplatz
+    vorbereitet – dort noch ein Klick, und sie steht."""
+    platz = _basis(request) + "/platz/" + zugang.token(zugang.PLATZ, person)
+    adresse = normalisieren.kurzadresse(v["kurz"])
+    eintraege = []
+    for s in treffer:
+        ort = s["ort"] or s["treffpunkt"]
+        zeile = f"{hilferuf.zeit(s)}  {s['bereich']}" + (f", Treffpunkt: {ort}" if ort else "")
+        eintraege.append((zeile + f" – {hilferuf.frei_text(s)}",
+                          f"{platz}/{adresse}/angaben?s={s['id']}"))
+    return mail.hilferuf(person, selbstanmeldung.va_text(v), eintraege,
+                         _abbestellen(request, person))
+
+
+def _kurzlink(request: Request, schicht_id: int) -> str:
+    return _basis(request) + "/s/" + hilferuf.kurz(schicht_id)
+
+
+@app.get("/helfer/hilferuf")
+async def hilferuf_seite(request: Request, hinweis: str = "",
+                         sitzung: auth.Sitzung = Depends(_sitzung),
+                         v=Depends(_veranstaltung)):
+    """C-03: die knappen Schichten zum Auswählen; dazu der Text für die
+    Community und wer die Mail bekäme."""
+    gewaehlt = {int(x) for x in request.query_params.getlist("s") if x.isdigit()}
+    lage = _hilferuf_lage(v, gewaehlt)
+    text = hilferuf.whatsapp_text(v["name"], lage["gewaehlte"],
+                                  lambda i: _kurzlink(request, i)) if lage["gewaehlte"] else ""
+    return templates.TemplateResponse(
+        "admin_hilferuf.html",
+        _admin(request, sitzung, hinweis=hinweis, schichten=lage["schichten"],
+               gewaehlt=gewaehlt, gewaehlte=lage["gewaehlte"], empfaenger=lage["empfaenger"],
+               text=text, wa=hilferuf.whatsapp_link(text) if text else "",
+               beispiel=_hilferuf_mail(request, v, *lage["empfaenger"][0])[3]
+               if lage["empfaenger"] else "",
+               offen=_zustand(v) == "offen", darf=_pflegt_grenzen(sitzung),
+               sperre=hilferuf.SPERRE_STUNDEN))
+
+
+@app.post("/helfer/hilferuf")
+async def hilferuf_senden(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
+                          v=Depends(_veranstaltung)):
+    """C-03 (a): je passende Person eine Mail mit allen gewählten Schichten,
+    die zu ihr passen. C-04: für eine Schicht, für die in den letzten 24
+    Stunden gerufen wurde, geht keine Mail."""
+    _nur_orga(sitzung)
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    gewaehlt = {int(x) for x in daten.getlist("s") if str(x).isdigit()}
+    zurueck = "/helfer/hilferuf?" + urlencode([("s", i) for i in sorted(gewaehlt)])
+    if _zustand(v) != "offen":
+        return _zurueck(zurueck, "einladen-zu")
+    lage = _hilferuf_lage(v, gewaehlt)
+    if not lage["empfaenger"]:
+        return _zurueck(zurueck, "hilferuf-leer")
+    mails = [(person["id"], [s["id"] for s in treffer], _hilferuf_mail(request, v, person, treffer))
+             for person, treffer in lage["empfaenger"]]
+    if db.hilferuf_senden(v["id"], mails, sitzung.kuerzel, lage["seit"]) is None:
+        return _zurueck(zurueck, "hilferuf-schon")
+    return _zurueck(zurueck, "hilferuf")
 
 
 # --- Dubletten zusammenführen (Lastenheft 3.2: I-06) ------------------------
@@ -2455,7 +2555,7 @@ class _Adresse(StringConvertor):
     Pfadteile. Sonst passte '/monitor/' ohne Schrägstrich auf '/{adresse}',
     und Starlette leitete dorthin um, statt 404 zu geben."""
     regex = (r"(?!(?:helfer|monitor|unterschrift|static|gemeinsam|platz|bestaetigen"
-             r"|kalender|email|eltern|datenschutz)(?![^/]))[^/]+")
+             r"|kalender|email|eltern|datenschutz|abbestellen|s)(?![^/]))[^/]+")
 
 
 register_url_convertor("adresse", _Adresse())
@@ -2600,6 +2700,51 @@ def _warte(gewaehlte) -> set[int]:
     return {s["id"] for s in gewaehlte if s["warteliste"]}
 
 
+@app.get("/s/{code}")
+def schicht_kurzlink(request: Request, code: str):
+    """A-12: der kurze Link auf eine Schicht, für Hilferufe in WhatsApp. Er
+    führt in die Liste, die Schicht ist schon angekreuzt. Ist sie nicht mehr
+    zu haben – voll, vorbei, intern –, kommt dieselbe neutrale Antwort wie
+    bei jeder anderen nicht buchbaren Schicht (K-06)."""
+    nummer = hilferuf.nummer(code)
+    vid = db.schicht_veranstaltung(nummer) if nummer is not None else None
+    v = next((x for x in _oeffentliche() if x["id"] == vid), None) if vid else None
+    if v is None:
+        return _nicht_da(request)
+    adresse = normalisieren.kurzadresse(v["kurz"])
+    if _zustand(v) != "offen":
+        return RedirectResponse(f"/{adresse}", status_code=303)
+    s = next((x for x in db.oeffentliche_schichten(v["id"]) if x["id"] == nummer), None)
+    if s is None or s["lage"] == "voll":
+        return RedirectResponse(f"/{adresse}/schichten?hinweis=nicht-frei", status_code=303)
+    return RedirectResponse(f"/{adresse}/schichten?s={nummer}#s{nummer}", status_code=303)
+
+
+@app.get("/abbestellen/{tok}")
+def abbestellen_seite(request: Request, tok: str):
+    """C-09: Hilferufe und Einladungen abbestellen. Der Link zeigt nur die
+    Seite – erst der Knopf ändert etwas (7.4)."""
+    person = _person_mit(zugang.ABBESTELLEN, tok)
+    if person is None:
+        return _nicht_da(request)
+    return templates.TemplateResponse(
+        "anmeldung_abbestellen.html",
+        _oeffentlich(request, person=person, tok=tok, erledigt=False,
+                     schon=bool(person["aufrufe_abbestellt_am"])))
+
+
+@app.post("/abbestellen/{tok}")
+def abbestellen(request: Request, tok: str):
+    person = _person_mit(zugang.ABBESTELLEN, tok)
+    if person is None:
+        return _nicht_da(request)
+    db.aufrufe_setzen(person["id"], False)
+    return templates.TemplateResponse(
+        "anmeldung_abbestellen.html",
+        _oeffentlich(request, person=person, tok=tok, erledigt=True, schon=True,
+                     platz_link=_basis(request) + "/platz/" + zugang.token(zugang.PLATZ, person)))
+
+
 @app.get("/{adresse:adresse}/schichten")
 def oeffentliche_schichten(request: Request, adresse: str, hinweis: str = ""):
     v = _nach_adresse(adresse)
@@ -2617,7 +2762,10 @@ def oeffentliche_schichten(request: Request, adresse: str, hinweis: str = ""):
                      tage=_anmeldetage(v, schichten),
                      tageszeiten=selbstanmeldung.TAGESZEITEN,
                      hinweis={"leer": "Wähle mindestens eine Schicht – oder trag dich "
-                              "unten als Springer ein."}.get(hinweis, "")))
+                              "unten als Springer ein.",
+                              # K-06, A-12: dieselbe Antwort für alles, was nicht geht.
+                              "nicht-frei": "Diese Schicht ist gerade nicht frei – hier "
+                              "sind andere, die Hilfe brauchen."}.get(hinweis, "")))
 
 
 # --- Der Assistent (Lastenheft 3.1: A-02 bis A-05) --------------------------
@@ -3487,6 +3635,8 @@ def platz_angaben_aendern_seite(request: Request, tok: str):
         eingabe[f"bemerkung-{v['id']}"] = db.bemerkung(v["id"], person["id"])
     if person["stamm_einwilligung_am"]:
         eingabe["stamm"] = "1"
+    if not person["aufrufe_abbestellt_am"]:
+        eingabe["aufrufe"] = "1"
     return _angaben_aendern_seite(request, tok, person, eingabe)
 
 
@@ -3530,6 +3680,10 @@ async def platz_angaben_aendern(request: Request, tok: str):
                                 str(daten.get(feld) or "").strip())
     # D-03, D-05: in den Helferstamm – oder wieder heraus, so einfach wie hinein.
     db.stamm_einwilligung(person["id"], person["id"], bool(daten.get("stamm")))
+    # C-09: getrennt von den Mails zu den eigenen Schichten. Nur, wenn das
+    # Häkchen im Formular stand – sonst hieße „fehlt“ schon „abbestellt“.
+    if daten.get("aufrufe_feld"):
+        db.aufrufe_setzen(person["id"], bool(daten.get("aufrufe")))
     hinweis = "angaben"
     for wer, praefix, email in neue_adressen:
         grund = db.email_vormerken(person["id"], wer["id"], email)

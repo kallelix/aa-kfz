@@ -1,0 +1,81 @@
+{% extends "admin_base.html" %}
+{% block titel %}Hilferuf{% endblock %}
+{% block ueberschrift %}Hilferuf{% endblock %}
+
+{# C-03: knappe Schichten auswählen, dann zweierlei – der Text für die
+   Ankündigungsgruppe der Community (zum Kopieren oder als wa.me-Link) und
+   eine Mail an alle aus dem Helferstamm, zu denen eine der Schichten passt.
+   C-04: je Schicht höchstens eine Mail-Runde in 24 Stunden. #}
+{% block inhalt %}
+  {% if not schichten %}
+    <p class="leer">Keine Schicht unter Soll – gerade braucht es keinen Hilferuf.</p>
+  {% else %}
+    <form method="get" action="/helfer/hilferuf">
+      <div class="tabelle-huelle">
+        <table>
+          <thead>
+            <tr><th scope="col"></th><th scope="col">Schicht</th>
+              <th scope="col" class="rechts">Besetzt</th>
+              <th scope="col" class="rechts">Passend</th></tr>
+          </thead>
+          <tbody>
+            {% for s in schichten %}
+              <tr>
+                <td><input type="checkbox" name="s" value="{{ s.id }}" id="s{{ s.id }}"
+                           {% if s.id in gewaehlt %}checked{% endif %}></td>
+                <td><label for="s{{ s.id }}">{{ s.datum | tag }} {{ s | spanne }} · {{ s.bereich }}</label>
+                  {% if s.dringend %}<span class="marke marke-luecke">unter Minimum</span>{% endif %}</td>
+                <td class="rechts nowrap">{{ s.besetzt }}/{{ s.soll }}</td>
+                <td class="rechts nowrap">
+                  {%- if s.gesperrt %}<span class="gedaempft">gerufen {{ s.gerufen[8:10] }}.{{ s.gerufen[5:7] }}. {{ s.gerufen[11:16] }}</span>
+                  {%- else %}{{ s.passend }}{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="hilfe">„Passend“: so viele aus dem Helferstamm hätten zu der Zeit frei, und
+        Zeiten, Vorlieben, Alter und Einsatzgrenzen stehen nicht dagegen. Für eine Schicht,
+        für die gerufen wurde, geht {{ sperre }} Stunden lang keine Mail mehr – in den Text
+        für die Community darf sie trotzdem.</p>
+      <div class="knopfreihe">
+        <button type="submit" class="knopf-schlicht">Hilferuf vorbereiten</button>
+      </div>
+    </form>
+  {% endif %}
+
+  {% if gewaehlte %}
+    <section class="kasten">
+      <h2>Für die Community</h2>
+      <p class="hilfe">Zum Kopieren in die Ankündigungsgruppe. Jeder Link führt direkt zur
+        Schicht.</p>
+      <textarea aria-label="Text für die Community" rows="{{ 4 + gewaehlte | length * 3 }}" readonly>{{ text }}</textarea>
+      <p><a class="knopf-schlicht" href="{{ wa }}" rel="noopener noreferrer" target="_blank">In WhatsApp öffnen</a></p>
+    </section>
+
+    <section class="kasten">
+      <h2>Per Mail an den Helferstamm ({{ empfaenger | length }})</h2>
+      {% if not empfaenger %}
+        <p class="leer">Zu diesen Schichten passt gerade niemand aus dem Helferstamm.</p>
+      {% else %}
+        <ul class="strichliste">
+          {% for person, treffer in empfaenger %}
+            <li><span><a href="/helfer/helfer/{{ person.id }}">{{ person.name }}</a></span>
+              <span class="gedaempft">{{ treffer | map(attribute='bereich') | join(', ') }}</span></li>
+          {% endfor %}
+        </ul>
+        {% if not offen %}
+          <p class="hilfe">Mails gehen erst, wenn die Anmeldung offen ist.</p>
+        {% elif darf %}
+          <form method="post" action="/helfer/hilferuf">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            {% for s in gewaehlte %}<input type="hidden" name="s" value="{{ s.id }}">{% endfor %}
+            <button type="submit" class="knopf">{{ empfaenger | length }} {{ 'Mail' if empfaenger | length == 1 else 'Mails' }} schicken</button>
+          </form>
+        {% endif %}
+        <h3>So sieht die Mail aus</h3>
+        <pre>{{ beispiel }}</pre>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

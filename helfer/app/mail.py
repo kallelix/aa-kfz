@@ -209,7 +209,7 @@ def anmeldung_offen(email: str, vorname: str, va_text: str, anmeldung: str) -> t
     return ("anmeldestart", email, "Die Anmeldung ist offen", text)
 
 
-def einladung(person, va_text: str, schichten: str, platz: str) -> tuple:
+def einladung(person, va_text: str, schichten: str, abbestellen: str) -> tuple:
     """An den Helferstamm (D-03): die Angaben sind schon da, es fehlen nur
     die Schichten."""
     text = "\n".join([
@@ -223,12 +223,36 @@ def einladung(person, va_text: str, schichten: str, platz: str) -> tuple:
         f"  {schichten}",
         "",
         "Keine Zeit diesmal? Dann ignoriere diese Mail einfach.",
-        "Keine Einladungen mehr? Das stellst du in Mein Helferplatz ab:",
+        "Keine Einladungen und Hilferufe mehr? Ein Klick genügt:",
         "",
-        f"  {platz}",
+        f"  {abbestellen}",
         _fuss(),
     ])
     return ("einladung", person["email"], "Die Anmeldung ist offen – bist du wieder dabei?", text)
+
+
+def hilferuf(person, va_text: str, eintraege: list[tuple[str, str]], abbestellen: str) -> tuple:
+    """C-03 (a): mehrere knappe Schichten in einer Mail, je mit einem Link,
+    der die Zusage gleich vorbereitet. `eintraege`: (Zeile, Link)."""
+    zeilen = [
+        f"Hallo {_vorname(person)},",
+        "",
+        f"bei {va_text} fehlen noch Leute – vielleicht passt dir",
+        "etwas davon:",
+        "",
+    ]
+    for zeile, link in eintraege:
+        zeilen += [f"  {zeile}", f"  Eintragen: {link}", ""]
+    zeilen += [
+        "Ein Klick auf den Link, dann noch einmal bestätigen – fertig.",
+        "Keine Zeit? Dann ignoriere diese Mail einfach.",
+        "",
+        "Keine Hilferufe und Einladungen mehr? Ein Klick genügt:",
+        "",
+        f"  {abbestellen}",
+        _fuss(),
+    ]
+    return ("hilferuf", person["email"], "Hilfe gesucht – " + va_text, "\n".join(zeilen))
 
 
 # --- Selbstbedienung (Lastenheft 2.5) ---------------------------------------

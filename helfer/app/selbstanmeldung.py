@@ -254,6 +254,11 @@ def zeitspannen(roh_werte, tage: list[date]) -> list[tuple[str, str]]:
         if schluessel.endswith("|abend"):
             ende = ende[:11] + ABEND_BIS
         spannen.append((beginn, ende))
+    return vereinen(spannen)
+
+
+def vereinen(spannen) -> list[tuple[str, str]]:
+    """Zeitspannen, die sich überlappen oder berühren, zu einer; sortiert."""
     vereint: list[tuple[str, str]] = []
     for von, bis in sorted(spannen):
         if vereint and von <= vereint[-1][1]:
