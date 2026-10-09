@@ -25,6 +25,7 @@
     {% if schicht.hinweis %}<p class="hilfe">{{ schicht.hinweis }}</p>{% endif %}
     <p class="knopfreihe">
       <a class="knopf-schlicht" href="/helfer/schicht/{{ schicht.id }}/aendern">Schicht ändern</a>
+      <a class="knopf-schlicht" href="/helfer/druck/schicht/{{ schicht.id }}">Liste drucken</a>
       <a class="knopf-schlicht" href="/helfer/bereich/{{ schicht.bereich_id }}">Zum Bereich</a>
     </p>
   </section>

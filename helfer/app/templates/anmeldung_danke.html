@@ -3,6 +3,11 @@
 {% block ueberschrift %}Danke, {{ anmeldung.anmelder.vorname or anmeldung.anmelder.name }}!{% endblock %}
 
 {% block inhalt %}
+  {% if hinweis %}<div class="hinweis gut">{{ hinweis }}</div>{% endif %}
+  {% if gruende %}
+    <div class="hinweis warn" role="alert"><strong>Das ging leider nicht:</strong>
+      <ul>{% for g in gruende %}<li>{{ g }}</li>{% endfor %}</ul></div>
+  {% endif %}
   {% if anmeldung.anmelder.email_bestaetigt_am %}
     <div class="hinweis gut">Du bist dabei. Deine Schichten und alles Weitere findest du
       in Mein Helferplatz – der Link steht in deiner Mail.</div>
@@ -49,6 +54,24 @@
       <div class="karte"><h3>Springer</h3><p>{{ f.beginn|zeitpunkt }} bis {{ f.ende|uhr }} – wir setzen dich ein, wo gerade jemand fehlt.</p></div>
     {% endfor %}
   {% endfor %}
+
+
+  {% if noch.vorschlaege %}
+    {# G-03: die zweite und dritte Schicht – direkt nach der ersten. #}
+    <section class="karte noch">
+      <h2>{{ ('Noch eine Schicht bis: ' ~ noch.goodie ~ '!') if noch.goodie else 'Noch eine Schicht?' }}</h2>
+      <p class="leise">Die passen gut zu {{ 'euren' if noch.gruppe else 'deinen' }} Schichten:</p>
+      {% for s in noch.vorschlaege %}
+        <form method="post" action="/{{ adresse }}/noch?p={{ p }}&amp;t={{ t }}" class="vorschlag">
+          <input type="hidden" name="s" value="{{ s.id }}">
+          <span><strong>{{ s.bereich }}</strong> · {{ s.datum|tag }} {{ s|spanne }}
+            {%- if s.warum %} <span class="leise">– {{ s.warum }}</span>{% endif %}
+            {%- if s.dringend %} <span class="marke dringend">wird dringend gebraucht</span>{% endif %}</span>
+          <button type="submit" class="knopf klein">{{ 'Für alle eintragen' if noch.gruppe else 'Eintragen' }}</button>
+        </form>
+      {% endfor %}
+    </section>
+  {% endif %}
 
   <p class="leise">Bitte sei 15 Minuten vor Beginn am Treffpunkt.</p>
 {% endblock %}

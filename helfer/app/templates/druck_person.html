@@ -1,0 +1,43 @@
+{# Druckansicht Person (L-04): wann und wo jemand eingeteilt ist – etwa zum
+   Mitgeben, wer kein Handy hat. #}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ person.name }} – {{ va.kurz }}</title>
+  <link rel="stylesheet" href="/helfer/static/druck.css">
+</head>
+<body>
+  <div class="werkzeug"><button type="button" data-drucken>Drucken</button></div>
+  <header class="kopf">
+    <p class="klein">{{ va.name }}</p>
+    <h1>{{ person.name }}</h1>
+    <p class="angaben">
+      {%- if person.telefon %}Telefon {{ person.telefon }}{% endif %}
+      {%- if angebot.shirt and person.tshirt_roh %} · Shirt {{ person.tshirt_roh }}{% endif %}
+      {%- if angebot.verpflegung and person.veggie is not none %} · {{ 'vegetarisch' if person.veggie == 1 else 'mit Fleisch' }}{% endif %}</p>
+  </header>
+  {% if not schichten %}
+    <p>Keine Schicht in {{ va.kurz }}.</p>
+  {% else %}
+    <table class="liste">
+      <thead><tr><th>Tag</th><th>Zeit</th><th>Bereich</th><th>Treffpunkt</th><th>Ansprechpartner</th></tr></thead>
+      <tbody>
+        {% for s in schichten %}
+          <tr>
+            <td class="nowrap">{{ s.datum|tag }}</td>
+            <td class="nowrap">{{ s|spanne }}</td>
+            <td>{{ s.bereich }}{% if s.art == 'reserve' %} <span class="klein">(Reserve)</span>{% endif %}</td>
+            <td>{{ s.ort or s.treffpunkt or '–' }}</td>
+            <td>{% for k in leitungen.get(s.bereich_id, []) %}{{ k.name }}{% if k.telefon %} {{ k.telefon }}{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  <p class="angaben">Bitte 15 Minuten vor Beginn am Treffpunkt sein. Fragen: {{ kontakt_name }}{% if kontakt_telefon %} · {{ kontakt_telefon }}{% endif %}</p>
+  <p class="fuss">Stand {{ stand }}</p>
+  <script src="/helfer/static/druck.js"></script>
+</body>
+</html>

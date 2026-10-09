@@ -77,6 +77,37 @@ Mails gehen wie in Kennzeichen und Presse über `mail_out` und einen Worker
 und `MAIL_FROM` gesetzt sind. Verschickte Mails werden nach einem Monat
 gelöscht.
 
+## Noch eine Schicht? und das gemeinsame Ziel
+
+Die erste Schicht ist leicht – es geht um die zweite und dritte (Lastenheft
+2.6, G-03, G-04):
+
+- Gleich nach dem Eintragen schlagen Dankeseite und Mein Helferplatz bis zu
+  drei Schichten vor: am liebsten direkt davor oder danach im selben
+  Bereich, dann am selben Tag, dann was dringend gebraucht wird. Nur was für
+  alle frei ist, sich mit nichts überschneidet, zum Alter passt und keine
+  Voraussetzung verlangt, die noch niemand bestätigt hat. Fehlt für ein
+  Goodie genau eine Schicht, heißt es „Noch eine Schicht bis: …“. Auf der
+  Dankeseite trägt ein Klick ein, für alle, die zusammen angemeldet sind.
+- Die Startseite zeigt je Tag, wie viele der geplanten Plätze besetzt sind –
+  das Wir, keine Rangliste.
+
+## Drucken
+
+Unter Vor Ort → Drucken (Lastenheft 2.8, L-01 bis L-04), jederzeit aktuell –
+die Seite ist die Liste, gedruckt wird aus dem Browser, A4 hoch:
+
+- **Schicht** (an der Schicht), **Bereich** je Tag oder alle Tage, **Tag**
+  gesamt, **Person** (an der Person).
+- Kopf mit Bereich, Zeit, Treffpunkt und Bereichsleitung samt Nummer; Spalten
+  zum Abhaken für *da*, Shirt (wenn es welche gibt) und Funk; zwei leere
+  Zeilen für die, die am Tag dazukommen; die Warteliste darunter. Wer
+  mitangemeldet ist, steht mit der Nummer der Person, die angemeldet hat.
+- **Notfallmappe** je Tag: Deckblatt mit Orga, Bereichsleitungen und den
+  Springern des Tages, dann je Bereich eine Seite. Am Vorabend drucken.
+- Eine Bereichsleitung druckt nur ihre Bereiche. Einsatzgrenzen stehen auf
+  keinem Ausdruck.
+
 ## Selbstbedienung
 
 Was Helfer heute die Orga anschreiben müssten, erledigen sie in Mein
@@ -244,6 +275,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_grenzen.py      # Einsatzgrenzen
 .venv/Scripts/python.exe helfer/tests/test_helferplatz.py  # Bestätigen, Mein Helferplatz, Kalender
 .venv/Scripts/python.exe helfer/tests/test_selbstbedienung.py  # Absagen, Tauschen, Warteliste, Löschen
+.venv/Scripts/python.exe helfer/tests/test_druck.py        # Noch eine Schicht?, Tagesbalken, Drucken
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

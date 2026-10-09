@@ -13,6 +13,18 @@
     </a>
     {% if va.anmeldung_bis %}<p class="leise">Anmelden bis {{ va.anmeldung_bis.strftime('%d.%m.%Y') }}.</p>{% endif %}
 
+    {% if ziele %}
+      {# G-04: das gemeinsame Ziel – das Wir zählt, keine Rangliste. #}
+      <h2>So weit sind wir</h2>
+      {% for z in ziele %}
+        <div class="balken">
+          <div class="balken-kopf"><span>{{ z.lang }}</span>
+            <span>{{ z.besetzt }} von {{ z.soll }} Plätzen besetzt</span></div>
+          <progress class="balken-bahn" max="{{ z.soll }}" value="{{ z.besetzt }}">{{ z.besetzt }} von {{ z.soll }}</progress>
+        </div>
+      {% endfor %}
+    {% endif %}
+
   {% elif zustand == 'bald' %}
     <p>Die Anmeldung öffnet {% if va.anmeldung_ab %}am <strong>{{ va.anmeldung_ab.strftime('%d.%m.%Y') }}</strong>{% else %}bald{% endif %}.
       Wir sagen dir Bescheid, sobald es losgeht.</p>

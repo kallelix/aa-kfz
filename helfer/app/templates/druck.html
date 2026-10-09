@@ -1,0 +1,110 @@
+{# Druckansichten (Lastenheft 2.8, L-01 bis L-04). Eine eigene Hülle ohne
+   Navigation: was hier steht, kommt aufs Papier. Jederzeit aktuell – die
+   Seite ist die Liste, gedruckt wird aus dem Browser. Einsatzgrenzen stehen
+   auf keinem Ausdruck (K-07). #}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ titel }} – {{ va.kurz }}</title>
+  <link rel="stylesheet" href="/helfer/static/druck.css">
+</head>
+<body>
+  <div class="werkzeug">
+    <button type="button" data-drucken>Drucken</button>
+    <span>A4 hoch. Jeder Bereich{% if mappe %} beginnt auf einer neuen Seite{% else %} bleibt möglichst beisammen{% endif %}.</span>
+  </div>
+
+  {% if mappe %}
+    {# L-03: das Deckblatt – wen man anruft, wenn nichts mehr geht. #}
+    <section class="blatt deckblatt">
+      <p class="klein">{{ va.name }}</p>
+      <h1>Notfallmappe</h1>
+      <p class="gross">{{ tag_lang }}</p>
+      <h2>Orga</h2>
+      <p>{{ kontakt_name }}{% if kontakt_telefon %} · {{ kontakt_telefon }}{% endif %}{% if kontakt_mail %} · {{ kontakt_mail }}{% endif %}</p>
+      <h2>Bereichsleitungen</h2>
+      <table>
+        <tbody>
+          {% for g in gruppen %}
+            <tr><td>{{ g.bereich }}</td>
+              <td>{% for k in leitungen.get(g.bereich_id, []) %}{{ k.name }}{% if k.telefon %} · {{ k.telefon }}{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}<span class="leise">–</span>{% endfor %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h2>Springer an diesem Tag</h2>
+      {% if springer %}
+        <table>
+          <tbody>
+            {% for f in springer %}
+              <tr><td class="nowrap">{{ f.beginn[11:16] }}–{{ f.ende[11:16] if f.ende[:10] == f.beginn[:10] else '24:00' }}</td>
+                <td>{{ f.name }}</td><td class="nowrap">{{ f.telefon or '–' }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}<p class="leise">Keine.</p>{% endif %}
+      <p class="fuss">Stand {{ stand }} · Enthält Telefonnummern – nach der Veranstaltung vernichten.</p>
+    </section>
+  {% else %}
+    <header class="kopf">
+      <p class="klein">{{ va.name }}</p>
+      <h1>{{ titel }}</h1>
+    </header>
+  {% endif %}
+
+  {% for g in gruppen %}
+    <section class="bereich{% if mappe %} neue-seite{% endif %}">
+      {% if mappe or gruppen|length > 1 %}<h2 class="bereichskopf">{{ g.bereich }}</h2>{% endif %}
+      {% for s in g.schichten %}
+        <div class="schicht">
+          {# L-02: Bereich, Zeit, Treffpunkt, Bereichsleitung mit Nummer. #}
+          <h3>{{ s.bereich }} · {{ s.datum|tag }} {{ s|spanne }}</h3>
+          <p class="angaben">Treffpunkt: {{ s.ort or s.treffpunkt or '–' }}
+            {%- for k in leitungen.get(s.bereich_id, []) %}{% if loop.first %} · Bereichsleitung: {% else %}, {% endif %}{{ k.name }}{% if k.telefon %} {{ k.telefon }}{% endif %}{% endfor %}
+            · {{ s.besetzt }} von {{ s.soll }} besetzt, Minimum {{ s.minimum }}</p>
+          {% if s.hinweis %}<p class="angaben">{{ s.hinweis }}</p>{% endif %}
+          <table class="liste">
+            <thead>
+              <tr><th class="haken">da</th><th>Name</th><th>Telefon</th>
+                {% if angebot.shirt %}<th class="haken">Shirt</th>{% endif %}
+                <th class="haken">Funk</th><th>Hinweis</th></tr>
+            </thead>
+            <tbody>
+              {% for h in s.leute %}
+                <tr>
+                  <td class="haken">☐</td>
+                  <td>{{ h.name }}</td>
+                  <td class="nowrap">{% if h.telefon %}{{ h.telefon }}{% elif h.ueber_name %}<span class="klein">über {{ h.ueber_name }}</span> {{ h.ueber_telefon }}{% else %}–{% endif %}</td>
+                  {% if angebot.shirt %}<td class="haken nowrap">☐ {{ h.tshirt_roh if h.tshirt_roh and h.tshirt_roh != 'kein Shirt' else (h.tshirt or '') }}</td>{% endif %}
+                  <td class="haken">☐</td>
+                  <td class="klein">{{ [
+                    'Reserve' if h.art == 'reserve' else '',
+                    'von der Warteliste angefragt' if h.bestaetigen_bis
+                      else ('noch nicht bestätigt' if h.unbestaetigt else ''),
+                    'vegetarisch' if h.veggie == 1 else ''] | select | join(', ') }}</td>
+                </tr>
+              {% endfor %}
+              {# Platz für die, die am Tag noch dazukommen. #}
+              {% for _ in range(2 if s.leute|length < s.soll + s.reserve else 1) %}
+                <tr class="leer"><td class="haken">☐</td><td></td><td></td>
+                  {% if angebot.shirt %}<td class="haken">☐</td>{% endif %}<td class="haken">☐</td><td></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if s.warteliste %}
+            <p class="klein">Warteliste: {% for w in s.warteliste %}{{ w.name }}{% if w.telefon %} ({{ w.telefon }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+      {% if mappe %}<p class="fuss">Stand {{ stand }} · {{ va.kurz }} · {{ g.bereich }}</p>{% endif %}
+    </section>
+  {% else %}
+    <p>Hier gibt es keine Schicht.</p>
+  {% endfor %}
+
+  {# L-02: der Fuß – Stand mit Uhrzeit. #}
+  {% if not mappe %}<p class="fuss">Stand {{ stand }} · Enthält Telefonnummern – nach der Veranstaltung vernichten.</p>{% endif %}
+  <script src="/helfer/static/druck.js"></script>
+</body>
+</html>

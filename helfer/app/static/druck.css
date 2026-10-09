@@ -1,0 +1,65 @@
+/* Druckansichten (Lastenheft 2.8). Am Bildschirm ein Blatt auf grauem
+   Grund, gedruckt A4 hoch ohne alles Drumherum. Bewusst schwarz-weiß: die
+   Listen landen auf dem Bürodrucker. */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0 auto;
+  max-width: 210mm;
+  padding: 12mm;
+  font: 10.5pt/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #000;
+  background: #fff;
+}
+
+@media screen {
+  html { background: #e5e7eb; }
+  body { margin: 1rem auto; box-shadow: 0 1px 6px rgba(0, 0, 0, .15); }
+}
+
+.werkzeug {
+  display: flex; gap: .75rem; align-items: center;
+  margin: -4mm 0 6mm; padding: .5rem .75rem;
+  background: #f3f4f6; border-radius: 6px; font-size: 10pt;
+}
+.werkzeug button {
+  font: inherit; font-weight: 600; padding: .35rem .9rem; cursor: pointer;
+  border: 1px solid #1d4ed8; border-radius: 6px; background: #1d4ed8; color: #fff;
+}
+
+h1 { font-size: 17pt; margin: 0 0 2mm; }
+h2 { font-size: 13pt; margin: 6mm 0 2mm; }
+h3 { font-size: 11pt; margin: 0 0 1mm; }
+.klein { font-size: 8.5pt; color: #333; }
+.leise { color: #555; }
+.gross { font-size: 14pt; margin: 0 0 6mm; }
+.nowrap { white-space: nowrap; }
+
+.kopf { margin-bottom: 4mm; }
+.angaben { margin: 0 0 2mm; font-size: 9.5pt; }
+.bereichskopf { border-bottom: 2px solid #000; padding-bottom: 1mm; }
+
+.schicht { margin: 0 0 6mm; break-inside: avoid; page-break-inside: avoid; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; vertical-align: top; padding: 1.2mm 1.5mm; }
+.liste th { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .03em;
+  border-bottom: 1.5px solid #000; }
+.liste td { border-bottom: .5px solid #999; }
+.liste tr.leer td { height: 7mm; }
+.haken { width: 1%; white-space: nowrap; text-align: center; font-size: 11pt; }
+.deckblatt td { border-bottom: .5px solid #999; }
+
+.fuss { margin-top: 6mm; font-size: 8.5pt; color: #333; border-top: .5px solid #999;
+  padding-top: 1.5mm; }
+
+@page { size: A4 portrait; margin: 12mm; }
+
+@media print {
+  body { max-width: none; padding: 0; }
+  .werkzeug { display: none; }
+  .deckblatt { break-after: page; page-break-after: always; }
+  .neue-seite + .neue-seite { break-before: page; page-break-before: always; }
+  a { color: inherit; text-decoration: none; }
+}

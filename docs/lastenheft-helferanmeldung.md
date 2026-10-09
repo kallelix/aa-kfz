@@ -352,6 +352,14 @@ und dritte**.
 | G-08 | **Keine** öffentlichen Bestenlisten mit Namen. Studien aus Ehrenamtsprojekten zeigen: Ranglisten spornen wenige an und vergraulen andere (Anhang B). | M | – |
 | G-09 | **Helferparty**: nach den Veranstaltungen gibt es in der Regel eine – Grillen und Beisammensein. Einladung an **alle** Helfer der Veranstaltung, mit Zu- oder Absage und der Zahl der Begleitpersonen, damit die Orga Grillgut und Getränke planen kann; Erinnerung am Tag. Keine Belohnungsstufe – eingeladen ist jeder, der geholfen hat. | S | 4 |
 
+**Stand 09.10.2026, Schritt 2.6:** G-03 und G-04 sind umgesetzt. Die
+Vorschläge kommen auf der Dankeseite – dort mit einem Klick eingetragen, für
+alle, die zusammen angemeldet sind – und in Mein Helferplatz gleich nach dem
+Dazunehmen. „Noch eine Schicht bis …“ nennt das Goodie, für das genau eine
+Schicht fehlt. Vorgeschlagen wird nur, was passt: frei für alle, ohne
+Überschneidung, im Alter, und keine Voraussetzung, die noch niemand bestätigt
+hat.
+
 ### 5.8 Kommunikation und WhatsApp (C)
 
 Die Recherche (Stand Oktober 2026, Quellen in Anhang A) ergibt ein klares
@@ -403,6 +411,13 @@ Ankündigungsgruppe niemanden mit @ erwähnen: das zeigt dessen Nummer allen.
 | L-03 | **Notfallmappe**: ein Druck mit allen Listen eines Tages, nach Bereichen getrennt, mit Telefonnummern – für den Fall, dass am Tag nichts geht. | S | 2 |
 | L-04 | Eine Auswahl an Ansichten statt vieler Varianten: *Schicht*, *Bereich*, *Tag*, *Person*. Mehr nicht. | M | 2 |
 | L-05 | CSV-Ausfuhr wie heute, eine Zeile je Person. | M | 2 |
+
+**Stand 09.10.2026, Schritt 2.8:** L-01 bis L-04 sind umgesetzt, L-05 gab es
+schon. Die Listen sind Seiten, die der Browser druckt (A4 hoch), mit zwei
+leeren Zeilen je Schicht für Nachzügler und der Warteliste darunter. Die
+Notfallmappe hat ein Deckblatt mit Orga, Bereichsleitungen und den Springern
+des Tages, dann je Bereich eine Seite. Eine Bereichsleitung druckt nur ihre
+Bereiche; Einsatzgrenzen stehen auf keinem Ausdruck (K-07).
 
 ### 5.10 Am Veranstaltungstag (T)
 
@@ -760,9 +775,9 @@ Selbstbedienung.
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | **erledigt** |
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | **erledigt** |
 | 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; **Warteliste mit Nachrücken** (R-04, aus 3.6); Meldung kurzfristiger Absagen; Protokoll | **erledigt** |
-| 2.6 | „Noch eine Schicht?" nach dem Eintragen, Tagesbalken auf der Startseite | 3 h |
+| 2.6 | „Noch eine Schicht?" nach dem Eintragen, Tagesbalken auf der Startseite | **erledigt** |
 | 2.7 | Dashboard und Monitor: Stufen statt Bedarf, Reserve, Springer, kurzfristige Absagen | 4 h |
-| 2.8 | Druckansichten und Notfallmappe | 3 h |
+| 2.8 | Druckansichten und Notfallmappe | **erledigt** |
 | 2.9 | Datenschutzhinweise, Einwilligungen, Altersprüfung, Elternbestätigung, Löschwerkzeug angepasst | 5 h |
 | 2.10 | Lasttest: 200 gleichzeitige Anmeldungen auf dieselben zehn Plätze, Umbuchen gegeneinander | 2 h |
 
@@ -785,13 +800,13 @@ Bestehendes umgebaut.
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
 89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 bis
-2.5 schon erledigt; es bleiben rund 19 Stunden, die 8 Stunden pro Woche haben
+2.6 und 2.8 schon erledigt; es bleiben rund 13 Stunden, die 8 Stunden pro Woche haben
 also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~19 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~13 h, ab 12. Oktober |
 | --- | --- |
-| Anfang Dezember 2026 | ~3 h |
-| **Mitte Dezember 2026** | **~2 h** |
+| Anfang Dezember 2026 | ~2 h |
+| **Mitte Dezember 2026** | **~1,5 h** |
 | Rückfallebene: Anfang März 2027 | ~1 h |
 
 Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
@@ -839,7 +854,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~65 h, davon ~48 h erledigt |
+| 2 Öffnung | ~65 h, davon ~54 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |

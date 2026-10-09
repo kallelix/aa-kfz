@@ -531,7 +531,9 @@ try:
             ("/helfer/bereich/neu", ("Helfer", "Planen", "Bereiche & Schichten")),
             ("/helfer/schichten", ("Helfer", "Planen", "Bereiche & Schichten")),
             ("/helfer/helfer/neu", ("Helfer", "Leute", None)),
-            ("/helfer/monitor", ("Helfer", "Vor Ort", None)),
+            # Seit 2.8 steht unter Vor Ort auch Drucken, also eine dritte Ebene.
+            ("/helfer/monitor", ("Helfer", "Vor Ort", "Monitor")),
+            ("/helfer/druck", ("Helfer", "Vor Ort", "Drucken")),
             ("/helfer/funk", ("Ausgabe", None, "Funk")),
             ("/helfer/schluessel", ("Ausgabe", None, "Schlüssel")),
             ("/helfer/goodie/neu", ("Verwaltung", None, "Goodies & Verpflegung")),

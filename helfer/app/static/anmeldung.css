@@ -280,3 +280,19 @@ details.karte > summary { cursor: pointer; font-weight: 600; }
 .aktionen .knopf { width: auto; }
 .wahl-zeile { display: flex; gap: .75rem; align-items: flex-start; cursor: pointer; }
 .wahl-zeile input { margin-top: .3rem; }
+
+/* Das gemeinsame Ziel (G-04): <progress> statt einer Breite im style-
+   Attribut – die verbietet die CSP. */
+progress.balken-bahn { display: block; width: 100%; height: .7rem; border: 0;
+  appearance: none; -webkit-appearance: none; border-radius: 99px;
+  background: var(--rand); overflow: hidden; }
+progress.balken-bahn::-webkit-progress-bar { background: var(--rand); border-radius: 99px; }
+progress.balken-bahn::-webkit-progress-value { background: var(--ok); border-radius: 99px; }
+progress.balken-bahn::-moz-progress-bar { background: var(--ok); border-radius: 99px; }
+
+/* Noch eine Schicht? (G-03) */
+.noch { border-color: var(--ok); }
+.vorschlag { display: flex; gap: .75rem; align-items: center; justify-content: space-between;
+  padding: .5rem 0; border-top: 1px solid var(--rand); }
+.vorschlag:first-of-type { border-top: 0; }
+.vorschlag .knopf { margin: 0; flex: none; }

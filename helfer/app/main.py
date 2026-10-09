@@ -298,7 +298,8 @@ def _veranstaltung(request: Request):
 _BEREICHSLEITUNG_PFADE = re.compile(
     r"^/helfer(/veranstaltung|/bereiche|/bereich/\d+(/schicht/neu)?"
     r"|/schichten|/schicht/\d+(/aendern|/loeschen|/einteilen)?"
-    r"|/einteilung/\d+/austragen|/helfer/\d+|/aenderungen)?$")
+    r"|/einteilung/\d+/austragen|/helfer/\d+|/aenderungen"
+    r"|/druck(/schicht/\d+|/bereich/\d+|/tag/[0-9-]+|/mappe/[0-9-]+|/person/\d+)?)?$")
 
 
 def _sitzung(request: Request) -> kern_auth.Sitzung:
@@ -398,6 +399,7 @@ def _helfer_gruppen(aktuell) -> list:
     if aktuell is not None and db.angebot(aktuell["id"])["shirt"]:
         vor_ort.append(("/helfer/shirts", "Shirts & Goodies", ()))
     vor_ort.append(("/helfer/monitor", "Monitor", ()))
+    vor_ort.append(("/helfer/druck", "Drucken", ()))
     return [
         ("Übersicht", [("/helfer", "Übersicht", ()),
                        ("/helfer/aenderungen", "Änderungen", ())]),
@@ -416,7 +418,8 @@ GRUPPEN_BEREICHSLEITUNG = [
     ("Meine Bereiche", [("/helfer/bereiche", "Meine Bereiche",
                          ("/helfer/bereich", "/helfer/schichten", "/helfer/schicht",
                           "/helfer/helfer")),
-                        ("/helfer/aenderungen", "Änderungen", ())]),
+                        ("/helfer/aenderungen", "Änderungen", ()),
+                        ("/helfer/druck", "Drucken", ())]),
 ]
 
 # Der Reiter Ausgabe. Bis die Materialausgabe verallgemeinert ist (3.8),
@@ -2365,7 +2368,9 @@ async def oeffentliche_veranstaltung(request: Request, adresse: str, vorgemerkt:
     return templates.TemplateResponse(
         "anmeldung_start.html",
         _oeffentlich(request, v, zustand=_zustand(v), vorgemerkt=bool(vorgemerkt),
-                     eingabe={}, fehler=""))
+                     eingabe={}, fehler="",
+                     ziele=[{**z, "lang": _tag_lang(z["datum"])} for z in db.tagesziele(v["id"])]
+                     if _zustand(v) == "offen" else []))
 
 
 @app.post("/{adresse:adresse}/interesse")
@@ -2574,11 +2579,22 @@ async def angaben_absenden(request: Request, adresse: str):
                             status_code=303)
 
 
-def _danke_seite(request, v, ergebnis, p, t, fehler="", status_code=200):
+def _noch_eine(v, personen) -> dict:
+    """G-03: Vorschläge für die nächste Schicht – und wofür sie reicht."""
+    ids = [e["person"]["id"] for e in personen]
+    eigene = len(personen[0]["schichten"]) if personen else 0
+    return {"vorschlaege": db.schicht_vorschlaege(v["id"], ids) if _zustand(v) == "offen" else [],
+            "goodie": db.naechstes_goodie(v["id"], eigene), "gruppe": len(ids) > 1}
+
+
+def _danke_seite(request, v, ergebnis, p, t, fehler="", status_code=200, hinweis="",
+                 gruende=()):
     return templates.TemplateResponse(
         "anmeldung_danke.html",
         _oeffentlich(request, v, anmeldung=ergebnis, p=p, t=t, fehler=fehler,
-                     code_gesperrt=ergebnis["anmelder"]["code_versuche"] >= zugang.CODE_VERSUCHE),
+                     code_gesperrt=ergebnis["anmelder"]["code_versuche"] >= zugang.CODE_VERSUCHE,
+                     noch=_noch_eine(v, ergebnis["personen"]), hinweis=hinweis,
+                     gruende=list(gruende)),
         status_code=status_code)
 
 
@@ -2591,11 +2607,40 @@ def _danke_laden(adresse: str, p: str, t: str):
 
 
 @app.get("/{adresse:adresse}/danke")
-async def danke(request: Request, adresse: str, p: str = "", t: str = ""):
+async def danke(request: Request, adresse: str, p: str = "", t: str = "", hinweis: str = ""):
     v, ergebnis = _danke_laden(adresse, p, t)
     if ergebnis is None:
         return _nicht_da(request)
-    return _danke_seite(request, v, ergebnis, p, t)
+    return _danke_seite(request, v, ergebnis, p, t,
+                        hinweis="Eingetragen – danke, das hilft uns sehr!" if hinweis == "noch" else "")
+
+
+@app.post("/{adresse:adresse}/noch")
+async def noch_eine_schicht(request: Request, adresse: str, p: str = "", t: str = ""):
+    """G-03: einen Vorschlag von der Dankeseite gleich eintragen – für alle,
+    die zusammen angemeldet sind. Nur, was die Seite vorgeschlagen hat; die
+    Adresse ist damit noch nicht bestätigt."""
+    v, ergebnis = _danke_laden(adresse, p, t)
+    if ergebnis is None or _zustand(v) != "offen":
+        return _nicht_da(request)
+    daten = await request.form()
+    gewuenscht = str(daten.get("s") or "")
+    angeboten = {s["id"] for s in _noch_eine(v, ergebnis["personen"])["vorschlaege"]}
+    if not gewuenscht.isdigit() or int(gewuenscht) not in angeboten:
+        return _danke_seite(request, v, ergebnis, p, t, status_code=409, gruende=[
+            "Diese Schicht ist gerade nicht frei – in der Liste findest du andere, die Hilfe brauchen."])
+    person = ergebnis["anmelder"]
+    try:
+        db.dazunehmen(v["id"], person["id"], [e["person"]["id"] for e in ergebnis["personen"]],
+                      [], [int(gewuenscht)], [], bestaetigt=False)
+    except db.AnmeldeFehler as ausnahme:
+        return _danke_seite(request, v, ergebnis, p, t, status_code=409, gruende=ausnahme.gruende)
+    if person["email_bestaetigt_am"]:
+        neu = db.anmeldung_laden(v["id"], person["id"])
+        db.mail_einreihen(person["id"], mail.dazu(
+            neu["anmelder"], selbstanmeldung.va_text(v), neu["personen"],
+            _links(request, person)["platz"]))
+    return RedirectResponse(f"/{adresse}/danke?p={p}&t={t}&hinweis=noch", status_code=303)
 
 
 @app.post("/{adresse:adresse}/danke")
@@ -2725,7 +2770,10 @@ async def platz(request: Request, tok: str, hinweis: str = ""):
         veranstaltungen.append({
             "va": v, "tage": _tage_text(v), "adresse": normalisieren.kurzadresse(v["kurz"]),
             "zustand": _zustand(v), "personen": ergebnis["personen"],
-            "leitungen": db.leitungen(sorted(bereiche))})
+            "leitungen": db.leitungen(sorted(bereiche)),
+            # G-03: direkt nach dem Eintragen, nicht bei jedem Besuch.
+            "noch": _noch_eine(v, ergebnis["personen"][:1])
+            if hinweis in ("dazu", "bestaetigt") else None})
     dabei = {x["va"]["id"] for x in veranstaltungen}
     weitere = [{"va": v, "tage": _tage_text(v), "adresse": normalisieren.kurzadresse(v["kurz"])}
                for v in _oeffentliche() if _zustand(v) == "offen" and v["id"] not in dabei]
@@ -3295,3 +3343,110 @@ async def aenderungen(request: Request, stunden: int = 24,
         "admin_aenderungen.html",
         _admin(request, sitzung, stunden=stunden,
                **db.aenderungen(v["id"], _leitung(sitzung), stunden)))
+
+
+# --- Druckansichten und Notfallmappe (Lastenheft 2.8) --------------------------
+#
+# L-01 bis L-04: jederzeit aktuell, ohne Erzeugen und Warten – eine Seite,
+# die der Browser druckt. Vier Ansichten, nicht mehr: Schicht, Bereich (je
+# Tag oder alle), Tag, Person; dazu die Notfallmappe eines Tages. Eine
+# Bereichsleitung druckt nur ihre Bereiche. Einsatzgrenzen stehen auf keinem
+# Ausdruck (K-07).
+
+def _druck(request: Request, sitzung, v, titel: str, schichten, mappe: bool = False,
+           datum: str = "", person=None):
+    bereiche = sorted({s["bereich_id"] for s in schichten})
+    gruppen = []
+    for s in schichten:
+        if not gruppen or gruppen[-1]["bereich_id"] != s["bereich_id"]:
+            gruppen.append({"bereich_id": s["bereich_id"], "bereich": s["bereich"],
+                            "schichten": []})
+        gruppen[-1]["schichten"].append(s)
+    return templates.TemplateResponse(
+        "druck.html",
+        _kontext(request, va=v, titel=titel, gruppen=gruppen, mappe=mappe, person=person,
+                 leitungen=db.leitungen(bereiche), angebot=db.angebot(v["id"]),
+                 springer=db.springer_am(v["id"], datum) if mappe else [],
+                 tag_lang=_tag_lang(datum) if datum else "",
+                 stand=db.jetzt_lokal().strftime("%d.%m.%Y %H:%M")))
+
+
+@app.get("/helfer/druck")
+async def druck_auswahl(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
+                        v=Depends(_veranstaltung)):
+    """Was es zu drucken gibt – je Tag die Liste und die Notfallmappe, je
+    Bereich und Tag."""
+    return templates.TemplateResponse(
+        "admin_druck.html",
+        _admin(request, sitzung, tage=[{"datum": t, "lang": _tag_lang(t)} for t in db.tage(v["id"])],
+               bereichsliste=db.bereiche(v["id"], _leitung(sitzung))))
+
+
+def _datum(roh: str) -> str:
+    try:
+        return date.fromisoformat(roh).isoformat()
+    except ValueError:
+        return ""
+
+
+@app.get("/helfer/druck/schicht/{schicht_id}")
+async def druck_schicht(request: Request, schicht_id: int,
+                        sitzung: auth.Sitzung = Depends(_sitzung), v=Depends(_veranstaltung)):
+    _eigen(sitzung, db.leitet_schicht, schicht_id)
+    schichten = db.druckliste(v["id"], schicht_id=schicht_id)
+    if not schichten:
+        return _fehlt(request)
+    return _druck(request, sitzung, v, "Schichtliste", schichten)
+
+
+@app.get("/helfer/druck/bereich/{bereich_id}")
+async def druck_bereich(request: Request, bereich_id: int, tag: str = "",
+                        sitzung: auth.Sitzung = Depends(_sitzung), v=Depends(_veranstaltung)):
+    _eigen(sitzung, db.leitet_bereich, bereich_id)
+    bereich = db.bereich_laden(bereich_id)
+    if bereich is None or bereich["veranstaltung_id"] != v["id"]:
+        return _fehlt(request)
+    datum = _datum(tag)
+    return _druck(request, sitzung, v, bereich["name"] + (" · " + _tag_lang(datum) if datum else ""),
+                  db.druckliste(v["id"], bereich_id=bereich_id, datum=datum))
+
+
+@app.get("/helfer/druck/tag/{tag}")
+async def druck_tag(request: Request, tag: str,
+                    sitzung: auth.Sitzung = Depends(_sitzung), v=Depends(_veranstaltung)):
+    datum = _datum(tag)
+    if not datum:
+        return _fehlt(request)
+    return _druck(request, sitzung, v, _tag_lang(datum),
+                  db.druckliste(v["id"], datum=datum, leitung=_leitung(sitzung)))
+
+
+@app.get("/helfer/druck/mappe/{tag}")
+async def druck_mappe(request: Request, tag: str,
+                      sitzung: auth.Sitzung = Depends(_sitzung), v=Depends(_veranstaltung)):
+    """L-03: alle Listen eines Tages, nach Bereichen getrennt, mit
+    Telefonnummern – am Vorabend drucken, falls am Tag nichts geht."""
+    datum = _datum(tag)
+    if not datum:
+        return _fehlt(request)
+    return _druck(request, sitzung, v, "Notfallmappe · " + _tag_lang(datum),
+                  db.druckliste(v["id"], datum=datum, leitung=_leitung(sitzung)),
+                  mappe=True, datum=datum)
+
+
+@app.get("/helfer/druck/person/{helfer_id}")
+async def druck_person(request: Request, helfer_id: int,
+                       sitzung: auth.Sitzung = Depends(_sitzung), v=Depends(_veranstaltung)):
+    person = db.helfer_laden(helfer_id)
+    if person is None:
+        return _fehlt(request)
+    _eigen(sitzung, db.leitet_helfer, helfer_id)
+    schichten = db.helfer_schichten(v["id"], helfer_id)
+    if sitzung.ist_bereichsleitung:
+        eigene = {b["id"] for b in db.bereiche(v["id"], sitzung.konto_id)}
+        schichten = [s for s in schichten if s["bereich_id"] in eigene]
+    leitungen = db.leitungen(sorted({s["bereich_id"] for s in schichten}))
+    return templates.TemplateResponse(
+        "druck_person.html",
+        _kontext(request, va=v, person=person, schichten=schichten, leitungen=leitungen,
+                 angebot=db.angebot(v["id"]), stand=db.jetzt_lokal().strftime("%d.%m.%Y %H:%M")))

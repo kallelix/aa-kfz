@@ -46,6 +46,7 @@
       {% endif %}
       <p class="knopfreihe">
         <a class="knopf" href="/helfer/bereich/{{ bereich.id }}/schicht/neu">Neue Schicht</a>
+        {% if schichten %}<a class="knopf-schlicht" href="/helfer/druck/bereich/{{ bereich.id }}">Listen drucken</a>{% endif %}
       </p>
     </section>
 

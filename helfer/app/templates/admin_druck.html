@@ -1,0 +1,53 @@
+{% extends "admin_base.html" %}
+{% block titel %}Drucken{% endblock %}
+{% block ueberschrift %}Drucken{% endblock %}
+
+{# L-04: eine Auswahl an Ansichten statt vieler Varianten – Schicht (an der
+   Schicht selbst), Bereich, Tag, Person (an der Person). Dazu je Tag die
+   Notfallmappe (L-03). Jede Liste ist so aktuell wie der Moment, in dem sie
+   aufgerufen wird. #}
+{% block inhalt %}
+  <p class="unterzeile">Listen zum Abhaken – mit Spalten für <em>da</em>, Shirt und Funk.
+    Eine einzelne Schicht druckst du an der Schicht, eine Person an der Person.</p>
+
+  {% if not tage %}
+    <p class="leer">Noch keine Schichten.</p>
+  {% else %}
+    <section>
+      <h2>Je Tag</h2>
+      <div class="tabelle-huelle">
+        <table>
+          <tbody>
+            {% for t in tage %}
+              <tr>
+                <td>{{ t.lang }}</td>
+                <td><a href="/helfer/druck/tag/{{ t.datum }}">Tagesliste</a></td>
+                <td><a href="/helfer/druck/mappe/{{ t.datum }}">Notfallmappe</a>
+                  <span class="gedaempft">– mit Deckblatt, je Bereich eine Seite</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="hilfe">Die Notfallmappe am Vorabend drucken: alle Listen des Tages, nach
+        Bereichen getrennt, mit Telefonnummern – für den Fall, dass am Tag nichts geht.</p>
+    </section>
+
+    <section>
+      <h2>Je Bereich</h2>
+      <div class="tabelle-huelle">
+        <table>
+          <tbody>
+            {% for b in bereichsliste %}
+              <tr>
+                <td>{{ b.name }}</td>
+                <td><a href="/helfer/druck/bereich/{{ b.id }}">alle Tage</a>
+                  {%- for t in tage %} · <a href="/helfer/druck/bereich/{{ b.id }}?tag={{ t.datum }}">{{ t.datum | tag }}</a>{% endfor %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

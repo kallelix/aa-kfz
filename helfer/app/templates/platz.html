@@ -73,6 +73,20 @@
       {% endif %}
     {% endfor %}
 
+    {% if x.noch and x.noch.vorschlaege %}
+      {# G-03: direkt nach dem Eintragen – die zweite und dritte Schicht. #}
+      <section class="karte noch">
+        <h3>{{ ('Noch eine Schicht bis: ' ~ x.noch.goodie ~ '!') if x.noch.goodie else 'Noch eine Schicht?' }}</h3>
+        {% for s in x.noch.vorschlaege %}
+          <div class="vorschlag">
+            <span><strong>{{ s.bereich }}</strong> · {{ s.datum|tag }} {{ s|spanne }}
+              {%- if s.warum %} <span class="leise">– {{ s.warum }}</span>{% endif %}
+              {%- if s.dringend %} <span class="marke dringend">wird dringend gebraucht</span>{% endif %}</span>
+            <a class="knopf klein" href="/platz/{{ token }}/{{ x.adresse }}/angaben?s={{ s.id }}">Eintragen</a>
+          </div>
+        {% endfor %}
+      </section>
+    {% endif %}
     {% if x.zustand == 'offen' %}
       <a class="knopf zweit" href="/platz/{{ token }}/{{ x.adresse }}/schichten">Schichten dazunehmen</a>
     {% endif %}

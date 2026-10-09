@@ -211,7 +211,7 @@ def helfer_schichten(vid: int, helfer_id: int) -> list[Zeile]:
     try:
         return con.execute(
             "SELECT e.id AS einteilung_id, e.quelle, e.art, e.vermerk, s.*,"
-            " b.name AS bereich"
+            " b.name AS bereich, b.treffpunkt"
             " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
             " JOIN bereich b ON b.id = s.bereich_id"
             " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? ORDER BY s.beginn",
@@ -1059,11 +1059,12 @@ def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
 
 def dazunehmen(vid: int, anmelder_id: int, helfer_ids: list[int], neue: list[dict],
                schicht_ids: list[int], fenster: list[tuple[str, str, str]],
-               bemerkung: str = "", warteliste=frozenset()) -> dict:
+               bemerkung: str = "", warteliste=frozenset(), bestaetigt: bool = True) -> dict:
     """Schichten dazunehmen aus Mein Helferplatz (A-09): für sich selbst, für
     die Mitangemeldeten und für neue, die mitkommen. Dieselben Prüfungen wie
     beim Anmelden. Wer hier bucht, hat den Link aus seiner Mail benutzt –
-    damit ist die Adresse bestätigt."""
+    damit ist die Adresse bestätigt. Von der Dankeseite aus (G-03) gilt das
+    nicht: `bestaetigt=False`."""
     con = verbinden()
     try:
         with con:
@@ -1094,8 +1095,9 @@ def dazunehmen(vid: int, anmelder_id: int, helfer_ids: list[int], neue: list[dic
                                       for person in neue]
             _eintragen(con, vid, ids, schichten, verteilung, fenster, bemerkung,
                        bemerkung_von=anmelder_id if anmelder_id in ids else None)
-            con.execute("UPDATE helfer SET email_bestaetigt_am = ? WHERE id = ?"
-                        " AND email_bestaetigt_am IS NULL", (jetzt(), anmelder_id))
+            if bestaetigt:
+                con.execute("UPDATE helfer SET email_bestaetigt_am = ? WHERE id = ?"
+                            " AND email_bestaetigt_am IS NULL", (jetzt(), anmelder_id))
             for i, helfer_id in enumerate(ids):
                 for s in schichten:
                     art = verteilung[s["id"]][i]
@@ -3415,5 +3417,160 @@ def namen_vorschlaege(vid: int) -> list[str]:
             "SELECT name FROM helfer ORDER BY lower(name)")
             if z["name"] not in gesehen]
         return shuttle + rest
+    finally:
+        con.close()
+
+
+# --- Noch eine Schicht? und das gemeinsame Ziel (Lastenheft 2.6) ------------
+
+def tagesziele(vid: int) -> list[dict]:
+    """G-04: je Tag, wie viele der geplanten Plätze besetzt sind – nur was
+    öffentlich ist, Reserve zählt nicht und Überbuchung nicht doppelt."""
+    con = verbinden()
+    try:
+        return [dict(z) for z in con.execute(
+            "SELECT s.datum, SUM(s.soll) AS soll, SUM(LEAST(s.soll,"
+            " (SELECT COUNT(*) FROM einteilung e WHERE e.schicht_id = s.id"
+            "  AND e.art = 'platz'))) AS besetzt"
+            " FROM schicht s JOIN bereich b ON b.id = s.bereich_id"
+            " WHERE s.veranstaltung_id = ? AND s.intern = 0 AND b.intern = 0"
+            " GROUP BY s.datum HAVING SUM(s.soll) > 0 ORDER BY s.datum", (vid,)).fetchall()]
+    finally:
+        con.close()
+
+
+def schicht_vorschlaege(vid: int, helfer_ids: list[int], anzahl: int = 3) -> list[dict]:
+    """G-03: Schichten, die zu den eingetragenen passen – am liebsten am
+    selben Tag im selben Bereich direkt davor oder danach, dann am selben
+    Tag, dann die, die am dringendsten gebraucht werden. Nur was für alle
+    frei ist, sich mit nichts überschneidet, nicht hinter einer Einsatzgrenze
+    liegt, zum Alter passt und keine Voraussetzung verlangt, die noch
+    niemand bestätigt hat."""
+    if not helfer_ids:
+        return []
+    v = VERANSTALTUNGEN.laden(vid)
+    con = verbinden()
+    try:
+        eigene = con.execute(
+            "SELECT DISTINCT s.* FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            " WHERE e.helfer_id = ANY(?) AND s.veranstaltung_id = ?",
+            (list(helfer_ids), vid)).fetchall()
+        wartet = {z["schicht_id"] for z in con.execute(
+            "SELECT schicht_id FROM warteliste WHERE helfer_id = ANY(?)",
+            (list(helfer_ids),)).fetchall()}
+        gesperrt: set[int] = set()
+        alter: list[int] = []
+        for helfer_id in helfer_ids:
+            gesperrt |= _gesperrt(con, vid, helfer_id)
+            zeile = con.execute("SELECT * FROM helfer WHERE id = ?", (helfer_id,)).fetchone()
+            jahre = _alter(zeile, v["beginn"]) if zeile else None
+            if jahre is not None:
+                alter.append(jahre)
+    finally:
+        con.close()
+    eigene_ids = {s["id"] for s in eigene}
+    bestaetigt = {s["bereich_id"] for s in eigene}
+    juengste = min(alter) if alter else None
+
+    def rang(s) -> tuple[int, str]:
+        for e in eigene:
+            if s["datum"] == e["datum"] and s["bereich_id"] == e["bereich_id"]:
+                if s["beginn"] == e["ende"]:
+                    return 0, "direkt danach"
+                if s["ende"] == e["beginn"]:
+                    return 0, "direkt davor"
+        if any(s["datum"] == e["datum"] and s["bereich_id"] == e["bereich_id"] for e in eigene):
+            return 1, "am selben Tag, im selben Bereich"
+        if any(s["datum"] == e["datum"] for e in eigene):
+            return 2, "am selben Tag"
+        return 3, ""
+
+    passend = []
+    for s in oeffentliche_schichten(vid):
+        if (s["id"] in eigene_ids or s["id"] in gesperrt or s["id"] in wartet
+                or s["frei"] + s["reserve_frei"] < len(helfer_ids)
+                or any(selbstanmeldung.ueberschneiden(s["beginn"], s["ende"], e["beginn"], e["ende"])
+                       for e in eigene)
+                or (s["alter_ab"] and juengste is not None and juengste < s["alter_ab"])
+                or ((s["voraussetzungen"] or "").strip() and s["bereich_id"] not in bestaetigt)):
+            continue
+        stufe, warum = rang(s)
+        passend.append({**s, "stufe": stufe, "warum": warum})
+    passend.sort(key=lambda s: (s["stufe"], not s["dringend"], s["beginn"]))
+    return passend[:anzahl]
+
+
+def naechstes_goodie(vid: int, schichten: int) -> str:
+    """„Noch eine Schicht bis …“ (G-03): das Goodie, für das genau eine
+    Schicht fehlt – nur, wenn die Veranstaltung Goodies ausgibt (V-07)."""
+    if not angebot(vid)["goodies"]:
+        return ""
+    for g in goodies(vid):
+        if g["ab_schichten"] == schichten + 1:
+            return g["name"]
+    return ""
+
+
+# --- Druckansichten und Notfallmappe (Lastenheft 2.8) ------------------------
+
+def druckliste(vid: int, bereich_id: int | None = None, datum: str = "",
+               schicht_id: int | None = None, leitung: int | None = None) -> list[dict]:
+    """Die Schichten für eine Liste (L-01, L-04) – je Schicht, je Bereich und
+    Tag, je Tag –, jede mit den Leuten darauf und der Warteliste. Wer keine
+    eigene Nummer hat, weil mitangemeldet, wird über die Person erreicht, die
+    angemeldet hat. Einsatzgrenzen stehen nirgends (K-07)."""
+    sql = ("SELECT s.*, b.name AS bereich, b.treffpunkt,"
+           " (SELECT COUNT(*) FROM einteilung e WHERE e.schicht_id = s.id"
+           "  AND e.art = 'platz') AS besetzt"
+           " FROM schicht s JOIN bereich b ON b.id = s.bereich_id"
+           " WHERE s.veranstaltung_id = ?")
+    werte: tuple = (vid,)
+    if bereich_id is not None:
+        sql += " AND s.bereich_id = ?"
+        werte += (bereich_id,)
+    if datum:
+        sql += " AND s.datum = ?"
+        werte += (datum,)
+    if schicht_id is not None:
+        sql += " AND s.id = ?"
+        werte += (schicht_id,)
+    if leitung is not None:
+        sql += " AND " + _GELEITET
+        werte += (leitung,)
+    con = verbinden()
+    try:
+        schichten = [dict(z) for z in con.execute(
+            sql + " ORDER BY lower(b.name), s.beginn, s.id", werte).fetchall()]
+        for s in schichten:
+            s["leute"] = con.execute(
+                "SELECT e.art, e.bestaetigen_bis, h.id, h.name, h.telefon, h.tshirt,"
+                " h.tshirt_roh, h.veggie, a.name AS ueber_name, a.telefon AS ueber_telefon,"
+                " (e.quelle = 'selbst' AND COALESCE(a.email_bestaetigt_am,"
+                "  h.email_bestaetigt_am) IS NULL) AS unbestaetigt"
+                " FROM einteilung e JOIN helfer h ON h.id = e.helfer_id"
+                " LEFT JOIN helfer a ON a.id = h.angemeldet_von"
+                " WHERE e.schicht_id = ?"
+                " ORDER BY e.art = 'reserve', lower(h.name)", (s["id"],)).fetchall()
+            s["warteliste"] = con.execute(
+                "SELECT h.name, COALESCE(NULLIF(h.telefon, ''), a.telefon, '') AS telefon"
+                " FROM warteliste w JOIN helfer h ON h.id = w.helfer_id"
+                " LEFT JOIN helfer a ON a.id = h.angemeldet_von"
+                " WHERE w.schicht_id = ? ORDER BY w.angelegt_am, w.id", (s["id"],)).fetchall()
+        return schichten
+    finally:
+        con.close()
+
+
+def springer_am(vid: int, datum: str) -> list[Zeile]:
+    """Wer an dem Tag als Springer kommt – für die Notfallmappe (L-03)."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT f.beginn, f.ende, h.name,"
+            " COALESCE(NULLIF(h.telefon, ''), a.telefon, '') AS telefon"
+            " FROM verfuegbarkeit f JOIN helfer h ON h.id = f.helfer_id"
+            " LEFT JOIN helfer a ON a.id = h.angemeldet_von"
+            " WHERE f.veranstaltung_id = ? AND f.springer = 1 AND left(f.beginn, 10) = ?"
+            " ORDER BY f.beginn, lower(h.name)", (vid, datum)).fetchall()
     finally:
         con.close()
