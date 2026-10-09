@@ -1,0 +1,273 @@
+/* Die öffentliche Anmeldung (Lastenheft 2.2) – auf dem Handy zuerst.
+
+   Aus dem Prototyp übernommen (docs/prototyp-anmeldung), den Helfer in der
+   Hand hatten. Keine fremden Schriften, keine Skripte von anderswo: die
+   Content-Security-Policy erlaubt nur, was von hier kommt. */
+/* Ruhiges Schieferblau statt des hellen Formular-Blaus: es trägt Knöpfe
+   und Auswahl, Überschriften bleiben in Textfarbe. */
+:root {
+  --grund: #ffffff;
+  --flaeche: #f4f5f7;
+  --rand: #d6d9de;
+  --text: #1c1f23;
+  --gedaempft: #5b6169;
+  --akzent: #3a5a74;
+  --akzent-hell: #edf1f5;
+  --dringend: #b3261e;
+  --dringend-hell: #fdecea;
+  --ok: #1a7f37;
+  --ok-hell: #e6f4ea;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grund: #16181c;
+    --flaeche: #1f2227;
+    --rand: #343a42;
+    --text: #e8eaed;
+    --gedaempft: #a2a9b3;
+    --akzent: #9db6cb;
+    --akzent-hell: #232d36;
+    --dringend: #ff8f86;
+    --dringend-hell: #3a1f1d;
+    --ok: #6fcf8b;
+    --ok-hell: #17301f;
+  }
+}
+* { box-sizing: border-box; }
+html { font-size: 17px; }
+body {
+  margin: 0;
+  background: var(--flaeche);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+.huelle { max-width: 34rem; margin: 0 auto; padding: 1rem 1rem 3rem; }
+.kopf { margin: .5rem 0 1rem; }
+.veranstaltung {
+  margin: 0;
+  font-size: .78rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--gedaempft);
+}
+h1 { font-size: 1.45rem; line-height: 1.25; margin: .2rem 0 0; }
+h2 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; }
+p { margin: .5rem 0; }
+.leise { color: var(--gedaempft); font-size: .9rem; }
+.karte {
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 12px;
+  padding: 1rem;
+  margin: .75rem 0;
+}
+.karte > h3:first-child { margin-top: 0; }
+.knopf {
+  display: block;
+  width: 100%;
+  min-height: 3.2rem;
+  margin: .6rem 0;
+  padding: .7rem 1rem;
+  border: 2px solid var(--akzent);
+  border-radius: 12px;
+  background: var(--akzent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.knopf.zweit { background: var(--grund); color: var(--text); border-color: var(--rand); }
+.knopf.klein {
+  display: inline-block;
+  width: auto;
+  min-height: 2.6rem;
+  padding: .4rem .9rem;
+  margin: .3rem .4rem .3rem 0;
+  font-size: .92rem;
+}
+.knopf.warnung { border-color: var(--dringend); background: var(--grund); color: var(--dringend); }
+.knopf:disabled { opacity: .45; cursor: not-allowed; }
+.weg {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--grund);
+  border: 2px solid var(--rand);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  margin: .75rem 0;
+}
+.weg strong { display: block; font-size: 1.1rem; }
+.weg strong::after { content: " ›"; color: var(--gedaempft); }
+.weg span { color: var(--gedaempft); font-size: .92rem; }
+.zurueck {
+  display: inline-block;
+  margin: .25rem 0 0;
+  color: var(--gedaempft);
+  text-decoration: none;
+  font-size: .95rem;
+}
+a { color: var(--text); }
+.balken { margin: .4rem 0; }
+.balken-kopf { display: flex; justify-content: space-between; font-size: .9rem; }
+.balken-bahn { height: .7rem; border-radius: 99px; background: var(--rand); overflow: hidden; }
+.balken-fuellung { height: 100%; background: var(--ok); }
+.tag { margin: .2rem 0 .7rem; }
+.tagname { font-size: .92rem; margin-bottom: .25rem; }
+.drei { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; }
+.wahl {
+  width: 100%;
+  min-height: 2.9rem;
+  border: 2px solid var(--rand);
+  border-radius: 10px;
+  background: var(--grund);
+  color: var(--text);
+  font: inherit;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.wahl[aria-pressed="true"] { border-color: var(--akzent); background: var(--akzent-hell); font-weight: 600; }
+.wahl .name { display: block; font-size: .9rem; }
+.wahl .spanne { display: block; font-size: .76rem; color: var(--gedaempft); font-weight: 400; }
+fieldset { border: 0; padding: 0; margin: .9rem 0 0; }
+legend { font-weight: 600; padding: 0; margin-bottom: .25rem; }
+.knopfwahl { display: flex; gap: .5rem; }
+.knopfwahl label {
+  flex: 1;
+  margin: 0;
+  font-weight: 400;
+  border: 2px solid var(--rand);
+  border-radius: 10px;
+  padding: .6rem .8rem;
+  background: var(--grund);
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+  cursor: pointer;
+}
+.knopfwahl input { width: 1.2rem; height: 1.2rem; }
+.schicht { position: relative; }
+.schicht h3 { margin: 0; font-size: 1rem; }
+.schicht .zeit { font-weight: 600; }
+.schicht .ort { color: var(--gedaempft); font-size: .9rem; }
+.marke {
+  display: inline-block;
+  font-size: .8rem;
+  font-weight: 600;
+  border-radius: 99px;
+  padding: .1rem .55rem;
+  margin: .35rem .3rem 0 0;
+}
+.marke.dringend { background: var(--dringend-hell); color: var(--dringend); }
+.marke.frei { background: var(--ok-hell); color: var(--ok); }
+.marke.reserve { background: var(--akzent-hell); color: var(--akzent); }
+.marke.voll { background: var(--flaeche); color: var(--gedaempft); border: 1px solid var(--rand); }
+.schicht.gewaehlt { border: 2px solid var(--akzent); background: var(--akzent-hell); }
+.schicht.gesperrt { opacity: .55; }
+.grund { font-size: .85rem; color: var(--gedaempft); margin-top: .35rem; }
+.filter { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .3rem; }
+.filter button {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  border: 2px solid var(--rand);
+  border-radius: 99px;
+  background: var(--grund);
+  color: var(--text);
+  font: inherit;
+  font-size: .9rem;
+  padding: .2rem .9rem;
+  cursor: pointer;
+}
+.filter button[aria-pressed="true"] { border-color: var(--akzent); background: var(--akzent-hell); font-weight: 600; }
+.leiste {
+  position: sticky;
+  bottom: 0;
+  background: var(--flaeche);
+  padding: .5rem 0 .75rem;
+  border-top: 1px solid var(--rand);
+}
+label { display: block; font-weight: 600; margin: .9rem 0 .25rem; }
+label .leise { font-weight: 400; }
+input[type="text"], input[type="email"], input[type="tel"], input[type="date"], select, textarea {
+  width: 100%;
+  min-height: 3rem;
+  padding: .55rem .7rem;
+  border: 2px solid var(--rand);
+  border-radius: 10px;
+  background: var(--grund);
+  color: var(--text);
+  font: inherit;
+}
+.zeile { display: flex; gap: .6rem; }
+.zeile > div { flex: 1; }
+.haken { display: flex; gap: .6rem; align-items: flex-start; font-weight: 400; }
+.haken input { width: 1.4rem; height: 1.4rem; margin-top: .15rem; flex: 0 0 auto; }
+.fehler { color: var(--dringend); font-size: .9rem; margin: .25rem 0 0; }
+.hinweis {
+  border-left: 4px solid var(--akzent);
+  background: var(--akzent-hell);
+  border-radius: 8px;
+  padding: .7rem .9rem;
+  margin: .75rem 0;
+}
+.hinweis.gut { border-left-color: var(--ok); background: var(--ok-hell); }
+.hinweis.warn { border-left-color: var(--dringend); background: var(--dringend-hell); }
+/* Kudos: ein Kreis je Schicht, im Kreis steht kurz, was es dafür gibt. */
+.kudos { display: flex; gap: .5rem; flex-wrap: wrap; margin: .25rem 0 .5rem; }
+.kudos div {
+  width: 3.4rem;
+  height: 3.4rem;
+  border: 2px dashed var(--rand);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .78rem;
+  text-align: center;
+  line-height: 1.1;
+  color: var(--gedaempft);
+}
+.kudos div.voll { border: 2px solid var(--ok); background: var(--ok-hell); color: var(--ok); font-weight: 700; }
+.person { border-top: 1px solid var(--rand); margin-top: 1rem; padding-top: .5rem; }
+.fuss { margin-top: 2rem; font-size: .88rem; color: var(--gedaempft); text-align: center; }
+.fuss a { color: var(--text); }
+
+/* --- Ergänzungen für die echte Anmeldung --------------------------------- */
+
+/* Eine Schicht wählt man mit einem großen Haken: die ganze Karte ist das
+   Ziel, nicht nur das Kästchen. */
+.schicht .eintragen {
+  display: flex; gap: .6rem; align-items: center;
+  margin: .6rem 0 0; font-weight: 600; cursor: pointer;
+}
+.schicht .eintragen input { width: 1.5rem; height: 1.5rem; flex: 0 0 auto; }
+.schicht .beschreibung { margin: .35rem 0 0; font-size: .9rem; }
+.schicht.ausgeblendet, .tagkopf.ausgeblendet { display: none; }
+.leiste .knopf { margin: 0; }
+
+/* Springer: Tag mal Tageszeit, wie im Prototyp. */
+.drei label.wahl {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin: 0; font-weight: 400; text-align: center; padding: .3rem;
+}
+.drei label.wahl input { width: 1.1rem; height: 1.1rem; margin: 0 0 .15rem; }
+.drei label.wahl:has(input:checked) { border-color: var(--akzent); background: var(--akzent-hell); font-weight: 600; }
+details.karte > summary { cursor: pointer; font-weight: 600; }
+
+.hinweis {
+  border-radius: 10px; padding: .7rem .9rem; margin: .75rem 0;
+  background: var(--akzent-hell); border: 1px solid var(--rand);
+}
+.hinweis.warn { background: var(--dringend-hell); color: var(--dringend); border-color: var(--dringend); }
+.hinweis.gut { background: var(--ok-hell); color: var(--ok); border-color: var(--ok); }
+.hinweis ul { margin: .3rem 0 0; padding-left: 1.2rem; }
+.feld-fehler input, .feld-fehler select, .feld-fehler textarea { border-color: var(--dringend); }
+
+/* Gegen Formular-Roboter: ein Feld, das Menschen nicht sehen. */
+.verborgen { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+.fuss { margin-top: 2rem; }
+@media (max-width: 22rem) { .zeile { flex-direction: column; gap: 0; } }

@@ -18,7 +18,7 @@ from pathlib import Path
 from kern import veranstaltungen as va
 from kern.db import Datenbank, IntegrityError, Verbindung, Zeile
 
-from . import config, normalisieren, planung
+from . import config, normalisieren, planung, selbstanmeldung
 
 _DATENBANK = Datenbank(lambda: config.DATABASE_URL, config.DB_SCHEMA,
                        Path(__file__).resolve().parent / "migrationen")
@@ -239,7 +239,7 @@ def bereiche(vid: int, leitung: int | None = None) -> list[Zeile]:
             " (SELECT COALESCE(SUM(s.soll), 0) FROM schicht s"
             "  WHERE s.bereich_id = b.id) AS soll,"
             " (SELECT COUNT(*) FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
-            "  WHERE s.bereich_id = b.id) AS besetzt"
+            "  WHERE s.bereich_id = b.id AND e.art = 'platz') AS besetzt"
             " FROM bereich b WHERE b.veranstaltung_id = ?" +
             (" AND " + _GELEITET if leitung else "") +
             " ORDER BY lower(b.name)",
@@ -498,9 +498,12 @@ _SCHICHT_SPALTEN = (
     "s.*, b.name AS bereich, b.treffpunkt,"
     " COALESCE(s.mindestalter, b.mindestalter) AS alter_ab,"
     " GREATEST(s.intern, b.intern) AS ist_intern,"
-    " (SELECT COUNT(*) FROM einteilung e WHERE e.schicht_id = s.id) AS besetzt,"
+    " (SELECT COUNT(*) FROM einteilung e"
+    "  WHERE e.schicht_id = s.id AND e.art = 'platz') AS besetzt,"
+    " (SELECT COUNT(*) FROM einteilung e"
+    "  WHERE e.schicht_id = s.id AND e.art = 'reserve') AS reserve_besetzt,"
     " GREATEST(0, s.soll - (SELECT COUNT(*) FROM einteilung e"
-    "                       WHERE e.schicht_id = s.id)) AS fehlt"
+    "                       WHERE e.schicht_id = s.id AND e.art = 'platz')) AS fehlt"
 )
 _SCHICHT_VON = " FROM schicht s JOIN bereich b ON b.id = s.bereich_id"
 
@@ -524,7 +527,7 @@ def schichten(vid: int, bereich_id: int | None = None, tag: str = "",
     if nur_luecken:
         bedingungen.append(
             "s.soll > (SELECT COUNT(*) FROM einteilung e"
-            " WHERE e.schicht_id = s.id)")
+            " WHERE e.schicht_id = s.id AND e.art = 'platz')")
     wo = " WHERE " + " AND ".join(bedingungen)
 
     con = verbinden()
@@ -552,7 +555,7 @@ def besetzung(schicht_id: int) -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
-            "SELECT e.id AS einteilung_id, e.quelle, e.bemerkung AS notiz,"
+            "SELECT e.id AS einteilung_id, e.quelle, e.art, e.bemerkung AS notiz,"
             " e.eingeteilt_am, h.*"
             " FROM einteilung e JOIN helfer h ON h.id = e.helfer_id"
             " WHERE e.schicht_id = ?"
@@ -758,6 +761,255 @@ def vorlage_uebernehmen(vid: int, quelle_id: int) -> dict | None:
         con.close()
 
 
+# --- Öffentliche Anmeldung (Lastenheft 2.2) ---------------------------------
+
+class AnmeldeFehler(Exception):
+    """Was einer Anmeldung im Weg steht, als Sätze für den Menschen."""
+
+    def __init__(self, gruende: list[str]) -> None:
+        super().__init__("; ".join(gruende))
+        self.gruende = gruende
+
+
+def _lage(zeile) -> dict:
+    """Frei, Reserve oder voll – und ob die Schicht dringend gebraucht wird
+    (unter Minimum)."""
+    frei = max(0, zeile["soll"] - zeile["besetzt"])
+    reserve_frei = max(0, zeile["reserve"] - zeile["reserve_besetzt"])
+    return {"frei": frei, "reserve_frei": reserve_frei,
+            "lage": "frei" if frei else "reserve" if reserve_frei else "voll",
+            "dringend": zeile["besetzt"] < zeile["minimum"]}
+
+
+def oeffentliche_schichten(vid: int) -> list[dict]:
+    """Was in der öffentlichen Liste steht (A-06): nicht intern, noch nicht
+    begonnen, nach Tag und Uhrzeit."""
+    con = verbinden()
+    try:
+        zeilen = [dict(z) for z in con.execute(
+            "SELECT " + _SCHICHT_SPALTEN + ", b.beschreibung, b.voraussetzungen"
+            + _SCHICHT_VON +
+            " WHERE s.veranstaltung_id = ? AND s.intern = 0 AND b.intern = 0"
+            " AND s.beginn > ? ORDER BY s.datum, s.beginn, lower(b.name)",
+            (vid, marke(jetzt_lokal())))]
+    finally:
+        con.close()
+    for zeile in zeilen:
+        zeile.update(_lage(zeile))
+    return zeilen
+
+
+def _person_sichern(con: Verbindung, werte: dict, schluessel_email: str,
+                    angemeldet_von: int | None) -> int:
+    """Legt die Person an oder findet sie wieder – an Name und Adresse wie
+    beim Import. Was sie selbst angibt, gilt: Name, Nummer, Alter, Shirt,
+    Verpflegung werden überschrieben, alles andere bleibt."""
+    schluessel = normalisieren.schluessel(werte["name"], schluessel_email)
+    vorhanden = con.execute("SELECT id FROM helfer WHERE schluessel = ?",
+                            (schluessel,)).fetchone()
+    felder = ("name", "vorname", "nachname", "volljaehrig", "geburtsdatum",
+              "veggie", "tshirt", "tshirt_roh")
+    if vorhanden is None:
+        return int(con.execute(
+            "INSERT INTO helfer (" + ", ".join(felder) + ", email, telefon, schluessel,"
+            " angemeldet_von, angelegt_am) VALUES (" + ", ".join("?" for _ in felder) +
+            ", ?, ?, ?, ?, ?) RETURNING id",
+            (*(werte[f] for f in felder), werte["email"], werte["telefon"], schluessel,
+             angemeldet_von, jetzt())).fetchone()[0])
+    con.execute(
+        "UPDATE helfer SET " + ", ".join(f + " = ?" for f in felder) +
+        ", telefon = CASE WHEN ? <> '' THEN ? ELSE telefon END,"
+        " aktiv = 1, geaendert_am = ? WHERE id = ?",
+        (*(werte[f] for f in felder), werte["telefon"], werte["telefon"], jetzt(),
+         vorhanden["id"]))
+    return int(vorhanden["id"])
+
+
+def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
+             fenster: list[tuple[str, str, str]], bemerkung: str = "") -> dict:
+    """Trägt eine Anmeldung ein – alles oder nichts.
+
+    `personen[0]` meldet an, die übrigen kommen mit (A-08) und stehen auf
+    denselben Schichten. Je Schicht bekommt, wer zuerst kommt, einen Platz;
+    ist das Soll erreicht, Reserve (R-03); ist auch die voll, geht es nicht.
+    Die Schichten werden dafür gesperrt (FOR UPDATE): wer gleichzeitig auf
+    denselben letzten Platz will, wartet, bis der Erste fertig ist, und sieht
+    dann, dass er weg ist.
+
+    Wirft AnmeldeFehler mit allen Gründen auf einmal.
+    """
+    gruende: list[str] = []
+    con = verbinden()
+    try:
+        with con:
+            schichten = [dict(z) for z in con.execute(
+                "SELECT s.id, s.beginn, s.ende, s.soll, s.reserve, s.minimum,"
+                " b.name AS bereich, COALESCE(s.mindestalter, b.mindestalter) AS alter_ab,"
+                " GREATEST(s.intern, b.intern) AS ist_intern"
+                " FROM schicht s JOIN bereich b ON b.id = s.bereich_id"
+                " WHERE s.id = ANY(?) AND s.veranstaltung_id = ?"
+                " ORDER BY s.id FOR UPDATE OF s", (list(schicht_ids), vid))]
+            if len(schichten) != len(set(schicht_ids)) or any(s["ist_intern"] for s in schichten):
+                raise AnmeldeFehler(["Eine der gewählten Schichten gibt es nicht mehr. "
+                                     "Bitte noch einmal auswählen."])
+            jetzt_marke = marke(jetzt_lokal())
+            for s in schichten:
+                s["text"] = _schicht_text(s)
+                if s["beginn"] <= jetzt_marke:
+                    gruende.append(s["text"] + " hat schon begonnen.")
+
+            # K-01 und K-04: nichts darf sich überschneiden – keine zwei
+            # Schichten, keine Schicht mit einer Springer-Zeit.
+            zeiten = [(s["text"], s["beginn"], s["ende"]) for s in schichten]
+            for a, b in selbstanmeldung.ueberschneidungen(zeiten):
+                gruende.append(f"{a} und {b} überschneiden sich.")
+            for _, von, bis in fenster:
+                for s in schichten:
+                    if selbstanmeldung.ueberschneiden(von, bis, s["beginn"], s["ende"]):
+                        gruende.append(f"Als Springer bist du zur Zeit von {s['text']} "
+                                       "schon eingeplant – bitte eins von beiden.")
+
+            # Das Mindestalter (D-07). Volljährig erfüllt jede Grenze bis 18.
+            for person in personen:
+                alter = 18 if person["volljaehrig"] else person["alter"]
+                for s in schichten:
+                    if s["alter_ab"] and alter is not None and alter < s["alter_ab"]:
+                        gruende.append(f"{s['text']} ist erst ab {s['alter_ab']} – für "
+                                       f"{person['vorname']} geht das noch nicht.")
+
+            # Wer schon da ist, mit seinen Schichten in dieser Veranstaltung.
+            ids, belegt = [], {}
+            anmelder_email = personen[0]["email"]
+            for i, person in enumerate(personen):
+                zeile = con.execute(
+                    "SELECT id FROM helfer WHERE schluessel = ?",
+                    (normalisieren.schluessel(person["name"], anmelder_email),)).fetchone()
+                if zeile is not None:
+                    belegt[i] = con.execute(
+                        "SELECT s.id, s.beginn, s.ende, b.name AS bereich FROM einteilung e"
+                        " JOIN schicht s ON s.id = e.schicht_id"
+                        " JOIN bereich b ON b.id = s.bereich_id"
+                        " WHERE e.helfer_id = ? AND s.veranstaltung_id = ?",
+                        (zeile["id"], vid)).fetchall()
+            for i, eigene in belegt.items():
+                for alt in eigene:
+                    for s in schichten:
+                        if alt["id"] == s["id"]:
+                            gruende.append(f"{personen[i]['vorname']} ist für {s['text']} "
+                                           "schon eingetragen.")
+                        elif selbstanmeldung.ueberschneiden(alt["beginn"], alt["ende"],
+                                                      s["beginn"], s["ende"]):
+                            gruende.append(f"{s['text']} überschneidet sich mit "
+                                           f"{_schicht_text(alt)}, für die "
+                                           f"{personen[i]['vorname']} schon eingetragen ist.")
+
+            # Platz, Reserve oder voll – für alle Personen zusammen.
+            verteilung: dict[int, list[str]] = {}
+            for s in schichten:
+                zahlen = con.execute(
+                    "SELECT COUNT(*) FILTER (WHERE art = 'platz') AS platz,"
+                    " COUNT(*) FILTER (WHERE art = 'reserve') AS reserve"
+                    " FROM einteilung WHERE schicht_id = ?", (s["id"],)).fetchone()
+                frei = max(0, s["soll"] - zahlen["platz"])
+                reserve_frei = max(0, s["reserve"] - zahlen["reserve"])
+                arten = []
+                for _ in personen:
+                    if frei:
+                        arten.append("platz")
+                        frei -= 1
+                    elif reserve_frei:
+                        arten.append("reserve")
+                        reserve_frei -= 1
+                if len(arten) < len(personen):
+                    gruende.append(
+                        f"{s['text']} ist inzwischen voll." if len(personen) == 1 else
+                        f"In {s['text']} ist nicht mehr für alle {len(personen)} Platz.")
+                verteilung[s["id"]] = arten
+
+            if gruende:
+                raise AnmeldeFehler(list(dict.fromkeys(gruende)))
+
+            anmelder = None
+            for i, person in enumerate(personen):
+                helfer_id = _person_sichern(con, person, anmelder_email,
+                                            None if i == 0 else anmelder)
+                if i == 0:
+                    anmelder = helfer_id
+                ids.append(helfer_id)
+                con.execute(
+                    "INSERT INTO teilnahme (veranstaltung_id, helfer_id, quelle, bemerkung,"
+                    " angemeldet_am) VALUES (?, ?, 'selbst', ?, ?)"
+                    " ON CONFLICT (veranstaltung_id, helfer_id) DO UPDATE SET bemerkung ="
+                    " CASE WHEN excluded.bemerkung <> '' THEN excluded.bemerkung"
+                    " ELSE teilnahme.bemerkung END",
+                    (vid, helfer_id, bemerkung if i == 0 else "", jetzt()))
+                for s in schichten:
+                    con.execute(
+                        "INSERT INTO einteilung (schicht_id, helfer_id, quelle, art,"
+                        " eingeteilt_am) VALUES (?, ?, 'selbst', ?, ?)",
+                        (s["id"], helfer_id, verteilung[s["id"]][i], jetzt()))
+                for _, von, bis in fenster:
+                    con.execute(
+                        "INSERT INTO verfuegbarkeit (veranstaltung_id, helfer_id, beginn,"
+                        " ende, springer, angelegt_am) VALUES (?, ?, ?, ?, 1, ?)",
+                        (vid, helfer_id, von, bis, jetzt()))
+        return {"anmelder": anmelder, "personen": ids,
+                "schichten": [{**s, "arten": verteilung[s["id"]]} for s in schichten]}
+    finally:
+        con.close()
+
+
+def _schicht_text(s) -> str:
+    """'Shuttle Sa 03.07. 07:00–12:00' – für Meldungen."""
+    try:
+        tag = datetime.fromisoformat(s["beginn"])
+        kurz = config.WOCHENTAGE[tag.weekday()][:2] + tag.strftime(" %d.%m. %H:%M")
+    except ValueError:
+        kurz = s["beginn"]
+    return f"{s['bereich']} {kurz}–{s['ende'][11:16]}"
+
+
+def anmeldung_laden(vid: int, anmelder_id: int) -> dict | None:
+    """Was die Dankeseite zeigt: wer, auf welchen Schichten, als was, und
+    die Springer-Zeiten."""
+    con = verbinden()
+    try:
+        anmelder = con.execute("SELECT * FROM helfer WHERE id = ?", (anmelder_id,)).fetchone()
+        if anmelder is None:
+            return None
+        personen = [anmelder] + con.execute(
+            "SELECT * FROM helfer WHERE angemeldet_von = ? ORDER BY id", (anmelder_id,)).fetchall()
+        ergebnis = []
+        for person in personen:
+            schichten = con.execute(
+                "SELECT s.*, b.name AS bereich, b.treffpunkt, e.art"
+                " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+                " JOIN bereich b ON b.id = s.bereich_id"
+                " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? ORDER BY s.beginn",
+                (person["id"], vid)).fetchall()
+            fenster = con.execute(
+                "SELECT * FROM verfuegbarkeit WHERE helfer_id = ? AND veranstaltung_id = ?"
+                " AND springer = 1 ORDER BY beginn", (person["id"], vid)).fetchall()
+            if schichten or fenster or person["id"] == anmelder_id:
+                ergebnis.append({"person": person, "schichten": schichten, "fenster": fenster})
+        return {"anmelder": anmelder, "personen": ergebnis}
+    finally:
+        con.close()
+
+
+def interesse_vormerken(vid: int, email: str, vorname: str) -> bool:
+    """True, wenn neu; False, wenn die Adresse schon vorgemerkt war."""
+    con = verbinden()
+    try:
+        with con:
+            return con.execute(
+                "INSERT INTO interesse (veranstaltung_id, email, vorname, angelegt_am)"
+                " VALUES (?, ?, ?, ?) ON CONFLICT (veranstaltung_id, email) DO NOTHING",
+                (vid, email, vorname, jetzt())).rowcount > 0
+    finally:
+        con.close()
+
+
 # --- Einteilung ------------------------------------------------------------
 
 def einteilen(schicht_id: int, helfer_id: int, quelle: str = "hand",
@@ -864,7 +1116,8 @@ def zaehler(vid: int) -> dict:
         bedarf = eine("SELECT COALESCE(SUM(soll), 0) FROM schicht"
                       " WHERE veranstaltung_id = ?", vid)
         besetzt = eine("SELECT COUNT(*) FROM einteilung e JOIN schicht s"
-                       " ON s.id = e.schicht_id WHERE s.veranstaltung_id = ?", vid)
+                       " ON s.id = e.schicht_id WHERE s.veranstaltung_id = ?"
+                       " AND e.art = 'platz'", vid)
         return {
             "schichten": eine("SELECT COUNT(*) FROM schicht WHERE veranstaltung_id = ?",
                               vid),
@@ -875,7 +1128,7 @@ def zaehler(vid: int) -> dict:
             "luecken": eine(
                 "SELECT COUNT(*) FROM schicht s WHERE s.veranstaltung_id = ?"
                 " AND s.soll > (SELECT COUNT(*) FROM einteilung e"
-                "                 WHERE e.schicht_id = s.id)", vid),
+                "                 WHERE e.schicht_id = s.id AND e.art = 'platz')", vid),
             "tshirts": {z["tshirt"]: z["anzahl"] for z in con.execute(
                 "SELECT tshirt, COUNT(*) AS anzahl FROM helfer"
                 " WHERE tshirt IS NOT NULL GROUP BY tshirt")},

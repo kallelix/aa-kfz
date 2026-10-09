@@ -1,0 +1,16 @@
+{% extends "anmeldung_base.html" %}
+{% block ueberschrift %}Mithelfen{% endblock %}
+
+{% block inhalt %}
+  {% if liste %}
+    <p>Ohne Helfer gibt es kein Rennen – schön, dass du dabei sein willst!</p>
+    {% for eintrag in liste %}
+      <a class="weg" href="/{{ eintrag.adresse }}">
+        <strong>{{ eintrag.va.name }}</strong>
+        <span>{{ eintrag.tage }} · {{ eintrag.zustand_text }}</span>
+      </a>
+    {% endfor %}
+  {% else %}
+    <p>Gerade suchen wir keine Helfer. Schau bald wieder vorbei – oder frag uns direkt.</p>
+  {% endif %}
+{% endblock %}

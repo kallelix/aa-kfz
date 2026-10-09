@@ -288,6 +288,13 @@ systemctl reload nginx
 
 ---
 
+
+Seit der öffentlichen Helferanmeldung (Lastenheft 2.2) stehen in
+[nginx-dienst.conf](nginx-dienst.conf) zwei Zeilen mehr: die Zone
+`abfahrt_helfer` oben und im Block der öffentlichen Hostnamen eine
+`location` für `/<veranstaltung>/angaben` und `/<veranstaltung>/interesse`.
+Wer die Config schon eingespielt hat, trägt beides von Hand nach.
+
 ## 3. Sicherung
 
 Ein Lauf, eine Datei: `pg_dump` sichert die ganze Datenbank, also alle drei

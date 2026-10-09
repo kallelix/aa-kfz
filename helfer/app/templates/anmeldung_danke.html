@@ -1,0 +1,28 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Danke{% endblock %}
+{% block ueberschrift %}Danke, {{ anmeldung.anmelder.vorname or anmeldung.anmelder.name }}!{% endblock %}
+
+{% block inhalt %}
+  {# Bis die Bestätigung per Mail steht (Schritt 2.4), sagt die Seite nur,
+     was sicher stimmt. #}
+  <div class="hinweis gut">Du stehst drin. Die Orga meldet sich bei dir unter
+    <strong>{{ anmeldung.anmelder.email }}</strong>.</div>
+
+  {% for eintrag in anmeldung.personen %}
+    <h2>{{ 'Deine Schichten' if loop.first else 'Schichten von ' ~ eintrag.person.vorname }}</h2>
+    {% for s in eintrag.schichten %}
+      <div class="karte schicht">
+        <h3>{{ s.bereich }}</h3>
+        <div class="zeit">{{ s.datum|tag }} · {{ s|spanne }}</div>
+        <div class="ort">Treffpunkt: {{ s.ort or s.treffpunkt or 'kommt noch' }}</div>
+        {% if s.art == 'reserve' %}<span class="marke reserve">Du bist Reserve – danke, das hilft uns sehr</span>{% endif %}
+      </div>
+    {% endfor %}
+    {% for f in eintrag.fenster %}
+      <div class="karte"><h3>Springer</h3><p>{{ f.beginn|zeitpunkt }} bis {{ f.ende|uhr }} – wir setzen dich ein, wo gerade jemand fehlt.</p></div>
+    {% endfor %}
+  {% endfor %}
+
+  <p class="leise">Bitte sei 15 Minuten vor Beginn am Treffpunkt.</p>
+  <a class="knopf zweit" href="/{{ adresse }}/schichten">Noch eine Schicht dazunehmen</a>
+{% endblock %}

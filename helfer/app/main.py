@@ -27,9 +27,10 @@ from fastapi.responses import (JSONResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader
+from starlette.convertors import StringConvertor, register_url_convertor
 
-from . import (band, config, csv_import, db, eintraege,
-               normalisieren, planung, unterschriften, worker, zeitplan)
+from . import (band, config, csv_import, db, eintraege, normalisieren,
+               planung, selbstanmeldung, unterschriften, worker, zeitplan)
 
 # Die Repo-Wurzel steht schon auf dem Suchpfad - siehe __init__.py.
 from . import WURZEL as _WURZELPFAD
@@ -95,6 +96,15 @@ def _tag(wert):
     return WOCHENTAGE_KURZ[zeit.weekday()] + zeit.strftime(" %d.%m.")
 
 
+def _tag_lang(wert):
+    """'2027-07-02' -> 'Freitag, 02.07.' – für die öffentliche Liste."""
+    try:
+        zeit = datetime.fromisoformat(str(wert))
+    except ValueError:
+        return wert
+    return config.WOCHENTAGE[zeit.weekday()] + zeit.strftime(", %d.%m.")
+
+
 def _spanne(zeile):
     """Die Zeitspanne einer Schicht, mit Tag nur dann zweimal, wenn sie über
     Mitternacht läuft."""
@@ -117,6 +127,7 @@ def _programmzeit(zeile):
 templates.env.filters["zeitpunkt"] = _zeitpunkt
 templates.env.filters["uhr"] = _uhr
 templates.env.filters["tag"] = _tag
+templates.env.filters["tag_lang"] = lambda wert: _tag_lang(wert)
 templates.env.filters["spanne"] = _spanne
 templates.env.filters["programmzeit"] = _programmzeit
 templates.env.filters["ausschnitt"] = unterschriften.ausschnitt
@@ -443,9 +454,6 @@ def _weiter_pfad(roh: str) -> str:
     return "/helfer"
 
 
-@app.get("/")
-async def start():
-    return RedirectResponse("/helfer", status_code=303)
 
 
 # Anmelden, Abmelden und die Fehlerseiten dazu liegen in kern/anmeldung.py,
@@ -2143,3 +2151,284 @@ async def import_abrufen(request: Request,
         return seite(str(fehler), code=400)
 
     return seite(bericht=bericht)
+
+
+# --- Öffentliche Anmeldung (Lastenheft 2.2) ---------------------------------
+#
+# Auf dem öffentlichen Hostnamen des Helferbereichs, neben Monitor und
+# Tablet. Jede Veranstaltung hat ihren Kurzlink: /aa-2027. Diese Routen
+# stehen am Ende, damit /{adresse} nichts überdeckt, was vorher kommt.
+
+_MONATE = ("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
+           "September", "Oktober", "November", "Dezember")
+# Mehr Leute auf einmal meldet niemand mit an, der nicht ein ganzer Verein
+# ist – und der ruft besser an.
+MAX_WEITERE = 6
+
+
+def _tage_text(v) -> str:
+    """'1. bis 4. Juli 2027' – oder ein einzelner Tag."""
+    beginn, ende = v["beginn"], v["ende"]
+    if beginn == ende:
+        return f"{beginn.day}. {_MONATE[beginn.month - 1]} {beginn.year}"
+    if (beginn.month, beginn.year) == (ende.month, ende.year):
+        return f"{beginn.day}. bis {ende.day}. {_MONATE[ende.month - 1]} {ende.year}"
+    return (f"{beginn.day}. {_MONATE[beginn.month - 1]} bis "
+            f"{ende.day}. {_MONATE[ende.month - 1]} {ende.year}")
+
+
+def _zustand(v) -> str:
+    """offen, bald oder zu – nach Status und Anmeldezeitraum (V-01, V-02).
+    In Planung und archiviert gibt es öffentlich gar nichts."""
+    heute = db.jetzt_lokal().date()
+    if v["status"] == "angekuendigt":
+        return "bald"
+    if v["status"] == "offen":
+        if v["anmeldung_ab"] and heute < v["anmeldung_ab"]:
+            return "bald"
+        if v["anmeldung_bis"] and heute > v["anmeldung_bis"]:
+            return "zu"
+        return "offen"
+    if v["status"] == "geschlossen":
+        return "zu"
+    return ""
+
+
+class _Adresse(StringConvertor):
+    """Der Kurzlink einer Veranstaltung – aber nie einer der festen ersten
+    Pfadteile. Sonst passte '/monitor/' ohne Schrägstrich auf '/{adresse}',
+    und Starlette leitete dorthin um, statt 404 zu geben."""
+    regex = r"(?!(?:helfer|monitor|unterschrift|static|gemeinsam)(?![^/]))[^/]+"
+
+
+register_url_convertor("adresse", _Adresse())
+
+
+def _oeffentliche():
+    return [v for v in db.VERANSTALTUNGEN.liste() if _zustand(v)]
+
+
+def _nach_adresse(adresse: str):
+    for v in _oeffentliche():
+        if normalisieren.kurzadresse(v["kurz"]) == adresse:
+            return v
+    return None
+
+
+def _oeffentlich(request: Request, v=None, **extra) -> dict:
+    return _kontext(request, va=v, va_tage=_tage_text(v) if v else "",
+                    adresse=normalisieren.kurzadresse(v["kurz"]) if v else "", **extra)
+
+
+def _nicht_da(request: Request):
+    return templates.TemplateResponse(
+        "anmeldung_uebersicht.html",
+        _oeffentlich(request, liste=[]), status_code=404)
+
+
+@app.get("/")
+async def oeffentlicher_start(request: Request):
+    """Die öffentliche Startseite: welche Veranstaltung Helfer sucht. Ist es
+    genau eine, gleich dorthin."""
+    liste = [{"va": v, "adresse": normalisieren.kurzadresse(v["kurz"]),
+              "tage": _tage_text(v),
+              "zustand_text": {"offen": "Anmeldung offen", "bald": "Anmeldung öffnet bald",
+                               "zu": "Anmeldung geschlossen"}[_zustand(v)]}
+             for v in _oeffentliche()]
+    if len(liste) == 1:
+        return RedirectResponse("/" + liste[0]["adresse"], status_code=303)
+    return templates.TemplateResponse("anmeldung_uebersicht.html",
+                                      _oeffentlich(request, liste=liste))
+
+
+@app.get("/{adresse:adresse}")
+async def oeffentliche_veranstaltung(request: Request, adresse: str, vorgemerkt: str = ""):
+    v = _nach_adresse(adresse)
+    if v is None:
+        return _nicht_da(request)
+    return templates.TemplateResponse(
+        "anmeldung_start.html",
+        _oeffentlich(request, v, zustand=_zustand(v), vorgemerkt=bool(vorgemerkt),
+                     eingabe={}, fehler=""))
+
+
+@app.post("/{adresse:adresse}/interesse")
+async def interesse(request: Request, adresse: str):
+    """Interesse an einer angekündigten Veranstaltung vormerken (V-02). Die
+    Mail bei Anmeldestart kommt mit Schritt 3.3."""
+    v = _nach_adresse(adresse)
+    if v is None or _zustand(v) != "bald":
+        return _nicht_da(request)
+    daten = await request.form()
+    ziel = RedirectResponse(f"/{adresse}?vorgemerkt=1", status_code=303)
+    if normalisieren.text(daten.get("webseite")):
+        return ziel
+    email = normalisieren.text(daten.get("email")).lower()[:120]
+    vorname = normalisieren.text(daten.get("vorname"))[:60]
+    fehler = ""
+    if not selbstanmeldung._EMAIL.match(email):
+        fehler = "Bitte eine vollständige Mailadresse."
+    elif not daten.get("einverstanden"):
+        fehler = "Bitte das Häkchen setzen – sonst dürfen wir dir nicht schreiben."
+    if fehler:
+        return templates.TemplateResponse(
+            "anmeldung_start.html",
+            _oeffentlich(request, v, zustand="bald", vorgemerkt=False, fehler=fehler,
+                         eingabe={"email": email, "vorname": vorname}),
+            status_code=400)
+    db.interesse_vormerken(v["id"], email, vorname)
+    return ziel
+
+
+def _auswahl(v, schicht_roh, fenster_roh):
+    """Die gewählten Schichten (nur öffentliche, noch nicht begonnene) und
+    Springer-Zeiten aus dem Formular."""
+    alle = {s["id"]: s for s in db.oeffentliche_schichten(v["id"])}
+    ids = []
+    for roh in schicht_roh:
+        if str(roh).isdigit() and int(roh) in alle and int(roh) not in ids:
+            ids.append(int(roh))
+    gewaehlte = sorted((alle[i] for i in ids), key=lambda s: s["beginn"])
+    namen = {k: n for k, n, *_ in selbstanmeldung.TAGESZEITEN}
+    fenster = [{"schluessel": k, "beginn": von, "ende": bis,
+                "text": _tag(k.split("|")[0]) + " " + namen[k.split("|")[1]]}
+               for k, von, bis in selbstanmeldung.springer_fenster(fenster_roh, db.tage_der(v))]
+    return gewaehlte, fenster
+
+
+def _auswahl_query(gewaehlte, fenster) -> str:
+    return urlencode([("s", s["id"]) for s in gewaehlte] +
+                     [("z", f["schluessel"]) for f in fenster])
+
+
+@app.get("/{adresse:adresse}/schichten")
+async def oeffentliche_schichten(request: Request, adresse: str, hinweis: str = ""):
+    v = _nach_adresse(adresse)
+    if v is None or _zustand(v) != "offen":
+        return _nicht_da(request) if v is None else RedirectResponse(f"/{adresse}", 303)
+    schichten = db.oeffentliche_schichten(v["id"])
+    auswahl = {int(x) for x in request.query_params.getlist("s") if x.isdigit()}
+    return templates.TemplateResponse(
+        "anmeldung_schichten.html",
+        _oeffentlich(request, v, schichten=schichten, auswahl=auswahl,
+                     bereichsnamen=sorted({s["bereich"] for s in schichten}, key=str.lower),
+                     fenster_gewaehlt=set(request.query_params.getlist("z")),
+                     tage=[{"datum": t.isoformat(), "lang": _tag_lang(t.isoformat())}
+                           for t in db.tage_der(v)],
+                     tageszeiten=selbstanmeldung.TAGESZEITEN,
+                     hinweis={"leer": "Wähle mindestens eine Schicht – oder trag dich "
+                              "unten als Springer ein."}.get(hinweis, "")))
+
+
+def _angaben_seite(request, v, gewaehlte, fenster, eingabe, liste, weitere,
+                   fehler=None, gruende=None, status_code=200):
+    voraussetzungen = []
+    for s in gewaehlte:
+        for zeile in planung.voraussetzungen(s.get("voraussetzungen") or ""):
+            if zeile not in voraussetzungen:
+                voraussetzungen.append(zeile)
+    return templates.TemplateResponse(
+        "anmeldung_angaben.html",
+        _oeffentlich(request, v, gewaehlte=gewaehlte, fenster=fenster,
+                     auswahl_query=_auswahl_query(gewaehlte, fenster),
+                     eingabe=eingabe, eingabe_liste=liste, weitere=weitere,
+                     max_weitere=MAX_WEITERE, angebot=db.angebot(v["id"]),
+                     groessen=normalisieren.GROESSEN, schnitte=selbstanmeldung.SCHNITTE,
+                     verpflegung=selbstanmeldung.VERPFLEGUNG, voraussetzungen=voraussetzungen,
+                     fehler=fehler or {}, gruende=gruende or []),
+        status_code=status_code)
+
+
+@app.get("/{adresse:adresse}/angaben")
+async def angaben(request: Request, adresse: str):
+    v = _nach_adresse(adresse)
+    if v is None or _zustand(v) != "offen":
+        return _nicht_da(request) if v is None else RedirectResponse(f"/{adresse}", 303)
+    gewaehlte, fenster = _auswahl(v, request.query_params.getlist("s"),
+                                  request.query_params.getlist("z"))
+    if not gewaehlte and not fenster:
+        return RedirectResponse(f"/{adresse}/schichten?hinweis=leer", status_code=303)
+    return _angaben_seite(request, v, gewaehlte, fenster, {}, {"voraussetzung": []}, [])
+
+
+@app.post("/{adresse:adresse}/angaben")
+async def angaben_absenden(request: Request, adresse: str):
+    v = _nach_adresse(adresse)
+    if v is None or _zustand(v) != "offen":
+        return _nicht_da(request) if v is None else RedirectResponse(f"/{adresse}", 303)
+    daten = await request.form()
+    if normalisieren.text(daten.get("webseite")):
+        return RedirectResponse(f"/{adresse}", status_code=303)
+    gewaehlte, fenster = _auswahl(v, daten.getlist("s"), daten.getlist("z"))
+    if not gewaehlte and not fenster:
+        return RedirectResponse(f"/{adresse}/schichten?hinweis=leer", status_code=303)
+
+    # Was im Formular stand – auch um es nach einem Fehler wieder hinzustellen.
+    try:
+        anzahl = max(0, min(MAX_WEITERE, int(str(daten.get("weitere") or "0"))))
+    except ValueError:
+        anzahl = 0
+    eingabe = {k: str(w) for k, w in daten.items() if not k.startswith("p")}
+    personen_roh = [{k[len(f"p{i}-"):]: str(w) for k, w in daten.items()
+                     if k.startswith(f"p{i}-")} for i in range(anzahl)]
+    liste = {"voraussetzung": daten.getlist("voraussetzung")}
+
+    # Weitere Person dazu oder weg – das Formular kommt nur neu, gespeichert
+    # wird nichts.
+    aktion = str(daten.get("aktion") or "")
+    if aktion == "dazu" and anzahl < MAX_WEITERE:
+        personen_roh.append({})
+    elif aktion.startswith("weg-") and aktion[4:].isdigit():
+        weg = int(aktion[4:])
+        personen_roh = [p for i, p in enumerate(personen_roh) if i != weg]
+    def neu_nummeriert() -> dict:
+        werte = dict(eingabe)
+        for i, person in enumerate(personen_roh):
+            werte.update({f"p{i}-{k}": w for k, w in person.items()})
+        return werte
+    if aktion != "anmelden":
+        return _angaben_seite(request, v, gewaehlte, fenster, neu_nummeriert(), liste,
+                              personen_roh)
+
+    stichtag = v["beginn"]
+    angebot = db.angebot(v["id"])
+    ich, fehler = selbstanmeldung.person_pruefen(daten, "ich-", angebot, stichtag, True)
+    personen = [ich]
+    for i in range(len(personen_roh)):
+        werte, f = selbstanmeldung.person_pruefen(daten, f"p{i}-", angebot, stichtag, False)
+        personen.append(werte)
+        fehler.update(f)
+    noetig = []
+    for s in gewaehlte:
+        noetig += [z for z in planung.voraussetzungen(s.get("voraussetzungen") or "")
+                   if z not in noetig]
+    if set(noetig) - set(liste["voraussetzung"]):
+        fehler["voraussetzungen"] = "Bitte bestätigen – sonst können wir dich dort nicht einsetzen."
+    if fehler:
+        return _angaben_seite(request, v, gewaehlte, fenster, neu_nummeriert(), liste,
+                              personen_roh, fehler=fehler, status_code=400)
+
+    try:
+        ergebnis = db.anmelden(v["id"], personen, [s["id"] for s in gewaehlte],
+                               [(f["schluessel"], f["beginn"], f["ende"]) for f in fenster],
+                               bemerkung=str(daten.get("bemerkung") or "").strip()[:1000])
+    except db.AnmeldeFehler as ausnahme:
+        return _angaben_seite(request, v, gewaehlte, fenster, neu_nummeriert(), liste,
+                              personen_roh, gruende=ausnahme.gruende, status_code=409)
+    zeichen = selbstanmeldung.zeichen(config.APP_SECRET_KEY, v["id"], ergebnis["anmelder"])
+    return RedirectResponse(f"/{adresse}/danke?p={ergebnis['anmelder']}&t={zeichen}",
+                            status_code=303)
+
+
+@app.get("/{adresse:adresse}/danke")
+async def danke(request: Request, adresse: str, p: str = "", t: str = ""):
+    v = _nach_adresse(adresse)
+    if v is None or not p.isdigit() or not selbstanmeldung.zeichen_stimmt(
+            config.APP_SECRET_KEY, t, v["id"], int(p)):
+        return _nicht_da(request)
+    ergebnis = db.anmeldung_laden(v["id"], int(p))
+    if ergebnis is None:
+        return _nicht_da(request)
+    return templates.TemplateResponse("anmeldung_danke.html",
+                                      _oeffentlich(request, v, anmeldung=ergebnis))
+

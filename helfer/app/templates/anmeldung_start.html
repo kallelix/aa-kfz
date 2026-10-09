@@ -1,0 +1,45 @@
+{% extends "anmeldung_base.html" %}
+{% block ueberschrift %}Hilf mit bei {{ va.name }}!{% endblock %}
+
+{% block inhalt %}
+  {% if va.beschreibung %}<p>{{ va.beschreibung }}</p>{% endif %}
+
+  {% if zustand == 'offen' %}
+    <p>Ohne Helfer gibt es kein Rennen – schön, dass du dabei sein willst! Schon eine
+      Schicht hilft uns sehr.</p>
+    <a class="weg" href="/{{ adresse }}/schichten">
+      <strong>Ich suche mir Schichten aus</strong>
+      <span>Alle Schichten auf einen Blick – oder sag uns, wann du als Springer Zeit hast.</span>
+    </a>
+    {% if va.anmeldung_bis %}<p class="leise">Anmelden bis {{ va.anmeldung_bis.strftime('%d.%m.%Y') }}.</p>{% endif %}
+
+  {% elif zustand == 'bald' %}
+    <p>Die Anmeldung öffnet {% if va.anmeldung_ab %}am <strong>{{ va.anmeldung_ab.strftime('%d.%m.%Y') }}</strong>{% else %}bald{% endif %}.
+      Wir sagen dir Bescheid, sobald es losgeht.</p>
+    {% if vorgemerkt %}
+      <div class="hinweis gut">Danke! Wir schreiben dir, sobald die Anmeldung öffnet.</div>
+    {% else %}
+      <form method="post" action="/{{ adresse }}/interesse" class="karte">
+        {% if fehler %}<div class="hinweis warn">{{ fehler }}</div>{% endif %}
+        <label for="vorname">Vorname <span class="leise">– freiwillig</span></label>
+        <input type="text" id="vorname" name="vorname" maxlength="60" autocomplete="given-name"
+               value="{{ eingabe.vorname }}">
+        <label for="email">E-Mail</label>
+        <input type="email" id="email" name="email" maxlength="120" required autocomplete="email"
+               inputmode="email" value="{{ eingabe.email }}">
+        <div class="verborgen" aria-hidden="true">
+          <label for="webseite">Webseite</label>
+          <input type="text" id="webseite" name="webseite" tabindex="-1" autocomplete="off">
+        </div>
+        <label class="haken"><input type="checkbox" name="einverstanden" value="1" required>
+          <span>Schreibt mir einmal, wenn die Anmeldung öffnet. <span class="leise">Danach
+            löschen wir die Adresse wieder.</span></span></label>
+        <button type="submit" class="knopf">Bescheid sagen</button>
+      </form>
+    {% endif %}
+
+  {% else %}
+    <div class="hinweis">Die Anmeldung ist geschlossen. Danke an alle, die dabei sind!</div>
+    <p>Du willst trotzdem noch helfen? Ruf uns an – oft wird kurzfristig noch jemand gebraucht.</p>
+  {% endif %}
+{% endblock %}

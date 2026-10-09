@@ -184,3 +184,40 @@ def kennzeichen(roh: str | None) -> str:
 def kennzeichen_anzeige(roh: str | None) -> str:
     """Was der Mensch getippt hat, nur aufgeräumt – Trennzeichen bleiben."""
     return text(roh).upper()
+
+
+# --- Öffentliche Anmeldung (Schritt 2.2) -------------------------------------
+
+def telefon(roh: str | None) -> str | None:
+    """Eine Handynummer in einheitlicher Form (I-04): '0151 234 56 78' ->
+    '+49 1512345678'. Leer bleibt leer; None, wenn es keine Nummer ist.
+
+    Bewusst schlicht: Ländervorwahl vorn, der Rest am Stück. Wer eine
+    Nummer aus dem Ausland angibt, behält seine Vorwahl.
+    """
+    wert = text(roh)
+    if not wert:
+        return ""
+    ziffern = re.sub(r"[\s()/.\-]", "", wert)
+    if ziffern.startswith("00"):
+        ziffern = "+" + ziffern[2:]
+    if not re.fullmatch(r"\+?\d{6,15}", ziffern):
+        return None
+    if ziffern.startswith("+"):
+        # Die gängigen Ländervorwahlen haben zwei Stellen; für +49 und die
+        # Nachbarn reicht das, die übrigen bleiben einfach am Stück.
+        land, rest = ziffern[1:3], ziffern[3:]
+        return "+" + land + " " + rest if rest else ziffern
+    if ziffern.startswith("0"):
+        return "+49 " + ziffern[1:]
+    return "+49 " + ziffern
+
+
+_UMLAUTE = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+
+
+def kurzadresse(kurz: str) -> str:
+    """Der Kurzname einer Veranstaltung als Pfadstück: 'AA 2027' -> 'aa-2027'.
+    So lautet der Link, der in WhatsApp herumgeht."""
+    wert = text(kurz).lower().translate(_UMLAUTE)
+    return re.sub(r"[^a-z0-9]+", "-", wert).strip("-")

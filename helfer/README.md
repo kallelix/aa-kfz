@@ -8,6 +8,8 @@ und ein Monitor, auf den alle schauen. Grundlage ist
 
 | Adresse | was dort liegt |
 | --- | --- |
+| `helfer.example.de/` | die öffentliche Anmeldung: welche Veranstaltung Helfer sucht |
+| `helfer.example.de/aa-2027` | die Anmeldung einer Veranstaltung, Kurzlink aus ihrem Kurznamen |
 | `helfer.example.de/monitor/<token>` | Monitoransicht, ohne Anmeldung |
 | `helfer.example.de/unterschrift/<token>` | Unterschriften-Tablet, ohne Anmeldung |
 | `admin.example.de/helfer` | Backoffice |
@@ -15,6 +17,34 @@ und ein Monitor, auf den alle schauen. Grundlage ist
 Monitor und Tablet sind über einen langen, widerrufbaren Token geschützt statt
 über ein Passwort – der Bildschirm im Zelt kann keines eingeben. Beide Links
 werden im Backoffice erzeugt.
+
+## Öffentliche Anmeldung
+
+Helfer melden sich selbst an (Lastenheft 2.2), ohne Konto: Schichten in einer
+Liste ankreuzen, nach Tag gegliedert, mit freien Plätzen im Klartext – dann
+die Angaben, dann eine Dankeseite. Was dabei gilt:
+
+- Zu sehen ist eine Veranstaltung erst ab dem Status *angekündigt*; dann gibt
+  es nur ihre Startseite, auf der man Interesse vormerken kann. Anmelden geht
+  bei *Anmeldung offen* und innerhalb des Anmeldezeitraums.
+- Je Schicht gibt es zuerst Plätze bis zum Soll, dann Reserve; ist auch die
+  voll, ist die Schicht voll. Belegt wird unter Sperre, gleichzeitige
+  Anmeldungen überholen sich nicht.
+- Was sich überschneidet, geht nicht – zwei Schichten, eine Schicht und eine
+  Springer-Zeit, eine neue Schicht und eine, für die jemand schon eingetragen
+  ist. Mit Skript ist es in der Liste gleich ausgegraut; geprüft wird beim
+  Absenden ohnehin.
+- Vor- und Nachname, Mail und das Alter sind Pflicht; Shirt (mit Schnitt) und
+  Essen nur, wenn die Veranstaltung sie anbietet. Unter 12 geht es nicht, das
+  Mindestalter der Schichten wird geprüft, Voraussetzungen werden bestätigt.
+- Weitere Personen lassen sich mitanmelden; sie stehen auf denselben
+  Schichten, zählen eigens, und Ansprechpartner bleibt, wer anmeldet.
+- Statt Schichten geht auch Springer: Tag mal Vormittag, Nachmittag, Abend.
+
+Wer sich anmeldet, steht danach in denselben Tabellen wie importierte oder von
+Hand eingeteilte Helfer – im Backoffice mit der Quelle „selbst angemeldet“ und
+gegebenenfalls als Reserve. Bestätigung per Mail und „Mein Helferplatz“ folgen
+mit Schritt 2.4.
 
 ## Starten
 
@@ -126,6 +156,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_unterschrift.py # Unterschriften am Tablet
 .venv/Scripts/python.exe helfer/tests/test_monitor.py      # Monitor mit gestellter Uhr
 .venv/Scripts/python.exe helfer/tests/test_bereiche.py     # Bereiche, Schichten, Goodies, Vorlage
+.venv/Scripts/python.exe helfer/tests/test_anmeldung.py    # die öffentliche Anmeldung
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

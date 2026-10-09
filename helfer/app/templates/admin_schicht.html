@@ -20,7 +20,8 @@
       {% endif %}
     </p>
     <p class="hilfe">Minimum {{ schicht.minimum }}, Soll {{ schicht.soll }}
-      {%- if schicht.reserve %}, dazu {{ schicht.reserve }} Reserve{% endif %}.</p>
+      {%- if schicht.reserve %}, dazu {{ schicht.reserve }} Reserve
+        ({{ schicht.reserve_besetzt }} belegt){% endif %}.</p>
     {% if schicht.hinweis %}<p class="hilfe">{{ schicht.hinweis }}</p>{% endif %}
     <p class="knopfreihe">
       <a class="knopf-schlicht" href="/helfer/schicht/{{ schicht.id }}/aendern">Schicht ändern</a>
@@ -63,7 +64,8 @@
                   {% elif h.veggie == 0 %}Fleisch
                   {% else %}<span class="gedaempft">–</span>{% endif %}
                 </td>
-                <td class="gedaempft">{{ 'Import' if h.quelle == 'import' else 'von Hand' }}</td>
+                <td class="gedaempft">{{ {'import': 'Import', 'hand': 'von Hand', 'selbst': 'selbst angemeldet'}[h.quelle] }}
+                  {%- if h.art == 'reserve' %} <span class="marke">Reserve</span>{% endif %}</td>
                 <td class="rechts">
                   <form method="post"
                         action="/helfer/einteilung/{{ h.einteilung_id }}/austragen">

@@ -1,0 +1,30 @@
+{# Die öffentliche Anmeldung (Lastenheft 2.2). Eine eigene Hülle, nicht die
+   des Backoffice: Helfer sehen nichts davon, und die Seite muss auf einem
+   alten Handy bei schlechtem Netz taugen. #}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titel %}Mithelfen{% endblock %}{% if va %} – {{ va.name }}{% endif %}</title>
+  <link rel="stylesheet" href="/static/anmeldung.css">
+</head>
+<body>
+  <div class="huelle">
+    <header class="kopf">
+      {% block zurueck %}{% endblock %}
+      <p class="veranstaltung">{% if va %}{{ va.name }} · {{ va_tage }}{% else %}{{ veranstaltung }}{% endif %}</p>
+      <h1>{% block ueberschrift %}Mithelfen{% endblock %}</h1>
+    </header>
+
+    {% block inhalt %}{% endblock %}
+
+    <p class="fuss leise">
+      Fragen? {% if kontakt_name %}{{ kontakt_name }}{% endif %}
+      {%- if kontakt_telefon %} · <a href="tel:{{ kontakt_telefon|replace(' ', '') }}">{{ kontakt_telefon }}</a>{% endif %}
+      {%- if kontakt_mail %} · <a href="mailto:{{ kontakt_mail }}">{{ kontakt_mail }}</a>{% endif %}
+    </p>
+  </div>
+  {% block skript %}{% endblock %}
+</body>
+</html>

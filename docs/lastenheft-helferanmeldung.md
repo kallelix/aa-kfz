@@ -230,6 +230,14 @@ macht aus jeder Liste einen Bereich und aus ihrem Bedarf Soll und Minimum.
 | A-11 | Wer schon angemeldet ist – in diesem Jahr oder früher –, wird beim Eintragen der Adresse erkannt und bekommt seinen Link zu Mein Helferplatz, statt ein zweites Mal angelegt zu werden. | M | 2 |
 | A-12 | Ein **Link auf eine einzelne Schicht** (kurz, z. B. `…/s/k7`) führt direkt dorthin – für Hilferufe in WhatsApp. | S | 3 |
 
+**Stand 09.10.2026:** Die Liste steht (Schritt 2.2): A-01 vorerst nur mit
+der Liste, A-06 mit Filtern nach Tag und Bereich, A-07 und A-08 mit Mitanmeldung,
+I-01, I-02 und I-04, K-01 und K-04, R-03 und R-05, dazu das Vormerken von
+Interesse (V-02). Jede Veranstaltung hat ihren Kurzlink, etwa
+`helfer.example.de/aa-2027`. Die Bestätigung per Mail, das Wiedererkennen und
+Mein Helferplatz (A-09 bis A-11, I-03, I-05) kommen mit 2.4; bis dahin sagt
+die Dankeseite nur, dass sich die Orga meldet.
+
 ### 5.3 Selbstbedienung (S)
 
 Entschieden: Helfer erledigen selbst, wofür sie heute die Orga anschreiben
@@ -625,6 +633,15 @@ party_zusage  (veranstaltung_id, person_id, kommt, begleitung, am)
 von der Person, die bleibt. `zusage` ersetzt die heutige `einteilung` und
 nimmt Reserve, Warteliste, Absage und Check-in mit auf.
 
+**Umgesetzt mit 2.2 – ohne zweites Modell neben dem Backoffice:** `person`
+ist die bestehende Tabelle `helfer`, erweitert um Vor- und Nachname, Alter,
+„mitangemeldet von“ und die Bestätigung der Adresse; `zusage` ist die
+bestehende `einteilung`, erweitert um `art` (Platz oder Reserve) und die
+Quelle *selbst*. Schichten, Monitor und Ausgabe sehen Selbstanmeldungen so
+ohne Umweg. `teilnahme`, `verfuegbarkeit` und `interesse` sind neu. Shirt und
+Verpflegung stehen vorerst weiter an der Person; je Veranstaltung wandern sie
+mit der Ausgabe am Check-in (4.2).
+
 ---
 
 ## 8. Ablösung von helferliste.online
@@ -694,7 +711,7 @@ Selbstbedienung.
 | 2.1 | Bereiche und Schichten pflegen: Minimum/Soll/Reserve, Mindestalter, Voraussetzungen, intern, Goodies je Veranstaltung, Vorlage aus dem Vorjahr | **erledigt** |
 | 2.1a | **Bereichsleitung als Konto** (B-02, aus Phase 3): sieht und pflegt nur ihre Bereiche, Schichten und Leute; Empfänger für Meldungen und Ausdrucke | **erledigt** |
 | 2.1b | **Navigation nach dem Klickentwurf**: Veranstaltung im Kopf, Reiter nach dem, was sie nutzt (V-08), Gruppen im Helferbereich (Übersicht, Planen, Leute, Vor Ort), Einrichten bei der Veranstaltung, Goodie-Schalter und Shirt-Schnitt; die Ausgabe als eigener Reiter, vorerst mit den heutigen Seiten für Funk und Schlüssel | **erledigt** |
-| 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten; **Interesse vormerken** bei angekündigten Veranstaltungen (aus 3.3); Verfügbarkeit und Vorlieben schon im Datenmodell, für den Assistenten | 11 h |
+| 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten; **Interesse vormerken** bei angekündigten Veranstaltungen (aus 3.3); Verfügbarkeit und Vorlieben schon im Datenmodell, für den Assistenten | **erledigt** |
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | 3 h |
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 9 h |
 | 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; **Warteliste mit Nachrücken** (R-04, aus 3.6); Meldung kurzfristiger Absagen; Protokoll | 11 h |
@@ -722,14 +739,14 @@ Bestehendes umgebaut.
 
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
-89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM, 2.1, 2.1a und
-2.1b schon erledigt; es bleiben rund 53 Stunden, die 8 Stunden pro Woche haben
+89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 bis
+2.2 schon erledigt; es bleiben rund 42 Stunden, die 8 Stunden pro Woche haben
 also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~53 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~42 h, ab 12. Oktober |
 | --- | --- |
-| Anfang Dezember 2026 | ~8 h |
-| **Mitte Dezember 2026** | **~6 h** |
+| Anfang Dezember 2026 | ~6 h |
+| **Mitte Dezember 2026** | **~5 h** |
 | Rückfallebene: Anfang März 2027 | ~3 h |
 
 Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
@@ -777,7 +794,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~65 h, davon ~14 h erledigt |
+| 2 Öffnung | ~65 h, davon ~25 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |

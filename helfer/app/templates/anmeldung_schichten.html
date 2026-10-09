@@ -1,0 +1,92 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Schichten{% endblock %}
+{% block zurueck %}<a class="zurueck" href="/{{ adresse }}">‹ Zurück</a>{% endblock %}
+{% block ueberschrift %}Alle Schichten{% endblock %}
+
+{% block inhalt %}
+  {% if hinweis %}<div class="hinweis warn">{{ hinweis }}</div>{% endif %}
+
+  {# Ein Formular, das nichts speichert: „Weiter“ trägt die Auswahl als
+     Parameter zu den Angaben. Ohne Skript geht alles; mit Skript zählt die
+     Leiste mit und graut aus, was sich überschneidet (K-01). Geprüft wird
+     beim Absenden ohnehin noch einmal. #}
+  <form method="get" action="/{{ adresse }}/angaben" data-auswahl>
+
+    {# Die Filter braucht nur, wer Skript hat – ohne bleibt die Liste ganz. #}
+    <div class="filter" data-filter="tag" hidden>
+      <button type="button" data-wert="" aria-pressed="true">Alle Tage</button>
+      {% for datum, _ in schichten|groupby('datum') %}
+        <button type="button" data-wert="{{ datum }}" aria-pressed="false">{{ datum|tag }}</button>
+      {% endfor %}
+    </div>
+    <div class="filter" data-filter="bereich" hidden>
+      <button type="button" data-wert="" aria-pressed="true">Alle Bereiche</button>
+      {% for name in bereichsnamen %}
+        <button type="button" data-wert="{{ name }}" aria-pressed="false">{{ name }}</button>
+      {% endfor %}
+    </div>
+
+    {% if not schichten %}
+      <p>Gerade ist keine Schicht offen. Als Springer kannst du trotzdem helfen – siehe unten.</p>
+    {% endif %}
+
+    {% for datum, liste in schichten|groupby('datum') %}
+      <h2 class="tagkopf" data-tag="{{ datum }}">{{ datum|tag_lang }}</h2>
+      {% for s in liste %}
+        {% set gewaehlt = s.id in auswahl %}
+        <div class="karte schicht{% if gewaehlt %} gewaehlt{% endif %}" data-schicht
+             data-tag="{{ s.datum }}" data-bereich="{{ s.bereich }}"
+             data-beginn="{{ s.beginn }}" data-ende="{{ s.ende }}"
+             data-text="{{ s.bereich }} {{ s|spanne }}">
+          <h3>{{ s.bereich }}</h3>
+          <div class="zeit">{{ s|spanne }}</div>
+          <div class="ort">Treffpunkt: {{ s.ort or s.treffpunkt or 'kommt noch' }}</div>
+          {% if s.beschreibung %}<p class="beschreibung leise">{{ s.beschreibung }}</p>{% endif %}
+          <div>
+            {% if s.dringend %}<span class="marke dringend">Wird dringend gebraucht</span>{% endif %}
+            {% if s.lage == 'frei' %}<span class="marke frei">noch {{ s.frei }} frei</span>
+            {% elif s.lage == 'reserve' %}<span class="marke reserve">als Reserve</span>
+            {% else %}<span class="marke voll">voll</span>{% endif %}
+            {% if s.alter_ab %}<span class="marke voll">ab {{ s.alter_ab }}</span>{% endif %}
+            {% for v in s.voraussetzungen.splitlines() if v.strip() %}<span class="marke voll">{{ v }}</span>{% endfor %}
+          </div>
+          {% if s.lage != 'voll' or gewaehlt %}
+            <label class="eintragen">
+              <input type="checkbox" name="s" value="{{ s.id }}" {% if gewaehlt %}checked{% endif %}>
+              {{ 'Als Reserve eintragen' if s.lage == 'reserve' else 'Eintragen' }}
+            </label>
+          {% endif %}
+          <div class="grund" data-grund></div>
+        </div>
+      {% endfor %}
+    {% endfor %}
+
+    {# R-05: Zeitfenster statt Schicht. #}
+    <details class="karte"{% if fenster_gewaehlt %} open{% endif %}>
+      <summary>Keine feste Schicht? Als Springer helfen</summary>
+      <p class="leise">Sag uns, wann du Zeit hast – wir setzen dich ein, wo gerade jemand fehlt.</p>
+      {% for tag in tage %}
+        <div class="tag">
+          <div class="tagname">{{ tag.lang }}</div>
+          <div class="drei">
+            {% for schluessel, name, spanne, _, _ in tageszeiten %}
+              {% set wert = tag.datum ~ '|' ~ schluessel %}
+              <label class="wahl">
+                <input type="checkbox" name="z" value="{{ wert }}" {% if wert in fenster_gewaehlt %}checked{% endif %}
+                       data-springer>
+                <span class="name">{{ name }}</span>
+                <span class="spanne">{{ spanne }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </details>
+
+    <div class="leiste">
+      <button type="submit" class="knopf" id="weiter">Weiter</button>
+    </div>
+  </form>
+{% endblock %}
+
+{% block skript %}<script src="/static/anmeldung.js"></script>{% endblock %}

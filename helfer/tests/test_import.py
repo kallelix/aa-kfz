@@ -153,8 +153,9 @@ try:
         pruefe(status == 303 and ort.startswith("/helfer/login"),
                pfad + " fuehrt zur Anmeldung")
 
-    status, ort, _ = anfrage("GET", "/")
-    pruefe(status == 303 and ort == "/helfer", "/ leitet ins Backoffice")
+    status, ort, seite = anfrage("GET", "/")
+    pruefe(status == 200 and "suchen wir keine Helfer" in seite,
+           "/ ist die öffentliche Anmeldung – ohne offene Veranstaltung sagt sie das")
 
     print("Anmelden")
     anfrage("POST", "/helfer/login",
