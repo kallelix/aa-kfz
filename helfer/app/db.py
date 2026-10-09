@@ -18,7 +18,7 @@ from pathlib import Path
 from kern import veranstaltungen as va
 from kern.db import Datenbank, IntegrityError, Verbindung, Zeile
 
-from . import config, normalisieren
+from . import config, normalisieren, planung
 
 _DATENBANK = Datenbank(lambda: config.DATABASE_URL, config.DB_SCHEMA,
                        Path(__file__).resolve().parent / "migrationen")
@@ -209,74 +209,238 @@ def helfer_schichten(vid: int, helfer_id: int) -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
-            "SELECT e.id AS einteilung_id, e.quelle, s.*"
+            "SELECT e.id AS einteilung_id, e.quelle, s.*, b.name AS bereich"
             " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            " JOIN bereich b ON b.id = s.bereich_id"
             " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? ORDER BY s.beginn",
             (helfer_id, vid)).fetchall()
     finally:
         con.close()
 
 
+# --- Bereiche --------------------------------------------------------------
+
+_BEREICH_FELDER = ("name", "beschreibung", "treffpunkt", "leitung",
+                   "leitung_telefon", "mindestalter", "voraussetzungen", "intern")
+
+
+def bereiche(vid: int) -> list[Zeile]:
+    """Die Bereiche der Veranstaltung mit ihren Zahlen: Schichten, Plätze
+    nach Soll, davon besetzt."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT b.*,"
+            " (SELECT COUNT(*) FROM schicht s WHERE s.bereich_id = b.id) AS schichten,"
+            " (SELECT COALESCE(SUM(s.soll), 0) FROM schicht s"
+            "  WHERE s.bereich_id = b.id) AS soll,"
+            " (SELECT COUNT(*) FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            "  WHERE s.bereich_id = b.id) AS besetzt"
+            " FROM bereich b WHERE b.veranstaltung_id = ?"
+            " ORDER BY lower(b.name)", (vid,)).fetchall()
+    finally:
+        con.close()
+
+
+def bereich_laden(bereich_id: int) -> Zeile | None:
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM bereich WHERE id = ?",
+                           (bereich_id,)).fetchone()
+    finally:
+        con.close()
+
+
+def bereich_anlegen(vid: int, werte: dict) -> int | None:
+    """None, wenn es den Namen in dieser Veranstaltung schon gibt."""
+    con = verbinden()
+    try:
+        with con:
+            return int(con.execute(
+                "INSERT INTO bereich (veranstaltung_id, " + ", ".join(_BEREICH_FELDER) +
+                ", angelegt_am) VALUES (?, " + ", ".join("?" for _ in _BEREICH_FELDER) +
+                ", ?) RETURNING id",
+                (vid, *(werte[f] for f in _BEREICH_FELDER), jetzt())).fetchone()[0])
+    except IntegrityError:
+        return None
+    finally:
+        con.close()
+
+
+def bereich_aendern(bereich_id: int, werte: dict) -> bool | None:
+    """False, wenn es den Bereich nicht mehr gibt; None, wenn der Name
+    schon vergeben ist."""
+    con = verbinden()
+    try:
+        with con:
+            return con.execute(
+                "UPDATE bereich SET " + ", ".join(f + " = ?" for f in _BEREICH_FELDER) +
+                ", geaendert_am = ? WHERE id = ?",
+                (*(werte[f] for f in _BEREICH_FELDER), jetzt(), bereich_id)).rowcount > 0
+    except IntegrityError:
+        return None
+    finally:
+        con.close()
+
+
+def bereich_loeschen(bereich_id: int) -> bool:
+    """Nur ein leerer Bereich. Mit Schichten weist die Datenbank das ab –
+    die Schichten tragen Einteilungen, die sonst stillschweigend mitgingen."""
+    con = verbinden()
+    try:
+        with con:
+            con.execute("DELETE FROM bereich WHERE id = ?", (bereich_id,))
+        return True
+    except IntegrityError:
+        return False
+    finally:
+        con.close()
+
+
+def bereich_sichern(con: Verbindung, vid: int, name: str) -> int:
+    """Für den Import: den Bereich mit diesem Namen, sonst einen neuen."""
+    vorhanden = con.execute(
+        "SELECT id FROM bereich WHERE veranstaltung_id = ? AND name = ?",
+        (vid, name)).fetchone()
+    if vorhanden is not None:
+        return int(vorhanden["id"])
+    return int(con.execute(
+        "INSERT INTO bereich (veranstaltung_id, name, angelegt_am)"
+        " VALUES (?, ?, ?) RETURNING id", (vid, name, jetzt())).fetchone()[0])
+
+
 # --- Schichten -------------------------------------------------------------
 
-def schicht_sichern(con: Verbindung, vid: int, liste: str, beginn: str,
-                    ende: str, datum: str,
-                    bedarf: int | None = None) -> tuple[int, bool]:
-    """Legt eine Schicht an oder aktualisiert sie. Gibt (id, neu) zurück.
+_SCHICHT_FELDER = ("beginn", "ende", "datum", "minimum", "soll", "reserve",
+                   "mindestalter", "ort", "hinweis", "intern")
 
-    `bedarf` wird GESETZT, nicht addiert. Der Import rechnet den Bedarf aus
-    beiden CSV-Dateien neu aus; würde hier addiert, verdoppelte ein zweiter
-    Lauf derselben Dateien den Bedarf. None lässt den Wert stehen.
+
+def schicht_sichern(con: Verbindung, vid: int, bereich: str, beginn: str,
+                    ende: str, datum: str,
+                    soll: int | None = None) -> tuple[int, bool]:
+    """Für den Import: legt eine Schicht an oder aktualisiert sie. Gibt
+    (id, neu) zurück. Der Bereich kommt als Name, wie er in den CSVs steht.
+
+    `soll` wird GESETZT, nicht addiert. Der Import rechnet es aus beiden
+    CSV-Dateien neu aus; würde hier addiert, verdoppelte ein zweiter Lauf
+    derselben Dateien das Soll. None lässt den Wert stehen.
+
+    Das alte Tool kennt nur eine Zahl. Eine neue Schicht bekommt sie als
+    Minimum und Soll. Bei einer vorhandenen wandert das Minimum mit, solange
+    es noch dem Soll gleicht, also niemand es von Hand gesenkt hat.
     """
+    bereich_id = bereich_sichern(con, vid, bereich)
     vorhanden = con.execute(
-        "SELECT id FROM schicht WHERE veranstaltung_id = ? AND liste = ?"
-        " AND beginn = ? AND ende = ?", (vid, liste, beginn, ende)).fetchone()
+        "SELECT id FROM schicht WHERE bereich_id = ? AND beginn = ? AND ende = ?",
+        (bereich_id, beginn, ende)).fetchone()
     if vorhanden is None:
         zeiger = con.execute(
-            "INSERT INTO schicht (veranstaltung_id, liste, beginn, ende, datum,"
-            " bedarf, angelegt_am) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
-            (vid, liste, beginn, ende, datum, bedarf or 0, jetzt()))
+            "INSERT INTO schicht (veranstaltung_id, bereich_id, beginn, ende, datum,"
+            " minimum, soll, angelegt_am) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (vid, bereich_id, beginn, ende, datum, soll or 0, soll or 0, jetzt()))
         return int(zeiger.fetchone()[0]), True
-    if bedarf is not None:
+    if soll is not None:
         con.execute(
-            "UPDATE schicht SET bedarf = ?, geaendert_am = ? WHERE id = ?",
-            (bedarf, jetzt(), vorhanden["id"]))
+            "UPDATE schicht SET"
+            " minimum = CASE WHEN minimum = soll THEN ? ELSE LEAST(minimum, ?) END,"
+            " soll = ?, geaendert_am = ? WHERE id = ?",
+            (soll, soll, soll, jetzt(), vorhanden["id"]))
     return int(vorhanden["id"]), False
+
+
+def schicht_anlegen(vid: int, bereich_id: int, werte: dict) -> int | None:
+    """None, wenn der Bereich zu derselben Zeit schon eine Schicht hat."""
+    con = verbinden()
+    try:
+        with con:
+            return int(con.execute(
+                "INSERT INTO schicht (veranstaltung_id, bereich_id, " +
+                ", ".join(_SCHICHT_FELDER) + ", angelegt_am) VALUES (?, ?, " +
+                ", ".join("?" for _ in _SCHICHT_FELDER) + ", ?) RETURNING id",
+                (vid, bereich_id, *(werte[f] for f in _SCHICHT_FELDER),
+                 jetzt())).fetchone()[0])
+    except IntegrityError:
+        return None
+    finally:
+        con.close()
+
+
+def schicht_aendern(schicht_id: int, bereich_id: int, werte: dict) -> bool | None:
+    """False, wenn es die Schicht nicht mehr gibt; None, wenn der Bereich zu
+    der Zeit schon eine hat. Der Bereich muss zur selben Veranstaltung
+    gehören – sonst weist der Fremdschlüssel ab, ebenfalls mit None."""
+    con = verbinden()
+    try:
+        with con:
+            return con.execute(
+                "UPDATE schicht SET bereich_id = ?, " +
+                ", ".join(f + " = ?" for f in _SCHICHT_FELDER) +
+                ", geaendert_am = ? WHERE id = ?",
+                (bereich_id, *(werte[f] for f in _SCHICHT_FELDER), jetzt(),
+                 schicht_id)).rowcount > 0
+    except IntegrityError:
+        return None
+    finally:
+        con.close()
+
+
+def schicht_loeschen(schicht_id: int) -> int:
+    """Löscht eine Schicht, auf der niemand steht. Gibt zurück, wie viele
+    darauf stehen – ist das mehr als 0, bleibt sie."""
+    con = verbinden()
+    try:
+        with con:
+            besetzt = con.execute(
+                "SELECT COUNT(*) FROM einteilung WHERE schicht_id = ?",
+                (schicht_id,)).fetchone()[0]
+            if not besetzt:
+                con.execute("DELETE FROM schicht WHERE id = ?", (schicht_id,))
+        return int(besetzt)
+    finally:
+        con.close()
 
 
 # besetzt/fehlt werden immer mitgerechnet – jede Ansicht braucht sie, und eine
 # eigene Zählspalte in schicht wäre eine zweite Wahrheit, die veralten kann.
+# Fehlen heißt: unter dem Soll. Die Reserve fehlt nie (R-02).
+#
+# Vom Bereich kommen sein Name und, was die Schicht von ihm erbt: das
+# Mindestalter, wenn sie kein eigenes hat, und „intern", wenn einer von
+# beiden es ist.
 _SCHICHT_SPALTEN = (
-    "s.*,"
+    "s.*, b.name AS bereich, b.treffpunkt,"
+    " COALESCE(s.mindestalter, b.mindestalter) AS alter_ab,"
+    " GREATEST(s.intern, b.intern) AS ist_intern,"
     " (SELECT COUNT(*) FROM einteilung e WHERE e.schicht_id = s.id) AS besetzt,"
-    " GREATEST(0, s.bedarf - (SELECT COUNT(*) FROM einteilung e"
-    "                         WHERE e.schicht_id = s.id)) AS fehlt"
+    " GREATEST(0, s.soll - (SELECT COUNT(*) FROM einteilung e"
+    "                       WHERE e.schicht_id = s.id)) AS fehlt"
 )
+_SCHICHT_VON = " FROM schicht s JOIN bereich b ON b.id = s.bereich_id"
 
 # Woraus `suche` für eine Schicht entsteht, siehe _mit_suche().
-_SCHICHT_SUCHE = ("liste", "ort")
+_SCHICHT_SUCHE = ("bereich", "ort")
 
 
-def schichten(vid: int, liste: str = "", tag: str = "",
+def schichten(vid: int, bereich_id: int | None = None, tag: str = "",
               nur_luecken: bool = False) -> list[Zeile]:
     bedingungen, werte = ["s.veranstaltung_id = ?"], [vid]
-    if liste:
-        bedingungen.append("s.liste = ?")
-        werte.append(liste)
+    if bereich_id:
+        bedingungen.append("s.bereich_id = ?")
+        werte.append(bereich_id)
     if tag:
         bedingungen.append("s.datum = ?")
         werte.append(tag)
     if nur_luecken:
         bedingungen.append(
-            "s.bedarf > (SELECT COUNT(*) FROM einteilung e"
+            "s.soll > (SELECT COUNT(*) FROM einteilung e"
             " WHERE e.schicht_id = s.id)")
     wo = " WHERE " + " AND ".join(bedingungen)
 
     con = verbinden()
     try:
         return _mit_suche(con.execute(
-            "SELECT " + _SCHICHT_SPALTEN + " FROM schicht s" + wo +
-            " ORDER BY s.beginn, lower(s.liste)", werte).fetchall(),
+            "SELECT " + _SCHICHT_SPALTEN + _SCHICHT_VON + wo +
+            " ORDER BY s.beginn, lower(b.name)", werte).fetchall(),
             *_SCHICHT_SUCHE)
     finally:
         con.close()
@@ -286,7 +450,7 @@ def schicht_laden(schicht_id: int) -> Zeile | None:
     con = verbinden()
     try:
         zeile = con.execute(
-            "SELECT " + _SCHICHT_SPALTEN + " FROM schicht s WHERE s.id = ?",
+            "SELECT " + _SCHICHT_SPALTEN + _SCHICHT_VON + " WHERE s.id = ?",
             (schicht_id,)).fetchone()
         return _mit_suche([zeile], *_SCHICHT_SUCHE)[0] if zeile else None
     finally:
@@ -306,22 +470,181 @@ def besetzung(schicht_id: int) -> list[Zeile]:
         con.close()
 
 
-def listen(vid: int) -> list[str]:
-    con = verbinden()
-    try:
-        return [z["liste"] for z in con.execute(
-            "SELECT liste FROM schicht WHERE veranstaltung_id = ?"
-            " GROUP BY liste ORDER BY lower(liste)", (vid,))]
-    finally:
-        con.close()
-
-
 def tage(vid: int) -> list[str]:
     con = verbinden()
     try:
         return [z["datum"] for z in con.execute(
             "SELECT DISTINCT datum FROM schicht WHERE veranstaltung_id = ?"
             " ORDER BY datum", (vid,))]
+    finally:
+        con.close()
+
+
+# --- Angebot und Goodies ---------------------------------------------------
+
+ANGEBOT_VORGABE = {"shirt": 0, "verpflegung": 1, "party": 0}
+
+
+def angebot(vid: int) -> dict:
+    """Was die Veranstaltung ihren Helfern bietet. Ohne gespeicherte Zeile
+    die Vorgabe der Tabelle."""
+    con = verbinden()
+    try:
+        zeile = con.execute("SELECT * FROM angebot WHERE veranstaltung_id = ?",
+                            (vid,)).fetchone()
+    finally:
+        con.close()
+    return {f: (zeile[f] if zeile else ANGEBOT_VORGABE[f]) for f in ANGEBOT_VORGABE}
+
+
+def angebot_setzen(vid: int, werte: dict) -> None:
+    con = verbinden()
+    try:
+        with con:
+            con.execute(
+                "INSERT INTO angebot (veranstaltung_id, shirt, verpflegung, party,"
+                " geaendert_am) VALUES (?, ?, ?, ?, ?)"
+                " ON CONFLICT (veranstaltung_id) DO UPDATE SET"
+                " shirt = excluded.shirt, verpflegung = excluded.verpflegung,"
+                " party = excluded.party, geaendert_am = excluded.geaendert_am",
+                (vid, werte["shirt"], werte["verpflegung"], werte["party"], jetzt()))
+    finally:
+        con.close()
+
+
+_GOODIE_FELDER = ("name", "ab_schichten", "ab_stunden", "mindestalter", "alternative")
+
+
+def goodies(vid: int) -> list[Zeile]:
+    """Nach Schwelle: erst die nach Schichten, dann die nach Stunden."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT * FROM goodie WHERE veranstaltung_id = ?"
+            " ORDER BY ab_schichten IS NULL, ab_schichten, ab_stunden, lower(name)",
+            (vid,)).fetchall()
+    finally:
+        con.close()
+
+
+def goodie_laden(goodie_id: int) -> Zeile | None:
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM goodie WHERE id = ?",
+                           (goodie_id,)).fetchone()
+    finally:
+        con.close()
+
+
+def goodie_anlegen(vid: int, werte: dict) -> int:
+    con = verbinden()
+    try:
+        with con:
+            return int(con.execute(
+                "INSERT INTO goodie (veranstaltung_id, " + ", ".join(_GOODIE_FELDER) +
+                ", angelegt_am) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                (vid, *(werte[f] for f in _GOODIE_FELDER), jetzt())).fetchone()[0])
+    finally:
+        con.close()
+
+
+def goodie_aendern(goodie_id: int, werte: dict) -> bool:
+    con = verbinden()
+    try:
+        with con:
+            return con.execute(
+                "UPDATE goodie SET " + ", ".join(f + " = ?" for f in _GOODIE_FELDER) +
+                ", geaendert_am = ? WHERE id = ?",
+                (*(werte[f] for f in _GOODIE_FELDER), jetzt(), goodie_id)).rowcount > 0
+    finally:
+        con.close()
+
+
+def goodie_loeschen(goodie_id: int) -> None:
+    con = verbinden()
+    try:
+        with con:
+            con.execute("DELETE FROM goodie WHERE id = ?", (goodie_id,))
+    finally:
+        con.close()
+
+
+# --- Vorlage (V-04) --------------------------------------------------------
+
+def vorlagen(vid: int) -> list[Zeile]:
+    """Frühere Veranstaltungen, aus denen sich etwas übernehmen lässt: die
+    mit mindestens einem Bereich."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT v.id, v.name, v.kurz, v.beginn, COUNT(DISTINCT b.id) AS bereiche,"
+            " COUNT(s.id) AS schichten"
+            " FROM kern.veranstaltung v JOIN bereich b ON b.veranstaltung_id = v.id"
+            " LEFT JOIN schicht s ON s.bereich_id = b.id"
+            " WHERE v.id <> ? GROUP BY v.id ORDER BY v.beginn DESC", (vid,)).fetchall()
+    finally:
+        con.close()
+
+
+def vorlage_uebernehmen(vid: int, quelle_id: int) -> dict | None:
+    """Bereiche, Schichten, Goodies und das Angebot einer früheren
+    Veranstaltung in diese kopieren. Die Schichten wandern um so viele Tage,
+    wie die beiden Veranstaltungen auseinanderliegen – gemessen am ersten
+    Tag. Einteilungen bleiben, wo sie sind: die Leute haben sich für damals
+    gemeldet, nicht für jetzt.
+
+    Nur in eine Veranstaltung ohne Bereiche; sonst None. Zusammenführen
+    hieße raten, welcher Bereich welcher ist.
+    """
+    ziel = VERANSTALTUNGEN.laden(vid)
+    quelle = VERANSTALTUNGEN.laden(quelle_id)
+    if ziel is None or quelle is None or ziel["id"] == quelle["id"]:
+        return None
+    tage = (ziel["beginn"] - quelle["beginn"]).days
+
+    con = verbinden()
+    try:
+        with con:
+            if con.execute("SELECT 1 FROM bereich WHERE veranstaltung_id = ?",
+                           (vid,)).fetchone():
+                return None
+            neu: dict[int, int] = {}
+            for b in con.execute("SELECT * FROM bereich WHERE veranstaltung_id = ?"
+                                 " ORDER BY id", (quelle_id,)).fetchall():
+                neu[b["id"]] = int(con.execute(
+                    "INSERT INTO bereich (veranstaltung_id, " +
+                    ", ".join(_BEREICH_FELDER) + ", angelegt_am) VALUES (?, " +
+                    ", ".join("?" for _ in _BEREICH_FELDER) + ", ?) RETURNING id",
+                    (vid, *(b[f] for f in _BEREICH_FELDER), jetzt())).fetchone()[0])
+            schichten = con.execute(
+                "SELECT * FROM schicht WHERE veranstaltung_id = ? ORDER BY beginn",
+                (quelle_id,)).fetchall()
+            for s in schichten:
+                werte = dict(s)
+                for feld in ("beginn", "ende", "datum"):
+                    werte[feld] = planung.verschieben(s[feld], tage)
+                con.execute(
+                    "INSERT INTO schicht (veranstaltung_id, bereich_id, " +
+                    ", ".join(_SCHICHT_FELDER) + ", angelegt_am) VALUES (?, ?, " +
+                    ", ".join("?" for _ in _SCHICHT_FELDER) + ", ?)",
+                    (vid, neu[s["bereich_id"]], *(werte[f] for f in _SCHICHT_FELDER),
+                     jetzt()))
+            goodies = con.execute("SELECT * FROM goodie WHERE veranstaltung_id = ?"
+                                  " ORDER BY id", (quelle_id,)).fetchall()
+            for g in goodies:
+                con.execute(
+                    "INSERT INTO goodie (veranstaltung_id, " + ", ".join(_GOODIE_FELDER) +
+                    ", angelegt_am) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (vid, *(g[f] for f in _GOODIE_FELDER), jetzt()))
+            # Das Angebot nur, wenn hier noch keins eingestellt ist.
+            con.execute(
+                "INSERT INTO angebot (veranstaltung_id, shirt, verpflegung, party,"
+                " geaendert_am)"
+                " SELECT ?, shirt, verpflegung, party, ? FROM angebot"
+                " WHERE veranstaltung_id = ? ON CONFLICT (veranstaltung_id) DO NOTHING",
+                (vid, jetzt(), quelle_id))
+        return {"bereiche": len(neu), "schichten": len(schichten),
+                "goodies": len(goodies), "tage": tage}
     finally:
         con.close()
 
@@ -381,18 +704,20 @@ def konflikte(vid: int) -> list[dict]:
     try:
         return [dict(z) for z in con.execute(
             "SELECT h.id AS helfer_id, h.name,"
-            " a.id AS schicht_a, a.liste AS liste_a, a.beginn AS beginn_a,"
+            " a.id AS schicht_a, ba.name AS bereich_a, a.beginn AS beginn_a,"
             " a.ende AS ende_a,"
-            " b.id AS schicht_b, b.liste AS liste_b, b.beginn AS beginn_b,"
+            " b.id AS schicht_b, bb.name AS bereich_b, b.beginn AS beginn_b,"
             " b.ende AS ende_b"
             " FROM einteilung ea"
             " JOIN einteilung eb ON eb.helfer_id = ea.helfer_id"
             " JOIN schicht a ON a.id = ea.schicht_id"
             " JOIN schicht b ON b.id = eb.schicht_id"
+            " JOIN bereich ba ON ba.id = a.bereich_id"
+            " JOIN bereich bb ON bb.id = b.bereich_id"
             " JOIN helfer h ON h.id = ea.helfer_id"
             " WHERE a.id < b.id AND a.beginn < b.ende AND b.beginn < a.ende"
             "   AND a.veranstaltung_id = ? AND b.veranstaltung_id = ?"
-            " GROUP BY h.id, a.id, b.id"
+            " GROUP BY h.id, a.id, b.id, ba.id, bb.id"
             " ORDER BY a.beginn, lower(h.name)", (vid, vid)).fetchall()]
     finally:
         con.close()
@@ -406,12 +731,13 @@ def doppelt_besetzt(vid: int) -> list[dict]:
     try:
         return [dict(z) for z in con.execute(
             "SELECT h.id AS helfer_id, h.name, h.email, s.id AS schicht_id,"
-            " s.liste, s.beginn, COUNT(*) AS anzahl"
+            " b.name AS bereich, s.beginn, COUNT(*) AS anzahl"
             " FROM einteilung e"
             " JOIN helfer h ON h.id = e.helfer_id"
             " JOIN schicht s ON s.id = e.schicht_id"
+            " JOIN bereich b ON b.id = s.bereich_id"
             " WHERE s.veranstaltung_id = ?"
-            " GROUP BY h.id, s.id HAVING COUNT(*) > 1"
+            " GROUP BY h.id, s.id, b.id HAVING COUNT(*) > 1"
             " ORDER BY s.beginn, lower(h.name)", (vid,)).fetchall()]
     finally:
         con.close()
@@ -425,7 +751,8 @@ def zaehler(vid: int) -> dict:
         def eine(sql: str, *werte) -> int:
             return con.execute(sql, werte).fetchone()[0]
 
-        bedarf = eine("SELECT COALESCE(SUM(bedarf), 0) FROM schicht"
+        # Der Bedarf ist die Summe der Soll-Zahlen; Reserve zählt nicht mit.
+        bedarf = eine("SELECT COALESCE(SUM(soll), 0) FROM schicht"
                       " WHERE veranstaltung_id = ?", vid)
         besetzt = eine("SELECT COUNT(*) FROM einteilung e JOIN schicht s"
                        " ON s.id = e.schicht_id WHERE s.veranstaltung_id = ?", vid)
@@ -438,7 +765,7 @@ def zaehler(vid: int) -> dict:
             "offen": max(0, bedarf - besetzt),
             "luecken": eine(
                 "SELECT COUNT(*) FROM schicht s WHERE s.veranstaltung_id = ?"
-                " AND s.bedarf > (SELECT COUNT(*) FROM einteilung e"
+                " AND s.soll > (SELECT COUNT(*) FROM einteilung e"
                 "                 WHERE e.schicht_id = s.id)", vid),
             "tshirts": {z["tshirt"]: z["anzahl"] for z in con.execute(
                 "SELECT tshirt, COUNT(*) AS anzahl FROM helfer"
@@ -614,8 +941,8 @@ def _schichten_mit_namen(con: Verbindung, bedingung: str,
     Auffrischen zwei Dutzend Abfragen statt zwei.
     """
     zeilen = _mit_suche([dict(z) for z in con.execute(
-        "SELECT " + _SCHICHT_SPALTEN + " FROM schicht s WHERE " + bedingung +
-        " ORDER BY s.beginn, lower(s.liste)", werte)], *_SCHICHT_SUCHE)
+        "SELECT " + _SCHICHT_SPALTEN + _SCHICHT_VON + " WHERE " + bedingung +
+        " ORDER BY s.beginn, lower(b.name)", werte)], *_SCHICHT_SUCHE)
     if not zeilen:
         return []
 
@@ -691,7 +1018,7 @@ def tagesstand(vid: int, datum: str, zeitpunkt: datetime) -> dict:
     except ValueError:
         lang = datum
 
-    bedarf = sum(s["bedarf"] for s in schichten)
+    bedarf = sum(s["soll"] for s in schichten)
     besetzt = sum(s["besetzt"] for s in schichten)
     return {
         "jetzt": zeitpunkt,
@@ -1535,7 +1862,8 @@ def namen_vorschlaege(vid: int) -> list[str]:
             "SELECT h.name FROM helfer h"
             " JOIN einteilung e ON e.helfer_id = h.id"
             " JOIN schicht s ON s.id = e.schicht_id"
-            " WHERE s.liste ILIKE '%shuttle%' AND s.veranstaltung_id = ?"
+            " JOIN bereich b ON b.id = s.bereich_id"
+            " WHERE b.name ILIKE '%shuttle%' AND s.veranstaltung_id = ?"
             " GROUP BY h.name ORDER BY lower(h.name)", (vid,))]
         gesehen = set(shuttle)
         rest = [z["name"] for z in con.execute(

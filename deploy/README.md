@@ -522,7 +522,8 @@ erst seinen Datenbestand:
    oder hochladen. Einzeln geht keiner von beiden: eine Zeile ist ein Platz,
    nicht eine Schicht – eine voll besetzte Schicht steht nur in *Vergebene*,
    eine leere nur in *Offene*. Erst beide zusammen ergeben den richtigen
-   Bedarf.
+   Bedarf. Aus jeder Liste wird ein Bereich, aus dem Bedarf einer Schicht
+   ihr Soll und ihr Minimum.
 2. Den Bericht durchsehen. Übersprungene Zeilen sind **nicht** in der
    Datenbank gelandet, die Hinweise darunter schon – dort stehen
    Mehrfachbelegungen und uneindeutige Angaben, die jemand anschauen sollte.
@@ -531,8 +532,9 @@ erst seinen Datenbestand:
 4. Unter **Einstellungen › Monitor** den Link erzeugen und auf den
    Bildschirmrechner übertragen.
 
-Der Import lässt sich beliebig wiederholen: er rechnet den Bedarf neu aus und
-ersetzt nur seine eigenen Einteilungen. Was im Dashboard von Hand eingetragen
+Der Import lässt sich beliebig wiederholen: er rechnet das Soll neu aus und
+ersetzt nur seine eigenen Einteilungen. Ein von Hand gesenktes Minimum bleibt
+stehen. Was im Dashboard von Hand eingetragen
 wurde, bleibt stehen.
 
 #### Abrufen statt hochladen

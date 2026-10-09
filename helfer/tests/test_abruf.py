@@ -242,7 +242,7 @@ NUR_KOPF_OFFEN = b"Liste,Datum,Zeit,Aufgabe" + ENDE
 
 stand = (zeilen("SELECT COUNT(*) FROM schicht")[0][0],
          zeilen("SELECT COUNT(*) FROM einteilung")[0][0],
-         zeilen("SELECT SUM(bedarf) FROM schicht")[0][0])
+         zeilen("SELECT SUM(soll) FROM schicht")[0][0])
 stellen(antworten=[
     ("home.php", Antwort(b"<html>Dashboard</html>", "text/html")),
     ("download_csv=1", Antwort(NUR_KOPF_VERGEBEN)),
@@ -256,7 +256,7 @@ except csv_import.Fehler as f:
            "die leere Ausfuhr wird abgelehnt: " + str(f)[:60])
 pruefe((zeilen("SELECT COUNT(*) FROM schicht")[0][0],
         zeilen("SELECT COUNT(*) FROM einteilung")[0][0],
-        zeilen("SELECT SUM(bedarf) FROM schicht")[0][0]) == stand,
+        zeilen("SELECT SUM(soll) FROM schicht")[0][0]) == stand,
        "und der Bestand steht unveraendert da: " + str(stand))
 
 # Dasselbe eine Stufe milder: die Haelfte fehlt.

@@ -182,9 +182,10 @@ dazu in [kern/konten_app.py](kern/konten_app.py).
 Der ILRC hat mehr als eine Veranstaltung, die Helfer braucht. Jede steht
 unter `admin.example.de/veranstaltungen` mit Name, Kurzname, Tagen, Ort,
 Anmeldezeitraum und Status (*in Planung*, *angekündigt*, *Anmeldung offen*,
-*geschlossen*, *archiviert*). Schichten, Programm, Aufgaben und Ausgaben des
-Helferbereichs gehören immer zu einer; Helfer und Fahrzeugstamm gehören
-keiner, es sind Jahr für Jahr dieselben.
+*geschlossen*, *archiviert*). Bereiche und Schichten, Goodies, Programm,
+Aufgaben und Ausgaben des Helferbereichs gehören immer zu einer; Helfer und
+Fahrzeugstamm gehören keiner, es sind Jahr für Jahr dieselben. Die Bereiche
+einer neuen Veranstaltung lassen sich aus einer früheren übernehmen.
 
 Mit welcher gearbeitet wird, wählt jeder oben im Helferbereich, gemerkt im
 Browser. Ohne Wahl gilt die nächste, die noch nicht vorbei ist – und die

@@ -181,7 +181,7 @@ den Umsetzungsplan in Abschnitt 9.
 | --- | --- | --- | --- |
 | V-01 | Im Backoffice lassen sich beliebig viele Veranstaltungen anlegen: Name, Zeitraum, Ort, Beschreibung, Anmeldezeitraum. | M | 1 |
 | V-02 | Eine Veranstaltung hat einen Status: *in Planung* (unsichtbar), *angekündigt* (sichtbar, Interesse vormerkbar), *Anmeldung offen*, *geschlossen*, *archiviert*. | M | 1 |
-| V-03 | Bereiche (heute „Liste": Streckenposten, Straßensperre …) mit Beschreibung in einfacher Sprache, Treffpunkt, Bereichsleitung, Mindestalter und Voraussetzungen (Führerschein …); eine Schicht kann das Mindestalter ihres Bereichs verschärfen. | M | 2 |
+| V-03 | Bereiche (heute „Liste": Streckenposten, Straßensperre …) mit Beschreibung in einfacher Sprache, Treffpunkt, Bereichsleitung, Mindestalter und Voraussetzungen (Führerschein …); eine Schicht kann vom Mindestalter ihres Bereichs abweichen – meist strenger, niedriger nur bewusst (D-07). | M | 2 |
 | V-04 | Eine Veranstaltung lässt sich aus einer früheren **als Vorlage** anlegen: Bereiche und Schichten werden übernommen und auf die neuen Tage verschoben. | S | 2 |
 | V-05 | Schichten haben Beginn, Ende, Ort, Hinweis und drei Zahlen: **Minimum**, **Soll** und **Reserve** (siehe R-01). | M | 2 |
 | V-06 | Schichten lassen sich als *intern* markieren – sie erscheinen nicht in der öffentlichen Anmeldung (z. B. Orgabüro). | S | 2 |
@@ -192,6 +192,15 @@ Veranstaltungen stehen im Schema `kern`; Schichten, Programm, Aufgaben und
 Ausgaben des Helferbereichs gehören zu einer. Mit welcher das Backoffice
 arbeitet, wählt jeder im Browser; ohne Wahl gilt die nächste, die noch nicht
 vorbei ist. Kennzeichen und Presse hängen noch an keiner.
+
+V-03 bis V-07 sind im Backoffice umgesetzt (Schritt 2.1): Bereiche mit
+Beschreibung, Treffpunkt, Bereichsleitung samt Nummer, Mindestalter,
+Voraussetzungen (eine je Zeile) und *intern*; Schichten mit Minimum, Soll,
+Reserve, eigenem Mindestalter und *intern*; je Veranstaltung Shirt,
+Verpflegung, Helferparty und Goodies mit Schwelle und Altersgrenze; die
+Vorlage aus einer früheren Veranstaltung. Die Bereichsleitung ist vorerst ein
+Name mit Nummer, noch kein Konto (B-02). Der Import aus helferliste.online
+macht aus jeder Liste einen Bereich und aus ihrem Bedarf Soll und Minimum.
 
 ### 5.2 Anmeldung (A)
 
@@ -568,8 +577,7 @@ Login.**
 ```sql
 -- kern: gehört allen Bereichen
 veranstaltung (id, name, kurz, beginn, ende, ort, status,
-               anmeldung_ab, anmeldung_bis, beschreibung,
-               shirt, verpflegung, party)
+               anmeldung_ab, anmeldung_bis, beschreibung)
 person        (id, vorname, nachname, email, email_bestaetigt_am, telefon,
                geburtsdatum, eltern_name, eltern_email, eltern_bestaetigt_am,
                angemeldet_von_person_id, stamm_einwilligung_am, angelegt_am)
@@ -581,9 +589,10 @@ protokoll     (id, benutzer_id, was, objekt, vorher, nachher, am)
 
 -- helfer
 bereich       (id, veranstaltung_id, name, beschreibung, treffpunkt,
-               mindestalter, voraussetzungen, intern)
+               leitung, leitung_telefon, mindestalter, voraussetzungen, intern)
 schicht       (id, bereich_id, beginn, ende, ort, hinweis,
                minimum, soll, reserve, mindestalter, intern)
+angebot       (veranstaltung_id, shirt, verpflegung, party)
 teilnahme     (veranstaltung_id, person_id, tshirt, verpflegung,
                vorlieben, bemerkung)            -- je Veranstaltung neu
 zusage        (id, schicht_id, person_id, art, quelle, status,
@@ -669,7 +678,7 @@ Selbstbedienung.
 
 | # | Schritt | Aufwand |
 | --- | --- | --- |
-| 2.1 | Bereiche und Schichten pflegen: Minimum/Soll/Reserve, Mindestalter, Voraussetzungen, intern, Goodies je Veranstaltung, Vorlage aus dem Vorjahr | 6 h |
+| 2.1 | Bereiche und Schichten pflegen: Minimum/Soll/Reserve, Mindestalter, Voraussetzungen, intern, Goodies je Veranstaltung, Vorlage aus dem Vorjahr | **erledigt** |
 | 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten | 9 h |
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | 3 h |
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 7 h |
@@ -684,8 +693,8 @@ Selbstbedienung.
 Bestehendes umgebaut.
 
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
-für Prototyp, Phase 1 und 2 – rund 74 Stunden. Davon sind der Prototyp (0.2)
-und Phase 1 bis auf DKIM schon erledigt; es bleiben rund 50 Stunden, die
+für Prototyp, Phase 1 und 2 – rund 74 Stunden. Davon sind der Prototyp (0.2),
+Phase 1 bis auf DKIM und 2.1 schon erledigt; es bleiben rund 44 Stunden, die
 8 Stunden pro Woche haben also Luft.
 
 | Öffnung | Bauzeit pro Woche ab 12. Oktober |
@@ -738,7 +747,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~50 h |
+| 2 Öffnung | ~50 h, davon ~6 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten | ~39 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~132 h** |

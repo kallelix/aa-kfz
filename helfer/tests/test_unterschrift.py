@@ -162,7 +162,9 @@ try:
     status, _, seite = anfrage("GET", "/unterschrift/" + TOKEN)
     pruefe(status == 200 and "Bereit" in seite,
            "mit richtigem Token steht dort „Bereit“")
-    status, _, _ = anfrage("GET", "/unterschrift/" + TOKEN[:-1] + "X")
+    # Das letzte Zeichen tauschen - gegen eines, das es sicher nicht schon ist.
+    status, _, _ = anfrage("GET", "/unterschrift/" + TOKEN[:-1]
+                           + ("Y" if TOKEN.endswith("X") else "X"))
     pruefe(status == 404, "ein falscher Token gibt 404, nicht 403")
     status, _, _ = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     pruefe(status == 200, "das Bruchstück lädt")
@@ -508,13 +510,14 @@ try:
     namen = re.findall(r'<a href="/helfer(?!/veranstaltung)[^"]*"[^>]*>\s*([^<]+?)\s*</a>', leiste)
     pruefe(namen == ["Übersicht", "Zeitplan", "Aufgaben", "Schichten", "Helfer",
                      "Funken", "Schlüssel",
+                     "Bereiche", "Goodies",
                      "Einstellungen", "Monitor", "Import", "Unterschriften",
                      "Zeitplan-Abruf"],
            "steht in der vereinbarten Reihenfolge: " + ", ".join(namen))
     pruefe('class="gewaehlt" aria-current="true"' in leiste and "AA 2026" in leiste,
            "daneben die Auswahl der Veranstaltung, die gewaehlte markiert")
     pruefe("nav-gruppe" in leiste and "admin_menue.js" in seite,
-           "die hinteren fuenf stecken in einem Menue")
+           "die hinteren sieben stecken in einem Menue")
 
     # Genau ein Punkt darf leuchten. /helfer ist der Anfang von jedem Pfad und
     # wuerde bei einem blossen "faengt damit an" ueberall mitleuchten.
@@ -526,6 +529,8 @@ try:
             ("/helfer/helfer/neu", "Helfer", False),
             ("/helfer/funk", "Funken", False),
             ("/helfer/monitor", "Monitor", True),
+            ("/helfer/bereich/neu", "Bereiche", True),
+            ("/helfer/goodie/neu", "Goodies", True),
             ("/helfer/zeitplan", "Zeitplan-Abruf", True)):
         _, _, seite = anfrage("GET", pfad)
         leiste = nav_ausschnitt(seite)

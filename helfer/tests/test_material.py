@@ -70,7 +70,7 @@ con = db.verbinden()
 with con:
     schicht_id, _ = db.schicht_sichern(con, VA, "Shuttle", "2026-08-29 08:00",
                                        "2026-08-29 16:00", "2026-08-29",
-                                       bedarf=2)
+                                       soll=2)
     anna, _ = db.helfer_anlegen(con, {"name": "Anna Berg",
                                       "email": "anna@example.org",
                                       "tshirt": "M", "tshirt_roh": "M"})

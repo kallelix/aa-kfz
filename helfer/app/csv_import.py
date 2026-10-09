@@ -223,7 +223,7 @@ def importieren(vid: int, offen_roh: bytes, vergeben_roh: bytes,
                 liste, beginn, ende = schluessel
                 schicht_id, neu = db.schicht_sichern(
                     con, vid, liste, beginn, ende, ergebnis["tage"][schluessel],
-                    bedarf=anzahl)
+                    soll=anzahl)
                 schicht_ids[schluessel] = schicht_id
                 neue_schichten += 1 if neu else 0
 
@@ -231,12 +231,13 @@ def importieren(vid: int, offen_roh: bytes, vergeben_roh: bytes,
             # Dateien. Nicht anfassen: dort können Einteilungen von Hand
             # hängen. Nur melden.
             for zeile in con.execute(
-                    "SELECT id, liste, beginn, ende FROM schicht"
-                    " WHERE veranstaltung_id = ?", (vid,)):
-                merkmal = (zeile["liste"], zeile["beginn"], zeile["ende"])
+                    "SELECT s.id, b.name AS bereich, s.beginn, s.ende FROM schicht s"
+                    " JOIN bereich b ON b.id = s.bereich_id"
+                    " WHERE s.veranstaltung_id = ?", (vid,)):
+                merkmal = (zeile["bereich"], zeile["beginn"], zeile["ende"])
                 if merkmal not in ergebnis["bedarf"]:
                     verschwunden.append(
-                        zeile["liste"] + " am " + zeile["beginn"] +
+                        zeile["bereich"] + " am " + zeile["beginn"] +
                         " steht nicht mehr in den Dateien – unverändert "
                         "gelassen.")
 

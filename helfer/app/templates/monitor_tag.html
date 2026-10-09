@@ -53,8 +53,8 @@
           <li class="{% if warnschwelle and s.fehlt >= warnschwelle %}schicht-luecke{% endif %}">
             <button type="button" class="kachel" data-schicht="{{ s.id }}">
               <span class="zeit">{{ s.beginn[11:] }}–{{ s.ende[11:] }}</span>
-              <span class="liste">{{ s.liste }}</span>
-              <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.bedarf }}</span></span>
+              <span class="liste">{{ s.bereich }}</span>
+              <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.soll }}</span></span>
               {% if s.fehlt %}
                 <span class="fehlt">{{ s.fehlt }} offen</span>
               {% else %}

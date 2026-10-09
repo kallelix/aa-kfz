@@ -10,7 +10,7 @@
      Overlay sie ohne zweiten Abruf herausholen kann - und damit sie auch dann
      noch da ist, wenn die Verbindung gerade weg ist. #}
   <div class="detail" data-detail="{{ s.id }}" hidden>
-    <h3 class="detail-titel">{{ s.liste }}</h3>
+    <h3 class="detail-titel">{{ s.bereich }}</h3>
     <p class="detail-zeit">
       {{ s.datum | tag }} · {{ s.beginn[11:] }}–{{ s.ende[11:] }}
       {%- if s.beginn[:10] != s.ende[:10] %} (am Folgetag){% endif %}
@@ -18,7 +18,7 @@
     </p>
     <p class="detail-quote">
       <span class="{% if s.fehlt %}zahl-fehlt{% else %}zahl-voll{% endif %}">
-        {{ s.besetzt }} von {{ s.bedarf }}</span>
+        {{ s.besetzt }} von {{ s.soll }}</span>
       {% if s.fehlt %}
         <span class="marke marke-luecke">{{ s.fehlt }} fehlen</span>
       {% else %}

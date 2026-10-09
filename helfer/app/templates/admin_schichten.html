@@ -5,11 +5,11 @@
 {% block inhalt %}
   <form method="get" action="/helfer/schichten" class="filter">
     <div>
-      <label for="f-liste">Liste</label>
-      <select id="f-liste" name="liste">
+      <label for="f-bereich">Bereich</label>
+      <select id="f-bereich" name="bereich">
         <option value="">alle</option>
-        {% for l in listen %}
-          <option value="{{ l }}" {% if l == f_liste %}selected{% endif %}>{{ l }}</option>
+        {% for b in bereichsliste %}
+          <option value="{{ b.id }}" {% if b.id == f_bereich %}selected{% endif %}>{{ b.name }}</option>
         {% endfor %}
       </select>
     </div>
@@ -29,17 +29,20 @@
     </div>
     <div class="filter-knoepfe">
       <button type="submit" class="knopf">Anzeigen</button>
-      {% if f_liste or f_tag or f_luecken %}
+      {% if f_bereich or f_tag or f_luecken %}
         <a class="knopf-schlicht" href="/helfer/schichten">zurücksetzen</a>
       {% endif %}
     </div>
   </form>
 
-  {% if not schichten %}
+  {% if not bereichsliste %}
+    <p class="leer">Noch keine Schichten. Sie entstehen in ihrem Bereich:
+      <a href="/helfer/bereiche">Bereiche und Schichten anlegen</a>.</p>
+  {% elif not schichten %}
     <p class="leer">Keine Schicht passt zu diesem Filter.</p>
   {% else %}
     <div class="sperre-suche">
-      <label for="suche">Liste suchen</label>
+      <label for="suche">Bereich suchen</label>
       <div class="sperre-suche-zeile">
         <input type="search" id="suche" autocomplete="off" spellcheck="false"
                placeholder="z. B. Streckenposten">
@@ -72,7 +75,7 @@
             </th>
             <th scope="col" aria-sort="none">
               <button type="button" class="sortknopf" data-spalte="2">
-                Liste <span class="sortpfeil" aria-hidden="true"></span>
+                Bereich <span class="sortpfeil" aria-hidden="true"></span>
               </button>
             </th>
             <th scope="col" aria-sort="none" class="rechts">
@@ -93,8 +96,9 @@
             <tr data-suche="{{ s.suche }}"{% if s.fehlt %} class="hat-luecke"{% endif %}>
               <td class="nowrap" data-wert="{{ s.beginn }}">{{ s.datum | tag }}</td>
               <td class="zeit" data-wert="{{ s.beginn }}">{{ s | spanne }}</td>
-              <td><a href="/helfer/schicht/{{ s.id }}">{{ s.liste }}</a></td>
-              <td class="rechts nowrap" data-wert="{{ s.besetzt }}">{{ s.besetzt }} / {{ s.bedarf }}</td>
+              <td><a href="/helfer/schicht/{{ s.id }}">{{ s.bereich }}</a>
+                {%- if s.ist_intern %} <span class="marke">intern</span>{% endif %}</td>
+              <td class="rechts nowrap" data-wert="{{ s.besetzt }}">{{ s.besetzt }} / {{ s.soll }}</td>
               <td class="rechts" data-wert="{{ s.fehlt }}">
                 {% if s.fehlt %}
                   <span class="marke marke-luecke">{{ s.fehlt }}</span>
@@ -113,8 +117,9 @@
     <p class="leer weg" id="nichts-gefunden">Kein Treffer.</p>
 
     <p class="hilfe">
-      Bedarf {{ schichten | sum(attribute='bedarf') }} Plätze, davon
+      Soll {{ schichten | sum(attribute='soll') }} Plätze, davon
       {{ schichten | sum(attribute='fehlt') }} offen.
+      Neue Schichten entstehen in ihrem <a href="/helfer/bereiche">Bereich</a>.
     </p>
   {% endif %}
 {% endblock %}

@@ -1,23 +1,31 @@
 {% extends "admin_base.html" %}
-{% block titel %}{{ schicht.liste }}{% endblock %}
-{% block ueberschrift %}{{ schicht.liste }}{% endblock %}
+{% block titel %}{{ schicht.bereich }}{% endblock %}
+{% block ueberschrift %}{{ schicht.bereich }}{% endblock %}
 
 {% block inhalt %}
   <p class="unterzeile">
     {{ schicht.datum | tag }}, {{ schicht | spanne }}
-    {%- if schicht.ort %} · {{ schicht.ort }}{% endif %}
+    {%- if schicht.ort or schicht.treffpunkt %} · {{ schicht.ort or schicht.treffpunkt }}{% endif %}
+    {%- if schicht.alter_ab %} · ab {{ schicht.alter_ab }}{% endif %}
+    {%- if schicht.ist_intern %} · <span class="marke">intern</span>{% endif %}
   </p>
 
   <section class="kasten {% if not schicht.fehlt %}kasten-ok{% endif %}">
     <p>
-      <strong>{{ schicht.besetzt }} von {{ schicht.bedarf }}</strong> Plätzen besetzt –
+      <strong>{{ schicht.besetzt }} von {{ schicht.soll }}</strong> Plätzen besetzt –
       {% if schicht.fehlt %}
         <span class="marke marke-luecke">{{ schicht.fehlt }} fehlen</span>
       {% else %}
         <span class="marke marke-voll">voll</span>
       {% endif %}
     </p>
+    <p class="hilfe">Minimum {{ schicht.minimum }}, Soll {{ schicht.soll }}
+      {%- if schicht.reserve %}, dazu {{ schicht.reserve }} Reserve{% endif %}.</p>
     {% if schicht.hinweis %}<p class="hilfe">{{ schicht.hinweis }}</p>{% endif %}
+    <p class="knopfreihe">
+      <a class="knopf-schlicht" href="/helfer/schicht/{{ schicht.id }}/aendern">Schicht ändern</a>
+      <a class="knopf-schlicht" href="/helfer/bereich/{{ schicht.bereich_id }}">Zum Bereich</a>
+    </p>
   </section>
 
   <section>

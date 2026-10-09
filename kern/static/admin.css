@@ -105,6 +105,17 @@ input[type="text"], input[type="email"], input[type="tel"], input[type="date"], 
   border-radius: 8px;
 }
 
+/* Zahl und Uhrzeit im Formular wie die übrigen Felder. Nur dort: die
+   Mengenfelder an den Ausgabetischen haben ihre eigene, schmale Form. */
+.feld > input[type="number"], .feld > input[type="time"] {
+  padding: .55rem .65rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+}
+
 input:focus-visible, textarea:focus-visible, button:focus-visible {
   outline: 2px solid var(--akzent);
   outline-offset: 1px;

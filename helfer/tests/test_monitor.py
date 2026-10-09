@@ -66,25 +66,25 @@ with con:
     # Läuft gerade, mit Lücke.
     lueckig, _ = db.schicht_sichern(con, VA, "Ordner Zeltplatz",
                                     "2026-08-29 08:00", "2026-08-29 13:00",
-                                    "2026-08-29", bedarf=4)
+                                    "2026-08-29", soll=4)
     # Läuft gerade, voll besetzt.
     voll, _ = db.schicht_sichern(con, VA, "Orgabüro", "2026-08-29 09:00",
-                                 "2026-08-29 18:00", "2026-08-29", bedarf=2)
+                                 "2026-08-29 18:00", "2026-08-29", soll=2)
     # Beginnt in 90 Minuten – im Vorschaufenster.
     bald, _ = db.schicht_sichern(con, VA, "Shuttle", "2026-08-29 12:00",
-                                 "2026-08-29 18:00", "2026-08-29", bedarf=3)
+                                 "2026-08-29 18:00", "2026-08-29", soll=3)
     # Beginnt erst in fünf Stunden – außerhalb des Fensters.
     spaeter, _ = db.schicht_sichern(con, VA, "Merchandise", "2026-08-29 15:30",
-                                    "2026-08-29 18:00", "2026-08-29", bedarf=2)
+                                    "2026-08-29 18:00", "2026-08-29", soll=2)
     # Schon vorbei.
     vorbei, _ = db.schicht_sichern(con, VA, "Aufbau", "2026-08-29 06:00",
-                                   "2026-08-29 09:00", "2026-08-29", bedarf=2)
+                                   "2026-08-29 09:00", "2026-08-29", soll=2)
     # Nachtschicht über Mitternacht, läuft am Abend.
     nacht, _ = db.schicht_sichern(con, VA, "Nachtwache", "2026-08-29 20:00",
-                                  "2026-08-30 08:00", "2026-08-29", bedarf=2)
+                                  "2026-08-30 08:00", "2026-08-29", soll=2)
     # Am Folgetag – nur über den Tagesblick zu sehen.
     sonntag, _ = db.schicht_sichern(con, VA, "Sonntagsdienst", "2026-08-30 09:00",
-                                    "2026-08-30 17:00", "2026-08-30", bedarf=3)
+                                    "2026-08-30 17:00", "2026-08-30", soll=3)
 
     anna, _ = db.helfer_anlegen(con, {"name": "Anna Berg",
                                       "email": "anna@example.org"})
@@ -176,7 +176,9 @@ try:
     print("Token")
     status, _, _, seite = anfrage("GET", "/monitor/" + TOKEN)
     pruefe(status == 200, "der richtige Token oeffnet die Ansicht")
-    status, _, _, _ = anfrage("GET", "/monitor/" + TOKEN[:-1] + "X")
+    # Das letzte Zeichen tauschen - gegen eines, das es sicher nicht schon ist.
+    falsch = TOKEN[:-1] + ("Y" if TOKEN.endswith("X") else "X")
+    status, _, _, _ = anfrage("GET", "/monitor/" + falsch)
     pruefe(status == 404, "ein falscher Token gibt 404, nicht 403")
     status, _, _, _ = anfrage("GET", "/monitor/")
     pruefe(status in (404, 405), "ohne Token gibt es nichts")

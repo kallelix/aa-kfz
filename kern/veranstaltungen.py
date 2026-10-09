@@ -2,7 +2,8 @@
 
 Eine Veranstaltung hat Name, Kurzname, Tage, Ort, Beschreibung, einen
 Anmeldezeitraum und einen Status. Die Bereiche hängen ihre Daten daran – bis
-jetzt der Helferbereich: Schichten, Programm, Aufgaben, Ausleihen, Schlüssel.
+jetzt der Helferbereich: Bereiche und Schichten, Goodies, Programm, Aufgaben,
+Ausleihen, Schlüssel.
 
 Mit welcher Veranstaltung jemand im Backoffice arbeitet, wählt er selbst;
 gemerkt wird das im Browser. Ohne Wahl gilt die Vorgabe: die nächste, die
@@ -166,5 +167,5 @@ class Veranstaltungen:
             with self._db.transaktion() as con:
                 con.execute("DELETE FROM veranstaltung WHERE id = ?", (veranstaltung_id,))
         except IntegrityError:
-            raise Fehler("An dieser Veranstaltung hängen schon Schichten, Aufgaben "
-                         "oder Ausgaben. Archivieren statt löschen.")
+            raise Fehler("An dieser Veranstaltung hängen schon Bereiche, Schichten, "
+                         "Aufgaben oder Ausgaben. Archivieren statt löschen.")

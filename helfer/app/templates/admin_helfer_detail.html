@@ -58,7 +58,7 @@
               <tr>
                 <td class="nowrap">{{ s.datum | tag }}</td>
                 <td class="zeit">{{ s | spanne }}</td>
-                <td><a href="/helfer/schicht/{{ s.id }}">{{ s.liste }}</a></td>
+                <td><a href="/helfer/schicht/{{ s.id }}">{{ s.bereich }}</a></td>
                 <td class="gedaempft">{{ 'Import' if s.quelle == 'import' else 'von Hand' }}</td>
                 <td class="rechts">
                   <form method="post"

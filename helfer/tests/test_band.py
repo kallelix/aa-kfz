@@ -34,10 +34,10 @@ def programmpunkt(titel, beginn, ende, serie="dhc", roh=""):
             "zeit_roh": roh}
 
 
-def schicht(nummer, liste, beginn, ende, besetzt, bedarf, tag=TAG):
-    return {"id": nummer, "liste": liste, "beginn": TAG + " " + beginn,
-            "ende": tag + " " + ende, "besetzt": besetzt, "bedarf": bedarf,
-            "fehlt": max(0, bedarf - besetzt)}
+def schicht(nummer, bereich, beginn, ende, besetzt, soll, tag=TAG):
+    return {"id": nummer, "bereich": bereich, "beginn": TAG + " " + beginn,
+            "ende": tag + " " + ende, "besetzt": besetzt, "soll": soll,
+            "fehlt": max(0, soll - besetzt)}
 
 
 print("Minuten seit Mitternacht")

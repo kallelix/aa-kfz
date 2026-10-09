@@ -192,25 +192,30 @@ try:
     pruefe(status == 200, "laeuft durch")
     pruefe("Import fertig" in seite, "meldet Erfolg")
 
-    schichten = {(z["liste"], z["beginn"]): z for z in
-                 zeilen("SELECT * FROM schicht")}
+    # Die Liste aus den CSVs wird zum Bereich; der Bedarf zu Soll und Minimum.
+    schichten = {(z["bereich"], z["beginn"]): z for z in
+                 zeilen("SELECT s.*, b.name AS bereich FROM schicht s"
+                        " JOIN bereich b ON b.id = s.bereich_id")}
     pruefe(len(schichten) == 3, "drei Schichten: " + str(len(schichten)))
 
     strecke = schichten[("Streckenposten", "2026-08-28 10:00")]
-    pruefe(strecke["bedarf"] == 4, "Bedarf ist offen + vergeben, nicht nur eines")
+    pruefe(strecke["soll"] == 4, "Soll ist offen + vergeben, nicht nur eines")
+    pruefe(strecke["minimum"] == 4 and strecke["reserve"] == 0,
+           "das Minimum ist das Soll, Reserve gibt es im alten Tool nicht")
+    pruefe(len(zeilen("SELECT id FROM bereich")) == 3, "je Liste ein Bereich")
     pruefe(strecke["ende"] == "2026-08-28 18:00", "Ende am selben Tag")
 
     nacht = schichten[("Nachtwache", "2026-08-30 20:00")]
     pruefe(nacht["ende"] == "2026-08-31 08:00", "Nachtschicht endet am Folgetag")
     pruefe(nacht["datum"] == "2026-08-30", "steht aber beim Vortag")
-    pruefe(nacht["bedarf"] == 4, "Bedarf der Nachtschicht: " + str(nacht["bedarf"]))
+    pruefe(nacht["soll"] == 4, "Soll der Nachtschicht: " + str(nacht["soll"]))
 
     print("Kaputte Zeile")
     pruefe("Übersprungene Zeilen" in seite, "wird als uebersprungen gemeldet")
     pruefe("Zeile 6" in seite, "mit Zeilennummer: " + str("Zeile 6" in seite))
     aufbau = schichten[("Aufbau", "2026-08-27 08:00")]
-    pruefe(aufbau["bedarf"] == 4,
-           "die kaputte Zeile zaehlt nicht mit: " + str(aufbau["bedarf"]))
+    pruefe(aufbau["soll"] == 4,
+           "die kaputte Zeile zaehlt nicht mit: " + str(aufbau["soll"]))
 
     print("Helfer")
     leute = {z["name"]: z for z in zeilen("SELECT * FROM helfer")}
@@ -265,8 +270,9 @@ try:
                                    "vergeben": ("vergeben.csv", VERGEBEN)})
     pruefe(len(zeilen("SELECT id FROM schicht")) == 3, "keine neuen Schichten")
     pruefe(len(zeilen("SELECT id FROM helfer")) == 6, "keine neuen Helfer")
-    pruefe(zeilen("SELECT SUM(bedarf) FROM schicht")[0][0] == 12,
-           "der Bedarf verdoppelt sich nicht")
+    pruefe(zeilen("SELECT SUM(soll) FROM schicht")[0][0] == 12,
+           "das Soll verdoppelt sich nicht")
+    pruefe(len(zeilen("SELECT id FROM bereich")) == 3, "keine neuen Bereiche")
     pruefe(len(zeilen("SELECT id FROM einteilung")) == 8,
            "die Einteilungen verdoppeln sich nicht")
 
@@ -277,8 +283,9 @@ try:
     pruefe('data-wert="2026-08-30 20:00"' in liste, "Sortierwert steht dran")
     pruefe("hat-luecke" in liste, "Luecken sind markiert")
 
-    _, _, liste = anfrage("GET", "/helfer/schichten?liste=Nachtwache")
-    pruefe(liste.count("<tr data-suche=") == 1, "Filter nach Liste greift")
+    nachtwache = zeilen("SELECT id FROM bereich WHERE name = 'Nachtwache'")[0][0]
+    _, _, liste = anfrage("GET", "/helfer/schichten?bereich=" + str(nachtwache))
+    pruefe(liste.count("<tr data-suche=") == 1, "Filter nach Bereich greift")
     _, _, liste = anfrage("GET", "/helfer/schichten?tag=2026-08-27")
     pruefe(liste.count("<tr data-suche=") == 1, "Filter nach Tag greift")
     _, _, liste = anfrage("GET", "/helfer/schichten?luecken=1")

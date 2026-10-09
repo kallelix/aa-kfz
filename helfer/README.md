@@ -39,14 +39,26 @@ Das Backoffice hat sieben Punkte, in denen gearbeitet wird:
 - **Aufgaben** – der Aufgabenplan mit Phasen und Status. Arbeiten zwei Leute
   gleichzeitig am selben Eintrag, überschreibt keiner den anderen, ohne es
   zu merken.
-- **Schichten** – Bedarf, Besetzung und Lücken; Helfer zuordnen und entfernen
+- **Schichten** – Soll, Besetzung und Lücken; Helfer zuordnen und entfernen
 - **Helfer** – Stammdaten, T-Shirt-Ausgabe, CSV-Ausfuhr
 - **Funken**, **Schlüssel** – Ausgabe und Rücknahme von Funkgeräten und
   KFZ-Schlüsseln. Der Fahrzeugstamm baut sich bei der Schlüsselausgabe
   nebenbei auf.
 
-Dahinter, was man einmal einrichtet: Einstellungen, Monitor-Link, Import,
-Unterschriften und Zeitplan-Abruf.
+Dahinter, was man einmal einrichtet: Bereiche, Goodies, Einstellungen,
+Monitor-Link, Import, Unterschriften und Zeitplan-Abruf.
+
+- **Bereiche**: wo geholfen wird – Shuttle, Streckenposten, Orgabüro – mit
+  Beschreibung, Treffpunkt, Bereichsleitung, Mindestalter, Voraussetzungen
+  und dem Haken *intern*. Darin die Schichten, jede mit drei Zahlen:
+  **Minimum** (darunter geht es nicht), **Soll** (so ist es geplant) und
+  **Reserve** (zusätzlich willkommen, fehlt nie). Eine Schicht kann ein
+  eigenes Mindestalter haben und eigens intern sein. Hat eine Veranstaltung
+  noch keine Bereiche, lassen sie sich samt Schichten und Goodies aus einer
+  früheren übernehmen; die Schichten wandern dabei auf die neuen Tage.
+- **Goodies**: was die Veranstaltung ihren Helfern bietet – Helfershirt,
+  Verpflegung, Helferparty – und kleine Dankeschöns mit Schwelle („ab 2
+  Schichten ein Bier am Bierwagen, unter 16 eine Eistüte“).
 
 - **Import**: die beiden CSV-Dateien aus dem Registrierungstool hochladen –
   oder sie abrufen lassen, von Hand oder selbsttätig im Takt. Ein
@@ -94,6 +106,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_material.py     # T-Shirts, Funkgeräte, Schlüssel
 .venv/Scripts/python.exe helfer/tests/test_unterschrift.py # Unterschriften am Tablet
 .venv/Scripts/python.exe helfer/tests/test_monitor.py      # Monitor mit gestellter Uhr
+.venv/Scripts/python.exe helfer/tests/test_bereiche.py     # Bereiche, Schichten, Goodies, Vorlage
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

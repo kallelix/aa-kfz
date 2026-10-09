@@ -47,7 +47,7 @@
         {% for b in spur %}
           {% set beschriftung = b.beschriftung %}
           {% set marke = b.titel ~ ' · ' ~ b.von_uhr ~ '–' ~ b.bis_uhr
-                         ~ ' · ' ~ b.besetzt ~ ' von ' ~ b.bedarf
+                         ~ ' · ' ~ b.besetzt ~ ' von ' ~ b.soll
                          ~ (' · ' ~ b.fehlt ~ ' fehlen' if b.fehlt else ' · voll') %}
           {% if ziel == 'admin' %}
             <a class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"

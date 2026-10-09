@@ -82,7 +82,7 @@
 
   {% if va_zeile %}
     <h2>Löschen</h2>
-    <p class="hilfe">Geht nur, solange noch keine Schichten, Aufgaben oder Ausgaben
+    <p class="hilfe">Geht nur, solange noch keine Bereiche, Schichten, Aufgaben oder Ausgaben
       daran hängen. Danach archivieren.</p>
     <form method="post" action="/veranstaltungen/{{ va_zeile.id }}/loeschen">
       <input type="hidden" name="csrf" value="{{ csrf }}">

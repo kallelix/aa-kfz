@@ -64,9 +64,9 @@
               <tr>
                 <td class="nowrap">{{ s.datum | tag }}</td>
                 <td class="zeit">{{ s | spanne }}</td>
-                <td><a href="/helfer/schicht/{{ s.id }}">{{ s.liste }}</a></td>
+                <td><a href="/helfer/schicht/{{ s.id }}">{{ s.bereich }}</a></td>
                 <td class="rechts"><span class="marke marke-luecke">{{ s.fehlt }}</span></td>
-                <td class="rechts">{{ s.besetzt }} / {{ s.bedarf }}</td>
+                <td class="rechts">{{ s.besetzt }} / {{ s.soll }}</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -116,9 +116,9 @@
               {% for k in konflikte %}
                 <tr>
                   <td><a href="/helfer/helfer/{{ k.helfer_id }}">{{ k.name }}</a></td>
-                  <td><a href="/helfer/schicht/{{ k.schicht_a }}">{{ k.liste_a }}</a>
+                  <td><a href="/helfer/schicht/{{ k.schicht_a }}">{{ k.bereich_a }}</a>
                     <span class="gedaempft nowrap">{{ k.beginn_a | zeitpunkt }}</span></td>
-                  <td><a href="/helfer/schicht/{{ k.schicht_b }}">{{ k.liste_b }}</a>
+                  <td><a href="/helfer/schicht/{{ k.schicht_b }}">{{ k.bereich_b }}</a>
                     <span class="gedaempft nowrap">{{ k.beginn_b | zeitpunkt }}</span></td>
                 </tr>
               {% endfor %}
@@ -138,7 +138,7 @@
                 <tr>
                   <td><a href="/helfer/helfer/{{ d.helfer_id }}">{{ d.name }}</a></td>
                   <td class="gedaempft">{{ d.email }}</td>
-                  <td><a href="/helfer/schicht/{{ d.schicht_id }}">{{ d.liste }}</a>
+                  <td><a href="/helfer/schicht/{{ d.schicht_id }}">{{ d.bereich }}</a>
                     <span class="gedaempft nowrap">{{ d.beginn | zeitpunkt }}</span></td>
                   <td class="rechts nowrap">{{ d.anzahl }} Plätze</td>
                 </tr>

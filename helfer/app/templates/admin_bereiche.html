@@ -1,0 +1,73 @@
+{% extends "admin_base.html" %}
+{% block titel %}Bereiche{% endblock %}
+{% block ueberschrift %}Bereiche{% endblock %}
+
+{% block inhalt %}
+  <p class="unterzeile">Wo geholfen wird – Streckenposten, Shuttle, Orgabüro … –
+    und darin die Schichten.</p>
+
+  <p class="knopfreihe">
+    <a class="knopf" href="/helfer/bereich/neu">Neuer Bereich</a>
+    <a class="knopf-schlicht" href="/helfer/goodies">Shirt, Verpflegung, Goodies</a>
+  </p>
+
+  {% if not bereichsliste %}
+    <p class="leer">In dieser Veranstaltung gibt es noch keinen Bereich.</p>
+
+    {% if vorlagen %}
+      <section class="kasten">
+        <h2>Aus einer früheren Veranstaltung übernehmen</h2>
+        <p class="hilfe">Bereiche, Schichten, Goodies und das Angebot werden
+          kopiert, die Schichten auf die Tage von {{ va_aktuell.kurz }} verschoben –
+          gemessen am ersten Tag. Wer damals eingeteilt war, kommt nicht mit.
+          Danach lässt sich alles einzeln ändern.</p>
+        <form method="post" action="/helfer/bereiche/vorlage" class="einteilen">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label for="vorlage">Vorlage</label>
+          <select id="vorlage" name="von" required>
+            {% for q in vorlagen %}
+              <option value="{{ q.id }}">{{ q.kurz }} – {{ q.bereiche }} Bereiche,
+                {{ q.schichten }} Schichten</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="knopf">Übernehmen</button>
+        </form>
+      </section>
+    {% endif %}
+  {% else %}
+    <div class="tabelle-huelle">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Bereich</th>
+            <th scope="col">Treffpunkt</th>
+            <th scope="col">Leitung</th>
+            <th scope="col" class="rechts">Schichten</th>
+            <th scope="col" class="rechts">besetzt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bereichsliste %}
+            <tr>
+              <td>
+                <a href="/helfer/bereich/{{ b.id }}">{{ b.name }}</a>
+                {%- if b.mindestalter %} <span class="marke">ab {{ b.mindestalter }}</span>{% endif %}
+                {%- if b.intern %} <span class="marke">intern</span>{% endif %}
+              </td>
+              <td>{{ b.treffpunkt or '–' }}</td>
+              <td>
+                {%- if b.leitung %}{{ b.leitung }}
+                  {%- if b.leitung_telefon %}<br><span class="gedaempft">{{ b.leitung_telefon }}</span>{% endif %}
+                {%- else %}<span class="gedaempft">–</span>{% endif %}
+              </td>
+              <td class="rechts">{{ b.schichten }}</td>
+              <td class="rechts nowrap">{{ b.besetzt }} / {{ b.soll }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="hilfe">{{ bereichsliste | sum(attribute='schichten') }} Schichten mit
+      {{ bereichsliste | sum(attribute='soll') }} Plätzen nach Soll.</p>
+  {% endif %}
+{% endblock %}

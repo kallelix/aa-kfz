@@ -123,12 +123,12 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
         schichtbalken.append({
             "art": "schicht",
             "id": eintrag["id"],
-            "titel": eintrag["liste"],
+            "titel": eintrag["bereich"],
             "von": beginn,
             "bis": ende,
             "offen": False,
             "besetzt": eintrag["besetzt"],
-            "bedarf": eintrag["bedarf"],
+            "soll": eintrag["soll"],
             "fehlt": eintrag["fehlt"],
         })
 

@@ -1,0 +1,143 @@
+{% extends "admin_base.html" %}
+{% block titel %}{{ bereich.name if bereich else 'Neuer Bereich' }}{% endblock %}
+{% block hauptklasse %}spalte-schmal{% endblock %}
+{% block ueberschrift %}{{ bereich.name if bereich else 'Neuer Bereich' }}{% endblock %}
+
+{% block inhalt %}
+  {% if bereich %}
+    <section>
+      <h2>Schichten</h2>
+      {% if not schichten %}
+        <p class="leer">Noch keine Schicht in diesem Bereich.</p>
+      {% else %}
+        <div class="tabelle-huelle">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Tag</th>
+                <th scope="col">Zeit</th>
+                <th scope="col" class="rechts" title="Minimum / Soll / Reserve">Min / Soll / Res</th>
+                <th scope="col" class="rechts">besetzt</th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in schichten %}
+                <tr{% if s.fehlt %} class="hat-luecke"{% endif %}>
+                  <td class="nowrap">{{ s.datum | tag }}</td>
+                  <td class="zeit">
+                    <a href="/helfer/schicht/{{ s.id }}">{{ s | spanne }}</a>
+                    {%- if s.ort %}<br><span class="gedaempft">{{ s.ort }}</span>{% endif %}
+                    {%- if s.mindestalter %} <span class="marke">ab {{ s.mindestalter }}</span>{% endif %}
+                    {%- if s.intern and not bereich.intern %} <span class="marke">intern</span>{% endif %}
+                  </td>
+                  <td class="rechts nowrap">{{ s.minimum }} / {{ s.soll }} / {{ s.reserve }}</td>
+                  <td class="rechts">{{ s.besetzt }}</td>
+                  <td class="rechts nowrap">
+                    <a class="knopf-schlicht" href="/helfer/schicht/{{ s.id }}/aendern">ändern</a>
+                    <a class="knopf-schlicht" href="/helfer/bereich/{{ bereich.id }}/schicht/neu?von={{ s.id }}"
+                       title="Neue Schicht mit diesen Angaben">kopieren</a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+      <p class="knopfreihe">
+        <a class="knopf" href="/helfer/bereich/{{ bereich.id }}/schicht/neu">Neue Schicht</a>
+      </p>
+    </section>
+
+    <h2>Angaben zum Bereich</h2>
+  {% endif %}
+
+  <form method="post"
+        action="{{ '/helfer/bereich/' ~ bereich.id if bereich else '/helfer/bereich/neu' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="feld {% if fehler.name %}feld-fehler{% endif %}">
+      <label for="name">Name <span class="pflicht">*</span></label>
+      <input type="text" id="name" name="name" maxlength="80" required
+             value="{{ werte.name }}" {% if not bereich %}autofocus{% endif %}>
+      {% if fehler.name %}<p class="fehler">{{ fehler.name }}</p>{% endif %}
+    </div>
+
+    <div class="feld">
+      <label for="beschreibung">Was man dort tut <span class="optional">optional</span></label>
+      <textarea id="beschreibung" name="beschreibung" rows="4" maxlength="2000">{{ werte.beschreibung }}</textarea>
+      <p class="hilfe">In einfacher Sprache, für Leute, die noch nie dabei waren.
+        Steht später in der Anmeldung.</p>
+    </div>
+
+    <div class="feld">
+      <label for="treffpunkt">Treffpunkt <span class="optional">optional</span></label>
+      <input type="text" id="treffpunkt" name="treffpunkt" maxlength="200"
+             value="{{ werte.treffpunkt }}">
+      <p class="hilfe">Gilt für alle Schichten, die keinen eigenen Ort haben.</p>
+    </div>
+
+    <div class="paar">
+      <div class="feld">
+        <label for="leitung">Bereichsleitung <span class="optional">optional</span></label>
+        <input type="text" id="leitung" name="leitung" maxlength="120"
+               value="{{ werte.leitung }}">
+      </div>
+      <div class="feld">
+        <label for="leitung_telefon">Ihre Nummer <span class="optional">optional</span></label>
+        <input type="tel" id="leitung_telefon" name="leitung_telefon" maxlength="40"
+               value="{{ werte.leitung_telefon }}">
+      </div>
+    </div>
+
+    <div class="feld {% if fehler.mindestalter %}feld-fehler{% endif %}">
+      <label for="mindestalter">Mindestalter <span class="optional">optional</span></label>
+      <input type="number" id="mindestalter" name="mindestalter" min="1" max="99"
+             inputmode="numeric" value="{{ werte.mindestalter if werte.mindestalter is not none }}">
+      <p class="hilfe">Leer heißt: keine Grenze. Shuttle-Fahrer ab 18, Ausschank ab 18.
+        Eine einzelne Schicht kann davon abweichen.</p>
+      {% if fehler.mindestalter %}<p class="fehler">{{ fehler.mindestalter }}</p>{% endif %}
+    </div>
+
+    <div class="feld">
+      <label for="voraussetzungen">Voraussetzungen <span class="optional">optional</span></label>
+      <textarea id="voraussetzungen" name="voraussetzungen" rows="2" maxlength="2000"
+                placeholder="Führerschein Klasse B">{{ werte.voraussetzungen }}</textarea>
+      <p class="hilfe">Eine je Zeile. Bei der Anmeldung bestätigt man jede einzeln.</p>
+    </div>
+
+    <fieldset class="feld">
+      <legend>Sichtbarkeit</legend>
+      <label class="auswahl">
+        <input type="checkbox" name="intern" value="1" {% if werte.intern %}checked{% endif %}>
+        <span class="auswahl-text">
+          <span class="auswahl-titel">Intern</span>
+          <span class="auswahl-hilfe">Nur im Backoffice, nicht in der öffentlichen
+            Anmeldung – etwa das Orgabüro.</span>
+        </span>
+      </label>
+    </fieldset>
+
+    <div class="knopfreihe">
+      <button type="submit" class="knopf">Speichern</button>
+      <a class="knopf-schlicht" href="/helfer/bereiche">Abbrechen</a>
+    </div>
+  </form>
+
+  {% if bereich %}
+    <section class="loeschen">
+      <h2>Löschen</h2>
+      {% if schichten %}
+        <p class="hilfe">Geht erst, wenn der Bereich keine Schichten mehr hat.</p>
+      {% else %}
+        <p class="hilfe">Der Bereich ist leer und kann weg.</p>
+        <form method="post" action="/helfer/bereich/{{ bereich.id }}/loeschen">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="knopf-gefahr">Bereich löschen</button>
+        </form>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <p class="zurueck-zeile"><a href="/helfer/bereiche">Zurück zu den Bereichen</a></p>
+{% endblock %}

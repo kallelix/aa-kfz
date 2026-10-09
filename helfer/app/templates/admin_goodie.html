@@ -1,0 +1,67 @@
+{% extends "admin_base.html" %}
+{% block titel %}{{ 'Goodie ändern' if goodie else 'Neues Goodie' }}{% endblock %}
+{% block hauptklasse %}spalte-schmal{% endblock %}
+{% block ueberschrift %}{{ 'Goodie ändern' if goodie else 'Neues Goodie' }}{% endblock %}
+
+{% block inhalt %}
+  <form method="post" action="{{ '/helfer/goodie/' ~ goodie.id if goodie else '/helfer/goodie/neu' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="feld {% if fehler.name %}feld-fehler{% endif %}">
+      <label for="name">Was gibt es <span class="pflicht">*</span></label>
+      <input type="text" id="name" name="name" maxlength="120" required
+             value="{{ werte.name }}" placeholder="Ein Bier am Bierwagen"
+             {% if not goodie %}autofocus{% endif %}>
+      {% if fehler.name %}<p class="fehler">{{ fehler.name }}</p>{% endif %}
+    </div>
+
+    <div class="paar">
+      <div class="feld {% if fehler.schwelle %}feld-fehler{% endif %}">
+        <label for="schwelle">Ab <span class="pflicht">*</span></label>
+        <input type="number" id="schwelle" name="schwelle" min="1" max="99" required
+               inputmode="numeric" value="{{ werte.schwelle }}">
+        {% if fehler.schwelle %}<p class="fehler">{{ fehler.schwelle }}</p>{% endif %}
+      </div>
+      <div class="feld">
+        <label for="schwelle_art">gezählt in</label>
+        <select id="schwelle_art" name="schwelle_art">
+          {% for schluessel, text in schwellen.items() %}
+            <option value="{{ schluessel }}" {% if schluessel == werte.schwelle_art %}selected{% endif %}>{{ text }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="paar">
+      <div class="feld {% if fehler.mindestalter %}feld-fehler{% endif %}">
+        <label for="mindestalter">Mindestalter <span class="optional">optional</span></label>
+        <input type="number" id="mindestalter" name="mindestalter" min="1" max="99"
+               inputmode="numeric" value="{{ werte.mindestalter if werte.mindestalter is not none }}">
+        {% if fehler.mindestalter %}<p class="fehler">{{ fehler.mindestalter }}</p>{% endif %}
+      </div>
+      <div class="feld {% if fehler.alternative %}feld-fehler{% endif %}">
+        <label for="alternative">Wer jünger ist, bekommt <span class="optional">optional</span></label>
+        <input type="text" id="alternative" name="alternative" maxlength="120"
+               value="{{ werte.alternative }}" placeholder="Eine Eistüte">
+        {% if fehler.alternative %}<p class="fehler">{{ fehler.alternative }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="knopfreihe">
+      <button type="submit" class="knopf">Speichern</button>
+      <a class="knopf-schlicht" href="/helfer/goodies">Abbrechen</a>
+    </div>
+  </form>
+
+  {% if goodie %}
+    <section class="loeschen">
+      <h2>Löschen</h2>
+      <form method="post" action="/helfer/goodie/{{ goodie.id }}/loeschen">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="knopf-gefahr">Goodie löschen</button>
+      </form>
+    </section>
+  {% endif %}
+
+  <p class="zurueck-zeile"><a href="/helfer/goodies">Zurück zu den Goodies</a></p>
+{% endblock %}
