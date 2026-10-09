@@ -356,6 +356,9 @@ MELDUNGEN = {
     'zusammengefuehrt': 'Zusammengeführt. Was zur anderen Person gehörte, steht jetzt hier.',
     'eingeladen': 'Die Einladungen sind unterwegs.',
     'hilferuf': 'Der Hilferuf ist unterwegs.',
+    'gedankt': 'Die Danke-Mails sind unterwegs.',
+    'danke-zu': 'Danke sagen geht ab dem letzten Tag der Veranstaltung.',
+    'danke-fotos': 'Der Link zu den Fotos muss mit https:// beginnen.',
     'hilferuf-leer': 'Wähle mindestens eine Schicht, zu der jemand passt.',
     'hilferuf-schon': 'Für eine der Schichten wurde gerade schon gerufen – hier ist der neue Stand.',
     'einladen-zu': 'Einladen geht erst, wenn die Anmeldung offen ist.',
@@ -431,7 +434,8 @@ def _helfer_gruppen(aktuell) -> list:
             ("/helfer/band", "Zeitplan", ())]),
         ("Leute", [("/helfer/helfer", "Helfer", ()),
                    ("/helfer/einladen", "Einladen", ()),
-                   ("/helfer/hilferuf", "Hilferuf", ())]),
+                   ("/helfer/hilferuf", "Hilferuf", ()),
+                   ("/helfer/danke", "Danke", ())]),
         ("Vor Ort", vor_ort),
     ]
 
@@ -1389,6 +1393,83 @@ async def hilferuf_senden(request: Request, sitzung: auth.Sitzung = Depends(_sit
     if db.hilferuf_senden(v["id"], mails, sitzung.kuerzel, lage["seit"]) is None:
         return _zurueck(zurueck, "hilferuf-schon")
     return _zurueck(zurueck, "hilferuf")
+
+
+# --- Danke nach der Veranstaltung (Lastenheft 3.5: G-07) -------------------
+
+def _naechste(request: Request, v) -> tuple[str, str] | None:
+    """Die nächste Veranstaltung, die schon angekündigt oder offen ist."""
+    spaeter = [x for x in db.VERANSTALTUNGEN.liste()
+               if x["status"] in ("angekuendigt", "offen") and x["beginn"] > v["ende"]]
+    if not spaeter:
+        return None
+    n = min(spaeter, key=lambda x: x["beginn"])
+    return selbstanmeldung.va_text(n), _basis(request) + "/" + normalisieren.kurzadresse(n["kurz"])
+
+
+def _danke_mail(v, empfaenger, fotos: str, wort: str, naechste) -> tuple:
+    """Je Person die Stunden aus ihren Schichten, dazu ob sie als Springer
+    da war (G-07) – für sie und alle ohne eigene Adresse, die sie
+    mitangemeldet hat."""
+    beteiligte = []
+    for e in versand.beteiligt(v, empfaenger):
+        minuten = sum((datetime.fromisoformat(s["ende"]) - datetime.fromisoformat(s["beginn"]))
+                      .total_seconds() / 60 for s in e["schichten"])
+        beteiligte.append({
+            "name": None if e["person"]["id"] == empfaenger["id"]
+            else e["person"]["vorname"] or e["person"]["name"],
+            "stunden": round(minuten / 60 * 2) / 2, "springer": bool(e["fenster"])})
+    beteiligte = [b for b in beteiligte if b["stunden"] or b["springer"]] or beteiligte[:1]
+    return mail.danke(empfaenger, v["name"], beteiligte, fotos, wort, naechste)
+
+
+def _danke_eingabe(quelle) -> tuple[str, str, str]:
+    """Foto-Link und ein Wort der Orga aus dem Formular – und was nicht passt."""
+    fotos = normalisieren.text(quelle.get("fotos"))[:500]
+    wort = str(quelle.get("wort") or "").strip()[:1500]
+    if fotos and not fotos.startswith(("https://", "http://")):
+        return "", wort, "danke-fotos"
+    return fotos, wort, ""
+
+
+@app.get("/helfer/danke")
+async def danke_seite(request: Request, hinweis: str = "",
+                      sitzung: auth.Sitzung = Depends(_sitzung),
+                      v=Depends(_veranstaltung)):
+    """G-07: wer die Danke-Mail bekäme, und wie sie aussieht."""
+    fotos, wort, fehler = _danke_eingabe(request.query_params)
+    offen = db.danke_offen(v["id"])
+    beispiel = ""
+    if offen:
+        empfaenger = db.helfer_laden(offen[0]["empfaenger"])
+        beispiel = _danke_mail(v, empfaenger, fotos, wort, _naechste(request, v))[3]
+    return templates.TemplateResponse(
+        "admin_danke.html",
+        _admin(request, sitzung, hinweis=hinweis or fehler, anzahl=len(offen),
+               schon=db.gedankt(v["id"]), fotos=fotos, wort=wort, beispiel=beispiel,
+               vorbei=db.jetzt_lokal().date() >= v["ende"], darf=_pflegt_grenzen(sitzung)))
+
+
+@app.post("/helfer/danke")
+async def danke_senden(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
+                       v=Depends(_veranstaltung)):
+    """Je Person eine Mail – wer schon eine hat, bekommt keine zweite."""
+    _nur_orga(sitzung)
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    fotos, wort, fehler = _danke_eingabe(daten)
+    if fehler:
+        return _zurueck("/helfer/danke", fehler, wort=wort)
+    if db.jetzt_lokal().date() < v["ende"]:
+        return _zurueck("/helfer/danke", "danke-zu")
+    naechste = _naechste(request, v)
+    for zeile in db.danke_offen(v["id"]):
+        empfaenger = db.helfer_laden(zeile["empfaenger"])
+        if empfaenger is not None:
+            db.erinnerung_vermerken(v["id"], empfaenger["id"], "danke",
+                                    _danke_mail(v, empfaenger, fotos, wort, naechste))
+    return _zurueck("/helfer/danke", "gedankt")
 
 
 # --- Dubletten zusammenführen (Lastenheft 3.2: I-06) ------------------------

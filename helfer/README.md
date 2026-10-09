@@ -176,6 +176,27 @@ einem Klick abbestellen (C-09), aus jeder solchen Mail oder in Mein
 Helferplatz – getrennt von den Mails zu den eigenen Schichten, die immer
 kommen.
 
+## Erinnerung und Danke
+
+Zwei Tage vor der ersten Schicht – oder Springer-Zeit – kommt eine
+Erinnerung (Lastenheft 3.5, C-02): alle Schichten mit Treffpunkt, die
+Bereichsleitung mit Nummer, die Hinweise der Schichten, die Bitte, 15 Minuten
+vorher da zu sein, und der Link zu Mein Helferplatz, um abzusagen, falls
+etwas dazwischenkommt. Das erledigt der Mail-Worker (`versand.erinnern`);
+wie lange vorher, steht in `ERINNERN_STUNDEN`. Den QR-Code fürs Einchecken
+bringt der Check-in (Phase 4).
+
+Nach der Veranstaltung dankt die Orga unter Leute → Danke (G-07): je Person
+die Stunden aus ihren Schichten, ob sie als Springer da war, auf Wunsch der
+Link zu den Fotos und ein Wort von euch, dazu die nächste Veranstaltung, wenn
+sie schon angekündigt ist. Die Seite zeigt vorher, wie die Mail aussieht;
+geschickt wird ab dem letzten Tag der Veranstaltung.
+
+Beide Mails gehen an jede Person mit eigener Adresse einmal je Veranstaltung.
+Wer ohne eigene Adresse mitangemeldet ist, steht in der Mail dessen, der ihn
+angemeldet hat. Ein noch nicht angenommenes Angebot der Warteliste und eine
+unbestätigte Anmeldung zählen nicht.
+
 ## Datenschutz und Jugendschutz
 
 Seit Lastenheft 2.9 (D-01 bis D-07):
@@ -425,6 +446,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_dubletten.py    # zusammenführen, auseinanderhalten
 .venv/Scripts/python.exe helfer/tests/test_einladen.py     # Anmeldestart, Helferstamm einladen
 .venv/Scripts/python.exe helfer/tests/test_hilferuf.py     # passende Stamm-Helfer, Text, 24 Stunden, abbestellen
+.venv/Scripts/python.exe helfer/tests/test_erinnerung.py   # Erinnerung vor der Schicht, Danke danach
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

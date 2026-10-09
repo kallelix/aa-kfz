@@ -1604,6 +1604,81 @@ def schicht_veranstaltung(schicht_id: int) -> int | None:
         con.close()
 
 
+# --- Erinnerung und Danke (Lastenheft 3.5: C-02, G-07) ---------------------
+#
+# Eine Mail geht an jede Person mit eigener Adresse. Wer mitangemeldet ist
+# und keine eigene hat, steht in der Mail dessen, der ihn angemeldet hat
+# (A-08). Ein Angebot der Warteliste, das noch nicht angenommen ist, zählt
+# nicht; ebenso wenig eine Anmeldung, deren Adresse nicht bestätigt ist.
+
+_BETEILIGT = (
+    "SELECT x.vid, x.empfaenger, min(x.beginn) AS erste FROM ("
+    "  SELECT s.veranstaltung_id AS vid, s.beginn,"
+    "    CASE WHEN h.email = '' AND h.angemeldet_von IS NOT NULL"
+    "         THEN h.angemeldet_von ELSE h.id END AS empfaenger"
+    "  FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+    "  JOIN helfer h ON h.id = e.helfer_id WHERE e.bestaetigen_bis IS NULL"
+    "  UNION ALL"
+    "  SELECT f.veranstaltung_id, f.beginn,"
+    "    CASE WHEN h.email = '' AND h.angemeldet_von IS NOT NULL"
+    "         THEN h.angemeldet_von ELSE h.id END"
+    "  FROM verfuegbarkeit f JOIN helfer h ON h.id = f.helfer_id WHERE f.springer = 1"
+    ") x JOIN helfer r ON r.id = x.empfaenger"
+    " WHERE r.email <> '' AND r.aktiv = 1 AND r.loeschen_beantragt_am IS NULL"
+    " AND NOT (r.email_bestaetigt_am IS NULL AND EXISTS (SELECT 1 FROM teilnahme t"
+    "          WHERE t.helfer_id = r.id AND t.veranstaltung_id = x.vid AND t.quelle = 'selbst'))"
+    " AND NOT EXISTS (SELECT 1 FROM erinnerung n WHERE n.veranstaltung_id = x.vid"
+    "                 AND n.helfer_id = x.empfaenger AND n.art = ?)")
+
+
+def erinnerung_faellig(von: str, bis: str) -> list[Zeile]:
+    """C-02: wessen erste Schicht – oder Springer-Zeit – zwischen `von` und
+    `bis` beginnt und wer noch nicht erinnert ist. Je (Veranstaltung,
+    Empfänger) eine Zeile."""
+    con = verbinden()
+    try:
+        return con.execute(_BETEILIGT + " GROUP BY x.vid, x.empfaenger"
+                           " HAVING min(x.beginn) > ? AND min(x.beginn) <= ?"
+                           " ORDER BY erste", ("vorher", von, bis)).fetchall()
+    finally:
+        con.close()
+
+
+def danke_offen(vid: int) -> list[Zeile]:
+    """G-07: wer bei dieser Veranstaltung dabei war und noch keinen Dank hat."""
+    con = verbinden()
+    try:
+        return con.execute(_BETEILIGT + " AND x.vid = ? GROUP BY x.vid, x.empfaenger"
+                           " ORDER BY x.empfaenger", ("danke", vid)).fetchall()
+    finally:
+        con.close()
+
+
+def gedankt(vid: int) -> int:
+    con = verbinden()
+    try:
+        return int(con.execute("SELECT COUNT(*) FROM erinnerung WHERE veranstaltung_id = ?"
+                               " AND art = 'danke'", (vid,)).fetchone()[0])
+    finally:
+        con.close()
+
+
+def erinnerung_vermerken(vid: int, helfer_id: int, art: str, mail: tuple | None) -> bool:
+    """Vermerkt die Mail und reiht sie ein – beides oder keins, und nur
+    einmal. Ohne Mail (nichts zu sagen) nur der Vermerk."""
+    con = verbinden()
+    try:
+        with con:
+            neu = con.execute("INSERT INTO erinnerung (veranstaltung_id, helfer_id, art, am)"
+                              " VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                              (vid, helfer_id, art, jetzt())).rowcount > 0
+            if neu and mail is not None:
+                mail_einreihen(helfer_id, mail, con)
+            return neu
+    finally:
+        con.close()
+
+
 # --- Dubletten zusammenführen (Lastenheft 3.2: I-06) ------------------------
 
 # Was die bleibende Person von der anderen übernimmt, wenn es ihr fehlt.
@@ -1702,6 +1777,10 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                         " (SELECT 1 FROM verfuegbarkeit x WHERE x.helfer_id = ?"
                         "  AND x.veranstaltung_id = v.veranstaltung_id"
                         "  AND x.beginn = v.beginn AND x.ende = v.ende)", (weg, behalten))
+            con.execute("DELETE FROM erinnerung g WHERE helfer_id = ? AND EXISTS"
+                        " (SELECT 1 FROM erinnerung x WHERE x.helfer_id = ?"
+                        "  AND x.veranstaltung_id = g.veranstaltung_id AND x.art = g.art)",
+                        (weg, behalten))
             con.execute("DELETE FROM einladung g WHERE helfer_id = ? AND EXISTS"
                         " (SELECT 1 FROM einladung x WHERE x.helfer_id = ?"
                         "  AND x.veranstaltung_id = g.veranstaltung_id)", (weg, behalten))
@@ -1709,8 +1788,8 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                         " (SELECT 1 FROM einsatzgrenze x WHERE x.helfer_id = ?"
                         "  AND x.bereich_id IS NOT DISTINCT FROM g.bereich_id"
                         "  AND x.schicht_id IS NOT DISTINCT FROM g.schicht_id)", (weg, behalten))
-            for tabelle in ("verfuegbarkeit", "einsatzgrenze", "einladung", "ausleihe",
-                            "protokoll", "absage", "mail_out"):
+            for tabelle in ("verfuegbarkeit", "einsatzgrenze", "einladung", "erinnerung",
+                            "ausleihe", "protokoll", "absage", "mail_out"):
                 con.execute("UPDATE " + tabelle + " SET helfer_id = ? WHERE helfer_id = ?",
                             (behalten, weg))
             # Die Unterschrift unter der Shirt-Ausgabe hängt an der Person.

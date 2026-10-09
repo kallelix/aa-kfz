@@ -255,6 +255,75 @@ def hilferuf(person, va_text: str, eintraege: list[tuple[str, str]], abbestellen
     return ("hilferuf", person["email"], "Hilfe gesucht – " + va_text, "\n".join(zeilen))
 
 
+# --- Erinnerung und Danke (Lastenheft 3.5: C-02, G-07) ---------------------
+
+def vorher(person, va_text: str, wann: str, eintraege, leitung: list[str],
+           hinweise: list[str], platz: str) -> tuple:
+    """C-02: kurz vor der ersten Schicht – Treffpunkt, Ansprechpartner,
+    Hinweise, und die Bitte um 15 Minuten Vorlauf. Den QR-Code fürs
+    Einchecken bringt der Check-in (T-01, Phase 4)."""
+    zeilen = [
+        f"Hallo {_vorname(person)},",
+        "",
+        f"{wann} geht es los – schön, dass du bei {va_text} dabei bist!",
+        "",
+        schichten_text(eintraege),
+        "",
+        "Bitte sei 15 Minuten vor Beginn am Treffpunkt und melde dich bei der",
+        "Bereichsleitung." + (" Das sind:" if leitung else ""),
+    ]
+    zeilen += [f"  {zeile}" for zeile in leitung]
+    if hinweise:
+        zeilen += ["", "Denk dran:"] + [f"  {zeile}" for zeile in hinweise]
+    zeilen += [
+        "",
+        "Alles auf einen Blick – und falls etwas dazwischenkommt, sag dort bitte ab:",
+        f"  {platz}",
+        _fuss(),
+    ]
+    return ("vorher", person["email"], "Bald geht es los – " + va_text, "\n".join(zeilen))
+
+
+def _stunden(stunden: float) -> str:
+    zahl = f"{stunden:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+    return zahl + (" Stunde" if zahl == "1" else " Stunden")
+
+
+def danke(person, va_name: str, beteiligte: list[dict], fotos: str, wort: str,
+          naechste: tuple[str, str] | None) -> tuple:
+    """G-07: der Rückblick – wie viele Stunden, die Fotos, die nächste
+    Veranstaltung. `beteiligte`: je Person name (None für die Empfängerin
+    selbst), stunden, springer."""
+    zeilen = [
+        f"Hallo {_vorname(person)},",
+        "",
+        f"danke! {va_name} ist vorbei – und ohne Leute wie dich wäre sie nicht gelaufen.",
+        "",
+    ]
+    if len(beteiligte) == 1 and beteiligte[0]["name"] is None:
+        b = beteiligte[0]
+        if b["stunden"]:
+            zeilen.append(f"Du hast {_stunden(b['stunden'])} geholfen.")
+        if b["springer"]:
+            zeilen.append("Und du warst als Springer da, wenn es irgendwo brannte."
+                          if b["stunden"] else "Du warst als Springer da, wenn es irgendwo brannte.")
+    else:
+        zeilen.append("So viel habt ihr geholfen:")
+        for b in beteiligte:
+            was = _stunden(b["stunden"]) if b["stunden"] else ""
+            if b["springer"]:
+                was = (was + " und als Springer") if was else "als Springer"
+            zeilen.append(f"  {b['name'] or 'Du'}: {was}")
+    if wort:
+        zeilen += ["", wort]
+    if fotos:
+        zeilen += ["", "Die Fotos:", f"  {fotos}"]
+    if naechste:
+        zeilen += ["", f"Die nächste Veranstaltung: {naechste[0]}", f"  {naechste[1]}"]
+    zeilen.append(_fuss())
+    return ("danke", person["email"], "Danke! – " + va_name, "\n".join(zeilen))
+
+
 # --- Selbstbedienung (Lastenheft 2.5) ---------------------------------------
 
 def abgesagt(person, va_text: str, zeilen: list[str], platz: str) -> tuple:

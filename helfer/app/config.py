@@ -313,6 +313,8 @@ MAIL_AKTIV = bool(SMTP_HOST and MAIL_FROM)
 # ersten Frist kommt eine Erinnerung, nach der zweiten sind die Plätze frei.
 BESTAETIGEN_ERINNERN_STUNDEN = _zahl("BESTAETIGEN_ERINNERN_STUNDEN", 24)
 BESTAETIGEN_FRIST_STUNDEN = _zahl("BESTAETIGEN_FRIST_STUNDEN", 72)
+# C-02: so lange vor der ersten Schicht kommt die Erinnerung.
+ERINNERN_STUNDEN = _zahl("ERINNERN_STUNDEN", 48)
 
 # Wird ein Platz frei, hält die Warteliste ihn so lange für die erste Person
 # (R-04) – höchstens bis die Schicht beginnt.

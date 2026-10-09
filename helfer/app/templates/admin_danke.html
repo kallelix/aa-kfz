@@ -1,0 +1,52 @@
+{% extends "admin_base.html" %}
+{% block titel %}Danke{% endblock %}
+{% block ueberschrift %}Danke sagen{% endblock %}
+
+{# G-07: der Rückblick nach der Veranstaltung – je Person die Stunden, die
+   sie geholfen hat, die Fotos und die nächste Veranstaltung. Die Erinnerung
+   vor der Schicht (C-02) schickt der Mail-Worker von selbst.
+
+   Zwei Formulare: die Vorschau ist ein GET ohne Token, geschickt wird genau
+   das, was in der Vorschau steht. #}
+{% block inhalt %}
+  <p>Alle, die dabei waren, bekommen eine Mail: wie viele Stunden sie geholfen haben, auf
+    Wunsch der Link zu den Fotos und ein Wort von euch, und die nächste Veranstaltung, wenn
+    sie schon angekündigt ist. Wer ohne eigene Adresse mitangemeldet war, steht in der Mail
+    dessen, der angemeldet hat.</p>
+
+  <section class="kasten">
+    <h2>Noch nicht bedankt ({{ anzahl }})</h2>
+    {% if schon %}
+      <p class="hilfe">{{ schon }} {{ 'hat' if schon == 1 else 'haben' }} die Mail schon und {{ 'bekommt' if schon == 1 else 'bekommen' }} keine zweite.</p>
+    {% endif %}
+    <form method="get" action="/helfer/danke">
+      <div class="feld">
+        <label for="fotos">Link zu den Fotos <span class="optional">optional</span></label>
+        <input type="url" id="fotos" name="fotos" maxlength="500" value="{{ fotos }}"
+               placeholder="https://…">
+      </div>
+      <div class="feld">
+        <label for="wort">Ein Wort von euch <span class="optional">optional</span></label>
+        <textarea id="wort" name="wort" rows="3" maxlength="1500">{{ wort }}</textarea>
+      </div>
+      <button type="submit" class="knopf-schlicht">Vorschau</button>
+    </form>
+  </section>
+
+  {% if beispiel %}
+    <section>
+      <h2>So sieht die Mail aus</h2>
+      <pre>{{ beispiel }}</pre>
+      {% if not vorbei %}
+        <p class="hilfe">Schicken geht ab dem letzten Tag der Veranstaltung.</p>
+      {% elif darf %}
+        <form method="post" action="/helfer/danke">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="fotos" value="{{ fotos }}">
+          <input type="hidden" name="wort" value="{{ wort }}">
+          <button type="submit" class="knopf">{{ anzahl }} {{ 'Mail' if anzahl == 1 else 'Mails' }} schicken</button>
+        </form>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

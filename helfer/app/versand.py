@@ -186,10 +186,63 @@ def anmeldestart() -> int:
     return geschrieben
 
 
+def beteiligt(v, empfaenger) -> list[dict]:
+    """Die Einträge für die Mail an `empfaenger`: die eigenen und die derer,
+    die ohne eigene Adresse mitangemeldet sind. Angebote der Warteliste, die
+    noch offen sind, zählen nicht."""
+    anmeldung = db.anmeldung_laden(v["id"], empfaenger["id"])
+    eintraege = []
+    for e in anmeldung["personen"] if anmeldung else []:
+        if e["person"]["id"] != empfaenger["id"] and e["person"]["email"]:
+            continue
+        schichten = [s for s in e["schichten"] if not s["bestaetigen_bis"]]
+        if schichten or e["fenster"] or e["person"]["id"] == empfaenger["id"]:
+            eintraege.append({**e, "schichten": schichten, "warteliste": []})
+    return eintraege
+
+
+def _wann(erste: str, heute) -> str:
+    tage = (datetime.fromisoformat(erste).date() - heute).days
+    return {0: "Heute", 1: "Morgen", 2: "Übermorgen"}.get(tage, "Bald")
+
+
+def erinnern() -> int:
+    """C-02: kurz vor der ersten Schicht eine Erinnerung – Treffpunkt,
+    Bereichsleitung mit Nummer, Hinweise, Link zu Mein Helferplatz. Je
+    Veranstaltung und Person einmal."""
+    jetzt = db.jetzt_lokal()
+    erinnert = 0
+    for zeile in db.erinnerung_faellig(
+            db.marke(jetzt), db.marke(jetzt + timedelta(hours=config.ERINNERN_STUNDEN))):
+        v = db.VERANSTALTUNGEN.laden(zeile["vid"])
+        person = db.helfer_laden(zeile["empfaenger"])
+        if v is None or person is None:
+            continue
+        eintraege = beteiligt(v, person)
+        schichten = [s for e in eintraege for s in e["schichten"]]
+        leitungen = db.leitungen(sorted({s["bereich_id"] for s in schichten}))
+        leitung, hinweise = [], []
+        for s in sorted(schichten, key=lambda s: s["beginn"]):
+            for k in leitungen.get(s["bereich_id"], []):
+                text = f"{s['bereich']}: {k['name']}" + (f", {k['telefon']}" if k["telefon"] else "")
+                if text not in leitung:
+                    leitung.append(text)
+            if s["hinweis"] and f"{s['bereich']}: {s['hinweis']}" not in hinweise:
+                hinweise.append(f"{s['bereich']}: {s['hinweis']}")
+        platz = link("/platz/" + zugang.token(zugang.PLATZ, person))
+        db.erinnerung_vermerken(v["id"], person["id"], "vorher", mail.vorher(
+            person, selbstanmeldung.va_text(v), _wann(zeile["erste"], jetzt.date()),
+            eintraege, leitung, hinweise, platz))
+        erinnert += 1
+    return erinnert
+
+
 def runde() -> None:
     gesendet, fehlgeschlagen = verschicken()
     if anmeldestart():
         protokoll.info("Anmeldestart: Vorgemerkte benachrichtigt")
+    if erinnern():
+        protokoll.info("Erinnerungen vor der Schicht eingereiht")
     erinnert, verfallen = fristen()
     if gesendet or fehlgeschlagen or erinnert or verfallen:
         protokoll.info("Versand: %s gesendet, %s fehlgeschlagen, %s erinnert, %s verfallen",

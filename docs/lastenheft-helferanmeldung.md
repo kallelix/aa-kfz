@@ -449,6 +449,15 @@ Vorlieben (dieses Jahr, sonst zuletzt), Alter und Einsatzgrenzen. Je Schicht
 geht höchstens eine Mail-Runde in 24 Stunden. Hilferufe und Einladungen
 bestellt man mit einem Klick ab, aus der Mail oder in Mein Helferplatz.
 
+**Stand 09.10.2026, Schritt 3.5:** C-02 und G-07 sind umgesetzt. Zwei Tage
+vor der ersten Schicht oder Springer-Zeit kommt die Erinnerung – Schichten
+mit Treffpunkt, Bereichsleitung mit Nummer, Hinweise, 15 Minuten vorher da
+sein, Link zu Mein Helferplatz; den QR-Code fürs Einchecken bringt 4.1. Den
+Dank schickt die Orga nach der Veranstaltung: Stunden je Person, ob als
+Springer da, Fotos, ein Wort der Orga, die nächste Veranstaltung. Wer ohne
+eigene Adresse mitangemeldet ist, steht in der Mail dessen, der anmeldete.
+Jede der beiden Mails kommt je Veranstaltung genau einmal.
+
 ### 5.9 Listen und Ausdrucke (L)
 
 | Nr. | Anforderung | Prio | Phase |
@@ -901,7 +910,7 @@ Phase Vorrang.
 | 3.2 | Dubletten zusammenführen (I-06); das Erkennen kommt mit 2.4 | **erledigt** |
 | 3.3 | Mail bei Anmeldestart an die Vorgemerkten (C-08); das Vormerken kommt mit 2.2 | **erledigt** |
 | 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | **erledigt** |
-| 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | 3 h |
+| 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | **erledigt** |
 | 3.6 | ~~Warteliste mit Nachrücken~~ – vorgezogen in 2.5 | – |
 | 3.8 | **Materialausgabe verallgemeinern** (V-09): Materialien je Veranstaltung, eine Ausgabe für alles mit Rückgabe, Unterschrift und Nummer; Funk und Schlüssel ziehen um | 8 h |
 | 3.7 | Persönliche Backoffice-Konten mit Rollen und Einladen – für alle drei Bereiche | **erledigt** |
@@ -928,7 +937,7 @@ Fehler beheben, nichts Neues.
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
-| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~29 h erledigt |
+| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~32 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |
 
