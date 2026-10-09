@@ -1,0 +1,7 @@
+{# Bereiche und Schichten sind eine Stelle (Planen › Bereiche & Schichten),
+   mit drei Ansichten derselben Sache. `ansicht` sagt, welche offen ist. #}
+<nav class="ansichten" aria-label="Ansicht">
+  <a href="/helfer/bereiche" {% if ansicht == 'bereiche' %}aria-current="page"{% endif %}>{{ 'Meine Bereiche' if nur_eigene else 'Bereiche' }}</a>
+  <a href="/helfer/schichten" {% if ansicht == 'schichten' %}aria-current="page"{% endif %}>Alle Schichten</a>
+  <a href="/helfer/schichten?luecken=1" {% if ansicht == 'luecken' %}aria-current="page"{% endif %}>Nur Lücken</a>
+</nav>

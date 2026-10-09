@@ -175,8 +175,8 @@ sehen darf. Ein Konto hat
 - eine **Nummer**, die jeder unter *Mein Konto* selbst pflegt – für eine
   Bereichsleitung steht sie in Erinnerungsmail und Ausdruck.
 
-Wer einen Helferbereich leitet, wird am Bereich eingetragen (Einstellungen ›
-Bereiche); leiten kann auch jemand von der Orga.
+Wer einen Helferbereich leitet, wird am Bereich eingetragen (Helfer › Planen ›
+Bereiche & Schichten); leiten kann auch jemand von der Orga.
 
 Admins laden unter `admin.example.de/konten` ein: die Person bekommt eine
 Mail mit einem Link und legt damit ihr Passwort fest. Vergessene Passwörter
@@ -194,10 +194,27 @@ Aufgaben und Ausgaben des Helferbereichs gehören immer zu einer; Helfer und
 Fahrzeugstamm gehören keiner, es sind Jahr für Jahr dieselben. Die Bereiche
 einer neuen Veranstaltung lassen sich aus einer früheren übernehmen.
 
-Mit welcher gearbeitet wird, wählt jeder oben im Helferbereich, gemerkt im
-Browser. Ohne Wahl gilt die nächste, die noch nicht vorbei ist – und die
-nehmen auch Monitor, Zeitplan-Abruf und Helferabgleich. Kennzeichen und
-Presse hängen noch an keiner Veranstaltung.
+Mit welcher gearbeitet wird, wählt jeder im Kopf des Backoffice, gemerkt im
+Browser; sie gilt für alle Bereiche. Ohne Wahl gilt die nächste, die noch nicht
+vorbei ist – und die nehmen auch Monitor, Zeitplan-Abruf und Helferabgleich.
+Jede Veranstaltung legt fest, was sie nutzt: Kennzeichen, Presse, Helfer,
+Materialausgabe. Die Daten von Kennzeichen und Presse hängen noch an keiner
+Veranstaltung; sie entscheidet dort nur, ob der Reiter erscheint.
+
+## Navigation
+
+Das Backoffice gliedert sich in drei Ebenen ([kern/navigation.py](kern/navigation.py)):
+
+| Ebene | was dort steht |
+| --- | --- |
+| Reiter | Kennzeichen · Presse · Helfer · Ausgabe · Verwaltung – nur, was die gewählte Veranstaltung nutzt und das Konto sehen darf |
+| Gruppen | je Reiter nach dem Ablauf, im Helferbereich Übersicht · Planen · Leute · Vor Ort; unter Verwaltung die gewählte Veranstaltung, alle Veranstaltungen, die Konten |
+| Seiten | die der offenen Gruppe |
+
+Was man für eine Veranstaltung einrichtet – Goodies, Import, Zeitplan-Abruf,
+Material, Tablet –, steht unter Verwaltung bei ihr, nicht im Bereich. Der
+Klickentwurf dazu liegt unter
+<https://kallelix.github.io/aa-kfz/prototyp-navigation/>.
 
 Den ersten Admin legt `python -m kern.konto admin` an. Wer bisher mit dem
 gemeinsamen Passwort (`ADMIN_PASSWORD_HASH`) gearbeitet hat, kann sich damit
@@ -215,6 +232,7 @@ Rückgabewert 0 heißt bestanden. Alles aus dem Hauptordner:
 .venv/Scripts/python.exe tests/test_kern_konten.py # Konten, Sitzungen und Links in der Datenbank
 .venv/Scripts/python.exe tests/test_kern_db.py    # Datenbankzugriff und Migrationen
 .venv/Scripts/python.exe tests/test_kern_veranstaltungen.py # Veranstaltungen und die Vorgabe
+.venv/Scripts/python.exe tests/test_navigation.py # Reiter, Gruppen, Punkte – wer was sieht
 .venv/Scripts/python.exe tests/test_auth.py       # Anmeldung, Token, CSRF, Rate Limit
 .venv/Scripts/python.exe tests/test_suchen.py     # Suche mit Umlauten, Python gegen JavaScript
 node tests/test_suchen_js.js

@@ -192,11 +192,13 @@ runuser -u abfahrt -- env DATABASE_URL='postgresql://abfahrt@/abfahrt?host=/var/
 ```
 
 Das fragt Mailadresse, Name, Kürzel und Passwort. Danach unter
-`admin.example.de` anmelden, unter **Konten** die anderen einladen und unter
-**Veranstaltungen** die erste Veranstaltung anlegen: Schichten, Programm,
-Aufgaben und Ausgaben des Helferbereichs gehören immer zu einer. Mit welcher
-gearbeitet wird, wählt jeder oben im Helferbereich; ohne Wahl gilt die
-nächste, die noch nicht vorbei ist. Monitor, Zeitplan-Abruf und
+`admin.example.de` anmelden, unter **Verwaltung › Konten** die anderen
+einladen und unter **Verwaltung › Alle Veranstaltungen** die erste
+Veranstaltung anlegen – mit dem, was sie nutzt: Kennzeichen, Presse, Helfer,
+Materialausgabe. Schichten, Programm, Aufgaben und Ausgaben des
+Helferbereichs gehören immer zu einer. Mit welcher gearbeitet wird, wählt
+jeder im Kopf des Backoffice; ohne Wahl gilt die nächste, die noch nicht
+vorbei ist. Monitor, Zeitplan-Abruf und
 Helferabgleich nehmen immer diese.
 
 Die Einladungen gehen über das **Postfach des Kennzeichen-Bereichs**
@@ -496,11 +498,11 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 | Mails bleiben liegen | `SMTP_HOST`/`MAIL_FROM` fehlen, oder Zugangsdaten stimmen nicht. Der Fehler steht in der Detailansicht des Antrags und im Journal. |
 | 429 beim Absenden | Rate Limit im nginx. Bei geteilten NAT-Adressen `rate=` in der Config hochsetzen. |
 | Monitor zeigt dauerhaft die orange „Keine Verbindung"-Leiste, obwohl die Seite lädt | `connect-src 'self'` fehlt in der Content-Security-Policy. Die Seite selbst kommt durch, ihre Nachladeanfragen nicht. In der Browserkonsole steht die geblockte Anfrage. Siehe `nginx-dienst.conf`. |
-| Zeitplan-Abruf schlägt immer fehl | Der Container kommt nicht nach draußen (Egress auf 443 und DNS), oder `ca-certificates` fehlt. Der genaue Text steht im Backoffice unter *Einstellungen › Zeitplan-Abruf* bei den bisherigen Abrufen. |
+| Zeitplan-Abruf schlägt immer fehl | Der Container kommt nicht nach draußen (Egress auf 443 und DNS), oder `ca-certificates` fehlt. Der genaue Text steht im Backoffice unter *Verwaltung › (Veranstaltung) › Zeitplan-Abruf* bei den bisherigen Abrufen. |
 | Monitor zeigt eine Uhrzeit, die nicht stimmt | Entweder steht `JETZT_FEST` noch gesetzt (Warnung im Journal), oder die Containeruhr geht falsch – `timedatectl`. Die Uhr auf dem Bildschirm kommt vom Server, nicht vom Bildschirmrechner. |
 | Monitor zeigt nichts, obwohl Schichten erfasst sind | Der Monitor zeigt die nächste Veranstaltung, die noch nicht vorbei ist – die Schichten hängen an einer anderen, oder deren Tage stimmen nicht. Unter **Veranstaltungen** nachsehen. |
 | Eine Adresse zeigt den falschen Bereich | Der Host-Kopf kommt nicht durch. `proxy_set_header Host $host;` fehlt im Schnipsel, oder der Name steht nicht in `HOST_…`. Ohne Treffer landet alles beim Pfad-Rückfall. |
-| Anmeldung gilt nur in einem Bereich | Das Konto ist nur für diesen Bereich freigegeben – unter **Konten** nachsehen. Sonst: `APP_SECRET_KEY` fehlt in `dienst.env`, und jeder Bereich hat einen eigenen. |
+| Anmeldung gilt nur in einem Bereich | Das Konto ist nur für diesen Bereich freigegeben – unter **Verwaltung › Konten** nachsehen. Sonst: `APP_SECRET_KEY` fehlt in `dienst.env`, und jeder Bereich hat einen eigenen. |
 | Das gemeinsame Passwort geht nicht mehr | So gewollt: es gibt einen Admin mit eigenem Konto. Jeder meldet sich mit seinem eigenen an. |
 | Niemand kommt mehr hinein | `python -m kern.konto passwort <mail>` auf dem Server, siehe Abschnitt 1, *Das erste Admin-Konto*. |
 | Einladung kommt nicht an | `SMTP_…` und `MAIL_FROM` in `kennzeichen.env` prüfen; die Einladungen gehen über dieses Postfach. Bis dahin zeigt die Kontenseite den Link zum Weitergeben. |
@@ -527,9 +529,9 @@ erst seinen Datenbestand:
 2. Den Bericht durchsehen. Übersprungene Zeilen sind **nicht** in der
    Datenbank gelandet, die Hinweise darunter schon – dort stehen
    Mehrfachbelegungen und uneindeutige Angaben, die jemand anschauen sollte.
-3. Unter **Einstellungen › Zeitplan-Abruf** einmal *Jetzt abrufen* drücken.
+3. Unter **Verwaltung › (Veranstaltung) › Zeitplan-Abruf** einmal *Jetzt abrufen* drücken.
    Ab dann läuft der Abruf täglich von selbst.
-4. Unter **Einstellungen › Monitor** den Link erzeugen und auf den
+4. Unter **Helfer › Vor Ort › Monitor** den Link erzeugen und auf den
    Bildschirmrechner übertragen.
 
 Der Import lässt sich beliebig wiederholen: er rechnet das Soll neu aus und
@@ -540,7 +542,7 @@ wurde, bleibt stehen.
 #### Abrufen statt hochladen
 
 Stehen die drei Adressen in der Konfiguration, holt sich der Import beide
-Listen selbst – ein Knopf unter **Einstellungen › Import** statt Herunterladen
+Listen selbst – ein Knopf unter **Verwaltung › (Veranstaltung) › Import** statt Herunterladen
 und Hochladen:
 
 ```
@@ -652,8 +654,8 @@ Energiesparen aus. Die Seite hält sich selbst aktuell und braucht kein F5.
 Zusätzlich zu Abschnitt 4:
 
 - [ ] `JETZT_FEST` ist leer, im Journal steht keine Warnung dazu
-- [ ] Die Veranstaltung steht unter **Veranstaltungen** mit den richtigen
-      Tagen, und oben im Helferbereich ist sie gewählt
+- [ ] Die Veranstaltung steht unter **Verwaltung** mit den richtigen
+      Tagen und dem, was sie nutzt, und im Kopf ist sie gewählt
 - [ ] Uhr des Containers geht richtig (`timedatectl`) – sie steht auf dem
       Monitor
 - [ ] Import beider Listen gelaufen (Abruf oder Hochladen), Bericht durchgesehen

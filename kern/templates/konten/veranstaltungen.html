@@ -16,6 +16,7 @@
             <th>Tage</th>
             <th>Ort</th>
             <th>Anmeldung</th>
+            <th>nutzt</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -23,7 +24,9 @@
           {% for v in liste %}
             <tr{% if v.status == 'archiviert' %} class="gedaempft"{% endif %}>
               <td>
-                <a href="/veranstaltungen/{{ v.id }}">{{ v.kurz }}</a>
+                {# Wählt sie zugleich: was man für sie einrichtet, richtet
+                   sich nach der gewählten. #}
+                <a href="/veranstaltung?id={{ v.id }}&amp;weiter=/veranstaltungen/{{ v.id }}">{{ v.kurz }}</a>
                 <span class="gedaempft">{{ v.name }}</span>
                 {% if v.id == vorgabe_id %}<span class="marke marke-neu" title="Mit dieser arbeitet das Backoffice, solange niemand eine andere wählt">Vorgabe</span>{% endif %}
               </td>
@@ -34,6 +37,7 @@
                   {{ v.anmeldung_ab.strftime('%d.%m.%Y') if v.anmeldung_ab else '' }}–{{ v.anmeldung_bis.strftime('%d.%m.%Y') if v.anmeldung_bis else '' }}
                 {% endif %}
               </td>
+              <td>{% for b in v.nutzt %}<span class="marke">{{ nutzbar[b][0] }}</span> {% endfor %}</td>
               <td>{{ status_werte[v.status] }}</td>
             </tr>
           {% endfor %}

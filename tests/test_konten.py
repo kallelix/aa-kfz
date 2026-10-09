@@ -296,22 +296,56 @@ try:
     _, _, seite, _ = ruf("/helfer", keks=ada)
     pruefe("Noch keine Veranstaltung" in seite,
            "ohne Veranstaltung sagt der Helferbereich, was zu tun ist")
-    for name, kurz, beginn, ende in (("Die absolute Abfahrt 2027", "AA 2027", "2027-07-01", "2027-07-04"),
-                                     ("Cross-Country 2027", "XCO 2027", "2027-05-15", "2027-05-15")):
+    _, _, seite, _ = ruf("/veranstaltungen/neu", keks=ada)
+    status, _, seite, _ = ruf("/veranstaltungen/neu", "POST", {
+        "csrf": csrf(seite), "name": "Nichts", "kurz": "N", "beginn": "2027-01-01",
+        "ende": "2027-01-01", "status": "planung"}, keks=ada)
+    pruefe(status == 400 and "mindestens einen Bereich" in seite,
+           "eine Veranstaltung, die nichts nutzt, gibt es nicht")
+    # Die AA nutzt alles, der XCO nur Helfer und Materialausgabe (V-08).
+    for name, kurz, beginn, ende, nutzt in (
+            ("Die absolute Abfahrt 2027", "AA 2027", "2027-07-01", "2027-07-04",
+             ("kennzeichen", "presse", "helfer", "ausgabe")),
+            ("Cross-Country 2027", "XCO 2027", "2027-05-15", "2027-05-15", ("helfer", "ausgabe"))):
         _, _, seite, _ = ruf("/veranstaltungen/neu", keks=ada)
         status, ort, _, _ = ruf("/veranstaltungen/neu", "POST", {
             "csrf": csrf(seite), "name": name, "kurz": kurz, "beginn": beginn,
-            "ende": ende, "ort": "Ilmenau", "status": "planung"}, keks=ada)
+            "ende": ende, "ort": "Ilmenau", "status": "planung",
+            **{"nutzt_" + b: "1" for b in nutzt}}, keks=ada)
         pruefe(status == 303, kurz + " angelegt")
     aa = sql("kern", "SELECT id FROM veranstaltung WHERE kurz = 'AA 2027'")[0][0]
+    def gewaehlt_im_kopf(seite):
+        treffer = re.search(r'title="Veranstaltung wechseln">\s*([^<]+?)\s*<', seite)
+        return treffer.group(1) if treffer else ""
+
+    def reiter(seite):
+        stueck = seite[seite.index('class="bereiche"'):]
+        return re.findall(r'class="bereich[^"]*"\s+href="[^"]*"[^>]*>([^<]+)</a>',
+                          stueck[:stueck.index("</nav>")])
+
     _, _, seite, _ = ruf("/helfer", keks=ada)
-    pruefe('title="Veranstaltung wechseln">\n        XCO 2027' in seite,
+    pruefe(gewaehlt_im_kopf(seite) == "XCO 2027",
            "ohne Wahl gilt die nächste, die noch nicht vorbei ist: der XCO")
-    status, ort, _, gewaehlt = ruf(f"/helfer/veranstaltung?id={aa}&weiter=/helfer/schichten", keks=ada)
-    pruefe(status == 303 and ort == "/helfer/schichten" and gewaehlt.startswith("abfahrt_veranstaltung="),
-           "die Auswahl merkt sich der Browser und führt zurück")
+    pruefe(reiter(seite) == ["Helfer", "Ausgabe", "Verwaltung"],
+           "beim XCO nur die Reiter dessen, was er nutzt: " + ", ".join(reiter(seite)))
+    _, _, seite, _ = ruf("/presse", keks=ada)
+    pruefe(gewaehlt_im_kopf(seite) == "XCO 2027" and "Presse" not in reiter(seite),
+           "die Auswahl steht auch über der Presse, deren Reiter dann fehlt")
+    status, ort, _, gewaehlt = ruf(f"/veranstaltung?id={aa}&weiter=/presse", keks=ada)
+    pruefe(status == 303 and ort == "/presse" and gewaehlt.startswith("abfahrt_veranstaltung="),
+           "die Auswahl merkt sich der Browser, für alle Bereiche, und führt zurück")
+    status, ort, _, _ = ruf(f"/veranstaltung?id={aa}&weiter=https://example.org/", keks=ada)
+    pruefe(status == 303 and ort == "/", "nach draußen führt sie nicht")
     _, _, seite, _ = ruf("/helfer", keks=ada + "; " + gewaehlt)
-    pruefe('title="Veranstaltung wechseln">\n        AA 2027' in seite, "danach gilt die AA")
+    pruefe(gewaehlt_im_kopf(seite) == "AA 2027", "danach gilt die AA")
+    pruefe(reiter(seite) == ["Kennzeichen", "Presse", "Helfer", "Ausgabe", "Verwaltung"],
+           "und mit ihr alle Reiter")
+    _, _, seite, _ = ruf(f"/veranstaltungen/{aa}", keks=ada + "; " + gewaehlt)
+    gruppen = re.findall(r'>([^<]+)</a>', seite[seite.index('class="gruppen-nav"'):].split("</nav>")[0])
+    pruefe(gruppen == ["AA 2027", "Alle Veranstaltungen", "Konten"],
+           "unter Verwaltung die gewählte, alle und die Konten: " + ", ".join(gruppen))
+    pruefe('href="/helfer/goodies"' in seite and 'href="/helfer/einstellungen"' in seite,
+           "bei der Veranstaltung, was man für sie einrichtet")
     pruefe(ruf("/veranstaltungen", keks=pia)[0] == 403,
            "wer den Helferbereich nicht sieht, pflegt auch keine Veranstaltungen")
 

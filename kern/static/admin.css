@@ -7,6 +7,7 @@
   --text: #1c1f23;
   --gedaempft: #5b6169;
   --akzent: #1f6feb;
+  --akzent-zart: #e7effd;
   --fehler: #b3261e;
   --ok: #1a7f37;
 }
@@ -19,6 +20,7 @@
     --text: #e8eaed;
     --gedaempft: #a2a9b3;
     --akzent: #6aa4ff;
+    --akzent-zart: #1c2a42;
     --fehler: #ff8f86;
     --ok: #6fcf8b;
   }
@@ -466,35 +468,118 @@ h2 {
 
 /* --- Mail und Telefonliste (Schritt 6) ------------------------------------ */
 
+/* --- Navigation in drei Ebenen (Schritt 2.1b) ----------------------------- */
+
+/* Reiter (.bereiche, weiter unten), darunter die Gruppen des offenen Reiters,
+   darunter die Seiten der offenen Gruppe. Jede Ebene sieht anders aus, damit
+   man sie auseinanderhält: Pillen, Reiter mit Unterstrich, flache Kacheln. */
+.navigation { margin-bottom: 1.4rem; }
+
+.gruppen-nav {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--rand);
+  font-size: .97rem;
+}
+.gruppen-nav a {
+  padding: .3rem 0 .5rem;
+  margin-bottom: -1px;
+  border-bottom: 3px solid transparent;
+  color: var(--gedaempft);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.gruppen-nav a:hover { color: var(--text); }
+.gruppen-nav a.ist-hier { color: var(--text); border-bottom-color: var(--akzent); }
+
 .admin-nav {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  margin-bottom: 1.5rem;
-  padding-bottom: .75rem;
-  border-bottom: 1px solid var(--rand);
-  font-size: .9rem;
+  gap: .3rem;
+  padding-top: .5rem;
+  font-size: .92rem;
 }
 
 .admin-nav a {
   display: inline-flex;
   align-items: center;
   gap: .4rem;
+  padding: .3rem .75rem;
+  border-radius: 8px;
+  color: var(--text);
   text-decoration: none;
-  font-weight: 600;
+  white-space: nowrap;
+}
+.admin-nav a:hover { background: var(--flaeche); }
+
+/* Wo man gerade ist: als Fläche, nicht als Unterstrich – der gehört der
+   Ebene darüber. */
+.admin-nav .ist-hier {
+  background: var(--akzent-zart);
+  color: var(--akzent);
+  font-weight: 700;
+}
+.admin-nav .ist-hier:hover { background: var(--akzent-zart); }
+
+/* Ansichten derselben Sache, etwa Bereiche, alle Schichten, nur Lücken. */
+.ansichten {
+  display: inline-flex;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: .92rem;
+}
+.ansichten a {
+  padding: .35rem .85rem;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--grund);
+}
+.ansichten a + a { border-left: 1px solid var(--rand); }
+.ansichten a:hover { background: var(--flaeche); }
+.ansichten a[aria-current="page"] {
+  background: var(--akzent-zart);
+  color: var(--akzent);
+  font-weight: 700;
 }
 
-.admin-nav a:hover { text-decoration: underline; }
+/* Die Auswahl der Veranstaltung im Kopf: steht in der Zeile über der
+   Überschrift, die sonst in Großbuchstaben läuft. */
+.veranstaltung.mit-wahl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+}
+.va-wahl .nav-gruppe-knopf {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: .9rem;
+  padding: .05rem .55rem;
+  border: 1px solid var(--rand);
+  border-radius: 999px;
+  background: var(--grund);
+}
+.va-wahl .nav-klappe { text-transform: none; letter-spacing: 0; font-size: .95rem; }
 
-/* Wo man gerade ist. Bisher sah die Zeile auf jeder Seite gleich aus - mit
-   einem zusammengefassten Menue geht das nicht mehr, sonst weiss man nicht,
-   dass die offene Seite dahinter steckt. */
-.admin-nav .ist-hier {
-  color: var(--text);
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: .4rem;
-  text-decoration-color: var(--akzent);
+/* Auf dem Telefon laufen die Zeilen zur Seite weg statt umzubrechen; der
+   Verlauf am Rand zeigt, dass es dort weitergeht. */
+/* Mit .navigation davor: die Grundregel für .bereiche steht weiter hinten
+   in diesem Blatt und gewönne sonst. */
+@media (max-width: 40rem) {
+  .navigation .bereiche, .navigation .gruppen-nav, .navigation .admin-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, #000 88%, transparent);
+    padding-right: 1.5rem;
+  }
+  .gruppen-nav { gap: 1rem; }
+  .bereich { white-space: nowrap; padding: .4rem .75rem; }
+  .va-wahl.nav-gruppe { width: auto; }
 }
 
 /* --- Zusammengefasstes Menue in der Navigation ---------------------------- */

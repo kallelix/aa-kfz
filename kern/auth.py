@@ -87,6 +87,13 @@ class Sitzung:
         return self.rolle == "admin"
 
     @property
+    def pflegt_veranstaltungen(self) -> bool:
+        """Veranstaltungen pflegt, wer den Helferbereich sieht – an ihnen
+        hängen bis jetzt vor allem dessen Daten. Admins sowieso; eine
+        Bereichsleitung nicht, sie sieht nur ihre Bereiche."""
+        return self.ist_admin or (self.darf("helfer") and not self.ist_bereichsleitung)
+
+    @property
     def ist_bereichsleitung(self) -> bool:
         """Sieht im Helferbereich nur die Bereiche, die sie leitet. Was das
         heißt, entscheidet der Helferbereich; kern kennt dessen Bereiche nicht."""

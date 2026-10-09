@@ -20,6 +20,7 @@ wieder ab; was ein abgebrochener Lauf liegen lässt, entfernt
 .venv/Scripts/python.exe tests/test_kern_konten.py
 .venv/Scripts/python.exe tests/test_kern_db.py
 .venv/Scripts/python.exe tests/test_kern_veranstaltungen.py
+.venv/Scripts/python.exe tests/test_navigation.py
 .venv/Scripts/python.exe tests/test_auth.py
 .venv/Scripts/python.exe tests/test_mail.py
 .venv/Scripts/python.exe tests/test_versand.py
@@ -48,6 +49,9 @@ node tests/test_durchfahrt_js.js
   getrennt.
 - `test_kern_veranstaltungen.py` – Veranstaltungen anlegen und prüfen, welche
   ohne eigene Wahl gilt (die nächste, die noch nicht vorbei ist).
+- `test_navigation.py` – die Navigation ohne Server: unter welchem Reiter eine
+  Seite steht, was markiert ist, welche Reiter ein Konto bei welcher
+  Veranstaltung sieht und was unter Verwaltung bei ihr steht.
 - `test_auth.py` – Passwort-Hashing, Session-Token (Signatur, getauschte
   Nutzlast, Ablauf), CSRF-Bindung, Login-Rate-Limit.
 - `test_mail.py` – Vorlagen, Kopplung von Entscheidung und Mail, Fälligkeit,

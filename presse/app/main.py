@@ -27,6 +27,7 @@ from . import WURZEL as _WURZELPFAD
 _WURZEL = str(_WURZELPFAD)
 
 from kern import anmeldung, navigation, suchen
+from kern import veranstaltungen as va
 from kern.auth import Auth
 
 WURZEL_STATIC = Path(_WURZEL) / "kern" / "static"
@@ -282,6 +283,12 @@ def _meldung(schluessel: str, anzahl: str = "") -> str:
     return MELDUNGEN.get(schluessel, "")
 
 
+# Für die Auswahl im Kopf (kern/navigation.py). Die Anträge hängen noch an
+# keiner Veranstaltung; die gewählte entscheidet nur, ob dieser Reiter
+# erscheint.
+VERANSTALTUNGEN = va.Veranstaltungen(lambda: config.DATABASE_URL)
+
+
 BEREICHSNAV = (
     ("/presse", "Anmeldungen", ("/presse/anmeldung",)),
     ("/presse/abholung", "Abholliste", ()),
@@ -302,7 +309,10 @@ def _admin_kontext(request: Request, sitzung, **extra) -> dict:
         csrf=auth.csrf_token(sitzung.token),
         status_werte=db.STATUS_WERTE,
         bilder_offen=offen,
-        bereiche=navigation.bereiche(request.url.path, sitzung),
+        # Für sich allein gestartet gibt es /veranstaltung nicht – dann
+        # ohne Auswahl.
+        **navigation.kopf(request, sitzung, VERANSTALTUNGEN,
+                          wahl=None if sitzung.verwaltung else ""),
         gemeinsam="/presse/gemeinsam",
         bereichsnav=punkte,
         **extra,

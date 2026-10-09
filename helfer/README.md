@@ -32,49 +32,61 @@ Vorgabeport ist dann 8082, Backoffice unter <http://127.0.0.1:8082/helfer>.
 
 ## Was der Bereich macht
 
-Das Backoffice hat sieben Punkte, in denen gearbeitet wird:
+Das Backoffice gliedert sich in Reiter, Gruppen und Seiten (siehe
+[README](../README.md#navigation)). Der Helferbereich liefert Seiten für drei
+Reiter.
+
+**Helfer**, nach dem Ablauf:
 
 - **Übersicht** – der Stand auf einen Blick
-- **Zeitplan** – das Programm-Band der Rennserien mit den Schichten darunter
-- **Aufgaben** – der Aufgabenplan mit Phasen und Status. Arbeiten zwei Leute
-  gleichzeitig am selben Eintrag, überschreibt keiner den anderen, ohne es
-  zu merken.
-- **Schichten** – Soll, Besetzung und Lücken; Helfer zuordnen und entfernen
-- **Helfer** – Stammdaten, T-Shirt-Ausgabe, CSV-Ausfuhr
-- **Funken**, **Schlüssel** – Ausgabe und Rücknahme von Funkgeräten und
-  KFZ-Schlüsseln. Der Fahrzeugstamm baut sich bei der Schlüsselausgabe
-  nebenbei auf.
+- **Planen**
+  - **Bereiche & Schichten** – wo geholfen wird (Shuttle, Streckenposten,
+    Orgabüro) mit Beschreibung, Treffpunkt, Bereichsleitung, Mindestalter,
+    Voraussetzungen und dem Haken *intern*; darin die Schichten, jede mit
+    **Minimum** (darunter geht es nicht), **Soll** (so ist es geplant) und
+    **Reserve** (zusätzlich willkommen, fehlt nie). Drei Ansichten: Bereiche,
+    alle Schichten, nur Lücken. Hat eine Veranstaltung noch keine Bereiche,
+    lassen sie sich samt Schichten und Goodies aus einer früheren übernehmen;
+    die Schichten wandern dabei auf die neuen Tage.
+  - **Aufgaben** – der Aufgabenplan mit Phasen und Status. Arbeiten zwei Leute
+    gleichzeitig am selben Eintrag, überschreibt keiner den anderen, ohne es
+    zu merken.
+  - **Zeitplan** – das Programm-Band der Rennserien mit den Schichten darunter
+- **Leute** – **Helfer**: Stammdaten, CSV-Ausfuhr
+- **Vor Ort**
+  - **Shirts & Goodies** – die T-Shirt-Ausgabe, nur wenn die Veranstaltung
+    Goodies mit Shirt ausgibt
+  - **Monitor** – der Link für den Bildschirm
 
-Ein Konto mit der Rolle *Bereichsleitung* sieht nur zwei Punkte: *Meine
-Bereiche* und *Schichten* – beides beschränkt auf die Bereiche, die es
-leitet. Dort ändert es Angaben und Schichten, teilt ein und trägt aus und
-sieht die Leute auf seinen Schichten. Neue Bereiche, die Ausgabetische, die
-ganze Helferliste, Monitor und Import bleiben der Orga.
+**Ausgabe** – Funkgeräte und KFZ-Schlüssel ausgeben und zurücknehmen. Der
+Fahrzeugstamm baut sich bei der Schlüsselausgabe nebenbei auf. Bei der Ausgabe
+unterschreibt der Helfer auf dem Tablet, bei der Rücknahme nicht – wer etwas
+hinlegt, ist meist schon wieder weg.
 
-Dahinter, was man einmal einrichtet: Bereiche, Goodies, Einstellungen,
-Monitor-Link, Import, Unterschriften und Zeitplan-Abruf.
+**Verwaltung**, bei der gewählten Veranstaltung – was man für sie einmal
+einrichtet:
 
-- **Bereiche**: wo geholfen wird – Shuttle, Streckenposten, Orgabüro – mit
-  Beschreibung, Treffpunkt, Bereichsleitung, Mindestalter, Voraussetzungen
-  und dem Haken *intern*. Die Bereichsleitung sind ein oder mehrere Konten;
-  Name und Nummer kommen von dort. Darin die Schichten, jede mit drei Zahlen:
-  **Minimum** (darunter geht es nicht), **Soll** (so ist es geplant) und
-  **Reserve** (zusätzlich willkommen, fehlt nie). Eine Schicht kann ein
-  eigenes Mindestalter haben und eigens intern sein. Hat eine Veranstaltung
-  noch keine Bereiche, lassen sie sich samt Schichten und Goodies aus einer
-  früheren übernehmen; die Schichten wandern dabei auf die neuen Tage.
-- **Goodies**: was die Veranstaltung ihren Helfern bietet – Helfershirt,
-  Verpflegung, Helferparty – und kleine Dankeschöns mit Schwelle („ab 2
-  Schichten ein Bier am Bierwagen, unter 16 eine Eistüte“).
-
-- **Import**: die beiden CSV-Dateien aus dem Registrierungstool hochladen –
-  oder sie abrufen lassen, von Hand oder selbsttätig im Takt. Ein
-  selbsttätiger Lauf übernimmt nichts, was nach einem Ausfall aussieht.
-- **Zeitplan-Abruf**: holt die Zeitpläne der Rennserien täglich von deren
+- **Goodies & Verpflegung** – ob es Goodies gibt (ein Schalter); wenn ja, das
+  Helfershirt mit einem Schnitt oder Damen- und Herrenschnitt und kleine
+  Dankeschöns mit Schwelle („ab 2 Schichten ein Bier am Bierwagen, unter 16
+  eine Eistüte“). Dazu Verpflegung und Helferparty.
+- **Import** – die beiden CSV-Dateien aus dem Registrierungstool hochladen
+  oder abrufen lassen, von Hand oder selbsttätig im Takt. Ein selbsttätiger
+  Lauf übernimmt nichts, was nach einem Ausfall aussieht.
+- **Zeitplan-Abruf** – holt die Zeitpläne der Rennserien täglich von deren
   Websites und bildet die Wochentage auf die Renntage ab.
-- **Unterschriften**: bei der Ausgabe von Material und Schlüsseln unterschreibt
-  der Helfer auf dem Tablet. Bei der Rücknahme nicht – wer etwas hinlegt, ist
-  meist schon wieder weg.
+- **Material** und **Tablet** – was bei einer Ausgabe vorgeschlagen wird, und
+  der Link fürs Tablet, auf dem unterschrieben wird.
+
+Die Adressen sind dieselben geblieben (`/helfer/funk`, `/helfer/goodies` …);
+nur die Navigation ordnet sie anders ein.
+
+Ein Konto mit der Rolle *Bereichsleitung* sieht nur den Reiter Helfer und
+darin *Meine Bereiche* – beschränkt auf die Bereiche, die es leitet. Dort
+ändert es Angaben und Schichten, teilt ein und trägt aus und sieht die Leute
+auf seinen Schichten. Neue Bereiche, die Ausgabe, die ganze Helferliste,
+Monitor und Verwaltung bleiben der Orga. Die Bereichsleitung sind ein oder
+mehrere Konten am Bereich; Name und Nummer kommen von dort.
 
 Kein Mailversand. Damit entfallen `mail.py`, `worker.py` und die Tabelle
 `mail_out`, die die anderen beiden Bereiche haben.

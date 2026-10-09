@@ -1,4 +1,4 @@
-/* Schliesst das zusammengefasste Menue in der Hauptnavigation wieder.
+/* Schliesst aufgeklappte Menues wieder - etwa die Auswahl der Veranstaltung.
  *
  * Das Auf- und Zuklappen selbst macht der Browser (details/summary) - ohne
  * Skript funktioniert das Menue also vollstaendig, es bliebe nur offen

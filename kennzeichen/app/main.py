@@ -28,6 +28,7 @@ from . import WURZEL as _WURZELPFAD
 _WURZEL = str(_WURZELPFAD)
 
 from kern import anmeldung, navigation, suchen
+from kern import veranstaltungen as va
 from kern.auth import Auth
 
 WURZEL_STATIC = Path(_WURZEL) / "kern" / "static"
@@ -280,6 +281,12 @@ anmeldung.einrichten(app, auth=auth, templates=templates, kontext=_kontext,
 # --- Backoffice -------------------------------------------------------------
 
 
+# Für die Auswahl im Kopf (kern/navigation.py). Die Anträge hängen noch an
+# keiner Veranstaltung; die gewählte entscheidet nur, ob dieser Reiter
+# erscheint.
+VERANSTALTUNGEN = va.Veranstaltungen(lambda: config.DATABASE_URL)
+
+
 BEREICHSNAV = (
     ("/kennzeichen", "Anträge", ()),
     ("/kennzeichen/durchfahrt", "Durchfahrtsliste", ()),
@@ -302,7 +309,10 @@ def _admin_kontext(request: Request, sitzung, **extra) -> dict:
     return _kontext(
         request,
         sitzung=sitzung,
-        bereiche=navigation.bereiche(request.url.path, sitzung),
+        # Für sich allein gestartet gibt es /veranstaltung nicht – dann
+        # ohne Auswahl.
+        **navigation.kopf(request, sitzung, VERANSTALTUNGEN,
+                          wahl=None if sitzung.verwaltung else ""),
         gemeinsam="/kennzeichen/gemeinsam",
         bereichsnav=_navigation(request.url.path, offen),
         csrf=auth.csrf_token(sitzung.token),

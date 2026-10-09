@@ -1,29 +1,71 @@
 {% extends "admin_base.html" %}
-{% block titel %}Shirt, Verpflegung, Goodies{% endblock %}
+{% block titel %}Goodies & Verpflegung{% endblock %}
 {% block hauptklasse %}spalte-schmal{% endblock %}
-{% block ueberschrift %}Shirt, Verpflegung, Goodies{% endblock %}
+{% block ueberschrift %}Goodies & Verpflegung{% endblock %}
 
 {% block inhalt %}
   <p class="unterzeile">Was {{ va_aktuell.kurz }} ihren Helfern bietet. Danach richtet
     sich, was die Anmeldung fragt: ohne Shirt keine Größe, ohne Verpflegung keine
     Verpflegungsfrage.</p>
 
-  <section class="kasten">
-    <h2>Angebot</h2>
-    <form method="post" action="/helfer/goodies/angebot">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
+  <form method="post" action="/helfer/goodies/angebot">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <fieldset class="feld">
+      <legend>Dank an die Helfer</legend>
       <label class="auswahl">
-        <input type="checkbox" name="shirt" value="1" {% if angebot.shirt %}checked{% endif %}>
+        <input type="radio" name="goodies" value="0" {% if not angebot.goodies %}checked{% endif %}>
         <span class="auswahl-text">
-          <span class="auswahl-titel">Helfershirt</span>
-          <span class="auswahl-hilfe">Ab der ersten Schicht. Die Anmeldung fragt nach der Größe.</span>
+          <span class="auswahl-titel">Keine Goodies</span>
+          <span class="auswahl-hilfe">Kein Shirt, keine Belohnungen. Die Anmeldung fragt
+            nach keiner Größe.</span>
         </span>
       </label>
+      <label class="auswahl">
+        <input type="radio" name="goodies" value="1" {% if angebot.goodies %}checked{% endif %}>
+        <span class="auswahl-text">
+          <span class="auswahl-titel">Goodies ausgeben</span>
+          <span class="auswahl-hilfe">Ein Helfershirt und kleine Dankeschöns mit Schwelle –
+            was genau, steht darunter, sobald gespeichert ist.</span>
+        </span>
+      </label>
+    </fieldset>
+
+    {% if angebot.goodies %}
+      <fieldset class="feld">
+        <legend>Helfershirt</legend>
+        <label class="auswahl">
+          <input type="checkbox" name="shirt" value="1" {% if angebot.shirt %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">Ab der ersten Schicht ein Shirt</span>
+            <span class="auswahl-hilfe">Die Anmeldung fragt nach der Größe; ausgegeben wird
+              unter Vor Ort › Shirts & Goodies.</span>
+          </span>
+        </label>
+        <label class="auswahl">
+          <input type="radio" name="schnitte" value="0" {% if not angebot.schnitte %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">Ein Schnitt für alle</span>
+            <span class="auswahl-hilfe">Die Anmeldung fragt nur die Größe.</span>
+          </span>
+        </label>
+        <label class="auswahl">
+          <input type="radio" name="schnitte" value="1" {% if angebot.schnitte %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">Damen- und Herrenschnitt</span>
+            <span class="auswahl-hilfe">Die Anmeldung fragt Schnitt und Größe.</span>
+          </span>
+        </label>
+      </fieldset>
+    {% endif %}
+
+    <fieldset class="feld">
+      <legend>Verpflegung und Party</legend>
       <label class="auswahl">
         <input type="checkbox" name="verpflegung" value="1" {% if angebot.verpflegung %}checked{% endif %}>
         <span class="auswahl-text">
           <span class="auswahl-titel">Verpflegung</span>
-          <span class="auswahl-hilfe">Die Anmeldung fragt, was jemand isst.</span>
+          <span class="auswahl-hilfe">Die Anmeldung fragt, was jemand isst. Ist kein Goodie.</span>
         </span>
       </label>
       <label class="auswahl">
@@ -33,45 +75,46 @@
           <span class="auswahl-hilfe">Für alle, die geholfen haben, nach der Veranstaltung.</span>
         </span>
       </label>
-      <div class="knopfreihe">
-        <button type="submit" class="knopf">Speichern</button>
-      </div>
-    </form>
-  </section>
+    </fieldset>
 
-  <section>
-    <h2>Goodies</h2>
-    <p class="hilfe">Kleine Dankeschöns mit einer Schwelle: ab so vielen Schichten
-      oder Stunden. Nicht jede Veranstaltung hat welche.</p>
-    {% if not goodies %}
-      <p class="leer">Keine Goodies.</p>
-    {% else %}
-      <div class="tabelle-huelle">
-        <table>
-          <thead>
-            <tr><th scope="col">ab</th><th scope="col">Goodie</th>
-              <th scope="col">Altersgrenze</th></tr>
-          </thead>
-          <tbody>
-            {% for g in goodies %}
-              <tr>
-                <td class="nowrap">
-                  {%- if g.ab_schichten %}{{ g.ab_schichten }} Schicht{{ 'en' if g.ab_schichten != 1 }}
-                  {%- else %}{{ g.ab_stunden }} Stunde{{ 'n' if g.ab_stunden != 1 }}{% endif %}</td>
-                <td><a href="/helfer/goodie/{{ g.id }}">{{ g.name }}</a></td>
-                <td>
-                  {%- if g.mindestalter %}ab {{ g.mindestalter }}
-                    {%- if g.alternative %}, sonst {{ g.alternative }}{% endif %}
-                  {%- else %}<span class="gedaempft">–</span>{% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% endif %}
-    <p class="knopfreihe"><a class="knopf" href="/helfer/goodie/neu">Neues Goodie</a></p>
-  </section>
+    <div class="knopfreihe">
+      <button type="submit" class="knopf">Speichern</button>
+    </div>
+  </form>
 
-  <p class="zurueck-zeile"><a href="/helfer/bereiche">Zu den Bereichen</a></p>
+  {% if angebot.goodies %}
+    <section>
+      <h2>Goodies</h2>
+      <p class="hilfe">Kleine Dankeschöns mit einer Schwelle: ab so vielen Schichten
+        oder Stunden.</p>
+      {% if not goodies %}
+        <p class="leer">Noch keine.</p>
+      {% else %}
+        <div class="tabelle-huelle">
+          <table>
+            <thead>
+              <tr><th scope="col">ab</th><th scope="col">Goodie</th>
+                <th scope="col">Altersgrenze</th></tr>
+            </thead>
+            <tbody>
+              {% for g in goodies %}
+                <tr>
+                  <td class="nowrap">
+                    {%- if g.ab_schichten %}{{ g.ab_schichten }} Schicht{{ 'en' if g.ab_schichten != 1 }}
+                    {%- else %}{{ g.ab_stunden }} Stunde{{ 'n' if g.ab_stunden != 1 }}{% endif %}</td>
+                  <td><a href="/helfer/goodie/{{ g.id }}">{{ g.name }}</a></td>
+                  <td>
+                    {%- if g.mindestalter %}ab {{ g.mindestalter }}
+                      {%- if g.alternative %}, sonst {{ g.alternative }}{% endif %}
+                    {%- else %}<span class="gedaempft">–</span>{% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+      <p class="knopfreihe"><a class="knopf-schlicht" href="/helfer/goodie/neu">Neues Goodie</a></p>
+    </section>
+  {% endif %}
 {% endblock %}

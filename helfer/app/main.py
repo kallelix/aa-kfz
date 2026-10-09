@@ -345,77 +345,58 @@ WARNUNGEN = ("schon-drin", "keiner", "unbekannt", "widerrufen", "groesse",
              "schicht-besetzt", "alter-gesenkt", "vorlage-nicht")
 
 
-# --- Hauptnavigation -------------------------------------------------------
+# --- Navigation (Lastenheft 2.1b, kern/navigation.py) -----------------------
 
-# Die Reihenfolge folgt dem Ablauf: erst was waehrend der Veranstaltung
-# staendig gebraucht wird, dann die beiden Ausgabetische.
-#
-# Jeder Eintrag nennt neben seinem Ziel die Pfade, die er mitmarkiert. Das ist
-# noetig, weil die Einzelansichten in der Einzahl heissen - /helfer/schicht/7
-# gehoert zu "Schichten", faengt aber nicht mit /helfer/schichten an.
-HAUPTNAV = (
-    ("/helfer", "Übersicht", ()),
-    ("/helfer/band", "Zeitplan", ()),
-    ("/helfer/aufgaben", "Aufgaben", ("/helfer/aufgabe",)),
-    ("/helfer/schichten", "Schichten", ("/helfer/schicht",)),
-    ("/helfer/helfer", "Helfer", ()),
-    ("/helfer/funk", "Funken", ()),
-    ("/helfer/schluessel", "Schlüssel", ()),
-)
-
-# Was eine Bereichsleitung sieht: ihre Bereiche und deren Schichten.
-HAUPTNAV_BEREICHSLEITUNG = (
-    ("/helfer/bereiche", "Meine Bereiche", ("/helfer/bereich",)),
-    ("/helfer/schichten", "Schichten", ("/helfer/schicht", "/helfer/helfer")),
-)
-
-# Was man einmal einrichtet und danach selten anfasst - zusammengefasst hinter
-# einem Punkt, damit die Zeile darueber die sieben zeigt, in denen man
-# tatsaechlich arbeitet.
-UNTERNAV = (
-    ("/helfer/bereiche", "Bereiche", ("/helfer/bereich",)),
-    ("/helfer/goodies", "Goodies", ("/helfer/goodie",)),
-    ("/helfer/einstellungen", "Einstellungen", ()),
-    ("/helfer/monitor", "Monitor", ()),
-    ("/helfer/import", "Import", ()),
-    ("/helfer/unterschriften", "Unterschriften", ()),
-    ("/helfer/zeitplan", "Zeitplan-Abruf", ("/helfer/programm",)),
-)
+# Der Helferbereich nach dem Ablauf: erst planen, dann die Leute, dann der
+# Veranstaltungstag. Was man einmal einrichtet, steht nicht hier, sondern bei
+# der Veranstaltung (Reiter Verwaltung); Funk und Schlüssel unter Ausgabe.
+def _helfer_gruppen(aktuell) -> list:
+    vor_ort = []
+    # Shirts gibt es nur, wenn die Veranstaltung welche ausgibt.
+    if aktuell is not None and db.angebot(aktuell["id"])["shirt"]:
+        vor_ort.append(("/helfer/shirts", "Shirts & Goodies", ()))
+    vor_ort.append(("/helfer/monitor", "Monitor", ()))
+    return [
+        ("Übersicht", [("/helfer", "Übersicht", ())]),
+        ("Planen", [
+            ("/helfer/bereiche", "Bereiche & Schichten",
+             ("/helfer/bereich", "/helfer/schichten", "/helfer/schicht")),
+            ("/helfer/aufgaben", "Aufgaben", ("/helfer/aufgabe",)),
+            ("/helfer/band", "Zeitplan", ())]),
+        ("Leute", [("/helfer/helfer", "Helfer", ())]),
+        ("Vor Ort", vor_ort),
+    ]
 
 
-def _navigation(pfad: str, bereichsleitung: bool = False) -> dict:
-    """Die Navigation mit dem Punkt der gerade offenen Seite markiert.
+# Was eine Bereichsleitung sieht: ihre Bereiche, darin die Schichten.
+GRUPPEN_BEREICHSLEITUNG = [
+    ("Meine Bereiche", [("/helfer/bereiche", "Meine Bereiche",
+                         ("/helfer/bereich", "/helfer/schichten", "/helfer/schicht",
+                          "/helfer/helfer"))]),
+]
 
-    Es gewinnt der laengste passende Pfadanfang. Ein blosses „faengt damit an“
-    reichte nicht: /helfer ist der Anfang von allem und waere sonst auf jeder
-    Seite hervorgehoben. So braucht die Uebersicht auch keine Sonderregel –
-    sie passt eben nur, solange nichts Genaueres passt.
-    """
+# Der Reiter Ausgabe. Bis die Materialausgabe verallgemeinert ist (3.8),
+# sind es die beiden Tische von heute.
+GRUPPEN_AUSGABE = [
+    ("Ausgabe", [("/helfer/funk", "Funk", ("/helfer/ausleihe",)),
+                 ("/helfer/schluessel", "Schlüssel", ("/helfer/fahrzeug",))]),
+]
 
-    def treffer(eintrag) -> int:
-        laenge = 0
-        for anfang in (eintrag[0],) + eintrag[2]:
-            if pfad == anfang or pfad.startswith(anfang + "/"):
-                laenge = max(laenge, len(anfang))
-        return laenge
 
-    haupt = HAUPTNAV_BEREICHSLEITUNG if bereichsleitung else HAUPTNAV
-    unter = () if bereichsleitung else UNTERNAV
-    laengster = max(treffer(eintrag) for eintrag in haupt + unter)
-
-    def punkte(eintraege) -> list:
-        gemacht = []
-        for ziel, name, weitere in eintraege:
-            eigen = treffer((ziel, name, weitere))
-            gemacht.append({"ziel": ziel, "name": name, "marke": "",
-                            "hier": eigen > 0 and eigen == laengster})
-        return gemacht
-
-    unten = punkte(unter)
-    # bereichsnav heisst, was frueher hauptnav hiess: die gemeinsame Huelle
-    # rendert unter dieser Bezeichnung die Punkte des offenen Bereichs.
-    return {"bereichsnav": punkte(haupt), "unternav": unten,
-            "unternav_hier": any(punkt["hier"] for punkt in unten)}
+def _navigation(request: Request, sitzung, aktuell) -> dict:
+    """Gruppen und Punkte für die Seite, je nachdem, unter welchem Reiter sie
+    steht – derselbe Bereich liefert Seiten für drei Reiter."""
+    pfad = request.url.path
+    reiter = navigation.reiter_von(pfad)
+    if reiter == "verwaltung":
+        gruppen = navigation.verwaltung(sitzung, aktuell)
+    elif reiter == "ausgabe":
+        gruppen = GRUPPEN_AUSGABE
+    elif sitzung.ist_bereichsleitung:
+        gruppen = GRUPPEN_BEREICHSLEITUNG
+    else:
+        gruppen = _helfer_gruppen(aktuell)
+    return navigation.gegliedert(gruppen, pfad)
 
 
 def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
@@ -430,27 +411,26 @@ def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
     # Die Bereichsleitung hat mit den Ausgabetischen nichts zu tun: kein
     # Tablet-Stand, kein Nachfragen alle paar Sekunden.
     leitung = sitzung.ist_bereichsleitung
+    # Kopf und Reiter wie in allen Bereichen. Die Veranstaltung nach der Uhr
+    # des Dashboards (JETZT_FEST); gewählt wird sie im gemeinsamen Dienst
+    # unter /veranstaltung, für sich allein hier.
+    kopf = navigation.kopf(request, sitzung, db.VERANSTALTUNGEN, aktuell=aktuell,
+                           wahl=None if sitzung.verwaltung else "/helfer/veranstaltung")
     return _kontext(request, sitzung=sitzung,
-                    # Oben im Kopf und in der Auswahl: die Veranstaltung,
-                    # mit der dieser Browser gerade arbeitet.
                     veranstaltung=aktuell["name"] if aktuell else config.VERANSTALTUNG,
                     ort=aktuell["ort"] if aktuell else config.ORT,
-                    va_aktuell=aktuell,
-                    va_auswahl=db.VERANSTALTUNGEN.liste(),
-                    va_verwaltung=kern_auth.VERWALTUNG and not leitung,
                     nur_eigene=leitung,
                     csrf=auth.csrf_token(sitzung.token),
                     tabletstand=({"offen": None, "marke": 0} if leitung
                                  else unterschriften.stand()),
                     admin_takt=0 if leitung else config.ADMIN_TAKT,
-                                            bereiche=navigation.bereiche(request.url.path, sitzung),
                     gemeinsam="/helfer/gemeinsam",
                     # Die Meldung wird hier aufgeloest, nicht in der Vorlage:
                     # die gemeinsame Huelle kennt die Tabelle nicht.
                     hinweis=MELDUNGEN.get(roh, roh),
                     hinweis_art=("hinweis-warnung" if roh in WARNUNGEN
                                  else "hinweis-ok"),
-                    **_navigation(request.url.path, leitung), **extra)
+                    **kopf, **_navigation(request, sitzung, aktuell), **extra)
 
 
 # --- Anmeldung -------------------------------------------------------------
@@ -911,8 +891,15 @@ async def angebot_sichern(request: Request,
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
-    db.angebot_setzen(v["id"], {f: 1 if daten.get(f) else 0
-                                for f in db.ANGEBOT_VORGABE})
+    werte = {f: 1 if daten.get(f) else 0 for f in db.ANGEBOT_VORGABE}
+    werte["goodies"] = 1 if str(daten.get("goodies") or "") == "1" else 0
+    werte["schnitte"] = 1 if str(daten.get("schnitte") or "") == "1" else 0
+    if not werte["goodies"]:
+        # Ohne Goodies stehen Shirt und Schnitt nicht im Formular; was dort
+        # eingestellt war, bleibt für den Fall, dass sie wiederkommen.
+        bisher = db.angebot_roh(v["id"])
+        werte["shirt"], werte["schnitte"] = bisher["shirt"], bisher["schnitte"]
+    db.angebot_setzen(v["id"], werte)
     return _zurueck("/helfer/goodies", "gespeichert")
 
 
@@ -996,6 +983,17 @@ async def goodie_weg(request: Request, goodie_id: int,
 
 
 # --- Helfer ----------------------------------------------------------------
+
+@app.get("/helfer/shirts")
+async def shirts(request: Request, hinweis: str = "", suche: str = "",
+                 sitzung: auth.Sitzung = Depends(_sitzung),
+                 v=Depends(_veranstaltung)):
+    """Vor Ort: Shirts ausgeben. Bis Anmeldung und Check-in die Personen
+    von der Ausgabe trennen, ist es die Helferliste mit ihrer Shirt-Spalte –
+    unter dem Punkt, unter dem man sie am Ausgabetisch sucht."""
+    return await helfer_liste(request, hinweis=hinweis, suche=suche,
+                              sitzung=sitzung, v=v)
+
 
 @app.get("/helfer/helfer")
 async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",

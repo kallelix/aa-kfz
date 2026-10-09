@@ -148,7 +148,7 @@ with con:
             (alt_va, liste, "2026-08-29 " + beginn, "2026-08-29 " + ende, bedarf))
 con.close()
 eingespielt = kern_db.migrieren(alt_url, "helfer", WURZEL / "app" / "migrationen")
-pruefe(eingespielt == ["0002_bereiche.sql"], "die neue Migration läuft auf alten Bestand")
+pruefe(eingespielt[:1] == ["0002_bereiche.sql"], "die neue Migration läuft auf alten Bestand")
 pruefe(tupel(testdb.abfrage(alt_url, "helfer", "SELECT name FROM bereich ORDER BY name"))
        == [("Orgabüro",), ("Shuttle",)], "aus jeder Liste wird ein Bereich")
 pruefe(tupel(testdb.abfrage(
@@ -356,8 +356,24 @@ try:
     pruefe(re.search(r'name="verpflegung" value="1" checked', seite)
            and not re.search(r'name="shirt" value="1" checked', seite),
            "Vorgabe: Verpflegung ja, Shirt nein")
-    anfrage("POST", "/helfer/goodies/angebot", {"csrf": CSRF, "shirt": "1", "party": "1"})
-    pruefe(db.angebot(VA) == {"shirt": 1, "verpflegung": 0, "party": 1}, "Angebot gespeichert")
+    _, _, seite = anfrage("GET", "/helfer")
+    pruefe('href="/helfer/shirts"' not in seite, "ohne Goodies keine Shirt-Ausgabe unter Vor Ort")
+    anfrage("POST", "/helfer/goodies/angebot", {"csrf": CSRF, "goodies": "1", "shirt": "1",
+                                                 "schnitte": "1", "party": "1"})
+    pruefe(db.angebot(VA) == {"goodies": 1, "shirt": 1, "schnitte": 1, "verpflegung": 0,
+                              "party": 1}, "Angebot gespeichert, mit Damen- und Herrenschnitt")
+    _, _, seite = anfrage("GET", "/helfer")
+    pruefe('href="/helfer/shirts"' in seite, "mit Shirt gibt es unter Vor Ort die Ausgabe")
+    status, _, _ = anfrage("GET", "/helfer/shirts")
+    pruefe(status == 200, "und sie lädt")
+    anfrage("POST", "/helfer/goodies/angebot", {"csrf": CSRF, "goodies": "0", "party": "1"})
+    pruefe(db.angebot(VA)["shirt"] == 0 and db.angebot_roh(VA)["shirt"] == 1,
+           "„keine Goodies“ schaltet das Shirt ab, vergisst es aber nicht")
+    _, _, seite = anfrage("GET", "/helfer/goodies")
+    pruefe('name="shirt"' not in seite and 'name="goodies" value="0" checked' in seite,
+           "ohne Goodies fragt die Seite nicht nach Shirt und Liste")
+    anfrage("POST", "/helfer/goodies/angebot", {"csrf": CSRF, "goodies": "1", "shirt": "1",
+                                                 "schnitte": "1", "party": "1"})
     status, ort, _ = anfrage("POST", "/helfer/goodie/neu", {
         "csrf": CSRF, "name": "Ein Bier am Bierwagen", "schwelle": "2",
         "schwelle_art": "schichten", "mindestalter": "16", "alternative": "Eine Eistüte"})
@@ -399,8 +415,8 @@ try:
                   " WHERE veranstaltung_id = ? AND name = 'Shuttle'", NEU)
            == [("Parkplatz Talstation", 18, "Führerschein Klasse B")],
            "die Angaben zum Bereich kommen mit")
-    pruefe(db.angebot(NEU) == {"shirt": 1, "verpflegung": 0, "party": 1},
-           "das Angebot kommt mit")
+    pruefe(db.angebot(NEU) == {"goodies": 1, "shirt": 1, "schnitte": 1, "verpflegung": 0,
+                               "party": 1}, "das Angebot kommt mit")
     pruefe(zeilen("SELECT bl.konto_id FROM bereich_leitung bl"
                   " JOIN bereich b ON b.id = bl.bereich_id"
                   " WHERE b.veranstaltung_id = ? AND b.name = 'Shuttle'", NEU) == [(KALLE,)],

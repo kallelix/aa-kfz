@@ -573,19 +573,32 @@ def tage(vid: int) -> list[str]:
 
 # --- Angebot und Goodies ---------------------------------------------------
 
+# Die Häkchen im Formular. goodies und schnitte sind Schalter mit zwei
+# Stellungen und kommen dort als Auswahl.
 ANGEBOT_VORGABE = {"shirt": 0, "verpflegung": 1, "party": 0}
+_ANGEBOT_FELDER = ("goodies", "shirt", "schnitte", "verpflegung", "party")
 
 
-def angebot(vid: int) -> dict:
-    """Was die Veranstaltung ihren Helfern bietet. Ohne gespeicherte Zeile
-    die Vorgabe der Tabelle."""
+def angebot_roh(vid: int) -> dict:
+    """Was gespeichert ist, ohne Rücksicht auf den Goodie-Schalter. Ohne
+    gespeicherte Zeile die Vorgabe der Tabelle."""
     con = verbinden()
     try:
         zeile = con.execute("SELECT * FROM angebot WHERE veranstaltung_id = ?",
                             (vid,)).fetchone()
     finally:
         con.close()
-    return {f: (zeile[f] if zeile else ANGEBOT_VORGABE[f]) for f in ANGEBOT_VORGABE}
+    vorgabe = {**ANGEBOT_VORGABE, "goodies": 0, "schnitte": 0}
+    return {f: (zeile[f] if zeile else vorgabe[f]) for f in _ANGEBOT_FELDER}
+
+
+def angebot(vid: int) -> dict:
+    """Was die Veranstaltung ihren Helfern bietet. Ohne Goodies auch kein
+    Shirt und kein Schnitt – egal, was dafür noch gespeichert ist."""
+    roh = angebot_roh(vid)
+    if not roh["goodies"]:
+        roh["shirt"] = roh["schnitte"] = 0
+    return roh
 
 
 def angebot_setzen(vid: int, werte: dict) -> None:
@@ -593,12 +606,12 @@ def angebot_setzen(vid: int, werte: dict) -> None:
     try:
         with con:
             con.execute(
-                "INSERT INTO angebot (veranstaltung_id, shirt, verpflegung, party,"
-                " geaendert_am) VALUES (?, ?, ?, ?, ?)"
-                " ON CONFLICT (veranstaltung_id) DO UPDATE SET"
-                " shirt = excluded.shirt, verpflegung = excluded.verpflegung,"
-                " party = excluded.party, geaendert_am = excluded.geaendert_am",
-                (vid, werte["shirt"], werte["verpflegung"], werte["party"], jetzt()))
+                "INSERT INTO angebot (veranstaltung_id, " + ", ".join(_ANGEBOT_FELDER) +
+                ", geaendert_am) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT (veranstaltung_id) DO UPDATE SET " +
+                ", ".join(f + " = excluded." + f for f in _ANGEBOT_FELDER) +
+                ", geaendert_am = excluded.geaendert_am",
+                (vid, *(werte.get(f, 0) for f in _ANGEBOT_FELDER), jetzt()))
     finally:
         con.close()
 
@@ -734,9 +747,9 @@ def vorlage_uebernehmen(vid: int, quelle_id: int) -> dict | None:
                     (vid, *(g[f] for f in _GOODIE_FELDER), jetzt()))
             # Das Angebot nur, wenn hier noch keins eingestellt ist.
             con.execute(
-                "INSERT INTO angebot (veranstaltung_id, shirt, verpflegung, party,"
-                " geaendert_am)"
-                " SELECT ?, shirt, verpflegung, party, ? FROM angebot"
+                "INSERT INTO angebot (veranstaltung_id, goodies, shirt, schnitte,"
+                " verpflegung, party, geaendert_am)"
+                " SELECT ?, goodies, shirt, schnitte, verpflegung, party, ? FROM angebot"
                 " WHERE veranstaltung_id = ? ON CONFLICT (veranstaltung_id) DO NOTHING",
                 (vid, jetzt(), quelle_id))
         return {"bereiche": len(neu), "schichten": len(schichten),

@@ -52,10 +52,8 @@ MELDUNGEN = {
 
 
 def darf_veranstaltungen(sitzung) -> bool:
-    """Veranstaltungen pflegt, wer den Helferbereich sieht – an ihnen hängen
-    bis jetzt nur dessen Daten. Admins sowieso; eine Bereichsleitung nicht,
-    sie sieht nur ihre Bereiche."""
-    return sitzung.ist_admin or (sitzung.darf("helfer") and not sitzung.ist_bereichsleitung)
+    """Siehe Sitzung.pflegt_veranstaltungen."""
+    return sitzung.pflegt_veranstaltungen
 
 
 def _zeit(wert) -> str:
@@ -87,26 +85,43 @@ def bauen(config, mail_config=None) -> FastAPI:
                 "veranstaltung": config.VERANSTALTUNG, **extra}
 
     def admin_kontext(request: Request, sitzung, **extra) -> dict:
-        nav = []
-        if darf_veranstaltungen(sitzung):
-            nav.append(("/veranstaltungen", "Veranstaltungen", ("/veranstaltungen",)))
-        if sitzung.konto_id:
-            nav.append(("/konto", "Mein Konto", ()))
-        if sitzung.ist_admin:
-            nav.append(("/konten", "Konten", ("/konten",)))
+        """Diese Seiten stehen unter dem Reiter Verwaltung – bis auf die
+        Startseite und das eigene Konto, die unter keinem stehen."""
+        kopf = navigation.kopf(request, sitzung, veranstaltungen)
+        gliederung = {"gruppen": [], "bereichsnav": []}
+        if navigation.reiter_von(request.url.path) == "verwaltung":
+            gliederung = navigation.gegliedert(
+                navigation.verwaltung(sitzung, kopf["va_aktuell"]), request.url.path)
         hinweis = MELDUNGEN.get(request.query_params.get("hinweis", ""), "")
         return kontext(
             request,
             sitzung=sitzung,
             csrf=auth.csrf_token(sitzung.token),
-            bereiche=navigation.bereiche(request.url.path, sitzung),
-            bereichsnav=navigation.punkte(nav, request.url.path),
             hinweis=hinweis,
+            **kopf,
+            **gliederung,
             **extra,
         )
 
     anmeldung.einrichten(app, auth=auth, templates=templates, kontext=kontext,
                          bereich="konto", erlaubt=("/konten", "/veranstaltungen", "/"))
+
+    @app.get("/veranstaltung")
+    async def veranstaltung_waehlen(request: Request, id: str = "", weiter: str = "/",
+                                    sitzung=Depends(auth.angemeldet)):
+        """Merkt sich im Browser, mit welcher Veranstaltung gearbeitet wird –
+        für alle Bereiche. Ein Link statt eines Formulars: die Auswahl im Kopf
+        geht so auch ohne Skript."""
+        zeile = veranstaltungen.laden(id)
+        # Nur eigene Pfade – sonst wäre das eine offene Weiterleitung.
+        if not weiter.startswith("/") or weiter.startswith("//") or "\\" in weiter:
+            weiter = "/"
+        antwort = RedirectResponse(weiter, status_code=303)
+        if zeile is not None:
+            antwort.set_cookie(va.KEKS, str(zeile["id"]), max_age=400 * 24 * 3600,
+                               httponly=True, samesite="lax",
+                               secure=auth.keks_sicher(request), path="/")
+        return antwort
 
     def veranstaltungen_erforderlich(request: Request):
         sitzung = auth.sitzung_erforderlich(request)
@@ -186,8 +201,7 @@ def bauen(config, mail_config=None) -> FastAPI:
     async def startseite(request: Request, sitzung=Depends(auth.angemeldet)):
         return templates.TemplateResponse(
             "startseite.html",
-            admin_kontext(request, sitzung, titel="Backoffice",
-                          veranstaltungen_offen=darf_veranstaltungen(sitzung)))
+            admin_kontext(request, sitzung, titel="Backoffice"))
 
     # --- Veranstaltungen --------------------------------------------------------
 
@@ -197,13 +211,15 @@ def bauen(config, mail_config=None) -> FastAPI:
             "veranstaltung_form.html",
             admin_kontext(request, sitzung, werte=werte, va_zeile=veranstaltung,
                           fehler=fehler, status_werte=va.STATUS,
-                          status_text=va.STATUS_TEXT),
+                          status_text=va.STATUS_TEXT, nutzbar=va.NUTZBAR),
             status_code=status_code)
 
     def va_werte(daten) -> dict:
-        return {feld: str(daten.get(feld) or "") for feld in
-                ("name", "kurz", "beginn", "ende", "ort", "beschreibung", "status",
-                 "anmeldung_ab", "anmeldung_bis")}
+        werte = {feld: str(daten.get(feld) or "") for feld in
+                 ("name", "kurz", "beginn", "ende", "ort", "beschreibung", "status",
+                  "anmeldung_ab", "anmeldung_bis")}
+        werte["nutzt"] = [b for b in va.NUTZBAR if daten.get("nutzt_" + b)]
+        return werte
 
     @app.get("/veranstaltungen", response_class=HTMLResponse)
     async def va_liste(request: Request, sitzung=Depends(veranstaltungen_erforderlich)):
@@ -212,11 +228,12 @@ def bauen(config, mail_config=None) -> FastAPI:
             "veranstaltungen.html",
             admin_kontext(request, sitzung, liste=veranstaltungen.liste(),
                           vorgabe_id=vorgabe["id"] if vorgabe else None,
-                          status_werte=va.STATUS))
+                          status_werte=va.STATUS, nutzbar=va.NUTZBAR))
 
     @app.get("/veranstaltungen/neu", response_class=HTMLResponse)
     async def va_neu(request: Request, sitzung=Depends(veranstaltungen_erforderlich)):
-        return va_formular(request, sitzung, werte={"status": "planung"})
+        return va_formular(request, sitzung,
+                           werte={"status": "planung", "nutzt": list(va.NUTZBAR)})
 
     @app.post("/veranstaltungen/neu", response_class=HTMLResponse)
     async def va_anlegen(request: Request, sitzung=Depends(veranstaltungen_erforderlich)):

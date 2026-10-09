@@ -3,13 +3,14 @@
 {% block ueberschrift %}Bereiche{% endblock %}
 
 {% block inhalt %}
+  {% with ansicht = 'bereiche' %}{% include "_ansichten.html" %}{% endwith %}
   <p class="unterzeile">Wo geholfen wird – Streckenposten, Shuttle, Orgabüro … –
     und darin die Schichten.</p>
 
   {% if not nur_eigene %}
     <p class="knopfreihe">
       <a class="knopf" href="/helfer/bereich/neu">Neuer Bereich</a>
-      <a class="knopf-schlicht" href="/helfer/goodies">Shirt, Verpflegung, Goodies</a>
+      <a class="knopf-schlicht" href="/helfer/goodies">Goodies & Verpflegung</a>
     </p>
   {% endif %}
 

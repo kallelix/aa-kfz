@@ -3,6 +3,7 @@
 {% block ueberschrift %}Schichten{% endblock %}
 
 {% block inhalt %}
+  {% with ansicht = 'luecken' if f_luecken else 'schichten' %}{% include "_ansichten.html" %}{% endwith %}
   <form method="get" action="/helfer/schichten" class="filter">
     <div>
       <label for="f-bereich">Bereich</label>

@@ -8,6 +8,7 @@ angezeigt wird, und dass in den gespeicherten Pfad nichts hineinkommt, was
 später als Markup ausgeliefert würde.
 """
 
+import html
 import http.client
 import os
 import re
@@ -35,14 +36,12 @@ HASH = "$2b$12$jWSkTX2jwE2Afm795IqpuuLOLzUGEL8Qruhfa67JQvzJd4fn.6fnm"
 fehler = []
 
 
-def nav_ausschnitt(seite):
-    """Nur die Punkte des Bereichs, nicht die Bereichszeile darueber.
-
-    Seit die drei Backoffices eine Huelle teilen, stehen zwei <nav> auf der
-    Seite: oben die drei Bereiche, darunter die Punkte des offenen. Bis zum
-    ERSTEN </nav> zu schneiden erwischt die falsche.
-    """
-    anfang = seite.index('class="admin-nav"')
+def ausschnitt(seite, merkmal):
+    """Eine Zeile der Navigation, erkannt an ihrer Klasse; leer, wenn es sie
+    auf der Seite nicht gibt."""
+    if merkmal not in seite:
+        return ""
+    anfang = seite.index(merkmal)
     return seite[anfang:seite.index("</nav>", anfang)]
 
 
@@ -503,45 +502,51 @@ try:
         status, _, _ = anfrage("GET", pfad)
         pruefe(status == 200, pfad + " laedt")
 
-    print("Die Hauptnavigation")
+    # Die Navigation in drei Ebenen (Lastenheft 2.1b): Reiter, Gruppen,
+    # Punkte. Die Veranstaltung steht im Kopf.
+    print("Die Navigation")
     _, _, seite = anfrage("GET", "/helfer")
-    leiste = nav_ausschnitt(seite)
-    # Ohne die Auswahl der Veranstaltung: die ist eine Wahl, keine Seite.
-    namen = re.findall(r'<a href="/helfer(?!/veranstaltung)[^"]*"[^>]*>\s*([^<]+?)\s*</a>', leiste)
-    pruefe(namen == ["Übersicht", "Zeitplan", "Aufgaben", "Schichten", "Helfer",
-                     "Funken", "Schlüssel",
-                     "Bereiche", "Goodies",
-                     "Einstellungen", "Monitor", "Import", "Unterschriften",
-                     "Zeitplan-Abruf"],
-           "steht in der vereinbarten Reihenfolge: " + ", ".join(namen))
-    pruefe('class="gewaehlt" aria-current="true"' in leiste and "AA 2026" in leiste,
-           "daneben die Auswahl der Veranstaltung, die gewaehlte markiert")
-    pruefe("nav-gruppe" in leiste and "admin_menue.js" in seite,
-           "die hinteren sieben stecken in einem Menue")
+    reiter = re.findall(r'class="bereich[^"]*"\s+href="[^"]*"[^>]*>([^<]+)</a>',
+                        ausschnitt(seite, 'class="bereiche"'))
+    pruefe(reiter == ["Kennzeichen", "Presse", "Helfer", "Ausgabe", "Verwaltung"],
+           "Reiter: " + ", ".join(reiter))
+    gruppen = re.findall(r'>([^<]+)</a>', ausschnitt(seite, 'class="gruppen-nav"'))
+    pruefe(gruppen == ["Übersicht", "Planen", "Leute", "Vor Ort"],
+           "im Helferbereich die Gruppen nach dem Ablauf: " + ", ".join(gruppen))
+    kopf = seite[:seite.index('class="navigation"')]
+    pruefe('class="gewaehlt" aria-current="true"' in kopf and "AA 2026" in kopf,
+           "die Auswahl der Veranstaltung steht im Kopf, die gewaehlte markiert")
+    pruefe("menue.js" in seite and "Einstellungen" not in seite,
+           "kein Menue Einstellungen mehr")
 
-    # Genau ein Punkt darf leuchten. /helfer ist der Anfang von jedem Pfad und
-    # wuerde bei einem blossen "faengt damit an" ueberall mitleuchten.
+    # Genau einer je Ebene darf leuchten. /helfer ist der Anfang von jedem
+    # Pfad und wuerde bei einem blossen "faengt damit an" ueberall mitleuchten.
     print("Wo man gerade steht")
-    for pfad, erwartet, im_menue in (
-            ("/helfer", "Übersicht", False),
-            ("/helfer/band", "Zeitplan", False),
-            ("/helfer/aufgabe/neu", "Aufgaben", False),
-            ("/helfer/helfer/neu", "Helfer", False),
-            ("/helfer/funk", "Funken", False),
-            ("/helfer/monitor", "Monitor", True),
-            ("/helfer/bereich/neu", "Bereiche", True),
-            ("/helfer/goodie/neu", "Goodies", True),
-            ("/helfer/zeitplan", "Zeitplan-Abruf", True)):
+    for pfad, erwartet in (
+            ("/helfer", ("Helfer", "Übersicht", None)),
+            ("/helfer/band", ("Helfer", "Planen", "Zeitplan")),
+            ("/helfer/aufgabe/neu", ("Helfer", "Planen", "Aufgaben")),
+            ("/helfer/bereich/neu", ("Helfer", "Planen", "Bereiche & Schichten")),
+            ("/helfer/schichten", ("Helfer", "Planen", "Bereiche & Schichten")),
+            ("/helfer/helfer/neu", ("Helfer", "Leute", None)),
+            ("/helfer/monitor", ("Helfer", "Vor Ort", None)),
+            ("/helfer/funk", ("Ausgabe", None, "Funk")),
+            ("/helfer/schluessel", ("Ausgabe", None, "Schlüssel")),
+            ("/helfer/goodie/neu", ("Verwaltung", None, "Goodies & Verpflegung")),
+            ("/helfer/zeitplan", ("Verwaltung", None, "Zeitplan-Abruf")),
+            ("/helfer/unterschriften", ("Verwaltung", None, "Tablet"))):
         _, _, seite = anfrage("GET", pfad)
-        leiste = nav_ausschnitt(seite)
-        hier = [n.strip() for n in
-                re.findall(r'ist-hier[^>]*>\s*([^<]+?)\s*<', leiste)]
-        pruefe(erwartet in hier, pfad + " markiert " + erwartet)
-        pruefe(len(hier) == (2 if im_menue else 1),
-               "und sonst nichts: " + ", ".join(hier))
-        if im_menue:
-            pruefe("nav-gruppe-knopf ist-hier" in leiste,
-                   "das Menue selbst ist auch markiert")
+        seite = html.unescape(seite)
+        gefunden = (
+            re.findall(r'class="bereich ist-hier"[^>]*>([^<]+)</a>', seite),
+            re.findall(r'class="ist-hier"[^>]*>([^<]+)</a>',
+                       ausschnitt(seite, 'class="gruppen-nav"')),
+            [n.strip() for n in re.findall(r'class="ist-hier"[^>]*>\s*([^<]+?)\s*<',
+                                           ausschnitt(seite, 'class="admin-nav"'))])
+        gewollt = tuple([] if e is None else [e] for e in erwartet)
+        pruefe(gefunden == gewollt, pfad + " markiert " + " › ".join(
+            e for e in erwartet if e) + (" – gefunden: " + str(gefunden)
+                                        if gefunden != gewollt else ""))
 
     print("Der Zustand ist nichts fuer Fremde")
     keks_gemerkt = keks["wert"]

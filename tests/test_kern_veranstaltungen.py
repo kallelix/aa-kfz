@@ -56,10 +56,16 @@ pruefe(wirft(lambda: v.anlegen({**GRUND, "kurz": "X", "anmeldung_ab": "2026-12-1
        "die Anmeldung kann nicht vor ihrem Beginn enden")
 pruefe(wirft(lambda: v.anlegen({**GRUND, "kurz": "X", "status": "irgendwas"}), "Status"),
        "unbekannter Status wird abgewiesen")
+pruefe(zeile["nutzt"] == ["kennzeichen", "presse", "helfer", "ausgabe"],
+       "ohne Angabe nutzt eine Veranstaltung alles")
+pruefe(wirft(lambda: v.anlegen({**GRUND, "kurz": "X", "nutzt": []}), "mindestens einen"),
+       "eine Veranstaltung, die nichts nutzt, gibt es nicht")
 
 print("Welche gilt ohne Wahl")
 xco = v.anlegen({**GRUND, "name": "XCO 2027", "kurz": "XCO 2027",
-                 "beginn": "2027-05-15", "ende": "2027-05-15"})
+                 "beginn": "2027-05-15", "ende": "2027-05-15",
+                 "nutzt": ["helfer", "unbekannt", "ausgabe"]})
+pruefe(v.laden(xco)["nutzt"] == ["helfer", "ausgabe"], "was sie nutzt, ohne Unbekanntes")
 alt = v.anlegen({**GRUND, "name": "AA 2026", "kurz": "AA 2026", "beginn": "2026-08-28",
                  "ende": "2026-08-30", "status": "archiviert"})
 pruefe(v.vorgabe(date(2026, 10, 9))["id"] == xco, "im Oktober 2026: die nächste ist der XCO")

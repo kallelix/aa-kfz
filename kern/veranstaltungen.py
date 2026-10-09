@@ -33,6 +33,15 @@ STATUS_TEXT = {
     "archiviert": "vorbei; bleibt als Vorlage für die nächste",
 }
 
+# Was eine Veranstaltung nutzen kann (V-08). Das Backoffice zeigt nur die
+# Reiter dessen, was die gewählte Veranstaltung nutzt.
+NUTZBAR = {
+    "kennzeichen": ("Kennzeichen", "Anträge auf Durchfahrt, Karten, Liste für die Straßensperre"),
+    "presse": ("Presse", "Akkreditierung, Abholliste, Bilder"),
+    "helfer": ("Helfer", "Bereiche, Schichten, Anmeldung, Shirts und Goodies"),
+    "ausgabe": ("Materialausgabe", "Funkgeräte, Schlüssel und anderes gegen Unterschrift"),
+}
+
 # Wie der Browser sich die Wahl merkt.
 KEKS = "abfahrt_veranstaltung"
 
@@ -115,6 +124,10 @@ class Veranstaltungen:
             "ende": _datum(werte.get("ende"), "den letzten Tag", True),
             "anmeldung_ab": _datum(werte.get("anmeldung_ab"), "den Anmeldestart", False),
             "anmeldung_bis": _datum(werte.get("anmeldung_bis"), "das Anmeldeende", False),
+            # Fehlt die Angabe ganz, nutzt die Veranstaltung alles – so sah
+            # jede bisher aus.
+            "nutzt": ([b for b in NUTZBAR if b in werte["nutzt"]] if "nutzt" in werte
+                      else list(NUTZBAR)),
         }
         if not sauber["name"]:
             raise Fehler("Bitte einen Namen angeben.")
@@ -122,6 +135,9 @@ class Veranstaltungen:
             raise Fehler("Der Kurzname hat 1 bis 20 Zeichen, z. B. „AA 2027“.")
         if sauber["status"] not in STATUS:
             raise Fehler("Unbekannter Status.")
+        if not sauber["nutzt"]:
+            raise Fehler("Wähle mindestens einen Bereich, den die Veranstaltung nutzt – "
+                         "sonst bliebe das Backoffice für sie leer.")
         if sauber["ende"] < sauber["beginn"]:
             raise Fehler("Der letzte Tag liegt vor dem ersten.")
         if (sauber["anmeldung_ab"] and sauber["anmeldung_bis"]
@@ -135,11 +151,11 @@ class Veranstaltungen:
             with self._db.transaktion() as con:
                 return int(con.execute(
                     "INSERT INTO veranstaltung (name, kurz, beginn, ende, ort, beschreibung,"
-                    " status, anmeldung_ab, anmeldung_bis)"
-                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                    " status, anmeldung_ab, anmeldung_bis, nutzt)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
                     (w["name"], w["kurz"], w["beginn"], w["ende"], w["ort"],
                      w["beschreibung"], w["status"], w["anmeldung_ab"],
-                     w["anmeldung_bis"])).fetchone()[0])
+                     w["anmeldung_bis"], w["nutzt"])).fetchone()[0])
         except IntegrityError:
             raise Fehler("Diesen Kurznamen hat schon eine andere Veranstaltung.")
 
@@ -150,10 +166,10 @@ class Veranstaltungen:
                 geaendert = con.execute(
                     "UPDATE veranstaltung SET name = ?, kurz = ?, beginn = ?, ende = ?,"
                     " ort = ?, beschreibung = ?, status = ?, anmeldung_ab = ?,"
-                    " anmeldung_bis = ?, geaendert_am = now() WHERE id = ?",
+                    " anmeldung_bis = ?, nutzt = ?, geaendert_am = now() WHERE id = ?",
                     (w["name"], w["kurz"], w["beginn"], w["ende"], w["ort"],
                      w["beschreibung"], w["status"], w["anmeldung_ab"],
-                     w["anmeldung_bis"], veranstaltung_id)).rowcount
+                     w["anmeldung_bis"], w["nutzt"], veranstaltung_id)).rowcount
         except IntegrityError:
             raise Fehler("Diesen Kurznamen hat schon eine andere Veranstaltung.")
         if not geaendert:

@@ -23,7 +23,7 @@
         <label for="kurz">Kurzname</label>
         <input type="text" id="kurz" name="kurz" required maxlength="20"
                value="{{ werte.kurz or '' }}" placeholder="z. B. AA 2027">
-        <p class="hilfe">Steht in der Auswahl oben im Helferbereich.</p>
+        <p class="hilfe">Steht in der Auswahl im Kopf des Backoffice.</p>
       </div>
     </div>
 
@@ -59,6 +59,23 @@
           <span class="auswahl-text">
             <span class="auswahl-titel">{{ name }}</span>
             <span class="auswahl-hilfe">{{ status_text[schluessel] }}</span>
+          </span>
+        </label>
+      {% endfor %}
+    </fieldset>
+
+    <fieldset class="feld">
+      <legend>Was diese Veranstaltung nutzt</legend>
+      <p class="hilfe">Das Backoffice zeigt nur diese Reiter. Was man für die
+        Veranstaltung einrichtet – Goodies, Import, Material –, steht danach unter
+        Verwaltung bei ihr.</p>
+      {% for schluessel, (name, text) in nutzbar.items() %}
+        <label class="auswahl">
+          <input type="checkbox" name="nutzt_{{ schluessel }}" value="1"
+                 {% if schluessel in (werte.nutzt or []) %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">{{ name }}</span>
+            <span class="auswahl-hilfe">{{ text }}</span>
           </span>
         </label>
       {% endfor %}

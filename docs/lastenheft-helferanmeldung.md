@@ -201,7 +201,16 @@ Voraussetzungen (eine je Zeile) und *intern*; Schichten mit Minimum, Soll,
 Reserve, eigenem Mindestalter und *intern*; je Veranstaltung Shirt,
 Verpflegung, Helferparty und Goodies mit Schwelle und Altersgrenze; die
 Vorlage aus einer früheren Veranstaltung. Die Bereichsleitung sind Konten
-(B-02, Schritt 2.1a). Der Import aus helferliste.online
+(B-02, Schritt 2.1a).
+
+V-08 ist umgesetzt (Schritt 2.1b): Jede Veranstaltung legt fest, was sie
+nutzt; gewählt wird sie im Kopf, für alle Bereiche, und das Backoffice zeigt
+nur die Reiter dessen, was sie nutzt. Der Helferbereich gliedert sich in
+Übersicht, Planen, Leute und Vor Ort; Goodies und Verpflegung, Import,
+Zeitplan-Abruf, Material und Tablet stehen unter Verwaltung bei der
+Veranstaltung; Funk und Schlüssel unter dem eigenen Reiter Ausgabe. Goodies
+haben einen Schalter, das Shirt einen Schnitt (V-07). Die Daten von
+Kennzeichen und Presse hängen weiter an keiner Veranstaltung. Der Import aus helferliste.online
 macht aus jeder Liste einen Bereich und aus ihrem Bedarf Soll und Minimum.
 
 ### 5.2 Anmeldung (A)
@@ -684,7 +693,7 @@ Selbstbedienung.
 | --- | --- | --- |
 | 2.1 | Bereiche und Schichten pflegen: Minimum/Soll/Reserve, Mindestalter, Voraussetzungen, intern, Goodies je Veranstaltung, Vorlage aus dem Vorjahr | **erledigt** |
 | 2.1a | **Bereichsleitung als Konto** (B-02, aus Phase 3): sieht und pflegt nur ihre Bereiche, Schichten und Leute; Empfänger für Meldungen und Ausdrucke | **erledigt** |
-| 2.1b | **Navigation nach dem Klickentwurf**: Veranstaltung im Kopf, Reiter nach dem, was sie nutzt (V-08), Gruppen im Helferbereich (Übersicht, Planen, Leute, Vor Ort), Einrichten bei der Veranstaltung, Goodie-Schalter und Shirt-Schnitt; die Ausgabe als eigener Reiter, vorerst mit den heutigen Seiten für Funk und Schlüssel | 5 h |
+| 2.1b | **Navigation nach dem Klickentwurf**: Veranstaltung im Kopf, Reiter nach dem, was sie nutzt (V-08), Gruppen im Helferbereich (Übersicht, Planen, Leute, Vor Ort), Einrichten bei der Veranstaltung, Goodie-Schalter und Shirt-Schnitt; die Ausgabe als eigener Reiter, vorerst mit den heutigen Seiten für Funk und Schlüssel | **erledigt** |
 | 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten; **Interesse vormerken** bei angekündigten Veranstaltungen (aus 3.3); Verfügbarkeit und Vorlieben schon im Datenmodell, für den Assistenten | 11 h |
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | 3 h |
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 9 h |
@@ -713,14 +722,14 @@ Bestehendes umgebaut.
 
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
-89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM, 2.1 und 2.1a
-schon erledigt; es bleiben rund 58 Stunden, die 8 Stunden pro Woche haben also
-Luft.
+89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM, 2.1, 2.1a und
+2.1b schon erledigt; es bleiben rund 53 Stunden, die 8 Stunden pro Woche haben
+also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~58 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~53 h, ab 12. Oktober |
 | --- | --- |
 | Anfang Dezember 2026 | ~8 h |
-| **Mitte Dezember 2026** | **~7 h** |
+| **Mitte Dezember 2026** | **~6 h** |
 | Rückfallebene: Anfang März 2027 | ~3 h |
 
 Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
@@ -768,7 +777,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~65 h, davon ~9 h erledigt |
+| 2 Öffnung | ~65 h, davon ~14 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |
