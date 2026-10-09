@@ -185,7 +185,9 @@ den Umsetzungsplan in Abschnitt 9.
 | V-04 | Eine Veranstaltung lässt sich aus einer früheren **als Vorlage** anlegen: Bereiche und Schichten werden übernommen und auf die neuen Tage verschoben. | S | 2 |
 | V-05 | Schichten haben Beginn, Ende, Ort, Hinweis und drei Zahlen: **Minimum**, **Soll** und **Reserve** (siehe R-01). | M | 2 |
 | V-06 | Schichten lassen sich als *intern* markieren – sie erscheinen nicht in der öffentlichen Anmeldung (z. B. Orgabüro). | S | 2 |
-| V-07 | **Je Veranstaltung einstellbar, ob und welche Goodies es gibt**: das Helfershirt und frei benannte kleine Goodies – etwa ein Bier am Bierwagen, eine Eistüte, ein Getränkegutschein für die After-Hour. Nicht jede Veranstaltung bietet Goodies an. Verpflegung gibt es in der Regel ohnehin und ist kein Goodie; ob sie gestellt wird, ist ebenfalls einstellbar. Danach richtet sich, was bei der Anmeldung gefragt wird – ohne Shirt keine Größe, ohne Verpflegung keine Verpflegungsfrage (I-02) – und was Stempelkarte und Belohnungsstufen zeigen (G-01, G-02). | M | 2 |
+| V-07 | **Je Veranstaltung einstellbar, ob und welche Goodies es gibt**: das Helfershirt und frei benannte kleine Goodies – etwa ein Bier am Bierwagen, eine Eistüte, ein Getränkegutschein für die After-Hour. Nicht jede Veranstaltung bietet Goodies an – ein Schalter sagt „keine Goodies“. Beim Shirt außerdem, ob es einen Schnitt für alle gibt oder Damen- und Herrenschnitt. Verpflegung gibt es in der Regel ohnehin und ist kein Goodie; ob sie gestellt wird, ist ebenfalls einstellbar. Danach richtet sich, was bei der Anmeldung gefragt wird – ohne Shirt keine Größe, ohne Verpflegung keine Verpflegungsfrage (I-02) – und was Stempelkarte und Belohnungsstufen zeigen (G-01, G-02). | M | 2 |
+| V-08 | **Je Veranstaltung einstellbar, welche Bereiche sie nutzt**: Kennzeichen, Presse, Helfer, Materialausgabe. Die Veranstaltung wählt man im Kopf des Backoffice, sie gilt für alles, und es zeigt nur die Bereiche, die sie nutzt. Was man für sie einrichtet – Goodies, Verpflegung, Import, Zeitplan-Abruf, Material, Tablet –, steht bei ihr. | M | 2 |
+| V-09 | **Materialausgabe als eigener Bereich**: je Veranstaltung, ob es sie gibt und was ausgegeben wird – je Material mit oder ohne Rückgabe, Unterschrift am Tablet und erfasster Nummer oder Kennzeichen. Funkgeräte und Schlüssel sind dann zwei Materialien unter vielen; ausgegeben wird an Helfer und an jeden anderen. | S | 3 |
 
 **Stand 09.10.2026:** V-01 und V-02 sind umgesetzt (Schritt 1.2).
 Veranstaltungen stehen im Schema `kern`; Schichten, Programm, Aufgaben und
@@ -244,7 +246,7 @@ sofort bei der richtigen Person ankommt.
 | Nr. | Anforderung | Prio | Phase |
 | --- | --- | --- | --- |
 | I-01 | Vor- und Nachname in **getrennten Feldern**, beide Pflicht; ein Wort allein wird mit freundlichem Hinweis abgewiesen. | M | 2 |
-| I-02 | T-Shirt-Größe als **Auswahl** (XS bis 5XL, Damen-/Herrenschnitt, „kein Shirt"), Verpflegung als Auswahl – beides nur, wenn die Veranstaltung es anbietet (V-07). Freitext nur unter *Bemerkung*. | M | 2 |
+| I-02 | T-Shirt-Größe als **Auswahl** (XS bis 5XL, „kein Shirt"; Damen-/Herrenschnitt nur, wenn die Veranstaltung beide anbietet), Verpflegung als Auswahl – beides nur, wenn die Veranstaltung es anbietet (V-07). Freitext nur unter *Bemerkung*. | M | 2 |
 | I-03 | Die Mailadresse wird per Link **bestätigt**. Unbestätigte Anmeldungen halten ihren Platz eine begrenzte Zeit und verfallen dann, mit Erinnerung. | M | 2 |
 | I-04 | Handynummer wird beim Speichern in eine einheitliche Form gebracht (+49 …). | S | 2 |
 | I-05 | **Dublettenprüfung beim Anmelden**: gleiche Adresse oder gleiche Nummer mit gleichem Namen (Umlaute in beiden Schreibweisen, `kern/suchen.py`) → „Bist du das?" statt einer zweiten Person. Mitangemeldete Personen derselben anmeldenden Person sind ausgenommen – das sind Familien und Vereinskollegen, keine Dubletten. | M | 2 |
@@ -682,6 +684,7 @@ Selbstbedienung.
 | --- | --- | --- |
 | 2.1 | Bereiche und Schichten pflegen: Minimum/Soll/Reserve, Mindestalter, Voraussetzungen, intern, Goodies je Veranstaltung, Vorlage aus dem Vorjahr | **erledigt** |
 | 2.1a | **Bereichsleitung als Konto** (B-02, aus Phase 3): sieht und pflegt nur ihre Bereiche, Schichten und Leute; Empfänger für Meldungen und Ausdrucke | **erledigt** |
+| 2.1b | **Navigation nach dem Klickentwurf**: Veranstaltung im Kopf, Reiter nach dem, was sie nutzt (V-08), Gruppen im Helferbereich (Übersicht, Planen, Leute, Vor Ort), Einrichten bei der Veranstaltung, Goodie-Schalter und Shirt-Schnitt; die Ausgabe als eigener Reiter, vorerst mit den heutigen Seiten für Funk und Schlüssel | 5 h |
 | 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten; **Interesse vormerken** bei angekündigten Veranstaltungen (aus 3.3); Verfügbarkeit und Vorlieben schon im Datenmodell, für den Assistenten | 11 h |
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | 3 h |
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 9 h |
@@ -699,22 +702,29 @@ Transaktion wie Stornieren und Umbuchen), das Vormerken von Interesse (die
 das Wiedererkennen per Adresse). Später gebaut, hätte jedes davon Phase 2 ein
 zweites Mal aufgemacht. Der Assistent bleibt in Phase 3.
 
+**Navigation (2.1b):** Mit Phase 2 kommen Anmeldungen, Warteliste,
+Ausdrucke und ein neues Dashboard dazu; die Leiste des Helferbereichs war
+schon vorher voll und mischte Planung mit dem Veranstaltungstag. Die neue
+Gliederung steht vor 2.2, damit jede neue Seite gleich ihren Platz hat. Der
+Klickentwurf: <https://kallelix.github.io/aa-kfz/prototyp-navigation/>
+
 **Meilenstein:** Anmeldung öffnet. Ab hier wird nur noch ergänzt, nichts
 Bestehendes umgebaut.
 
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
-für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen rund 84 Stunden. Davon sind
-der Prototyp (0.2), Phase 1 bis auf DKIM, 2.1 und 2.1a schon erledigt; es
-bleiben rund 53 Stunden, die 8 Stunden pro Woche haben also Luft.
+für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
+89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM, 2.1 und 2.1a
+schon erledigt; es bleiben rund 58 Stunden, die 8 Stunden pro Woche haben also
+Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~53 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~58 h, ab 12. Oktober |
 | --- | --- |
 | Anfang Dezember 2026 | ~8 h |
-| **Mitte Dezember 2026** | **~6 h** |
+| **Mitte Dezember 2026** | **~7 h** |
 | Rückfallebene: Anfang März 2027 | ~3 h |
 
-Danach entspannt es sich: Phase 3 und 4 sind noch rund 46 Stunden, von Januar
-bis Ende April knapp 3 Stunden pro Woche – mit sechs Wochen Puffer bis zum
+Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
+bis Ende April gut 3 Stunden pro Woche – mit sechs Wochen Puffer bis zum
 Stillstand Mitte Juni. Und die Helfer haben über sechs Monate Zeit, sich bis
 zur AA am 1.–4. Juli anzumelden.
 
@@ -734,6 +744,7 @@ Phase Vorrang.
 | 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | 5 h |
 | 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | 3 h |
 | 3.6 | ~~Warteliste mit Nachrücken~~ – vorgezogen in 2.5 | – |
+| 3.8 | **Materialausgabe verallgemeinern** (V-09): Materialien je Veranstaltung, eine Ausgabe für alles mit Rückgabe, Unterschrift und Nummer; Funk und Schlüssel ziehen um | 8 h |
 | 3.7 | Persönliche Backoffice-Konten mit Rollen und Einladen – für alle drei Bereiche | **erledigt** |
 
 ### Phase 4 – Veranstaltungstag und Anerkennung (März bis Ende April 2027)
@@ -757,10 +768,10 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~60 h, davon ~9 h erledigt |
-| 3 Assistent, Helferstamm, Backoffice-Konten | ~32 h, davon ~9 h erledigt |
+| 2 Öffnung | ~65 h, davon ~9 h erledigt |
+| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
-| **gesamt** | **~135 h** |
+| **gesamt** | **~148 h** |
 
 Phase 1 und 2 sind die Öffnung. Fällt die Zeit knapp aus, wird Phase 4
 verschoben, nicht Phase 2 gekürzt – bis auf den Check-in (4.1), der zur AA
@@ -836,6 +847,11 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
   Interesse vormerken und das Erkennen von Dubletten sind aus Phase 3 in
   Phase 2 vorgezogen – sie fassen dieselben Stellen an. Der Assistent bleibt
   in Phase 3 (Abschnitt 9).
+- **Navigation** (09.10.2026): Die Veranstaltung ist der Ausgangspunkt. Sie
+  legt fest, welche Bereiche sie nutzt, und bei ihr steht, was man für sie
+  einrichtet; der Helferbereich gliedert sich in Übersicht, Planen, Leute und
+  Vor Ort (2.1b, V-08). Die Materialausgabe wird ein eigener Bereich mit
+  Materialien je Veranstaltung (3.8, V-09).
 
 ### Offen
 
