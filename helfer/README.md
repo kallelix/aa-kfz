@@ -92,6 +92,26 @@ Die erste Schicht ist leicht – es geht um die zweite und dritte (Lastenheft
 - Die Startseite zeigt je Tag, wie viele der geplanten Plätze besetzt sind –
   das Wir, keine Rangliste.
 
+## Unter Last
+
+Der Lasttest (Lastenheft 2.10, `tests/test_last.py`) prüft, was bei einem
+Hilferuf passiert, wenn viele gleichzeitig klicken:
+
+- 200 Anmeldungen auf dieselben zehn Plätze aus 50 Threads: genau zehn drin,
+  190 freundlich abgewiesen, nichts anderes. Ebenso über HTTP mit 200
+  gleichzeitigen Anfragen.
+- Dreißig wollen in fünf Plätze tauschen: fünf schaffen es, niemand steht
+  doppelt oder nirgends. Paare, die in Gegenrichtung tauschen, blockieren
+  sich nicht – jede Transaktion sperrt Schichten in derselben Reihenfolge,
+  aufsteigend nach id (`db._sperren`). Der Test hatte vorher genau diesen
+  Deadlock gefunden.
+- Die Anmeldung und die öffentlichen Seiten laufen in Threads, nicht im
+  Hauptstrang des Servers: sie sprechen viel mit der Datenbank, und sonst
+  hielte jede alle anderen auf. Lokal (Docker unter Windows, gut 20 ms je
+  Verbindungsaufbau) wartet die letzte von 200 gleichzeitigen Anmeldungen
+  rund 5 Sekunden, die letzte von 200 Schichtlisten rund 2. Auf dem Server
+  über den Unix-Socket ist der Verbindungsaufbau schneller.
+
 ## Datenschutz und Jugendschutz
 
 Seit Lastenheft 2.9 (D-01 bis D-07):
@@ -314,6 +334,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_druck.py        # Noch eine Schicht?, Tagesbalken, Drucken
 .venv/Scripts/python.exe helfer/tests/test_stufen.py       # Stufen, Springer, Absagen auf dem Monitor
 .venv/Scripts/python.exe helfer/tests/test_datenschutz.py  # Einwilligung, Eltern, Löschwerkzeug
+.venv/Scripts/python.exe helfer/tests/test_last.py         # 200 gleichzeitig, Tauschen gegeneinander
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

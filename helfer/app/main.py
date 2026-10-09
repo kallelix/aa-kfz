@@ -2363,7 +2363,7 @@ def _nicht_da(request: Request):
 
 
 @app.get("/")
-async def oeffentlicher_start(request: Request):
+def oeffentlicher_start(request: Request):
     """Die öffentliche Startseite: welche Veranstaltung Helfer sucht. Ist es
     genau eine, gleich dorthin."""
     liste = [{"va": v, "adresse": normalisieren.kurzadresse(v["kurz"]),
@@ -2378,7 +2378,7 @@ async def oeffentlicher_start(request: Request):
 
 
 @app.get("/{adresse:adresse}")
-async def oeffentliche_veranstaltung(request: Request, adresse: str, vorgemerkt: str = ""):
+def oeffentliche_veranstaltung(request: Request, adresse: str, vorgemerkt: str = ""):
     v = _nach_adresse(adresse)
     if v is None:
         return _nicht_da(request)
@@ -2450,7 +2450,7 @@ def _warte(gewaehlte) -> set[int]:
 
 
 @app.get("/{adresse:adresse}/schichten")
-async def oeffentliche_schichten(request: Request, adresse: str, hinweis: str = ""):
+def oeffentliche_schichten(request: Request, adresse: str, hinweis: str = ""):
     v = _nach_adresse(adresse)
     if v is None or _zustand(v) != "offen":
         return _nicht_da(request) if v is None else RedirectResponse(f"/{adresse}", 303)
@@ -2523,7 +2523,7 @@ def _angaben_seite(request, v, gewaehlte, fenster, eingabe, liste, weitere,
 
 
 @app.get("/{adresse:adresse}/angaben")
-async def angaben(request: Request, adresse: str):
+def angaben(request: Request, adresse: str):
     v = _nach_adresse(adresse)
     if v is None or _zustand(v) != "offen":
         return _nicht_da(request) if v is None else RedirectResponse(f"/{adresse}", 303)
@@ -2537,10 +2537,19 @@ async def angaben(request: Request, adresse: str):
 
 @app.post("/{adresse:adresse}/angaben")
 async def angaben_absenden(request: Request, adresse: str):
+    """Die Anmeldung. Die Arbeit läuft in einem Thread: sie spricht viel mit
+    der Datenbank, und im Hauptstrang hielte jede Anmeldung alle anderen auf
+    – bei einem Hilferuf kommen viele auf einmal (Lastenheft 2.10). Dass
+    niemand doppelt auf einen Platz kommt, regeln die Sperren in
+    db.anmelden, nicht die Reihenfolge hier."""
+    daten = await request.form()
+    return await asyncio.to_thread(_angaben_absenden, request, adresse, daten)
+
+
+def _angaben_absenden(request: Request, adresse: str, daten):
     v = _nach_adresse(adresse)
     if v is None or _zustand(v) != "offen":
         return _nicht_da(request) if v is None else RedirectResponse(f"/{adresse}", 303)
-    daten = await request.form()
     if normalisieren.text(daten.get("webseite")):
         return RedirectResponse(f"/{adresse}", status_code=303)
     gewaehlte, fenster = _auswahl(v, daten.getlist("s"), daten.getlist("z"),
@@ -2628,7 +2637,7 @@ def _danke_laden(adresse: str, p: str, t: str):
 
 
 @app.get("/{adresse:adresse}/danke")
-async def danke(request: Request, adresse: str, p: str = "", t: str = "", hinweis: str = ""):
+def danke(request: Request, adresse: str, p: str = "", t: str = "", hinweis: str = ""):
     v, ergebnis = _danke_laden(adresse, p, t)
     if ergebnis is None:
         return _nicht_da(request)
@@ -2778,7 +2787,7 @@ _PLATZ_HINWEISE = {
 
 
 @app.get("/platz/{tok}")
-async def platz(request: Request, tok: str, hinweis: str = ""):
+def platz(request: Request, tok: str, hinweis: str = ""):
     """Mein Helferplatz (A-09): alle Schichten, Treffpunkt, Ansprechpartner;
     weitere Schichten dazunehmen."""
     person = _person_mit(zugang.PLATZ, tok)
@@ -2817,7 +2826,7 @@ async def platz_bestaetigen(request: Request, tok: str):
 
 
 @app.get("/bestaetigen/{tok}")
-async def bestaetigen_seite(request: Request, tok: str):
+def bestaetigen_seite(request: Request, tok: str):
     """Der Link aus der Mail öffnet nur eine Seite mit einem Knopf – Mailscanner
     rufen Links vorab auf, eingelöst wird erst beim Klick (7.4)."""
     person = _person_mit(zugang.BESTAETIGEN, tok)
@@ -2848,7 +2857,7 @@ def _platz_va(tok: str, adresse: str):
 
 
 @app.get("/platz/{tok}/{adresse:adresse}/schichten")
-async def platz_schichten(request: Request, tok: str, adresse: str, hinweis: str = ""):
+def platz_schichten(request: Request, tok: str, adresse: str, hinweis: str = ""):
     """Die Schichtliste aus Mein Helferplatz: ohne das, was hinter einer
     Einsatzgrenze liegt (K-06), mit dem, wofür man schon eingetragen ist."""
     person, v = _platz_va(tok, adresse)
@@ -2901,7 +2910,7 @@ def _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste, weite
 
 
 @app.get("/platz/{tok}/{adresse:adresse}/angaben")
-async def platz_angaben(request: Request, tok: str, adresse: str):
+def platz_angaben(request: Request, tok: str, adresse: str):
     person, v = _platz_va(tok, adresse)
     if person is None:
         return _nicht_da(request)
@@ -2995,7 +3004,7 @@ async def link_anfordern(request: Request, adresse: str):
 
 
 @app.get("/kalender/{datei}")
-async def kalender(request: Request, datei: str):
+def kalender(request: Request, datei: str):
     """Das Kalender-Abo (A-10). Das Programm fragt es regelmäßig ab."""
     person = _person_mit(zugang.KALENDER, datei.removesuffix(".ics"))
     if person is None:
@@ -3032,7 +3041,7 @@ def _frage(request: Request, tok: str, titel: str, text: str, ziel: str, knopf: 
 
 
 @app.get("/platz/{tok}/absagen/{einteilung_id}")
-async def platz_absagen_frage(request: Request, tok: str, einteilung_id: int):
+def platz_absagen_frage(request: Request, tok: str, einteilung_id: int):
     person = _person_mit(zugang.PLATZ, tok)
     e = db.einteilung_fuer(person["id"], einteilung_id) if person else None
     if e is None:
@@ -3124,7 +3133,7 @@ def _tauschen_seite(request, tok, e, gruende=(), status_code=200, gewaehlt=None,
 
 
 @app.get("/platz/{tok}/tauschen/{einteilung_id}")
-async def platz_tauschen_seite(request: Request, tok: str, einteilung_id: int):
+def platz_tauschen_seite(request: Request, tok: str, einteilung_id: int):
     person = _person_mit(zugang.PLATZ, tok)
     e = db.einteilung_fuer(person["id"], einteilung_id) if person else None
     if e is None:
@@ -3164,7 +3173,7 @@ async def platz_tauschen(request: Request, tok: str, einteilung_id: int):
 
 
 @app.get("/platz/{tok}/{adresse:adresse}/abmelden")
-async def platz_abmelden_frage(request: Request, tok: str, adresse: str):
+def platz_abmelden_frage(request: Request, tok: str, adresse: str):
     person, v = _platz_va(tok, adresse)
     if person is None:
         return _nicht_da(request)
@@ -3220,7 +3229,7 @@ def _angaben_aendern_seite(request, tok, person, eingabe, fehler=None, status_co
 
 
 @app.get("/platz/{tok}/angaben")
-async def platz_angaben_aendern_seite(request: Request, tok: str):
+def platz_angaben_aendern_seite(request: Request, tok: str):
     person = _person_mit(zugang.PLATZ, tok)
     if person is None:
         return _nicht_da(request)
@@ -3293,7 +3302,7 @@ def _person_mit_neuer_adresse(roh: str):
 
 
 @app.get("/email/{tok}")
-async def email_bestaetigen_seite(request: Request, tok: str):
+def email_bestaetigen_seite(request: Request, tok: str):
     """Wie beim ersten Bestätigen: nur eine Seite mit Knopf (7.4)."""
     person = _person_mit_neuer_adresse(tok)
     if person is None:
@@ -3315,7 +3324,7 @@ async def email_bestaetigen(request: Request, tok: str):
 
 
 @app.get("/platz/{tok}/loeschen")
-async def platz_loeschen_frage(request: Request, tok: str, wer: str = ""):
+def platz_loeschen_frage(request: Request, tok: str, wer: str = ""):
     person = _person_mit(zugang.PLATZ, tok)
     if person is None:
         return _nicht_da(request)
@@ -3483,7 +3492,7 @@ async def druck_person(request: Request, helfer_id: int,
 # --- Datenschutz und Einverständnis der Eltern (Lastenheft 2.9) --------------
 
 @app.get("/datenschutz")
-async def datenschutz(request: Request):
+def datenschutz(request: Request):
     """D-01, D-02: der ausführliche Hinweis, auf den jedes Formular verweist.
     Vor dem Start fachkundig prüfen lassen (D-09)."""
     return templates.TemplateResponse(
@@ -3510,7 +3519,7 @@ def _eltern_seite(request: Request, tok: str, kind, bestaetigt: bool = False):
 
 
 @app.get("/eltern/{tok}")
-async def eltern_seite(request: Request, tok: str):
+def eltern_seite(request: Request, tok: str):
     """D-06: Was das Kind vorhat – und ein Knopf. Wie beim Bestätigen löst
     erst der Klick etwas aus, nicht schon der Aufruf (7.4)."""
     kind = _kind_mit(tok)

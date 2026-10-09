@@ -799,7 +799,20 @@ Selbstbedienung.
 | 2.7 | Dashboard und Monitor: Stufen statt Bedarf, Reserve, Springer, kurzfristige Absagen | **erledigt** |
 | 2.8 | Druckansichten und Notfallmappe | **erledigt** |
 | 2.9 | Datenschutzhinweise, Einwilligungen, Altersprüfung, Elternbestätigung, Löschwerkzeug angepasst | **erledigt** |
-| 2.10 | Lasttest: 200 gleichzeitige Anmeldungen auf dieselben zehn Plätze, Umbuchen gegeneinander | 2 h |
+| 2.10 | Lasttest: 200 gleichzeitige Anmeldungen auf dieselben zehn Plätze, Umbuchen gegeneinander | **erledigt** |
+
+**Stand 09.10.2026, Schritt 2.10:** Der Lasttest steht im Repository
+(`helfer/tests/test_last.py`) und läuft mit allen anderen. 200 auf zehn
+Plätze – aus 50 Threads direkt an der Datenbank und mit 200 gleichzeitigen
+HTTP-Anfragen – ergeben genau zehn Einteilungen; dreißig, die in fünf Plätze
+tauschen wollen, genau fünf. Gefunden hat er einen Deadlock beim Tauschen in
+Gegenrichtung: jetzt sperrt jede Transaktion Schichten aufsteigend nach id.
+Und er hat gezeigt, dass der Server Anmeldungen nacheinander abarbeitete –
+die letzte von 200 wartete über 30 Sekunden. Anmeldung und öffentliche
+Seiten laufen seither in Threads; lokal wartet die letzte rund 5 Sekunden,
+auf dem Server mit schnellerem Verbindungsaufbau weniger. Ein
+Verbindungspool für alle drei Bereiche wäre der nächste Schritt, falls es
+je nötig wird.
 
 **Vorgezogen am 09.10.2026** aus Phase 3, weil es dieselben Stellen anfasst:
 die Bereichsleitung als Konto, die Warteliste (sie gehört in dieselbe
@@ -820,13 +833,13 @@ Bestehendes umgebaut.
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
 89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 bis
-2.9 schon erledigt; es bleiben rund 4 Stunden, die 8 Stunden pro Woche haben
+2.10 erledigt; es bleibt DKIM (1.3), rund 2 Stunden, die 8 Stunden pro Woche haben
 also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~4 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~2 h, ab 12. Oktober |
 | --- | --- |
-| Anfang Dezember 2026 | ~0,5 h |
-| **Mitte Dezember 2026** | **~0,5 h** |
+| Anfang Dezember 2026 | < 0,5 h |
+| **Mitte Dezember 2026** | **< 0,5 h** |
 | Rückfallebene: Anfang März 2027 | ~1 h |
 
 Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
@@ -874,7 +887,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~65 h, davon ~63 h erledigt |
+| 2 Öffnung | ~65 h, **erledigt** |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |

@@ -1398,6 +1398,14 @@ def moegliche_dubletten() -> list[dict]:
 # richtigen Person. Jede Funktion prüft selbst, ob die Person zur Anmeldung
 # gehört; die Mails schreibt main.py aus dem, was zurückkommt.
 
+def _sperren(con: Verbindung, schicht_ids) -> None:
+    """Schichten sperren – immer aufsteigend nach id. Wer mehrere Schichten
+    in einer Transaktion anfasst, muss sie in derselben Reihenfolge sperren
+    wie alle anderen, sonst können sich zwei gegenseitig blockieren."""
+    con.execute("SELECT id FROM schicht WHERE id = ANY(?) ORDER BY id FOR UPDATE",
+                (sorted(set(schicht_ids)),)).fetchall()
+
+
 def _gehoert(con: Verbindung, anmelder_id: int, helfer_id: int) -> bool:
     """Die Person selbst oder jemand, den sie mitangemeldet hat (S-06)."""
     return helfer_id == anmelder_id or con.execute(
@@ -1563,7 +1571,8 @@ def angebote_abgelaufen() -> list[dict]:
                     "SELECT e.*, s.veranstaltung_id, s.bereich_id, s.beginn, s.ende,"
                     " b.name AS bereich FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
                     " JOIN bereich b ON b.id = s.bereich_id"
-                    " WHERE e.bestaetigen_bis IS NOT NULL AND e.bestaetigen_bis < ?",
+                    " WHERE e.bestaetigen_bis IS NOT NULL AND e.bestaetigen_bis < ?"
+                    " ORDER BY e.schicht_id, e.id",
                     (marke(jetzt_lokal()),)).fetchall():
                 con.execute("DELETE FROM einteilung WHERE id = ?", (e["id"],))
                 _protokollieren(con, e["helfer_id"], "", "Angebot verfallen: " + _schicht_text(e),
@@ -1635,6 +1644,14 @@ def umbuchen(vid: int, anmelder_id: int, einteilung_id: int, neu_id: int) -> dic
                 raise AnmeldeFehler(["Diese Schicht gehört nicht zu dir."])
             if neu_id == alt["schicht_id"]:
                 raise AnmeldeFehler(["Das ist dieselbe Schicht."])
+            # Beide Schichten gleich zu Beginn sperren, in fester Reihenfolge.
+            # Sonst sperrt, wer von links nach rechts tauscht, erst rechts und
+            # dann links – und wer gleichzeitig andersherum tauscht, umgekehrt:
+            # beide warten aufeinander (Lastenheft 2.10 hat genau das gefunden).
+            _sperren(con, [alt["schicht_id"], neu_id])
+            alt = _einteilung(con, anmelder_id, einteilung_id)
+            if alt is None:
+                raise AnmeldeFehler(["Diese Schicht gehört nicht mehr zu dir."])
             schichten = _schichten_sperren(con, vid, [neu_id])
             person = con.execute("SELECT * FROM helfer WHERE id = ?",
                                  (alt["helfer_id"],)).fetchone()
@@ -1664,6 +1681,11 @@ def abmelden(vid: int, anmelder_id: int, helfer_ids: list[int], grund: str = "")
     try:
         with con:
             abgaben: list[dict] = []
+            # Alle Schichten vorab sperren, aufsteigend (siehe _sperren).
+            _sperren(con, [z["schicht_id"] for z in con.execute(
+                "SELECT e.schicht_id FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+                " WHERE e.helfer_id = ANY(?) AND s.veranstaltung_id = ?",
+                (list(helfer_ids), vid)).fetchall()])
             for helfer_id in helfer_ids:
                 if not _gehoert(con, anmelder_id, helfer_id):
                     continue
@@ -1672,7 +1694,8 @@ def abmelden(vid: int, anmelder_id: int, helfer_ids: list[int], grund: str = "")
                         " b.name AS bereich FROM einteilung e"
                         " JOIN schicht s ON s.id = e.schicht_id"
                         " JOIN bereich b ON b.id = s.bereich_id"
-                        " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? AND s.ende > ?",
+                        " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? AND s.ende > ?"
+                        " ORDER BY s.id",
                         (helfer_id, vid, marke(jetzt_lokal()))).fetchall():
                     abgaben.append(_abgeben(con, e, grund[:300]))
                 con.execute("DELETE FROM warteliste WHERE helfer_id = ? AND schicht_id IN"
@@ -1818,6 +1841,10 @@ def loeschen(anmelder_id: int, helfer_ids: list[int]) -> dict:
     try:
         with con:
             ergebnis = {"geloescht": [], "wartet": [], "abgaben": []}
+            # Alle Schichten vorab sperren, aufsteigend (siehe _sperren).
+            _sperren(con, [z["schicht_id"] for z in con.execute(
+                "SELECT schicht_id FROM einteilung WHERE helfer_id = ANY(?)",
+                (list(helfer_ids),)).fetchall()])
             # Mitangemeldete zuerst – sonst stünden sie kurz ohne Ansprechpartner da.
             reihenfolge = sorted(helfer_ids, key=lambda h: h == anmelder_id)
             for helfer_id in reihenfolge:
@@ -1826,7 +1853,7 @@ def loeschen(anmelder_id: int, helfer_ids: list[int]) -> dict:
                 person = con.execute("SELECT * FROM helfer WHERE id = ?", (helfer_id,)).fetchone()
                 for e in con.execute(
                         "SELECT e.* FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
-                        " WHERE e.helfer_id = ? AND s.ende > ?",
+                        " WHERE e.helfer_id = ? AND s.ende > ? ORDER BY s.id",
                         (helfer_id, marke(jetzt_lokal()))).fetchall():
                     ergebnis["abgaben"].append(_abgeben(con, e, "Daten gelöscht"))
                 con.execute("DELETE FROM warteliste WHERE helfer_id = ?", (helfer_id,))
