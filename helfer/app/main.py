@@ -354,6 +354,8 @@ def _eigen(sitzung, pruefung, nummer: int) -> None:
 # ihr gereicht wird.
 MELDUNGEN = {
     'zusammengefuehrt': 'Zusammengeführt. Was zur anderen Person gehörte, steht jetzt hier.',
+    'eingeladen': 'Die Einladungen sind unterwegs.',
+    'einladen-zu': 'Einladen geht erst, wenn die Anmeldung offen ist.',
     'verschieden': 'Vermerkt: zwei verschiedene Menschen.',
     'zusammen-nr': 'Diese Person gibt es nicht – bitte die Nummer prüfen.',
     'eingeteilt': 'Eingeteilt.',
@@ -424,7 +426,8 @@ def _helfer_gruppen(aktuell) -> list:
              ("/helfer/bereich", "/helfer/schichten", "/helfer/schicht")),
             ("/helfer/aufgaben", "Aufgaben", ("/helfer/aufgabe",)),
             ("/helfer/band", "Zeitplan", ())]),
-        ("Leute", [("/helfer/helfer", "Helfer", ())]),
+        ("Leute", [("/helfer/helfer", "Helfer", ()),
+                   ("/helfer/einladen", "Einladen", ())]),
         ("Vor Ort", vor_ort),
     ]
 
@@ -1242,6 +1245,50 @@ async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
                grenz_ziele=_grenz_ziele(v["id"]) if pflegt else [],
                grenz_arten=db.GRENZ_ARTEN,
                verlauf=db.protokoll(helfer_id) if pflegt else []))
+
+
+# --- Den Helferstamm einladen (Lastenheft 3.3: C-08) ------------------------
+
+def _einladung(request: Request, v, person) -> tuple:
+    """Die Mail an eine Person aus dem Helferstamm: mit ihrem Link direkt zu
+    den Schichten – Name, Größe und Verpflegung sind schon da."""
+    basis = _basis(request)
+    tok = zugang.token(zugang.PLATZ, person)
+    adresse = normalisieren.kurzadresse(v["kurz"])
+    return mail.einladung(person, selbstanmeldung.va_text(v),
+                          f"{basis}/platz/{tok}/{adresse}/schichten", f"{basis}/platz/{tok}")
+
+
+@app.get("/helfer/einladen")
+async def einladen_seite(request: Request, hinweis: str = "",
+                         sitzung: auth.Sitzung = Depends(_sitzung),
+                         v=Depends(_veranstaltung)):
+    """Wer aus dem Helferstamm noch nicht eingeladen ist – und die Mail dazu."""
+    liste = db.stamm_einzuladen(v["id"])
+    beispiel = mail.einladung({"vorname": "Lena", "name": "Lena", "email": ""},
+                              selbstanmeldung.va_text(v), "(Link zu den Schichten)",
+                              "(Link zu Mein Helferplatz)")[3]
+    return templates.TemplateResponse(
+        "admin_einladen.html",
+        _admin(request, sitzung, hinweis=hinweis, liste=liste, offen=_zustand(v) == "offen",
+               schon=db.eingeladen(v["id"]), beispiel=beispiel,
+               darf=_pflegt_grenzen(sitzung)))
+
+
+@app.post("/helfer/einladen")
+async def einladen(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
+                   v=Depends(_veranstaltung)):
+    """C-08: mit einem Klick alle aus dem Helferstamm einladen, die noch
+    nicht dabei sind. Wer schon eine Einladung hat, bekommt keine zweite."""
+    _nur_orga(sitzung)
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    if _zustand(v) != "offen":
+        return _zurueck("/helfer/einladen", "einladen-zu")
+    db.einladen(v["id"], [(p["id"], _einladung(request, v, p))
+                          for p in db.stamm_einzuladen(v["id"])], sitzung.kuerzel)
+    return _zurueck("/helfer/einladen", "eingeladen")
 
 
 # --- Dubletten zusammenführen (Lastenheft 3.2: I-06) ------------------------
@@ -2472,7 +2519,7 @@ def oeffentliche_veranstaltung(request: Request, adresse: str, vorgemerkt: str =
 @app.post("/{adresse:adresse}/interesse")
 async def interesse(request: Request, adresse: str):
     """Interesse an einer angekündigten Veranstaltung vormerken (V-02). Die
-    Mail bei Anmeldestart kommt mit Schritt 3.3."""
+    Mail bei Anmeldestart schickt versand.anmeldestart (3.3)."""
     v = _nach_adresse(adresse)
     if v is None or _zustand(v) != "bald":
         return _nicht_da(request)

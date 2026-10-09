@@ -135,6 +135,22 @@ Hilferuf passiert, wenn viele gleichzeitig klicken:
   rund 5 Sekunden, die letzte von 200 Schichtlisten rund 2. Auf dem Server
   über den Unix-Socket ist der Verbindungsaufbau schneller.
 
+## Anmeldestart und Einladungen
+
+Wenn die Anmeldung öffnet – Status *offen* und im Anmeldezeitraum –, bekommt
+jede vorgemerkte Adresse einmal eine Mail mit dem Link zur Anmeldung
+(Lastenheft 3.3, C-08). Danach ist die Adresse gelöscht, wie beim Vormerken
+versprochen. Das erledigt der Mail-Worker in jeder Runde
+(`versand.anmeldestart`).
+
+Den Helferstamm lädt die Orga unter Leute → Einladen mit einem Klick ein:
+alle, die eingewilligt haben, wieder angeschrieben zu werden, und bei dieser
+Veranstaltung noch nicht dabei sind. Jede Mail trägt den persönlichen Link
+direkt zu den Schichten – Name, Größe und Verpflegung sind schon da – und den
+zu Mein Helferplatz, wo man die Einladungen abstellt. Wer eine Einladung hat,
+bekommt keine zweite; die Seite zeigt vorher, wer sie bekommt und wie sie
+lautet.
+
 ## Datenschutz und Jugendschutz
 
 Seit Lastenheft 2.9 (D-01 bis D-07):
@@ -382,6 +398,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_last.py         # 200 gleichzeitig, Tauschen gegeneinander
 .venv/Scripts/python.exe helfer/tests/test_assistent.py    # Zeit, Vorlieben, Vorschläge, Springer
 .venv/Scripts/python.exe helfer/tests/test_dubletten.py    # zusammenführen, auseinanderhalten
+.venv/Scripts/python.exe helfer/tests/test_einladen.py     # Anmeldestart, Helferstamm einladen
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

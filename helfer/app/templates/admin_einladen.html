@@ -1,0 +1,44 @@
+{% extends "admin_base.html" %}
+{% block titel %}Einladen{% endblock %}
+{% block ueberschrift %}Helferstamm einladen{% endblock %}
+
+{# C-08: wer eingewilligt hat, wieder angeschrieben zu werden (D-03), bekommt
+   bei Anmeldestart eine Mail mit seinem Link direkt zu den Schichten. Wer
+   Interesse vorgemerkt hat, bekommt seine Mail von selbst (versand.py). #}
+{% block inhalt %}
+  <p>Wer bei einer früheren Veranstaltung eingewilligt hat, wieder angeschrieben zu werden,
+    bekommt eine Mail mit seinem persönlichen Link: Name, Größe und Verpflegung sind schon
+    da, es fehlen nur die Schichten. Wer Interesse vorgemerkt hat, bekommt seine Mail von
+    selbst, sobald die Anmeldung offen ist.</p>
+
+  <section class="kasten">
+    <h2>Noch nicht eingeladen ({{ liste | length }})</h2>
+    {% if schon %}
+      <p class="hilfe">{{ schon }} {{ 'hat' if schon == 1 else 'haben' }} schon eine Einladung und {{ 'bekommt' if schon == 1 else 'bekommen' }} keine zweite.</p>
+    {% endif %}
+    {% if not liste %}
+      <p class="leer">Niemand – alle aus dem Helferstamm sind eingeladen oder schon dabei.</p>
+    {% else %}
+      <ul class="strichliste">
+        {% for p in liste %}
+          <li><span><a href="/helfer/helfer/{{ p.id }}">{{ p.name }}</a></span>
+            <span class="gedaempft">{{ p.email }}</span></li>
+        {% endfor %}
+      </ul>
+      {% if not offen %}
+        <p class="hilfe">Einladen geht, sobald die Anmeldung offen ist – Status und
+          Anmeldezeitraum stehen bei der Veranstaltung.</p>
+      {% elif darf %}
+        <form method="post" action="/helfer/einladen">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="knopf">{{ liste | length }} {{ 'Person' if liste | length == 1 else 'Personen' }} einladen</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Die Mail</h2>
+    <pre>{{ beispiel }}</pre>
+  </section>
+{% endblock %}

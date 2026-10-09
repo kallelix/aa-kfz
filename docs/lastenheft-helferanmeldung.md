@@ -430,6 +430,15 @@ einer Gruppe für die großen Bereiche. Admin ist eine Vereinsnummer, nicht ein
 privates Handy – sonst hängt der Helferstamm an einer Person. In der
 Ankündigungsgruppe niemanden mit @ erwähnen: das zeigt dessen Nummer allen.
 
+**Stand 09.10.2026, Schritt 3.3:** C-08 ist umgesetzt. Wer Interesse
+vorgemerkt hat, bekommt eine Mail, sobald die Anmeldung offen ist – Status
+*offen* und im Anmeldezeitraum –, und seine Adresse ist danach gelöscht. Den
+Helferstamm lädt die Orga im Backoffice mit einem Klick ein (Leute →
+Einladen): wer eingewilligt hat und noch nicht dabei ist, bekommt seinen
+Link direkt zu den Schichten, Name, Größe und Verpflegung sind vorbelegt.
+Niemand bekommt dieselbe Einladung zweimal. „Bleibst du dabei?“ (D-04) steht
+noch aus; bis dahin sagt jede Einladung, wo man sie abstellt.
+
 ### 5.9 Listen und Ausdrucke (L)
 
 | Nr. | Anforderung | Prio | Phase |
@@ -880,7 +889,7 @@ Phase Vorrang.
 | --- | --- | --- |
 | 3.1 | **Assistent**: Verfügbarkeit, Vorlieben, Vorschläge nach Dringlichkeit, Springer | **erledigt** |
 | 3.2 | Dubletten zusammenführen (I-06); das Erkennen kommt mit 2.4 | **erledigt** |
-| 3.3 | Mail bei Anmeldestart an die Vorgemerkten (C-08); das Vormerken kommt mit 2.2 | 2 h |
+| 3.3 | Mail bei Anmeldestart an die Vorgemerkten (C-08); das Vormerken kommt mit 2.2 | **erledigt** |
 | 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | 5 h |
 | 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | 3 h |
 | 3.6 | ~~Warteliste mit Nachrücken~~ – vorgezogen in 2.5 | – |
@@ -909,7 +918,7 @@ Fehler beheben, nichts Neues.
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
-| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~22 h erledigt |
+| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~24 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |
 

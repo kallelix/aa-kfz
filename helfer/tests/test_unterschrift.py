@@ -530,7 +530,9 @@ try:
             ("/helfer/aufgabe/neu", ("Helfer", "Planen", "Aufgaben")),
             ("/helfer/bereich/neu", ("Helfer", "Planen", "Bereiche & Schichten")),
             ("/helfer/schichten", ("Helfer", "Planen", "Bereiche & Schichten")),
-            ("/helfer/helfer/neu", ("Helfer", "Leute", None)),
+            # Seit 3.3 hat Leute zwei Punkte: Helfer und Einladen.
+            ("/helfer/helfer/neu", ("Helfer", "Leute", "Helfer")),
+            ("/helfer/einladen", ("Helfer", "Leute", "Einladen")),
             # Seit 2.8 steht unter Vor Ort auch Drucken, also eine dritte Ebene.
             ("/helfer/monitor", ("Helfer", "Vor Ort", "Monitor")),
             ("/helfer/druck", ("Helfer", "Vor Ort", "Drucken")),

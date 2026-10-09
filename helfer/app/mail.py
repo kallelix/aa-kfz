@@ -191,6 +191,46 @@ def dazu(person, va_text: str, eintraege, platz: str) -> tuple:
     return ("dazu", person["email"], "Neue Schicht eingetragen", text)
 
 
+# --- Anmeldestart (Lastenheft 3.3: C-08) ------------------------------------
+
+def anmeldung_offen(email: str, vorname: str, va_text: str, anmeldung: str) -> tuple:
+    """An alle, die Interesse vorgemerkt haben (V-02) – einmal."""
+    text = "\n".join([
+        f"Hallo {vorname}," if vorname else "Hallo,",
+        "",
+        f"die Anmeldung für {va_text} ist offen. Du wolltest Bescheid",
+        "bekommen – hier geht es los:",
+        "",
+        f"  {anmeldung}",
+        "",
+        "Deine Adresse haben wir damit wieder gelöscht.",
+        _fuss(),
+    ])
+    return ("anmeldestart", email, "Die Anmeldung ist offen", text)
+
+
+def einladung(person, va_text: str, schichten: str, platz: str) -> tuple:
+    """An den Helferstamm (D-03): die Angaben sind schon da, es fehlen nur
+    die Schichten."""
+    text = "\n".join([
+        f"Hallo {_vorname(person)},",
+        "",
+        f"die Anmeldung für {va_text} ist offen – und wir würden uns",
+        "freuen, wenn du wieder dabei bist!",
+        "",
+        "Deine Angaben haben wir noch. Such dir einfach Schichten aus:",
+        "",
+        f"  {schichten}",
+        "",
+        "Keine Zeit diesmal? Dann ignoriere diese Mail einfach.",
+        "Keine Einladungen mehr? Das stellst du in Mein Helferplatz ab:",
+        "",
+        f"  {platz}",
+        _fuss(),
+    ])
+    return ("einladung", person["email"], "Die Anmeldung ist offen – bist du wieder dabei?", text)
+
+
 # --- Selbstbedienung (Lastenheft 2.5) ---------------------------------------
 
 def abgesagt(person, va_text: str, zeilen: list[str], platz: str) -> tuple:

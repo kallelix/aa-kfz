@@ -1200,6 +1200,82 @@ def interesse_vormerken(vid: int, email: str, vorname: str) -> bool:
         con.close()
 
 
+def interesse_faellig() -> list[Zeile]:
+    """Vorgemerkte (V-02), deren Veranstaltung jetzt zur Anmeldung offen ist
+    – Status *offen* und im Anmeldezeitraum (C-08)."""
+    heute = jetzt_lokal().date()
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT i.* FROM interesse i JOIN kern.veranstaltung v ON v.id = i.veranstaltung_id"
+            " WHERE i.benachrichtigt_am IS NULL AND v.status = 'offen'"
+            " AND (v.anmeldung_ab IS NULL OR v.anmeldung_ab <= ?)"
+            " AND (v.anmeldung_bis IS NULL OR v.anmeldung_bis >= ?) ORDER BY i.id",
+            (heute, heute)).fetchall()
+    finally:
+        con.close()
+
+
+def interesse_benachrichtigen(interesse_id: int, mail: tuple) -> None:
+    """Reiht die Mail ein und vergisst die Adresse – „Danach löschen wir die
+    Adresse wieder“, steht auf der Seite. Beides oder keins."""
+    con = verbinden()
+    try:
+        with con:
+            if con.execute("DELETE FROM interesse WHERE id = ?", (interesse_id,)).rowcount:
+                mail_einreihen(None, mail, con)
+    finally:
+        con.close()
+
+
+# --- Den Helferstamm einladen (Lastenheft 3.3: C-08) ------------------------
+
+def stamm_einzuladen(vid: int) -> list[Zeile]:
+    """Wer aus dem Helferstamm (D-03) zu dieser Veranstaltung noch keine
+    Einladung hat und nicht ohnehin schon dabei ist."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT h.* FROM helfer h WHERE h.stamm_einwilligung_am IS NOT NULL"
+            " AND h.email <> '' AND h.aktiv = 1 AND h.loeschen_beantragt_am IS NULL"
+            " AND NOT EXISTS (SELECT 1 FROM teilnahme t WHERE t.helfer_id = h.id"
+            "                 AND t.veranstaltung_id = ?)"
+            " AND NOT EXISTS (SELECT 1 FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            "                 WHERE e.helfer_id = h.id AND s.veranstaltung_id = ?)"
+            " AND NOT EXISTS (SELECT 1 FROM einladung x WHERE x.helfer_id = h.id"
+            "                 AND x.veranstaltung_id = ?)"
+            " ORDER BY lower(h.name)", (vid, vid, vid)).fetchall()
+    finally:
+        con.close()
+
+
+def eingeladen(vid: int) -> int:
+    con = verbinden()
+    try:
+        return int(con.execute("SELECT COUNT(*) FROM einladung WHERE veranstaltung_id = ?",
+                               (vid,)).fetchone()[0])
+    finally:
+        con.close()
+
+
+def einladen(vid: int, einladungen: list[tuple[int, tuple]], wer: str) -> int:
+    """Je Person die Einladung vermerken und die Mail einreihen – wer schon
+    eine hat, bekommt keine zweite. Gibt zurück, wie viele es waren."""
+    con = verbinden()
+    try:
+        with con:
+            neu = 0
+            for helfer_id, mail in einladungen:
+                if con.execute("INSERT INTO einladung (veranstaltung_id, helfer_id, wer, am)"
+                               " VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                               (vid, helfer_id, wer, jetzt())).rowcount:
+                    mail_einreihen(helfer_id, mail, con)
+                    neu += 1
+            return neu
+    finally:
+        con.close()
+
+
 # --- Wiedererkennen, Bestätigen, Mein Helferplatz (Lastenheft 2.4) ---------
 
 def _gleicher_name(a: str, b: str) -> bool:
@@ -1500,12 +1576,15 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                         " (SELECT 1 FROM verfuegbarkeit x WHERE x.helfer_id = ?"
                         "  AND x.veranstaltung_id = v.veranstaltung_id"
                         "  AND x.beginn = v.beginn AND x.ende = v.ende)", (weg, behalten))
+            con.execute("DELETE FROM einladung g WHERE helfer_id = ? AND EXISTS"
+                        " (SELECT 1 FROM einladung x WHERE x.helfer_id = ?"
+                        "  AND x.veranstaltung_id = g.veranstaltung_id)", (weg, behalten))
             con.execute("DELETE FROM einsatzgrenze g WHERE helfer_id = ? AND EXISTS"
                         " (SELECT 1 FROM einsatzgrenze x WHERE x.helfer_id = ?"
                         "  AND x.bereich_id IS NOT DISTINCT FROM g.bereich_id"
                         "  AND x.schicht_id IS NOT DISTINCT FROM g.schicht_id)", (weg, behalten))
-            for tabelle in ("verfuegbarkeit", "einsatzgrenze", "ausleihe", "protokoll",
-                            "absage", "mail_out"):
+            for tabelle in ("verfuegbarkeit", "einsatzgrenze", "einladung", "ausleihe",
+                            "protokoll", "absage", "mail_out"):
                 con.execute("UPDATE " + tabelle + " SET helfer_id = ? WHERE helfer_id = ?",
                             (behalten, weg))
             # Die Unterschrift unter der Shirt-Ausgabe hängt an der Person.

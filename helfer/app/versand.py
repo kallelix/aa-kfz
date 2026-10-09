@@ -171,8 +171,25 @@ def fristen() -> tuple[int, int]:
     return erinnert, verfallen
 
 
+def anmeldestart() -> int:
+    """C-08: wer Interesse vorgemerkt hat, bekommt eine Mail, sobald die
+    Anmeldung offen ist – einmal. Danach ist die Adresse weg."""
+    geschrieben = 0
+    for zeile in db.interesse_faellig():
+        v = db.VERANSTALTUNGEN.laden(zeile["veranstaltung_id"])
+        if v is None:
+            continue
+        db.interesse_benachrichtigen(zeile["id"], mail.anmeldung_offen(
+            zeile["email"], zeile["vorname"], selbstanmeldung.va_text(v),
+            link("/" + normalisieren.kurzadresse(v["kurz"]))))
+        geschrieben += 1
+    return geschrieben
+
+
 def runde() -> None:
     gesendet, fehlgeschlagen = verschicken()
+    if anmeldestart():
+        protokoll.info("Anmeldestart: Vorgemerkte benachrichtigt")
     erinnert, verfallen = fristen()
     if gesendet or fehlgeschlagen or erinnert or verfallen:
         protokoll.info("Versand: %s gesendet, %s fehlgeschlagen, %s erinnert, %s verfallen",
