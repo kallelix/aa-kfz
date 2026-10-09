@@ -7,6 +7,13 @@
   <p class="unterzeile">Wo geholfen wird – Streckenposten, Shuttle, Orgabüro … –
     und darin die Schichten.</p>
 
+  {% if allein %}
+    <section class="kasten kasten-warnung">
+      <h2>Bitte eine zweite Person dazu planen</h2>
+      {% include "_allein.html" %}
+    </section>
+  {% endif %}
+
   {% if not nur_eigene %}
     <p class="knopfreihe">
       <a class="knopf" href="/helfer/bereich/neu">Neuer Bereich</a>

@@ -1,0 +1,15 @@
+{# Wer „nur zu zweit“ hat und allein steht (K-07). Ohne Begründung – nur
+   wer, wo und dass jemand dazu muss. Für Übersicht und Meine Bereiche. #}
+<div class="tabelle-huelle">
+  <table>
+    <tbody>
+      {% for a in allein %}
+        <tr>
+          <td><a href="/helfer/helfer/{{ a.helfer_id }}">{{ a.name }}</a> steht allein</td>
+          <td><a href="/helfer/schicht/{{ a.schicht_id }}">{{ a.bereich }}</a>
+            <span class="gedaempft nowrap">{{ a.beginn | zeitpunkt }}</span></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

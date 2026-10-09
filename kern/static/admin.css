@@ -937,6 +937,10 @@ tr.hat-luecke td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
 }
 .kasten h2 { margin-top: 0; }
 .kasten-ok { border-color: var(--ok); }
+/* Etwas, das jemand anfassen sollte – kein Fehler. */
+.kasten-warnung { border-color: #d29200; }
+.grenze-neu { margin-top: 1rem; }
+.grenze-neu h3 { margin-top: 0; }
 
 .unterzeile { margin-top: -.6rem; color: var(--gedaempft); }
 

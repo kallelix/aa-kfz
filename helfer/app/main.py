@@ -305,6 +305,17 @@ def _leitung(sitzung) -> int | None:
     return sitzung.konto_id if sitzung.ist_bereichsleitung else None
 
 
+def _sieht_grenzen(sitzung) -> bool:
+    """Einsatzgrenzen sehen nur Orga und die Leitung des betroffenen
+    Bereichs (K-08) – nicht, wer nur lesend dabei ist."""
+    return sitzung.rolle in ("admin", "orga") or sitzung.ist_bereichsleitung
+
+
+def _pflegt_grenzen(sitzung) -> bool:
+    """Setzen, aufheben und übersteuern darf nur die Orga (K-05, K-09)."""
+    return sitzung.rolle in ("admin", "orga")
+
+
 def _eigen(sitzung, pruefung, nummer: int) -> None:
     """Bricht ab, wenn eine Bereichsleitung etwas außerhalb ihrer Bereiche
     anfasst. `pruefung` ist eine der db.leitet_*-Funktionen."""
@@ -347,13 +358,21 @@ MELDUNGEN = {
     'schicht-besetzt': 'Auf dieser Schicht stehen noch Leute. Erst austragen, dann löschen.',
     'alter-gesenkt': 'Gespeichert. Das Mindestalter dieser Schicht liegt unter dem ihres Bereichs – Jugendliche dann nur unter ständiger Aufsicht eines Erwachsenen.',
     'vorlage-nicht': 'Übernehmen geht nur in eine Veranstaltung, die noch keine Bereiche hat.',
+    'grenze-gesetzt': 'Einsatzgrenze gespeichert.',
+    'grenze-aufgehoben': 'Einsatzgrenze aufgehoben.',
+    'grenze-ziel': 'Bitte einen Bereich oder eine Schicht dieser Veranstaltung wählen.',
+    'zweit-nur-bereich': '„Nur zu zweit“ gilt für einen ganzen Bereich, nicht für eine einzelne Schicht.',
+    'grenze': 'Für diese Person gilt hier eine Einsatzgrenze. Trotzdem einteilen? Dann bitte mit Vermerk.',
+    'grenze-orga': 'Für diese Person gilt hier eine Einsatzgrenze. Übersteuern kann das nur die Orga.',
+    'vermerk-fehlt': 'Ohne Vermerk geht es nicht.',
 }
 
 # Welche davon eine Warnung ist und keine Erfolgsmeldung.
 WARNUNGEN = ("schon-drin", "keiner", "unbekannt", "widerrufen", "groesse",
              "nichts", "kein-kennzeichen", "tshirt-zurueck", "geloescht",
              "abgebrochen", "kein-tablet", "bereich-nicht-leer",
-             "schicht-besetzt", "alter-gesenkt", "vorlage-nicht")
+             "schicht-besetzt", "alter-gesenkt", "vorlage-nicht", "grenze-ziel",
+             "zweit-nur-bereich", "grenze", "grenze-orga", "vermerk-fehlt")
 
 
 # --- Navigation (Lastenheft 2.1b, kern/navigation.py) -----------------------
@@ -524,6 +543,7 @@ async def uebersicht(request: Request, hinweis: str = "",
                groessen=normalisieren.GROESSEN,
                luecken=luecken[:12], luecken_gesamt=len(luecken),
                konflikte=db.konflikte(v["id"]), doppelt=db.doppelt_besetzt(v["id"]),
+               allein=db.allein(v["id"]) if _sieht_grenzen(sitzung) else [],
                importe=db.importe()[:1], jetzt=db.jetzt_lokal()))
 
 
@@ -547,7 +567,7 @@ async def schichten(request: Request, bereich: str = "", tag: str = "",
 
 @app.get("/helfer/schicht/{schicht_id}")
 async def schicht(request: Request, schicht_id: int, hinweis: str = "",
-                  suche: str = "",
+                  suche: str = "", bestaetigen: str = "",
                   sitzung: auth.Sitzung = Depends(_sitzung),
                   v=Depends(_veranstaltung)):
     eintrag = db.schicht_laden(schicht_id)
@@ -557,10 +577,17 @@ async def schicht(request: Request, schicht_id: int, hinweis: str = "",
     _eigen(sitzung, db.leitet_schicht, schicht_id)
     besetzt = db.besetzung(schicht_id)
     drin = {z["id"] for z in besetzt}
+    # Die Rückfrage vor dem Übersteuern einer Einsatzgrenze (K-09).
+    trotzdem = None
+    if bestaetigen.isdigit() and _pflegt_grenzen(sitzung):
+        trotzdem = db.helfer_laden(int(bestaetigen))
     return templates.TemplateResponse(
         "admin_schicht.html",
         _admin(request, sitzung, hinweis=hinweis, schicht=eintrag,
-               besetzung=besetzt, suche=suche,
+               besetzung=besetzt, suche=suche, trotzdem=trotzdem,
+               sieht_grenzen=_sieht_grenzen(sitzung),
+               allein=db.allein(v["id"], schicht_id=schicht_id)
+               if _sieht_grenzen(sitzung) else [],
                helfer=[h for h in db.helfer_liste(v["id"]) if h["id"] not in drin]))
 
 
@@ -588,7 +615,19 @@ async def einteilen(request: Request, schicht_id: int,
     if db.steht_schon_drin(schicht_id, helfer_id):
         return _zurueck(ziel, "schon-drin")
 
-    db.einteilen(schicht_id, helfer_id, quelle="hand", kuerzel=sitzung.kuerzel)
+    # Eine Einsatzgrenze übersteuert nur die Orga, und nur mit Vermerk (K-09).
+    vermerk = ""
+    if db.unter_grenze(schicht_id, helfer_id):
+        if not _pflegt_grenzen(sitzung):
+            return _zurueck(ziel, "grenze-orga")
+        if not daten.get("trotzdem"):
+            return _zurueck(ziel, "grenze", bestaetigen=helfer_id)
+        vermerk = " ".join(str(daten.get("vermerk") or "").split())[:200]
+        if not vermerk:
+            return _zurueck(ziel, "vermerk-fehlt", bestaetigen=helfer_id)
+
+    db.einteilen(schicht_id, helfer_id, quelle="hand", kuerzel=sitzung.kuerzel,
+                 vermerk=vermerk)
     return _zurueck(ziel, "eingeteilt")
 
 
@@ -620,6 +659,9 @@ async def bereiche(request: Request, hinweis: str = "",
         "admin_bereiche.html",
         _admin(request, sitzung, hinweis=hinweis, bereichsliste=liste,
                leitungen=db.leitungen([b["id"] for b in liste]),
+               # Die Orga sieht den Hinweis in der Übersicht.
+               allein=db.allein(v["id"], sitzung.konto_id)
+               if sitzung.ist_bereichsleitung else [],
                vorlagen=[] if liste or sitzung.ist_bereichsleitung
                else db.vorlagen(v["id"])))
 
@@ -635,7 +677,7 @@ async def bereiche_aus_vorlage(request: Request,
         quelle = int(str(daten.get("von") or ""))
     except ValueError:
         return _zurueck("/helfer/bereiche", "vorlage-nicht")
-    ergebnis = db.vorlage_uebernehmen(v["id"], quelle)
+    ergebnis = db.vorlage_uebernehmen(v["id"], quelle, sitzung.kuerzel)
     if ergebnis is None:
         return _zurueck("/helfer/bereiche", "vorlage-nicht")
     tage = ergebnis["tage"]
@@ -1134,10 +1176,64 @@ async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
     if sitzung.ist_bereichsleitung:
         eigene = {b["id"] for b in db.bereiche(v["id"], sitzung.konto_id)}
         schichten = [s for s in schichten if s["bereich_id"] in eigene]
+    pflegt = _pflegt_grenzen(sitzung)
     return templates.TemplateResponse(
         "admin_helfer_detail.html",
         _admin(request, sitzung, hinweis=hinweis, person=person,
-               schichten=schichten))
+               schichten=schichten, sieht_grenzen=_sieht_grenzen(sitzung),
+               grenzen=db.grenzen(v["id"], helfer_id, _leitung(sitzung))
+               if _sieht_grenzen(sitzung) else [],
+               grenz_ziele=_grenz_ziele(v["id"]) if pflegt else [],
+               grenz_arten=db.GRENZ_ARTEN,
+               verlauf=db.protokoll(helfer_id) if pflegt else []))
+
+
+def _grenz_ziele(vid: int) -> list[dict]:
+    """Je Bereich der ganze Bereich und darunter seine Schichten – für die
+    Auswahl beim Setzen einer Einsatzgrenze."""
+    alle = db.schichten(vid)
+    return [{"bereich": b, "schichten": [s for s in alle if s["bereich_id"] == b["id"]]}
+            for b in db.bereiche(vid)]
+
+
+@app.post("/helfer/helfer/{helfer_id}/grenze")
+async def grenze_setzen(request: Request, helfer_id: int,
+                        sitzung: auth.Sitzung = Depends(_sitzung),
+                        v=Depends(_veranstaltung)):
+    """Eine Einsatzgrenze setzen (K-05). Nur die Grenze, kein Grund – es
+    gibt dafür auch kein Feld (K-08)."""
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    if not _pflegt_grenzen(sitzung):
+        raise kern_auth.KeinZugang("bereichsleitung")
+    if db.helfer_laden(helfer_id) is None:
+        return _fehlt(request)
+    ziel = "/helfer/helfer/%d" % helfer_id
+    roh = str(daten.get("ziel") or "")
+    art = str(daten.get("art") or "")
+    bereich_id = int(roh[1:]) if roh[:1] == "b" and roh[1:].isdigit() else None
+    schicht_id = int(roh[1:]) if roh[:1] == "s" and roh[1:].isdigit() else None
+    if art == "nur_zu_zweit" and schicht_id is not None:
+        return _zurueck(ziel, "zweit-nur-bereich", sprung="grenzen")
+    if not db.grenze_setzen(v["id"], helfer_id, art, bereich_id, schicht_id,
+                            sitzung.kuerzel):
+        return _zurueck(ziel, "grenze-ziel", sprung="grenzen")
+    return _zurueck(ziel, "grenze-gesetzt", sprung="grenzen")
+
+
+@app.post("/helfer/grenze/{grenze_id}/aufheben")
+async def grenze_aufheben(request: Request, grenze_id: int,
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    if not _pflegt_grenzen(sitzung):
+        raise kern_auth.KeinZugang("bereichsleitung")
+    helfer_id = db.grenze_aufheben(grenze_id, sitzung.kuerzel)
+    if helfer_id is None:
+        return _zurueck("/helfer/helfer", "unbekannt")
+    return _zurueck("/helfer/helfer/%d" % helfer_id, "grenze-aufgehoben", sprung="grenzen")
 
 
 # --- Monitor ---------------------------------------------------------------

@@ -29,6 +29,14 @@
     </p>
   </section>
 
+  {% if allein %}
+    {# K-07: ohne Begründung, nur was zu tun ist. #}
+    <section class="kasten kasten-warnung">
+      <p><strong>Bitte eine zweite Person dazu planen.</strong>
+        {{ allein[0].name }} sollte hier nicht allein stehen.</p>
+    </section>
+  {% endif %}
+
   <section>
     <h2>Eingeteilt</h2>
     {% if not besetzung %}
@@ -65,7 +73,8 @@
                   {% else %}<span class="gedaempft">–</span>{% endif %}
                 </td>
                 <td class="gedaempft">{{ {'import': 'Import', 'hand': 'von Hand', 'selbst': 'selbst angemeldet'}[h.quelle] }}
-                  {%- if h.art == 'reserve' %} <span class="marke">Reserve</span>{% endif %}</td>
+                  {%- if h.art == 'reserve' %} <span class="marke">Reserve</span>{% endif %}
+                  {%- if h.vermerk and sieht_grenzen %} <span class="marke" title="{{ h.vermerk }}">mit Vermerk</span>{% endif %}</td>
                 <td class="rechts">
                   <form method="post"
                         action="/helfer/einteilung/{{ h.einteilung_id }}/austragen">
@@ -85,6 +94,24 @@
 
   <section>
     <h2>Jemanden einteilen</h2>
+    {% if trotzdem %}
+      {# K-09: übersteuern geht, aber nicht stillschweigend. #}
+      <form method="post" action="/helfer/schicht/{{ schicht.id }}/einteilen"
+            class="einteilen kasten kasten-warnung">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="helfer_id" value="{{ trotzdem.id }}">
+        <input type="hidden" name="trotzdem" value="1">
+        <p>Für <strong>{{ trotzdem.name }}</strong> gilt hier eine Einsatzgrenze.</p>
+        <label for="vermerk">Vermerk – warum es diesmal passt</label>
+        <input type="text" id="vermerk" name="vermerk" maxlength="200" required
+               placeholder="z. B. abgesprochen, diesmal zu zweit">
+        <p class="hilfe">Wie bei der Grenze selbst: kein Grund, keine Diagnose.</p>
+        <p class="knopfreihe">
+          <button type="submit" class="knopf">Trotzdem einteilen</button>
+          <a class="knopf-schlicht" href="/helfer/schicht/{{ schicht.id }}">Abbrechen</a>
+        </p>
+      </form>
+    {% endif %}
     {% if not helfer %}
       <p class="leer">Alle erfassten Helfer stehen bereits auf dieser Schicht.</p>
     {% else %}

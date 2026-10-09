@@ -248,7 +248,8 @@ try:
     pruefe("Du bist Reserve" in seite, "ist das Soll erreicht, wird man Reserve (R-03)")
     status, _, seite = angaben([FRUEH], {"ich-vorname": "Cleo", "ich-email": "cleo@example.org"},
                                voraussetzung="Führerschein Klasse B")
-    pruefe(status == 409 and "inzwischen voll" in seite, "ist auch die Reserve voll, geht es nicht")
+    pruefe(status == 409 and "gerade nicht frei" in seite and "andere, die Hilfe brauchen" in seite,
+           "ist auch die Reserve voll, geht es nicht")
     _, _, seite = anfrage("GET", "/aa-2027/schichten")
     pruefe(f'name="s" value="{FRUEH}"' not in seite, "eine volle Schicht ist nicht mehr wählbar")
 
@@ -290,7 +291,7 @@ try:
     status, _, seite = angaben([MITTAG], {"ich-vorname": "Gert", "ich-email": "gert@example.org"},
                                weitere=[{**familie[0], "vorname": "Gerda"}],
                                voraussetzung="Führerschein Klasse B")
-    pruefe(status == 409 and ("voll" in seite or "nicht mehr für alle" in seite),
+    pruefe(status == 409 and "gerade nicht für alle 2 Platz" in seite,
            "für zwei weitere ist kein Platz mehr")
 
     print("Weitere Person dazu und weg, ohne Skript")

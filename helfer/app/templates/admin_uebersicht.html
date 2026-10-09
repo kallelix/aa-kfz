@@ -104,9 +104,15 @@
     </div>
   </section>
 
-  {% if konflikte or doppelt %}
+  {% if konflikte or doppelt or allein %}
     <section>
       <h2>Bitte prüfen</h2>
+
+      {% if allein %}
+        {# K-07: ohne Begründung, nur was zu tun ist. #}
+        <h3>Bitte eine zweite Person dazu planen ({{ allein | length }})</h3>
+        {% include "_allein.html" %}
+      {% endif %}
 
       {% if konflikte %}
         <h3>Zur selben Zeit auf zwei Schichten ({{ konflikte | length }})</h3>

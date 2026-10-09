@@ -209,7 +209,8 @@ def helfer_schichten(vid: int, helfer_id: int) -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
-            "SELECT e.id AS einteilung_id, e.quelle, s.*, b.name AS bereich"
+            "SELECT e.id AS einteilung_id, e.quelle, e.art, e.vermerk, s.*,"
+            " b.name AS bereich"
             " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
             " JOIN bereich b ON b.id = s.bereich_id"
             " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? ORDER BY s.beginn",
@@ -555,8 +556,8 @@ def besetzung(schicht_id: int) -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
-            "SELECT e.id AS einteilung_id, e.quelle, e.art, e.bemerkung AS notiz,"
-            " e.eingeteilt_am, h.*"
+            "SELECT e.id AS einteilung_id, e.quelle, e.art, e.vermerk,"
+            " e.bemerkung AS notiz, e.eingeteilt_am, h.*"
             " FROM einteilung e JOIN helfer h ON h.id = e.helfer_id"
             " WHERE e.schicht_id = ?"
             " ORDER BY lower(h.name), e.id", (schicht_id,)).fetchall()
@@ -693,12 +694,14 @@ def vorlagen(vid: int) -> list[Zeile]:
         con.close()
 
 
-def vorlage_uebernehmen(vid: int, quelle_id: int) -> dict | None:
+def vorlage_uebernehmen(vid: int, quelle_id: int, wer: str = "") -> dict | None:
     """Bereiche, Schichten, Goodies und das Angebot einer früheren
     Veranstaltung in diese kopieren. Die Schichten wandern um so viele Tage,
     wie die beiden Veranstaltungen auseinanderliegen – gemessen am ersten
     Tag. Einteilungen bleiben, wo sie sind: die Leute haben sich für damals
-    gemeldet, nicht für jetzt.
+    gemeldet, nicht für jetzt. Einsatzgrenzen auf ganze Bereiche kommen mit
+    – sie gelten der Person, nicht dem Jahr; die auf einzelne Schichten
+    nicht, die Schichten sind ja neue.
 
     Nur in eine Veranstaltung ohne Bereiche; sonst None. Zusammenführen
     hieße raten, welcher Bereich welcher ist.
@@ -728,6 +731,17 @@ def vorlage_uebernehmen(vid: int, quelle_id: int) -> dict | None:
                     "INSERT INTO bereich_leitung (bereich_id, konto_id)"
                     " SELECT ?, konto_id FROM bereich_leitung WHERE bereich_id = ?",
                     (neu[b["id"]], b["id"]))
+                for g in con.execute(
+                        "SELECT * FROM einsatzgrenze WHERE bereich_id = ? ORDER BY id",
+                        (b["id"],)).fetchall():
+                    con.execute(
+                        "INSERT INTO einsatzgrenze (helfer_id, bereich_id, art,"
+                        " angelegt_von, angelegt_am) VALUES (?, ?, ?, ?, ?)",
+                        (g["helfer_id"], neu[b["id"]], g["art"], g["angelegt_von"],
+                         g["angelegt_am"]))
+                    _protokollieren(con, g["helfer_id"], wer,
+                                    f"Einsatzgrenze aus {quelle['kurz']} übernommen: "
+                                    f"{b['name']} – {GRENZ_ARTEN[g['art']]}")
             schichten = con.execute(
                 "SELECT * FROM schicht WHERE veranstaltung_id = ? ORDER BY beginn",
                 (quelle_id,)).fetchall()
@@ -877,8 +891,10 @@ def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
                         gruende.append(f"{s['text']} ist erst ab {s['alter_ab']} – für "
                                        f"{person['vorname']} geht das noch nicht.")
 
-            # Wer schon da ist, mit seinen Schichten in dieser Veranstaltung.
+            # Wer schon da ist, mit seinen Schichten in dieser Veranstaltung –
+            # und mit seinen Einsatzgrenzen (K-06).
             ids, belegt = [], {}
+            gesperrt: set[int] = set()
             anmelder_email = personen[0]["email"]
             for i, person in enumerate(personen):
                 zeile = con.execute(
@@ -891,6 +907,7 @@ def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
                         " JOIN bereich b ON b.id = s.bereich_id"
                         " WHERE e.helfer_id = ? AND s.veranstaltung_id = ?",
                         (zeile["id"], vid)).fetchall()
+                    gesperrt |= _gesperrt(con, vid, zeile["id"])
             for i, eigene in belegt.items():
                 for alt in eigene:
                     for s in schichten:
@@ -903,7 +920,10 @@ def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
                                            f"{_schicht_text(alt)}, für die "
                                            f"{personen[i]['vorname']} schon eingetragen ist.")
 
-            # Platz, Reserve oder voll – für alle Personen zusammen.
+            # Platz, Reserve oder voll – für alle Personen zusammen. Eine
+            # Schicht hinter einer Einsatzgrenze ist für die Person schlicht
+            # nicht frei: dieselben Worte wie bei einer vollen, damit niemand
+            # an der Antwort merkt, dass es um ihn geht (K-06).
             verteilung: dict[int, list[str]] = {}
             for s in schichten:
                 zahlen = con.execute(
@@ -920,10 +940,11 @@ def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
                     elif reserve_frei:
                         arten.append("reserve")
                         reserve_frei -= 1
-                if len(arten) < len(personen):
+                if len(arten) < len(personen) or s["id"] in gesperrt:
                     gruende.append(
-                        f"{s['text']} ist inzwischen voll." if len(personen) == 1 else
-                        f"In {s['text']} ist nicht mehr für alle {len(personen)} Platz.")
+                        f"{s['text']} ist gerade nicht frei – in der Liste findest "
+                        "du andere, die Hilfe brauchen." if len(personen) == 1 else
+                        f"In {s['text']} ist gerade nicht für alle {len(personen)} Platz.")
                 verteilung[s["id"]] = arten
 
             if gruende:
@@ -1010,21 +1031,204 @@ def interesse_vormerken(vid: int, email: str, vorname: str) -> bool:
         con.close()
 
 
+# --- Einsatzgrenzen (Lastenheft 2.3: K-05 bis K-09) ------------------------
+
+# So steht es im Backoffice – und so könnte es die Person lesen (K-08).
+GRENZ_ARTEN = {"nicht_anbieten": "nicht anbieten", "nur_zu_zweit": "nur zu zweit einplanen"}
+
+
+def _protokollieren(con: Verbindung, helfer_id: int, wer: str, was: str) -> None:
+    con.execute("INSERT INTO protokoll (helfer_id, wer, was, am) VALUES (?, ?, ?, ?)",
+                (helfer_id, wer, was, jetzt()))
+
+
+def protokoll(helfer_id: int) -> list[Zeile]:
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM protokoll WHERE helfer_id = ?"
+                           " ORDER BY am DESC, id DESC", (helfer_id,)).fetchall()
+    finally:
+        con.close()
+
+
+def _gesperrt(con: Verbindung, vid: int, helfer_id: int) -> set[int]:
+    """Die Schichten, die dieser Person nicht angeboten werden – einzeln
+    oder mit ihrem ganzen Bereich."""
+    return {int(z["id"]) for z in con.execute(
+        "SELECT s.id FROM schicht s JOIN einsatzgrenze g ON g.helfer_id = ?"
+        " AND g.art = 'nicht_anbieten'"
+        " AND (g.schicht_id = s.id OR g.bereich_id = s.bereich_id)"
+        " WHERE s.veranstaltung_id = ?", (helfer_id, vid)).fetchall()}
+
+
+def gesperrt(vid: int, helfer_id: int) -> set[int]:
+    """Für Mein Helferplatz (2.4) und den Assistenten: was dort nicht
+    erscheint."""
+    con = verbinden()
+    try:
+        return _gesperrt(con, vid, helfer_id)
+    finally:
+        con.close()
+
+
+def unter_grenze(schicht_id: int, helfer_id: int) -> bool:
+    """Ob diese Schicht der Person nicht angeboten wird – fürs Einteilen von
+    Hand (K-09)."""
+    return _gibt_es(
+        "SELECT 1 FROM schicht s JOIN einsatzgrenze g ON g.helfer_id = ?"
+        " AND g.art = 'nicht_anbieten'"
+        " AND (g.schicht_id = s.id OR g.bereich_id = s.bereich_id) WHERE s.id = ?",
+        (helfer_id, schicht_id))
+
+
+_GRENZE_VON = (
+    " FROM einsatzgrenze g"
+    " LEFT JOIN schicht s ON s.id = g.schicht_id"
+    " JOIN bereich b ON b.id = COALESCE(g.bereich_id, s.bereich_id)")
+_GRENZE_SPALTEN = "SELECT g.*, b.name AS bereich, b.veranstaltung_id, s.beginn, s.ende"
+
+
+def _grenz_text(g) -> str:
+    """'Shuttle – nicht anbieten' oder mit der Schicht davor."""
+    ziel = _schicht_text(g) if g["schicht_id"] else g["bereich"]
+    return f"{ziel} – {GRENZ_ARTEN[g['art']]}"
+
+
+def grenzen(vid: int, helfer_id: int, leitung: int | None = None) -> list[dict]:
+    """Die Einsatzgrenzen einer Person in dieser Veranstaltung. Eine
+    Bereichsleitung sieht nur die in ihren Bereichen (K-08)."""
+    sql = (_GRENZE_SPALTEN + _GRENZE_VON +
+           " WHERE g.helfer_id = ? AND b.veranstaltung_id = ?")
+    werte: tuple = (helfer_id, vid)
+    if leitung is not None:
+        sql += " AND " + _GELEITET
+        werte += (leitung,)
+    con = verbinden()
+    try:
+        zeilen = [dict(z) for z in con.execute(
+            sql + " ORDER BY lower(b.name), s.beginn NULLS FIRST", werte).fetchall()]
+    finally:
+        con.close()
+    for z in zeilen:
+        z["text"] = _grenz_text(z)
+    return zeilen
+
+
+def grenze_laden(grenze_id: int) -> Zeile | None:
+    con = verbinden()
+    try:
+        return con.execute(_GRENZE_SPALTEN + _GRENZE_VON + " WHERE g.id = ?",
+                           (grenze_id,)).fetchone()
+    finally:
+        con.close()
+
+
+def grenze_setzen(vid: int, helfer_id: int, art: str, bereich_id: int | None = None,
+                  schicht_id: int | None = None, wer: str = "") -> bool:
+    """Setzt die Grenze; eine auf dasselbe Ziel ersetzt die alte. False, wenn
+    Bereich oder Schicht nicht zu dieser Veranstaltung gehören."""
+    if art not in GRENZ_ARTEN or (bereich_id is None) == (schicht_id is None):
+        return False
+    if art == "nur_zu_zweit" and bereich_id is None:
+        return False
+    tabelle, nummer = ("bereich", bereich_id) if bereich_id else ("schicht", schicht_id)
+    con = verbinden()
+    try:
+        with con:
+            if con.execute(f"SELECT 1 FROM {tabelle} WHERE id = ? AND veranstaltung_id = ?",
+                           (nummer, vid)).fetchone() is None:
+                return False
+            # Dieselbe Grenze noch einmal ist keine Änderung – auch nicht im
+            # Protokoll.
+            if con.execute(f"SELECT 1 FROM einsatzgrenze WHERE helfer_id = ?"
+                           f" AND {tabelle}_id = ? AND art = ?",
+                           (helfer_id, nummer, art)).fetchone() is not None:
+                return True
+            grenze_id = con.execute(
+                "INSERT INTO einsatzgrenze (helfer_id, bereich_id, schicht_id, art,"
+                " angelegt_von, angelegt_am) VALUES (?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT (helfer_id, bereich_id, schicht_id) DO UPDATE SET"
+                " art = excluded.art, angelegt_von = excluded.angelegt_von,"
+                " angelegt_am = excluded.angelegt_am RETURNING id",
+                (helfer_id, bereich_id, schicht_id, art, wer, jetzt())).fetchone()[0]
+            g = con.execute(_GRENZE_SPALTEN + _GRENZE_VON + " WHERE g.id = ?",
+                            (grenze_id,)).fetchone()
+            _protokollieren(con, helfer_id, wer, "Einsatzgrenze gesetzt: " + _grenz_text(g))
+        return True
+    finally:
+        con.close()
+
+
+def grenze_aufheben(grenze_id: int, wer: str = "") -> int | None:
+    """Hebt die Grenze auf; gibt die Person zurück, None, wenn es sie nicht gab."""
+    con = verbinden()
+    try:
+        with con:
+            g = con.execute(_GRENZE_SPALTEN + _GRENZE_VON + " WHERE g.id = ?",
+                            (grenze_id,)).fetchone()
+            if g is None:
+                return None
+            con.execute("DELETE FROM einsatzgrenze WHERE id = ?", (grenze_id,))
+            _protokollieren(con, g["helfer_id"], wer,
+                            "Einsatzgrenze aufgehoben: " + _grenz_text(g))
+        return int(g["helfer_id"])
+    finally:
+        con.close()
+
+
+def allein(vid: int, leitung: int | None = None,
+           schicht_id: int | None = None) -> list[Zeile]:
+    """Wer „nur zu zweit“ hat und in einer Schicht allein steht (K-07) – für
+    den Hinweis an Orga und Bereichsleitung. Vorbei ist vorbei."""
+    sql = ("SELECT s.id AS schicht_id, s.datum, s.beginn, s.ende, b.name AS bereich,"
+           " h.id AS helfer_id, h.name"
+           " FROM einsatzgrenze g"
+           " JOIN schicht s ON s.bereich_id = g.bereich_id"
+           " JOIN einteilung e ON e.schicht_id = s.id AND e.helfer_id = g.helfer_id"
+           " JOIN bereich b ON b.id = s.bereich_id"
+           " JOIN helfer h ON h.id = g.helfer_id"
+           " WHERE g.art = 'nur_zu_zweit' AND s.veranstaltung_id = ? AND s.ende > ?"
+           " AND (SELECT COUNT(DISTINCT x.helfer_id) FROM einteilung x"
+           "      WHERE x.schicht_id = s.id) = 1")
+    werte: tuple = (vid, marke(jetzt_lokal()))
+    if leitung is not None:
+        sql += " AND " + _GELEITET
+        werte += (leitung,)
+    if schicht_id is not None:
+        sql += " AND s.id = ?"
+        werte += (schicht_id,)
+    con = verbinden()
+    try:
+        return con.execute(sql + " ORDER BY s.beginn, lower(b.name)", werte).fetchall()
+    finally:
+        con.close()
+
+
 # --- Einteilung ------------------------------------------------------------
 
 def einteilen(schicht_id: int, helfer_id: int, quelle: str = "hand",
-              kuerzel: str = "",
+              kuerzel: str = "", vermerk: str = "",
               con: Verbindung | None = None) -> int:
+    """Von Hand oder aus dem Import. Ein Vermerk heißt: trotz Einsatzgrenze
+    (K-09) – das steht dann auch im Protokoll der Person."""
     eigene = con is None
     con = con or verbinden()
     try:
         with (con if eigene else _offen()):
             zeiger = con.execute(
                 "INSERT INTO einteilung (schicht_id, helfer_id, quelle,"
-                " kuerzel, eingeteilt_am) VALUES (?, ?, ?, ?, ?)"
+                " kuerzel, vermerk, eingeteilt_am) VALUES (?, ?, ?, ?, ?, ?)"
                 " RETURNING id",
-                (schicht_id, helfer_id, quelle, kuerzel, jetzt()))
+                (schicht_id, helfer_id, quelle, kuerzel, vermerk, jetzt()))
             nummer = int(zeiger.fetchone()[0])
+            if vermerk:
+                schicht = con.execute(
+                    "SELECT s.beginn, s.ende, b.name AS bereich FROM schicht s"
+                    " JOIN bereich b ON b.id = s.bereich_id WHERE s.id = ?",
+                    (schicht_id,)).fetchone()
+                _protokollieren(con, helfer_id, kuerzel,
+                                f"Trotz Einsatzgrenze eingeteilt: {_schicht_text(schicht)}"
+                                f" – {vermerk}")
         return nummer
     finally:
         if eigene:

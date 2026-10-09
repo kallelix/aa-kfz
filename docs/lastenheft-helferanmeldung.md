@@ -294,6 +294,14 @@ Backoffice vor vielen Augen, und gemeint ist Teilhabe, nicht Ausschluss.
 | K-08 | Gespeichert wird **nur die Grenze, nie der Grund** – keine Diagnose, keine Beschreibung der Einschränkung; das wären Gesundheitsdaten nach Art. 9 DSGVO. Sichtbar nur für Orga und die Leitung des betroffenen Bereichs, nicht in der CSV-Ausfuhr; Änderungen stehen im Protokoll. Formuliert so, dass die Person es lesen könnte: bei einer Auskunft nach Art. 15 DSGVO gehört der Eintrag dazu. | M | 2 |
 | K-09 | Die Orga kann trotzdem von Hand einteilen (wie K-02), mit Vermerk. | S | 2 |
 
+**Stand 09.10.2026:** K-05 bis K-09 sind umgesetzt (Schritt 2.3). Eine Schicht
+hinter einer Grenze bekommt in der Anmeldung dieselben Worte wie eine volle
+(„… ist gerade nicht frei – in der Liste findest du andere, die Hilfe
+brauchen“). Erkannt wird die Person bis 2.4 an Name und Adresse wie beim
+Import; in Mein Helferplatz, im Assistenten und in Hilferufen greift dieselbe
+Sperre, sobald es sie gibt. Grenzen auf ganze Bereiche wandern mit der Vorlage
+ins nächste Jahr.
+
 ### 5.6 Reserve, Warteliste, Springer (R)
 
 | Nr. | Anforderung | Prio | Phase |
@@ -642,6 +650,10 @@ ohne Umweg. `teilnahme`, `verfuegbarkeit` und `interesse` sind neu. Shirt und
 Verpflegung stehen vorerst weiter an der Person; je Veranstaltung wandern sie
 mit der Ausgabe am Check-in (4.2).
 
+**Mit 2.3** kamen `einsatzgrenze` wie skizziert (ohne Feld für einen Grund)
+und `protokoll` (id, helfer_id, wer, was, am) dazu, beide im Schema helfer;
+an `einteilung` steht der Vermerk, wenn die Orga eine Grenze übersteuert.
+
 ---
 
 ## 8. Ablösung von helferliste.online
@@ -712,7 +724,7 @@ Selbstbedienung.
 | 2.1a | **Bereichsleitung als Konto** (B-02, aus Phase 3): sieht und pflegt nur ihre Bereiche, Schichten und Leute; Empfänger für Meldungen und Ausdrucke | **erledigt** |
 | 2.1b | **Navigation nach dem Klickentwurf**: Veranstaltung im Kopf, Reiter nach dem, was sie nutzt (V-08), Gruppen im Helferbereich (Übersicht, Planen, Leute, Vor Ort), Einrichten bei der Veranstaltung, Goodie-Schalter und Shirt-Schnitt; die Ausgabe als eigener Reiter, vorerst mit den heutigen Seiten für Funk und Schlüssel | **erledigt** |
 | 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten; **Interesse vormerken** bei angekündigten Veranstaltungen (aus 3.3); Verfügbarkeit und Vorlieben schon im Datenmodell, für den Assistenten | **erledigt** |
-| 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | 3 h |
+| 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | **erledigt** |
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 9 h |
 | 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; **Warteliste mit Nachrücken** (R-04, aus 3.6); Meldung kurzfristiger Absagen; Protokoll | 11 h |
 | 2.6 | „Noch eine Schicht?" nach dem Eintragen, Tagesbalken auf der Startseite | 3 h |
@@ -740,14 +752,14 @@ Bestehendes umgebaut.
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
 89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 bis
-2.2 schon erledigt; es bleiben rund 42 Stunden, die 8 Stunden pro Woche haben
+2.3 schon erledigt; es bleiben rund 39 Stunden, die 8 Stunden pro Woche haben
 also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~42 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~39 h, ab 12. Oktober |
 | --- | --- |
 | Anfang Dezember 2026 | ~6 h |
-| **Mitte Dezember 2026** | **~5 h** |
-| Rückfallebene: Anfang März 2027 | ~3 h |
+| **Mitte Dezember 2026** | **~4 h** |
+| Rückfallebene: Anfang März 2027 | ~2 h |
 
 Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
 bis Ende April gut 3 Stunden pro Woche – mit sechs Wochen Puffer bis zum
@@ -794,7 +806,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~65 h, davon ~25 h erledigt |
+| 2 Öffnung | ~65 h, davon ~28 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |

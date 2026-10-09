@@ -46,6 +46,27 @@ Hand eingeteilte Helfer – im Backoffice mit der Quelle „selbst angemeldet“
 gegebenenfalls als Reserve. Bestätigung per Mail und „Mein Helferplatz“ folgen
 mit Schritt 2.4.
 
+## Einsatzgrenzen
+
+Für Helfer mit Einschränkungen, die aus dem Gedanken der Inklusion dabei sind
+(Lastenheft 2.3, K-05 bis K-09). Die Orga setzt sie auf der Seite der Person:
+einen Bereich oder eine Schicht **nicht anbieten**, einen Bereich **nur zu
+zweit**. Gespeichert wird nur die Grenze, nie der Grund – es gibt dafür auch
+kein Feld.
+
+- Die Grenzen wirken still. Wer sich für eine Schicht hinter einer Grenze
+  anmeldet, bekommt wortgleich dieselbe Antwort wie bei einer vollen Schicht.
+  Erkannt wird die Person wie beim Import an Name und Adresse.
+- Steht jemand mit „nur zu zweit“ allein in einer Schicht, zeigen die
+  Übersicht, die Schicht und – für die Bereichsleitung – „Meine Bereiche“ einen
+  Hinweis, ohne Begründung. Auf dem Monitor steht nichts davon.
+- Sehen dürfen die Grenzen Orga und Admin, die Bereichsleitung nur die in
+  ihren Bereichen; lesende Konten nicht. In der CSV-Ausfuhr stehen sie nicht.
+- Einteilen von Hand trotz Grenze geht nur für die Orga und nur mit Vermerk.
+- Jede Änderung steht im Protokoll der Person; geht die Person, gehen
+  Grenzen und Protokoll mit. Die Vorlage aus dem Vorjahr nimmt Grenzen auf
+  ganze Bereiche mit, die auf einzelne Schichten nicht.
+
 ## Starten
 
 Im Alltag als Teil des Dienstes, siehe [Übersicht](../README.md#lokal-starten).
@@ -157,6 +178,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_monitor.py      # Monitor mit gestellter Uhr
 .venv/Scripts/python.exe helfer/tests/test_bereiche.py     # Bereiche, Schichten, Goodies, Vorlage
 .venv/Scripts/python.exe helfer/tests/test_anmeldung.py    # die öffentliche Anmeldung
+.venv/Scripts/python.exe helfer/tests/test_grenzen.py      # Einsatzgrenzen
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen
