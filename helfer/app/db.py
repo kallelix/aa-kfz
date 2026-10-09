@@ -2310,6 +2310,11 @@ def zaehler(vid: int) -> dict:
                 "SELECT COUNT(*) FROM schicht s WHERE s.veranstaltung_id = ?"
                 " AND s.soll > (SELECT COUNT(*) FROM einteilung e"
                 "                 WHERE e.schicht_id = s.id AND e.art = 'platz')", vid),
+            # R-02: rot ist, was unter dem Minimum liegt – darunter geht es nicht.
+            "unter_minimum": eine(
+                "SELECT COUNT(*) FROM schicht s WHERE s.veranstaltung_id = ?"
+                " AND s.minimum > (SELECT COUNT(*) FROM einteilung e"
+                "                    WHERE e.schicht_id = s.id AND e.art = 'platz')", vid),
             "tshirts": {z["tshirt"]: z["anzahl"] for z in con.execute(
                 "SELECT tshirt, COUNT(*) AS anzahl FROM helfer"
                 " WHERE tshirt IS NOT NULL GROUP BY tshirt")},
@@ -2665,6 +2670,12 @@ def monitor_stand(vid: int, zeitpunkt: datetime,
             "programm_heute": len(programm),
             "offen_jetzt": sum(z["fehlt"] for z in laufend),
             "offen_gesamt": gesamt["offen"],
+            # R-06, T-04: wer jetzt einspringen kann. S-07: kurzfristige
+            # Absagen – auf dem Monitor ohne Namen, er hängt im Zelt.
+            "springer": springer_lage(vid, zeitpunkt),
+            "kurzfristig": [a for a in kurzfristige_absagen(vid)
+                            if a["beginn"] <= (zeitpunkt + timedelta(hours=24))
+                            .strftime("%Y-%m-%d %H:%M")],
         }
     finally:
         con.close()
@@ -3574,3 +3585,34 @@ def springer_am(vid: int, datum: str) -> list[Zeile]:
             " ORDER BY f.beginn, lower(h.name)", (vid, datum)).fetchall()
     finally:
         con.close()
+
+
+# --- Springer jetzt (Lastenheft 2.7, R-06) ----------------------------------
+
+def springer_lage(vid: int, zeitpunkt: datetime | None = None, stunden: int = 3) -> dict:
+    """Wer gerade als Springer da ist und nirgends eingeteilt – mit Name,
+    Nummer und bis wann –, und wie viele in den nächsten Stunden dazukommen
+    (R-06). Für Übersicht und Monitor."""
+    zeitpunkt = zeitpunkt or jetzt_lokal()
+    jetzt_ = zeitpunkt.strftime("%Y-%m-%d %H:%M")
+    bis = (zeitpunkt + timedelta(hours=stunden)).strftime("%Y-%m-%d %H:%M")
+    con = verbinden()
+    try:
+        frei = con.execute(
+            "SELECT DISTINCT ON (h.id) h.id, h.name,"
+            " COALESCE(NULLIF(h.telefon, ''), a.telefon, '') AS telefon, f.ende"
+            " FROM verfuegbarkeit f JOIN helfer h ON h.id = f.helfer_id"
+            " LEFT JOIN helfer a ON a.id = h.angemeldet_von"
+            " WHERE f.veranstaltung_id = ? AND f.springer = 1"
+            " AND f.beginn <= ? AND f.ende > ?"
+            " AND NOT EXISTS (SELECT 1 FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            "  WHERE e.helfer_id = h.id AND s.beginn <= ? AND s.ende > ?)"
+            " ORDER BY h.id, f.ende DESC", (vid, jetzt_, jetzt_, jetzt_, jetzt_)).fetchall()
+        bald = con.execute(
+            "SELECT COUNT(DISTINCT helfer_id) FROM verfuegbarkeit"
+            " WHERE veranstaltung_id = ? AND springer = 1 AND beginn > ? AND beginn <= ?",
+            (vid, jetzt_, bis)).fetchone()[0]
+    finally:
+        con.close()
+    return {"jetzt": sorted(frei, key=lambda z: z["name"].lower()), "bald": int(bald),
+            "stunden": stunden}

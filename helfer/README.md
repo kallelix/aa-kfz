@@ -92,6 +92,20 @@ Die erste Schicht ist leicht – es geht um die zweite und dritte (Lastenheft
 - Die Startseite zeigt je Tag, wie viele der geplanten Plätze besetzt sind –
   das Wir, keine Rangliste.
 
+## Stufen, Springer und der Monitor
+
+Seit Lastenheft 2.7 (R-02, R-06, T-04) färben Übersicht, Schichtliste,
+Bereich und Monitor nach Stufen statt nach Bedarf: **rot** unter Minimum –
+darunter geht es nicht –, **gelb** unter Soll, **grün** ab Soll. Die Reserve
+zählt nie als fehlend, steht aber als „+1“ dabei. Die Übersicht hat eine
+Kachel „Unter Minimum“ und zeigt rot vor gelb.
+
+Wer als Springer gerade da ist und nirgends eingeteilt, steht in der
+Übersicht mit Nummer und auf dem Monitor mit Namen – dazu, wie viele in den
+nächsten drei Stunden kommen. Kurzfristige Absagen stehen auf dem Monitor
+oben, ohne Namen und Grund: der Bildschirm hängt im Zelt. Hervorgehoben wird
+dort wie bisher erst ab `MONITOR_WARNUNG` fehlenden Leuten.
+
 ## Drucken
 
 Unter Vor Ort → Drucken (Lastenheft 2.8, L-01 bis L-04), jederzeit aktuell –
@@ -133,8 +147,8 @@ Veranstaltung (Lastenheft 2.5, 5.3):
   der Veranstaltung) oder fällt die Schicht unter ihr Minimum, geht sofort
   eine Mail an die Bereichsleitung, ohne Bereichsleitung an `KONTAKT_MAIL`.
   Kurzfristige Absagen stehen oben in der Übersicht und unter „Meine
-  Bereiche“, mit den Springern, die jetzt könnten. Auf den Monitor kommen sie
-  mit Schritt 2.7.
+  Bereiche“, mit den Springern, die jetzt könnten – auf dem Monitor ohne
+  Namen und Grund.
 - **Protokoll und „Änderungen“**: Was Helfer selbst tun, was die Orga von
   Hand ein- und austrägt und was nachrückt, steht im Protokoll der Person und
   unter Übersicht → Änderungen (seit gestern, drei Tagen, einer Woche); die
@@ -276,6 +290,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_helferplatz.py  # Bestätigen, Mein Helferplatz, Kalender
 .venv/Scripts/python.exe helfer/tests/test_selbstbedienung.py  # Absagen, Tauschen, Warteliste, Löschen
 .venv/Scripts/python.exe helfer/tests/test_druck.py        # Noch eine Schicht?, Tagesbalken, Drucken
+.venv/Scripts/python.exe helfer/tests/test_stufen.py       # Stufen, Springer, Absagen auf dem Monitor
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

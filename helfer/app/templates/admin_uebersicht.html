@@ -5,6 +5,25 @@
 {% block inhalt %}
   {% if kurzfristig %}{% include "_kurzfristig.html" %}{% endif %}
 
+  {% if springer.jetzt or springer.bald %}
+    {# R-06: wer jetzt einspringen kann – und wie viele bald dazukommen. #}
+    <section class="kasten">
+      <h2>Springer jetzt ({{ springer.jetzt | length }})</h2>
+      {% if springer.jetzt %}
+        <ul class="strichliste">
+          {% for f in springer.jetzt %}
+            <li><span><a href="/helfer/helfer/{{ f.id }}">{{ f.name }}</a>
+              {%- if f.telefon %} · {{ f.telefon }}{% endif %}</span>
+              <span class="gedaempft">bis {{ f.ende[11:16] if f.ende[11:16] != '00:00' else '24:00' }}</span></li>
+          {% endfor %}
+        </ul>
+      {% else %}<p class="leer">Gerade niemand.</p>{% endif %}
+      {% if springer.bald %}
+        <p class="hilfe">In den nächsten {{ springer.stunden }} Stunden kommen {{ springer.bald }} dazu.</p>
+      {% endif %}
+    </section>
+  {% endif %}
+
   {% if not zaehler.schichten %}
     <div class="kasten">
       <h2>Noch keine Daten</h2>
@@ -31,6 +50,12 @@
       <p class="zaehler-zahl">{{ zaehler.offen }}</p>
       <p class="zaehler-detail">auf {{ zaehler.luecken }} Schichten</p>
     </div>
+    {# R-02: was unter dem Minimum liegt, ist rot – darunter geht es nicht. #}
+    <div class="zaehler-kachel {% if zaehler.unter_minimum %}zaehler-rot{% endif %}">
+      <p class="zaehler-titel">Unter Minimum</p>
+      <p class="zaehler-zahl">{{ zaehler.unter_minimum }}</p>
+      <p class="zaehler-detail">Schichten</p>
+    </div>
     <div class="zaehler-kachel">
       <p class="zaehler-titel">Helfer</p>
       <p class="zaehler-zahl">{{ zaehler.helfer }}</p>
@@ -39,11 +64,9 @@
   </section>
 
   {% if zaehler.bedarf %}
-    {% set anteil = (100 * zaehler.besetzt / zaehler.bedarf) | round(1) %}
-    <p class="balken" role="img"
-       aria-label="{{ zaehler.besetzt }} von {{ zaehler.bedarf }} Plätzen besetzt">
-      <span class="balken-voll" style="width: {{ anteil }}%"></span>
-    </p>
+    {# <progress> statt einer Breite im style-Attribut – die verbietet die CSP. #}
+    <progress class="balken" max="{{ zaehler.bedarf }}" value="{{ zaehler.besetzt }}"
+              aria-label="{{ zaehler.besetzt }} von {{ zaehler.bedarf }} Plätzen besetzt"></progress>
     <p class="hilfe">{{ zaehler.besetzt }} von {{ zaehler.bedarf }} Plätzen
       besetzt, {{ zaehler.offen }} offen.</p>
   {% endif %}
@@ -67,8 +90,11 @@
                 <td class="nowrap">{{ s.datum | tag }}</td>
                 <td class="zeit">{{ s | spanne }}</td>
                 <td><a href="/helfer/schicht/{{ s.id }}">{{ s.bereich }}</a></td>
-                <td class="rechts"><span class="marke marke-luecke">{{ s.fehlt }}</span></td>
-                <td class="rechts">{{ s.besetzt }} / {{ s.soll }}</td>
+                {% set stufe = s | stufe %}
+                <td class="rechts"><span class="marke marke-{{ 'luecke' if stufe == 'rot' else 'knapp' }}"
+                    title="{{ 'unter Minimum' if stufe == 'rot' else 'unter Soll' }}">{{ s.fehlt }}</span></td>
+                <td class="rechts">{{ s.besetzt }} / {{ s.soll }}
+                  {%- if s.reserve_besetzt %} <span class="gedaempft">+{{ s.reserve_besetzt }}</span>{% endif %}</td>
               </tr>
             {% endfor %}
           </tbody>

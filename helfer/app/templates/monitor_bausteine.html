@@ -35,3 +35,18 @@
     {% endif %}
   </div>
 {% endmacro %}
+
+{# R-02: rot unter Minimum, gelb unter Soll. Hervorgehoben wird wie bisher
+   erst ab MONITOR_WARNUNG fehlenden Leuten; 0 heißt nie. #}
+{% macro stufe(s, schwelle) -%}
+  {%- if schwelle and s.fehlt >= schwelle -%}
+    {{ 'schicht-luecke' if s | stufe == 'rot' else 'schicht-knapp' }}
+  {%- endif -%}
+{%- endmacro %}
+
+{# Die Reserve zählt nie als fehlend, gezeigt wird sie trotzdem. #}
+{% macro quote(s) -%}
+  <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.soll }}
+    {%- if s.reserve_besetzt %} +{{ s.reserve_besetzt }}{% endif %}</span></span>
+{%- endmacro %}
+

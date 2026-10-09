@@ -23,7 +23,7 @@
             </thead>
             <tbody>
               {% for s in schichten %}
-                <tr{% if s.fehlt %} class="hat-luecke"{% endif %}>
+                <tr{% if s.fehlt %} class="hat-luecke stufe-{{ s | stufe }}"{% endif %}>
                   <td class="nowrap">{{ s.datum | tag }}</td>
                   <td class="zeit">
                     <a href="/helfer/schicht/{{ s.id }}">{{ s | spanne }}</a>
@@ -32,7 +32,9 @@
                     {%- if s.intern and not bereich.intern %} <span class="marke">intern</span>{% endif %}
                   </td>
                   <td class="rechts nowrap">{{ s.minimum }} / {{ s.soll }} / {{ s.reserve }}</td>
-                  <td class="rechts">{{ s.besetzt }}</td>
+                  <td class="rechts">{{ s.besetzt }}
+                    {%- if s.reserve_besetzt %} <span class="gedaempft">+{{ s.reserve_besetzt }}</span>{% endif %}
+                    {%- if s | stufe == 'rot' %} <span class="marke marke-luecke">unter Minimum</span>{% endif %}</td>
                   <td class="rechts nowrap">
                     <a class="knopf-schlicht" href="/helfer/schicht/{{ s.id }}/aendern">ändern</a>
                     <a class="knopf-schlicht" href="/helfer/bereich/{{ bereich.id }}/schicht/neu?von={{ s.id }}"

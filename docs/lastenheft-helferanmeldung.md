@@ -273,8 +273,8 @@ Warteliste (R-04): wer eine volle Schicht ankreuzt, steht darauf; wird ein
 Platz frei, rückt erst die Reserve auf, dann bekommt die Erste der
 Warteliste ihn angeboten und hält ihn 24 Stunden. Beim Tauschen wird bestätigt,
 was die neue Schicht verlangt (Führerschein). Kurzfristige Absagen stehen
-oben in der Übersicht und gehen per Mail an die Bereichsleitung – auf den
-Monitor kommen sie mit 2.7. Bei S-05 zählt nur, was an der Person hängt
+oben in der Übersicht und gehen per Mail an die Bereichsleitung; seit 2.7
+stehen sie auch auf dem Monitor, ohne Namen. Bei S-05 zählt nur, was an der Person hängt
 (Funkgeräte); Schlüssel sind nur über den Namen vermerkt.
 
 ### 5.4 Identität und Datenqualität (I)
@@ -333,6 +333,13 @@ ins nächste Jahr.
 | R-06 | Dashboard und Monitor zeigen die Springer, die **jetzt** verfügbar sind, und wie viele es in den nächsten Stunden werden. | M | 2 |
 | R-07 | Die Orga setzt einen Springer mit zwei Tipps in eine Schicht; er bekommt die Zuweisung als Mail bzw. per Anruf. Auch vorab möglich: wer bis zu einer Frist nur Zeiten angegeben hat, wird von der Orga eingeteilt und bekommt Bescheid. | S | 4 |
 | R-08 | Springer-Zeit zählt für die Anerkennung wie eine Schicht. | M | 4 |
+
+**Stand 09.10.2026, Schritt 2.7:** R-02 und R-06 sind umgesetzt, dazu T-04.
+Übersicht, Schichtliste, Bereich und Monitor färben rot unter Minimum, gelb
+unter Soll, grün ab Soll; die Reserve steht als „+1“ dabei und fehlt nie. Die
+Springer, die jetzt können, stehen in der Übersicht mit Nummer, auf dem
+Monitor mit Namen, jeweils mit der Zahl derer, die in den nächsten drei
+Stunden kommen. Die Übersicht hat eine Kachel „Unter Minimum“.
 
 ### 5.7 Anerkennung und Gamification (G)
 
@@ -776,7 +783,7 @@ Selbstbedienung.
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | **erledigt** |
 | 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; **Warteliste mit Nachrücken** (R-04, aus 3.6); Meldung kurzfristiger Absagen; Protokoll | **erledigt** |
 | 2.6 | „Noch eine Schicht?" nach dem Eintragen, Tagesbalken auf der Startseite | **erledigt** |
-| 2.7 | Dashboard und Monitor: Stufen statt Bedarf, Reserve, Springer, kurzfristige Absagen | 4 h |
+| 2.7 | Dashboard und Monitor: Stufen statt Bedarf, Reserve, Springer, kurzfristige Absagen | **erledigt** |
 | 2.8 | Druckansichten und Notfallmappe | **erledigt** |
 | 2.9 | Datenschutzhinweise, Einwilligungen, Altersprüfung, Elternbestätigung, Löschwerkzeug angepasst | 5 h |
 | 2.10 | Lasttest: 200 gleichzeitige Anmeldungen auf dieselben zehn Plätze, Umbuchen gegeneinander | 2 h |
@@ -800,13 +807,13 @@ Bestehendes umgebaut.
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
 89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 bis
-2.6 und 2.8 schon erledigt; es bleiben rund 13 Stunden, die 8 Stunden pro Woche haben
+2.8 schon erledigt; es bleiben rund 9 Stunden, die 8 Stunden pro Woche haben
 also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~13 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~9 h, ab 12. Oktober |
 | --- | --- |
-| Anfang Dezember 2026 | ~2 h |
-| **Mitte Dezember 2026** | **~1,5 h** |
+| Anfang Dezember 2026 | ~1,5 h |
+| **Mitte Dezember 2026** | **~1 h** |
 | Rückfallebene: Anfang März 2027 | ~1 h |
 
 Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
@@ -854,7 +861,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~65 h, davon ~54 h erledigt |
+| 2 Öffnung | ~65 h, davon ~58 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |

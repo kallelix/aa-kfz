@@ -13,6 +13,29 @@
 <div class="raster" data-jetzt="{{ stand.jetzt.isoformat(timespec='seconds') }}"
      data-tag="{{ stand.tag_lang }}">
 
+  {% if stand.kurzfristig or stand.springer.jetzt or stand.springer.bald %}
+    {# S-07: kurzfristige Absagen – ohne Namen, der Monitor hängt im Zelt.
+       R-06, T-04: wer jetzt einspringen kann. #}
+    <section class="hinweisleiste">
+      {% for schicht_id, gruppe in stand.kurzfristig | groupby('schicht_id') %}
+        {% set a = gruppe[0] %}
+        {% if a.besetzt < a.soll %}
+          <p class="hinweis-absage"><strong>Kurzfristig abgesagt:</strong>
+            {{ a.bereich }} {{ a.beginn[11:16] }}–{{ a.ende[11:16] }}
+            · jetzt {{ a.besetzt }}/{{ a.soll }}
+            {%- if a.besetzt < a.minimum %} · <span class="fehlt">unter Minimum</span>{% endif %}</p>
+        {% endif %}
+      {% endfor %}
+      {% if stand.springer.jetzt or stand.springer.bald %}
+        <p class="hinweis-springer"><strong>Springer jetzt:</strong>
+          {% if stand.springer.jetzt %}{{ stand.springer.jetzt | map(attribute='name') | join(' · ') }}
+          {%- else %}niemand{% endif %}
+          {%- if stand.springer.bald %} · in den nächsten {{ stand.springer.stunden }} Stunden
+            {{ stand.springer.bald }} weitere{% endif %}</p>
+      {% endif %}
+    </section>
+  {% endif %}
+
   <section class="tafel tafel-jetzt">
     <h2>Jetzt im Dienst
       {% if stand.offen_jetzt %}
@@ -25,11 +48,11 @@
     {% else %}
       <ul class="schichten">
         {% for s in stand.laufend %}
-          <li class="schicht{% if warnschwelle and s.fehlt >= warnschwelle %} schicht-luecke{% endif %}">
+          <li class="schicht {{ bausteine.stufe(s, warnschwelle) }}">
             <button type="button" class="kachel" data-schicht="{{ s.id }}">
               <span class="schicht-kopf">
                 <span class="liste">{{ s.bereich }}</span>
-                <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.soll }}</span></span>
+                {{ bausteine.quote(s) }}
               </span>
               <span class="schicht-zeit">
                 {{ s.beginn[11:] }}–{{ s.ende[11:] }}
@@ -114,11 +137,11 @@
     {% else %}
       <ul class="kommende">
         {% for s in stand.demnaechst %}
-          <li class="{% if warnschwelle and s.fehlt >= warnschwelle %}schicht-luecke{% endif %}">
+          <li class="{{ bausteine.stufe(s, warnschwelle) }}">
             <button type="button" class="kachel" data-schicht="{{ s.id }}">
               <span class="zeit">{{ s.beginn[11:] }}</span>
               <span class="liste">{{ s.bereich }}</span>
-              <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.soll }}</span></span>
+              {{ bausteine.quote(s) }}
               {% if s.fehlt %}<span class="fehlt">{{ s.fehlt }} offen</span>{% endif %}
             </button>
             {{ bausteine.detail(s) }}

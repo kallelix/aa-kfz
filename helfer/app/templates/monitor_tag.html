@@ -50,11 +50,11 @@
     {% else %}
       <ul class="tagesliste">
         {% for s in tagesblick.schichten %}
-          <li class="{% if warnschwelle and s.fehlt >= warnschwelle %}schicht-luecke{% endif %}">
+          <li class="{{ bausteine.stufe(s, warnschwelle) }}">
             <button type="button" class="kachel" data-schicht="{{ s.id }}">
               <span class="zeit">{{ s.beginn[11:] }}–{{ s.ende[11:] }}</span>
               <span class="liste">{{ s.bereich }}</span>
-              <span class="quote">{{ s.besetzt }}<span class="von">/{{ s.soll }}</span></span>
+              {{ bausteine.quote(s) }}
               {% if s.fehlt %}
                 <span class="fehlt">{{ s.fehlt }} offen</span>
               {% else %}

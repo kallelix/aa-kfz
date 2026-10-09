@@ -891,6 +891,8 @@ tr[id^="zeile-"]:target { background: var(--flaeche); }
 .marke-voll { border-color: var(--ok); color: var(--ok); }
 
 tr.hat-luecke td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
+/* R-02: unter Soll, aber über dem Minimum – gelb statt rot. */
+tr.hat-luecke.stufe-gelb td:first-child { box-shadow: inset 3px 0 0 #d29200; }
 
 .zeit { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rechts { text-align: right; }
@@ -905,6 +907,17 @@ tr.hat-luecke td:first-child { box-shadow: inset 3px 0 0 var(--fehler); }
   margin: 0 0 .35rem;
 }
 .balken-voll { display: block; height: 100%; background: var(--ok); }
+/* Dasselbe als <progress> – ohne Breite im style-Attribut, das die CSP verbietet. */
+progress.balken { display: block; width: 100%; appearance: none; -webkit-appearance: none;
+  color: var(--ok); }
+progress.balken::-webkit-progress-bar { background: var(--flaeche); }
+progress.balken::-webkit-progress-value { background: var(--ok); }
+progress.balken::-moz-progress-bar { background: var(--ok); }
+
+/* R-02: unter Soll gelb, unter Minimum rot (marke-luecke). */
+.marke-knapp { border-color: #d29200; color: #8a6100; }
+.zaehler-rot { border-color: var(--fehler); }
+.zaehler-rot .zaehler-zahl { color: var(--fehler); }
 
 /* Kleine Auszählungen (T-Shirt-Größen, Verpflegung). */
 .strichliste { list-style: none; margin: 0; padding: 0; }

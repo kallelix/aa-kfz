@@ -94,7 +94,8 @@
         </thead>
         <tbody>
           {% for s in schichten %}
-            <tr data-suche="{{ s.suche }}"{% if s.fehlt %} class="hat-luecke"{% endif %}>
+            {% set stufe = s | stufe %}
+            <tr data-suche="{{ s.suche }}"{% if s.fehlt %} class="hat-luecke stufe-{{ stufe }}"{% endif %}>
               <td class="nowrap" data-wert="{{ s.beginn }}">{{ s.datum | tag }}</td>
               <td class="zeit" data-wert="{{ s.beginn }}">{{ s | spanne }}</td>
               <td><a href="/helfer/schicht/{{ s.id }}">{{ s.bereich }}</a>
@@ -102,7 +103,8 @@
               <td class="rechts nowrap" data-wert="{{ s.besetzt }}">{{ s.besetzt }} / {{ s.soll }}</td>
               <td class="rechts" data-wert="{{ s.fehlt }}">
                 {% if s.fehlt %}
-                  <span class="marke marke-luecke">{{ s.fehlt }}</span>
+                  <span class="marke marke-{{ 'luecke' if stufe == 'rot' else 'knapp' }}"
+                        title="{{ 'unter Minimum' if stufe == 'rot' else 'unter Soll' }}">{{ s.fehlt }}</span>
                 {% else %}
                   <span class="marke marke-voll">voll</span>
                 {% endif %}

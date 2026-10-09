@@ -134,6 +134,19 @@ templates.env.filters["programmzeit"] = _programmzeit
 templates.env.filters["ausschnitt"] = unterschriften.ausschnitt
 
 
+def _stufe(s) -> str:
+    """R-02: rot unter Minimum, gelb unter Soll, grün ab Soll. Reserve zählt
+    nie als fehlend – sie steckt nicht in `besetzt`."""
+    if s["besetzt"] < s["minimum"]:
+        return "rot"
+    if s["besetzt"] < s["soll"]:
+        return "gelb"
+    return "gruen"
+
+
+templates.env.filters["stufe"] = _stufe
+
+
 # --- Start -----------------------------------------------------------------
 
 @asynccontextmanager
@@ -553,7 +566,9 @@ async def uebersicht(request: Request, hinweis: str = "",
     if sitzung.ist_bereichsleitung:
         return RedirectResponse("/helfer/bereiche", status_code=303)
     zaehler = db.zaehler(v["id"])
-    luecken = [z for z in db.schichten(v["id"], nur_luecken=True)]
+    # Rot vor gelb (R-02), darin die größten Lücken zuerst.
+    luecken = sorted(db.schichten(v["id"], nur_luecken=True),
+                     key=lambda z: (_stufe(z) != "rot", -z["fehlt"], z["beginn"]))
     return templates.TemplateResponse(
         "admin_uebersicht.html",
         _admin(request, sitzung, hinweis=hinweis, zaehler=zaehler,
@@ -563,6 +578,7 @@ async def uebersicht(request: Request, hinweis: str = "",
                allein=db.allein(v["id"]) if _sieht_grenzen(sitzung) else [],
                dubletten=db.moegliche_dubletten(),
                kurzfristig=db.kurzfristige_absagen(v["id"]),
+               springer=db.springer_lage(v["id"]),
                importe=db.importe()[:1], jetzt=db.jetzt_lokal()))
 
 
