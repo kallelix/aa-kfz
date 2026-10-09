@@ -35,6 +35,8 @@ from . import WURZEL as _WURZELPFAD
 _WURZEL = str(_WURZELPFAD)
 
 from kern import anmeldung, navigation
+from kern import auth as kern_auth
+from kern import veranstaltungen as va
 from kern.auth import Auth
 
 WURZEL_STATIC = Path(_WURZEL) / "kern" / "static"
@@ -244,6 +246,25 @@ def _kontext(request: Request, **extra) -> dict:
     return basis
 
 
+class KeineVeranstaltung(Exception):
+    """Es gibt noch keine Veranstaltung – ohne sie hat hier nichts einen Platz."""
+
+
+def _gewaehlt(request: Request):
+    """Die Veranstaltung, mit der dieser Browser arbeitet: die gewählte aus
+    dem Keks, sonst die Vorgabe. None, solange es keine gibt."""
+    return db.veranstaltung(request.cookies.get(va.KEKS, ""))
+
+
+def _veranstaltung(request: Request):
+    """Für Depends: wie _gewaehlt, aber ohne Veranstaltung gibt es die Seite
+    nicht – sie zeigt dann, wo man eine anlegt."""
+    zeile = _gewaehlt(request)
+    if zeile is None:
+        raise KeineVeranstaltung()
+    return zeile
+
+
 # Die Meldungen standen bis zur Zusammenfuehrung in der eigenen Huelle des
 # Helferbereichs. Die gibt es nicht mehr - die gemeinsame zeigt nur noch, was
 # ihr gereicht wird.
@@ -354,7 +375,15 @@ def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
     # bereits den Tagesstand durch, und zwei gleiche Schluesselwoerter waeren
     # keine stille Ueberdeckung, sondern ein Fehler auf jeder solchen Seite.
     roh = str(extra.pop("hinweis", "") or "")
+    aktuell = _gewaehlt(request)
     return _kontext(request, sitzung=sitzung,
+                    # Oben im Kopf und in der Auswahl: die Veranstaltung,
+                    # mit der dieser Browser gerade arbeitet.
+                    veranstaltung=aktuell["name"] if aktuell else config.VERANSTALTUNG,
+                    ort=aktuell["ort"] if aktuell else config.ORT,
+                    va_aktuell=aktuell,
+                    va_auswahl=db.VERANSTALTUNGEN.liste(),
+                    va_verwaltung=kern_auth.VERWALTUNG,
                     csrf=auth.csrf_token(sitzung.token),
                     tabletstand=unterschriften.stand(),
                     admin_takt=config.ADMIN_TAKT,
@@ -389,6 +418,32 @@ anmeldung.einrichten(app, auth=auth, templates=templates, kontext=_kontext,
                      bereich="helfer")
 
 
+@app.exception_handler(KeineVeranstaltung)
+async def _keine_veranstaltung(request: Request, ausnahme):
+    sitzung = auth.sitzung_lesen(request)
+    if sitzung is None:
+        return RedirectResponse("/helfer/login", status_code=303)
+    return templates.TemplateResponse("admin_keine_veranstaltung.html",
+                                      _admin(request, sitzung))
+
+
+@app.get("/helfer/veranstaltung")
+async def veranstaltung_waehlen(request: Request, id: str = "", weiter: str = "/helfer",
+                                sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+    """Merkt sich im Browser, mit welcher Veranstaltung gearbeitet wird.
+
+    Ein Link statt eines Formulars: die Auswahl oben ist eine Klappliste wie
+    die Einstellungen daneben, und sie geht ohne Skript.
+    """
+    zeile = db.VERANSTALTUNGEN.laden(id)
+    antwort = RedirectResponse(_weiter_pfad(weiter), status_code=303)
+    if zeile is not None:
+        antwort.set_cookie(va.KEKS, str(zeile["id"]), max_age=400 * 24 * 3600,
+                           httponly=True, samesite="lax",
+                           secure=auth.keks_sicher(request), path="/")
+    return antwort
+
+
 async def _csrf_pflicht(request: Request, sitzung: auth.Sitzung):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
@@ -413,15 +468,16 @@ def _zurueck(ziel: str, hinweis: str = "", **parameter) -> RedirectResponse:
 
 @app.get("/helfer")
 async def uebersicht(request: Request, hinweis: str = "",
-                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
-    zaehler = db.zaehler()
-    luecken = [z for z in db.schichten(nur_luecken=True)]
+                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                     v=Depends(_veranstaltung)):
+    zaehler = db.zaehler(v["id"])
+    luecken = [z for z in db.schichten(v["id"], nur_luecken=True)]
     return templates.TemplateResponse(
         "admin_uebersicht.html",
         _admin(request, sitzung, hinweis=hinweis, zaehler=zaehler,
                groessen=normalisieren.GROESSEN,
                luecken=luecken[:12], luecken_gesamt=len(luecken),
-               konflikte=db.konflikte(), doppelt=db.doppelt_besetzt(),
+               konflikte=db.konflikte(v["id"]), doppelt=db.doppelt_besetzt(v["id"]),
                importe=db.importe()[:1], jetzt=db.jetzt_lokal()))
 
 
@@ -430,19 +486,21 @@ async def uebersicht(request: Request, hinweis: str = "",
 @app.get("/helfer/schichten")
 async def schichten(request: Request, liste: str = "", tag: str = "",
                     luecken: str = "", hinweis: str = "",
-                    sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
-    reihen = db.schichten(liste=liste, tag=tag, nur_luecken=bool(luecken))
+                    sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                    v=Depends(_veranstaltung)):
+    reihen = db.schichten(v["id"], liste=liste, tag=tag, nur_luecken=bool(luecken))
     return templates.TemplateResponse(
         "admin_schichten.html",
         _admin(request, sitzung, hinweis=hinweis, schichten=reihen,
-               listen=db.listen(), tage=db.tage(),
+               listen=db.listen(v["id"]), tage=db.tage(v["id"]),
                f_liste=liste, f_tag=tag, f_luecken=bool(luecken)))
 
 
 @app.get("/helfer/schicht/{schicht_id}")
 async def schicht(request: Request, schicht_id: int, hinweis: str = "",
                   suche: str = "",
-                  sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                  sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                  v=Depends(_veranstaltung)):
     eintrag = db.schicht_laden(schicht_id)
     if eintrag is None:
         return templates.TemplateResponse("admin_fehlt.html",
@@ -453,7 +511,7 @@ async def schicht(request: Request, schicht_id: int, hinweis: str = "",
         "admin_schicht.html",
         _admin(request, sitzung, hinweis=hinweis, schicht=eintrag,
                besetzung=besetzt, suche=suche,
-               helfer=[h for h in db.helfer_liste() if h["id"] not in drin]))
+               helfer=[h for h in db.helfer_liste(v["id"]) if h["id"] not in drin]))
 
 
 @app.post("/helfer/schicht/{schicht_id}/einteilen")
@@ -498,11 +556,12 @@ async def austragen(request: Request, einteilung_id: int,
 
 @app.get("/helfer/helfer")
 async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",
-                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                       v=Depends(_veranstaltung)):
     return templates.TemplateResponse(
         "admin_helfer.html",
-        _admin(request, sitzung, hinweis=hinweis, helfer=db.helfer_liste(),
-               zaehler=db.zaehler(), tshirt=db.tshirt_zaehler(),
+        _admin(request, sitzung, hinweis=hinweis, helfer=db.helfer_liste(v["id"]),
+               zaehler=db.zaehler(v["id"]), tshirt=db.tshirt_zaehler(),
                groessen=normalisieren.GROESSEN, suche=suche,
                unterschrieben=unterschriften.je_vorgang("tshirt"),
                tablet=bool(db.tablet_token())))
@@ -551,7 +610,8 @@ def _helfer_zeile(person) -> list:
 @app.get("/helfer/helfer/export.csv")
 async def helfer_ausfuhr(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+        v=Depends(_veranstaltung)):
     """Alle Helfer als Datei - fuer die T-Shirt-Bestellung, eine Kontaktliste
     oder das Archiv nach der Veranstaltung.
 
@@ -563,7 +623,7 @@ async def helfer_ausfuhr(
     schreiber = csv.writer(puffer, delimiter=config.CSV_TRENNER,
                            quoting=csv.QUOTE_MINIMAL, lineterminator=chr(13) + chr(10))
     schreiber.writerow(HELFER_SPALTEN)
-    for person in db.helfer_liste():
+    for person in db.helfer_liste(v["id"]):
         schreiber.writerow(_helfer_zeile(person))
 
     # BOM voran, sonst zeigt Excel unter Windows Umlaute als Buchstabensalat.
@@ -614,7 +674,8 @@ async def helfer_anlegen_von_hand(
 
 @app.get("/helfer/helfer/{helfer_id}")
 async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
-                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                        v=Depends(_veranstaltung)):
     person = db.helfer_laden(helfer_id)
     if person is None:
         return templates.TemplateResponse("admin_fehlt.html",
@@ -622,7 +683,7 @@ async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
     return templates.TemplateResponse(
         "admin_helfer_detail.html",
         _admin(request, sitzung, hinweis=hinweis, person=person,
-               schichten=db.helfer_schichten(helfer_id)))
+               schichten=db.helfer_schichten(v["id"], helfer_id)))
 
 
 # --- Monitor ---------------------------------------------------------------
@@ -638,7 +699,11 @@ def _token_stimmt(uebermittelt: str) -> bool:
 
 def _monitor_kontext(request: Request, token: str, tag: str = "") -> dict:
     jetzt = db.jetzt_lokal()
-    stand = db.monitor_stand(jetzt, config.MONITOR_VORSCHAU)
+    # Der Monitor kennt keine Wahl: er zeigt die Vorgabe, die nächste
+    # Veranstaltung, die noch nicht vorbei ist. Gibt es keine, bleibt er leer.
+    aktuell = db.veranstaltung()
+    vid = aktuell["id"] if aktuell else None
+    stand = db.monitor_stand(vid, jetzt, config.MONITOR_VORSCHAU)
     # strftime('%A') käme im C-Locale als "Saturday" heraus, und ein Locale
     # auf dem Server zu setzen wäre für einen Wochentag zu viel Aufwand.
     stand["tag_lang"] = (config.WOCHENTAGE[jetzt.weekday()] + ", " +
@@ -646,27 +711,27 @@ def _monitor_kontext(request: Request, token: str, tag: str = "") -> dict:
     return _kontext(
         request, token=token, stand=stand,
         # Nur der Tagesblick, wenn ein Tag angefragt ist – sonst None.
-        tagesblick=db.tagesstand(tag, jetzt) if tag else None,
-        band=_band(tag, jetzt) if tag else None,
-        tagesleiste=db.monitor_tage(),
+        tagesblick=db.tagesstand(vid, tag, jetzt) if tag else None,
+        band=_band(vid, tag, jetzt) if tag else None,
+        tagesleiste=db.monitor_tage(vid),
         heute=jetzt.strftime("%Y-%m-%d"),
         intervall=config.MONITOR_INTERVALL,
         warnschwelle=config.MONITOR_WARNUNG,
         overlay_sekunden=config.MONITOR_OVERLAY_SEKUNDEN,
         tagesblick_sekunden=config.MONITOR_TAGESBLICK_SEKUNDEN,
-        tage=config.TAGE)
+        tage=db.tage_der(aktuell) if aktuell else [])
 
 
-def _band(tag: str, jetzt) -> dict | None:
+def _band(vid, tag: str, jetzt) -> dict | None:
     """Das Programm-Band eines Tages, fertig gerechnet."""
-    stand = db.tagesstand(tag, jetzt)
+    stand = db.tagesstand(vid, tag, jetzt)
     return band.bauen(
         tag, stand["programm"], stand["schichten"],
         # Die Jetzt-Linie gehoert nur auf den laufenden Tag. An einem anderen
         # stuende sie an einer Stelle, die dort nichts bedeutet.
         jetzt=jetzt if stand["ist_heute"] else None,
         farben={s["schluessel"]: s["farbe"] for s in config.serien()},
-        aufgaben=[dict(a) for a in db.aufgaben(tag=tag)])
+        aufgaben=[dict(a) for a in db.aufgaben(vid, tag=tag)])
 
 
 def _tag_pruefen(roh: str) -> str:
@@ -743,41 +808,43 @@ async def monitor_link(
 
 # --- Zeitplan der Rennserien -----------------------------------------------
 
-def _zeitplan_seite(request: Request, sitzung, berichte=None, code: int = 200):
+def _zeitplan_seite(request: Request, sitzung, v, berichte=None, code: int = 200):
     serien = []
     for eintrag in config.serien():
         letzter = db.letzter_erfolg(eintrag["schluessel"])
         serien.append({
             **eintrag,
-            "eintraege": db.programm(serie=eintrag["schluessel"]),
+            "eintraege": db.programm(v["id"], serie=eintrag["schluessel"]),
             "letzter_erfolg": letzter["gelaufen_am"] if letzter else "",
         })
     return templates.TemplateResponse(
         "admin_zeitplan.html",
         _admin(request, sitzung, hinweis="", serien=serien, berichte=berichte,
                abrufe=db.abrufe(8), stunde=config.ZEITPLAN_STUNDE,
-               tage=config.TAGE), status_code=code)
+               tage=db.tage_der(v)), status_code=code)
 
 
 @app.get("/helfer/zeitplan")
 async def zeitplan_ansicht(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
-    return _zeitplan_seite(request, sitzung)
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+        v=Depends(_veranstaltung)):
+    return _zeitplan_seite(request, sitzung, v)
 
 
 @app.post("/helfer/zeitplan/abrufen")
 async def zeitplan_abrufen(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+        v=Depends(_veranstaltung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return Response("Ungültiger CSRF-Token", status_code=400)
 
     # urllib blockiert; im Thread bleibt die Anwendung derweil ansprechbar.
     berichte = await asyncio.to_thread(
-        zeitplan.alle_abrufen, sitzung.kuerzel or "von Hand")
-    return _zeitplan_seite(request, sitzung, berichte=berichte)
+        zeitplan.alle_abrufen, v, sitzung.kuerzel or "von Hand")
+    return _zeitplan_seite(request, sitzung, v, berichte=berichte)
 
 
 # --- Aufgabenplan ----------------------------------------------------------
@@ -788,7 +855,7 @@ def _aufgabe_kontext(request: Request, sitzung, aufgabe, werte, fehler,
         request, sitzung, hinweis="", aufgabe=aufgabe, werte=werte,
         fehler=fehler, konflikt=konflikt,
         phasen=eintraege.PHASEN, status_texte=eintraege.STATUS,
-        tage=db.monitor_tage(),
+        tage=db.monitor_tage(_veranstaltung(request)["id"]),
         vorschlaege={s: db.vorschlaege(s)
                      for s in ("ort", "verantwortlich", "kontakt")})
 
@@ -809,13 +876,14 @@ def _aus_zeile(zeile) -> dict:
 @app.get("/helfer/aufgaben")
 async def aufgaben(request: Request, phase: str = "", status: str = "",
                    hinweis: str = "",
-                   sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
-    liste = db.aufgaben(phase=phase if phase in eintraege.PHASEN else "",
+                   sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                   v=Depends(_veranstaltung)):
+    liste = db.aufgaben(v["id"], phase=phase if phase in eintraege.PHASEN else "",
                         status=status if status in eintraege.STATUS else "")
     return templates.TemplateResponse(
         "admin_aufgaben.html",
         _admin(request, sitzung, hinweis=hinweis, aufgaben=liste,
-               zaehler=db.aufgaben_zaehler(), f_phase=phase, f_status=status,
+               zaehler=db.aufgaben_zaehler(v["id"]), f_phase=phase, f_status=status,
                phasen=eintraege.PHASEN, status_texte=eintraege.STATUS))
 
 
@@ -832,7 +900,8 @@ async def aufgabe_neu(request: Request, tag: str = "",
 
 @app.post("/helfer/aufgabe/neu")
 async def aufgabe_anlegen(request: Request,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                          v=Depends(_veranstaltung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -845,7 +914,7 @@ async def aufgabe_anlegen(request: Request,
             _aufgabe_kontext(request, sitzung, None, eingabe, fehler),
             status_code=400)
 
-    nummer = db.aufgabe_anlegen(werte, sitzung.kuerzel)
+    nummer = db.aufgabe_anlegen(v["id"], werte, sitzung.kuerzel)
     return _zurueck("/helfer/aufgaben", "angelegt",
                     sprung="aufgabe-" + str(nummer))
 
@@ -1006,20 +1075,21 @@ async def programm_freigeben(request: Request, programm_id: int,
 
 @app.get("/helfer/band")
 async def band_ansicht(request: Request, tag: str = "",
-                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                       v=Depends(_veranstaltung)):
     jetzt = db.jetzt_lokal()
-    tage = db.monitor_tage()
+    tage = db.monitor_tage(v["id"])
     gewaehlt = _tag_pruefen(tag)
     if not gewaehlt and tage:
         # Ohne Angabe der heutige Tag, sonst der erste, an dem etwas ansteht.
         heute = jetzt.strftime("%Y-%m-%d")
         gewaehlt = heute if any(t["datum"] == heute for t in tage) else tage[0]["datum"]
 
-    stand = db.tagesstand(gewaehlt, jetzt) if gewaehlt else None
+    stand = db.tagesstand(v["id"], gewaehlt, jetzt) if gewaehlt else None
     return templates.TemplateResponse(
         "admin_band.html",
         _admin(request, sitzung, hinweis="", tage=tage, gewaehlt=gewaehlt,
-               stand=stand, band=_band(gewaehlt, jetzt) if gewaehlt else None))
+               stand=stand, band=_band(v["id"], gewaehlt, jetzt) if gewaehlt else None))
 
 
 # --- T-Shirt-Ausgabe und Helfer von Hand -----------------------------------
@@ -1162,20 +1232,21 @@ def _person_aus_formular(daten, sitzung) -> tuple[int | None, str]:
 
 @app.get("/helfer/funk")
 async def funk(request: Request, hinweis: str = "", offen: str = "",
-               sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+               sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+               v=Depends(_veranstaltung)):
     # Einmal alles holen und in Python trennen: der Umschalter zeigt beide
     # Zahlen, und zwei Abfragen fuer ein paar Dutzend Zeilen waeren Aufwand
     # ohne Gegenwert.
-    alle = db.ausleihen_liste()
+    alle = db.ausleihen_liste(v["id"])
     noch_draussen = [z for z in alle if not z["zurueck_am"]]
     return templates.TemplateResponse(
         "admin_funk.html",
         _admin(request, sitzung, hinweis=hinweis,
                ausleihen=noch_draussen if offen else alle,
                anzahl_alle=len(alle), anzahl_offen=len(noch_draussen),
-               nur_offen=bool(offen), zaehler=db.material_zaehler(),
+               nur_offen=bool(offen), zaehler=db.material_zaehler(v["id"]),
                material=db.MATERIAL, material_text=db.MATERIAL_TEXT,
-               helfer=db.helfer_liste(), tage=db.monitor_tage(),
+               helfer=db.helfer_liste(v["id"]), tage=db.monitor_tage(v["id"]),
                heute=db.jetzt_lokal().strftime("%Y-%m-%d"),
                vorgaben=db.material_vorgaben(),
                unterschrieben=unterschriften.je_vorgang("material"),
@@ -1184,7 +1255,8 @@ async def funk(request: Request, hinweis: str = "", offen: str = "",
 
 @app.post("/helfer/funk/ausgeben")
 async def funk_ausgeben(request: Request,
-                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                        v=Depends(_veranstaltung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1196,7 +1268,7 @@ async def funk_ausgeben(request: Request,
     datum = _tag_pruefen(str(daten.get("datum") or ""))
 
     mengen = {stueck: daten.get(stueck) for stueck in db.MATERIAL}
-    nummer = db.ausleihen(helfer_id, mengen, datum,
+    nummer = db.ausleihen(v["id"], helfer_id, mengen, datum,
                           str(daten.get("bemerkung") or ""), sitzung.kuerzel)
     if nummer is None:
         return _zurueck("/helfer/funk", "nichts")
@@ -1239,8 +1311,9 @@ async def ausleihe_weg(request: Request, ausleihe_id: int,
 
 @app.get("/helfer/schluessel")
 async def schluessel(request: Request, hinweis: str = "", offen: str = "",
-                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
-    alle = db.schluessel_liste()
+                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                     v=Depends(_veranstaltung)):
+    alle = db.schluessel_liste(v["id"])
     noch_draussen = [z for z in alle if not z["zurueck_am"]]
     return templates.TemplateResponse(
         "admin_schluessel.html",
@@ -1248,14 +1321,15 @@ async def schluessel(request: Request, hinweis: str = "", offen: str = "",
                schluessel=noch_draussen if offen else alle,
                anzahl_alle=len(alle), anzahl_offen=len(noch_draussen),
                nur_offen=bool(offen), fahrzeuge=db.fahrzeuge(),
-               namen=db.namen_vorschlaege(),
+               namen=db.namen_vorschlaege(v["id"]),
                unterschrieben=unterschriften.je_vorgang("schluessel"),
                tablet=bool(db.tablet_token())))
 
 
 @app.post("/helfer/schluessel/ausgeben")
 async def schluessel_ausgeben(request: Request,
-                              sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                              sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                              v=Depends(_veranstaltung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1269,7 +1343,7 @@ async def schluessel_ausgeben(request: Request,
     if fahrzeug_id is None:
         return _zurueck("/helfer/schluessel", "kein-kennzeichen")
 
-    nummer = db.schluessel_ausgeben(fahrzeug_id, name,
+    nummer = db.schluessel_ausgeben(v["id"], fahrzeug_id, name,
                                     str(daten.get("bemerkung") or ""),
                                     sitzung.kuerzel)
     _unterschrift_dazu("schluessel", nummer, "ausgabe", sitzung.kuerzel)
@@ -1320,8 +1394,6 @@ def _einstellungsseite(request: Request, sitzung, hinweis: str = ""):
     Monitor alle 60 Sekunden neu lädt, soll es nicht im Dateisystem suchen
     müssen."""
     aus_der_env = [
-        ("Veranstaltungstage", ", ".join(t.isoformat() for t in config.TAGE),
-         "TAGE"),
         ("Zeitzone", config.ZEITZONE, "ZEITZONE"),
         ("Gestellte Uhr", config.JETZT_FEST or "aus (echte Uhr)", "JETZT_FEST"),
         ("Monitor: Auffrischen", str(config.MONITOR_INTERVALL) + " s",
@@ -1559,7 +1631,8 @@ async def import_formular(request: Request, hinweis: str = "",
 
 @app.post("/helfer/import")
 async def import_ausfuehren(request: Request,
-                            sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                            sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                            v=Depends(_veranstaltung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1586,7 +1659,7 @@ async def import_ausfuehren(request: Request,
             (vergeben.filename or "vergeben.csv")
 
     try:
-        bericht = csv_import.importieren(offen_roh, vergeben_roh, namen,
+        bericht = csv_import.importieren(v["id"], offen_roh, vergeben_roh, namen,
                                          sitzung.kuerzel)
     except csv_import.Fehler as fehler:
         return seite(str(fehler), code=400)
@@ -1596,7 +1669,8 @@ async def import_ausfuehren(request: Request,
 
 @app.post("/helfer/import/abrufen")
 async def import_abrufen(request: Request,
-                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                         v=Depends(_veranstaltung)):
     """Holt beide Listen beim Dienst, statt sie hochladen zu lassen.
 
     Es ist derselbe Import: nur die Herkunft der beiden Dateien ist eine
@@ -1618,7 +1692,7 @@ async def import_abrufen(request: Request,
     # urllib blockiert; im Thread bleibt die Anwendung derweil ansprechbar -
     # wie beim Zeitplan-Abruf.
     try:
-        bericht = await asyncio.to_thread(csv_import.abrufen, sitzung.kuerzel)
+        bericht = await asyncio.to_thread(csv_import.abrufen, v["id"], sitzung.kuerzel)
     except csv_import.Fehler as fehler:
         return seite(str(fehler), code=400)
 

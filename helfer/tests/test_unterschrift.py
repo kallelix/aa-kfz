@@ -60,7 +60,6 @@ def freier_hafen():
 
 db_url = testdb.wegwerf("helfer_unterschrift")
 os.environ["DATABASE_URL"] = db_url
-os.environ["TAGE"] = "2026-08-28,2026-08-29,2026-08-30"
 
 from app import db, unterschriften  # noqa: E402
 
@@ -83,6 +82,13 @@ for roh, gut in (("M10,10L20,30", True),
                                                        else "abgewiesen"))
 
 db.init()
+
+# Alles im Helferbereich gehört zu einer Veranstaltung: diese hier, auf die
+# Tage der Testdaten. Sie ist die einzige, also auch die, die der Server ohne
+# eigene Wahl nimmt.
+VA = db.VERANSTALTUNGEN.anlegen({"name": "Die absolute Abfahrt 2026", "kurz": "AA 2026",
+                                 "beginn": "2026-08-28", "ende": "2026-08-30",
+                                 "ort": "Ilmenau"})
 con = db.verbinden()
 with con:
     anna, _ = db.helfer_anlegen(con, {"name": "Anna Berg",
@@ -90,10 +96,10 @@ with con:
                                       "tshirt": "M"})
 con.close()
 db.tshirt_ausgeben(anna, "L", "KK")
-ausleihe = db.ausleihen(anna, {"funke": 1, "ersatzakku": 2}, "2026-08-29",
+ausleihe = db.ausleihen(VA, anna, {"funke": 1, "ersatzakku": 2}, "2026-08-29",
                         kuerzel="KK")
 fahrzeug, _ = db.fahrzeug_sichern("IL-A 1", "Anna Berg")
-schluessel = db.schluessel_ausgeben(fahrzeug, "Anna Berg", kuerzel="KK")
+schluessel = db.schluessel_ausgeben(VA, fahrzeug, "Anna Berg", kuerzel="KK")
 
 print("Wortlaut")
 titel, text, person = unterschriften.wortlaut("material", ausleihe, "ausgabe")
@@ -498,12 +504,15 @@ try:
     print("Die Hauptnavigation")
     _, _, seite = anfrage("GET", "/helfer")
     leiste = nav_ausschnitt(seite)
-    namen = re.findall(r'<a href="/helfer[^"]*"[^>]*>\s*([^<]+?)\s*</a>', leiste)
+    # Ohne die Auswahl der Veranstaltung: die ist eine Wahl, keine Seite.
+    namen = re.findall(r'<a href="/helfer(?!/veranstaltung)[^"]*"[^>]*>\s*([^<]+?)\s*</a>', leiste)
     pruefe(namen == ["Übersicht", "Zeitplan", "Aufgaben", "Schichten", "Helfer",
                      "Funken", "Schlüssel",
                      "Einstellungen", "Monitor", "Import", "Unterschriften",
                      "Zeitplan-Abruf"],
            "steht in der vereinbarten Reihenfolge: " + ", ".join(namen))
+    pruefe('class="gewaehlt" aria-current="true"' in leiste and "AA 2026" in leiste,
+           "daneben die Auswahl der Veranstaltung, die gewaehlte markiert")
     pruefe("nav-gruppe" in leiste and "admin_menue.js" in seite,
            "die hinteren fuenf stecken in einem Menue")
 

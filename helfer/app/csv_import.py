@@ -197,9 +197,10 @@ def pruefen(offen_roh: bytes, vergeben_roh: bytes) -> dict:
     }
 
 
-def importieren(offen_roh: bytes, vergeben_roh: bytes,
+def importieren(vid: int, offen_roh: bytes, vergeben_roh: bytes,
                 dateinamen: str = "", kuerzel: str = "") -> dict:
-    """Führt den Import in einer Transaktion aus und gibt den Bericht zurück."""
+    """Führt den Import in einer Transaktion aus und gibt den Bericht zurück.
+    Alles landet in der Veranstaltung ``vid``; andere bleiben unberührt."""
     ergebnis = pruefen(offen_roh, vergeben_roh)
 
     neue_schichten = 0
@@ -213,13 +214,15 @@ def importieren(offen_roh: bytes, vergeben_roh: bytes,
             # gesetzt, und ohne das Löschen stünden abgemeldete Helfer für
             # immer auf ihrer Schicht.
             entfernt = con.execute(
-                "DELETE FROM einteilung WHERE quelle = 'import'").rowcount
+                "DELETE FROM einteilung WHERE quelle = 'import' AND schicht_id IN"
+                " (SELECT id FROM schicht WHERE veranstaltung_id = ?)",
+                (vid,)).rowcount
 
             schicht_ids: dict[tuple, int] = {}
             for schluessel, anzahl in ergebnis["bedarf"].items():
                 liste, beginn, ende = schluessel
                 schicht_id, neu = db.schicht_sichern(
-                    con, liste, beginn, ende, ergebnis["tage"][schluessel],
+                    con, vid, liste, beginn, ende, ergebnis["tage"][schluessel],
                     bedarf=anzahl)
                 schicht_ids[schluessel] = schicht_id
                 neue_schichten += 1 if neu else 0
@@ -228,7 +231,8 @@ def importieren(offen_roh: bytes, vergeben_roh: bytes,
             # Dateien. Nicht anfassen: dort können Einteilungen von Hand
             # hängen. Nur melden.
             for zeile in con.execute(
-                    "SELECT id, liste, beginn, ende FROM schicht"):
+                    "SELECT id, liste, beginn, ende FROM schicht"
+                    " WHERE veranstaltung_id = ?", (vid,)):
                 merkmal = (zeile["liste"], zeile["beginn"], zeile["ende"])
                 if merkmal not in ergebnis["bedarf"]:
                     verschwunden.append(
@@ -388,7 +392,7 @@ def _plausibel(zeilen_neu: int, bezeichnung: str = "") -> None:
             % (zeilen_neu, vorher["zeilen"]))
 
 
-def abrufen(kuerzel: str = "", automatisch: bool = False) -> dict:
+def abrufen(vid: int, kuerzel: str = "", automatisch: bool = False) -> dict:
     """Holt beide Listen beim Dienst und importiert sie wie hochgeladene.
 
     automatisch=True fuegt die Plausibilitaetspruefung hinzu und vermerkt
@@ -414,7 +418,7 @@ def abrufen(kuerzel: str = "", automatisch: bool = False) -> dict:
             vorschau = pruefen(offen, vergeben)
             _plausibel(vorschau["zeilen_offen"] + vorschau["zeilen_vergeben"])
 
-        return importieren(offen, vergeben, ABRUF_NAME, kuerzel)
+        return importieren(vid, offen, vergeben, ABRUF_NAME, kuerzel)
     except Fehler as fehler:
         if automatisch:
             # Ein Lauf, dem niemand zusieht, muss sein Scheitern hinterlassen -

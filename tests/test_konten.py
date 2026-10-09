@@ -128,8 +128,7 @@ verzeichnis = Path(tempfile.mkdtemp(prefix="konten-"))
 hafen = freier_hafen()
 for name in ("kennzeichen", "presse", "helfer"):
     (verzeichnis / (name + ".env")).write_text(
-        "COOKIE_SECURE=0\n"
-        + ("TAGE=2026-08-28,2026-08-29,2026-08-30\n" if name == "helfer" else ""),
+        "COOKIE_SECURE=0\n",
         encoding="utf-8")
 
 umgebung = {
@@ -292,6 +291,29 @@ try:
         {"csrf": csrf(seite), "ausgeben": "1", "zurueck": f"/presse/anmeldung/{nummer}"}, keks=pia)
     pruefe(sql("presse", "SELECT badge_durch FROM anmeldung WHERE id = ?", nummer)[0][0] == "PP",
            "die Badge-Ausgabe trägt Pias Kürzel, ohne dass sie es eingetippt hat")
+
+    print("Veranstaltungen")
+    _, _, seite, _ = ruf("/helfer", keks=ada)
+    pruefe("Noch keine Veranstaltung" in seite,
+           "ohne Veranstaltung sagt der Helferbereich, was zu tun ist")
+    for name, kurz, beginn, ende in (("Die absolute Abfahrt 2027", "AA 2027", "2027-07-01", "2027-07-04"),
+                                     ("Cross-Country 2027", "XCO 2027", "2027-05-15", "2027-05-15")):
+        _, _, seite, _ = ruf("/veranstaltungen/neu", keks=ada)
+        status, ort, _, _ = ruf("/veranstaltungen/neu", "POST", {
+            "csrf": csrf(seite), "name": name, "kurz": kurz, "beginn": beginn,
+            "ende": ende, "ort": "Ilmenau", "status": "planung"}, keks=ada)
+        pruefe(status == 303, kurz + " angelegt")
+    aa = sql("kern", "SELECT id FROM veranstaltung WHERE kurz = 'AA 2027'")[0][0]
+    _, _, seite, _ = ruf("/helfer", keks=ada)
+    pruefe('title="Veranstaltung wechseln">\n        XCO 2027' in seite,
+           "ohne Wahl gilt die nächste, die noch nicht vorbei ist: der XCO")
+    status, ort, _, gewaehlt = ruf(f"/helfer/veranstaltung?id={aa}&weiter=/helfer/schichten", keks=ada)
+    pruefe(status == 303 and ort == "/helfer/schichten" and gewaehlt.startswith("abfahrt_veranstaltung="),
+           "die Auswahl merkt sich der Browser und führt zurück")
+    _, _, seite, _ = ruf("/helfer", keks=ada + "; " + gewaehlt)
+    pruefe('title="Veranstaltung wechseln">\n        AA 2027' in seite, "danach gilt die AA")
+    pruefe(ruf("/veranstaltungen", keks=pia)[0] == 403,
+           "wer den Helferbereich nicht sieht, pflegt auch keine Veranstaltungen")
 
     print("Ein Lesekonto")
     konto_anlegen(ada, name="Lea Lesend", email="lea@example.org", kuerzel="LL",

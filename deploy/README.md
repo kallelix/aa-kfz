@@ -192,7 +192,12 @@ runuser -u abfahrt -- env DATABASE_URL='postgresql://abfahrt@/abfahrt?host=/var/
 ```
 
 Das fragt Mailadresse, Name, Kürzel und Passwort. Danach unter
-`admin.example.de` anmelden und unter **Konten** die anderen einladen.
+`admin.example.de` anmelden, unter **Konten** die anderen einladen und unter
+**Veranstaltungen** die erste Veranstaltung anlegen: Schichten, Programm,
+Aufgaben und Ausgaben des Helferbereichs gehören immer zu einer. Mit welcher
+gearbeitet wird, wählt jeder oben im Helferbereich; ohne Wahl gilt die
+nächste, die noch nicht vorbei ist. Monitor, Zeitplan-Abruf und
+Helferabgleich nehmen immer diese.
 
 Die Einladungen gehen über das **Postfach des Kennzeichen-Bereichs**
 (`SMTP_…` und `MAIL_FROM` in `kennzeichen.env`). Kommt eine nicht hinaus,
@@ -433,34 +438,26 @@ geht mit zusätzlich `--schema=helfer`.
 ### Einmalig: von SQLite nach PostgreSQL
 
 Bis Oktober 2026 lagen die Daten in drei SQLite-Dateien unter
-`/var/lib/abfahrt`. Ein Server mit diesem Stand zieht so um:
+`/var/lib/abfahrt`. **Übernommen wird daraus nichts** – PostgreSQL beginnt
+leer, und das Backoffice mit der ersten Veranstaltung, die man anlegt. Die
+Personendaten aus 2026 waren ohnehin zu löschen (Abschnitt 8).
 
 ```bash
 # 1. Sichern - noch mit dem alten Skript, es sichert die drei .db-Dateien
 /opt/abfahrt/deploy/backup.sh
-
-# 2. Dienst anhalten: ab hier schreibt niemand mehr in die SQLite-Dateien
 systemctl stop abfahrt
 
-# 3. PostgreSQL einrichten, wie in Abschnitt 1 unter "Datenbank"
+# 2. PostgreSQL einrichten, wie in Abschnitt 1 unter "Datenbank"
 apt install -y postgresql
 runuser -u postgres -- createuser abfahrt
 runuser -u postgres -- createdb --owner=abfahrt abfahrt
 
-# 4. Neuer Stand
+# 3. Neuer Stand
 cd /opt/abfahrt
 git pull
 .venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# 5. Probelauf: liest alles, schreibt alles, rollt am Ende zurück
-runuser -u abfahrt -- .venv/bin/python deploy/sqlite-uebernehmen.py \
-    --kennzeichen /var/lib/abfahrt/antraege.db \
-    --presse      /var/lib/abfahrt/presse.db \
-    --helfer      /var/lib/abfahrt/helfer.db
-
-# 6. Stimmen die Zahlen, dasselbe mit --wirklich hintendran
-
-# 7. DATABASE_URL in /etc/abfahrt/dienst.env eintragen (siehe
+# 4. DATABASE_URL in /etc/abfahrt/dienst.env eintragen (siehe
 #    deploy/dienst.env.example) und die neue Unit installieren
 editor /etc/abfahrt/dienst.env
 install -m 644 deploy/dienst.service /etc/systemd/system/abfahrt.service
@@ -468,20 +465,15 @@ systemctl daemon-reload
 systemctl start abfahrt
 ```
 
-Die Übernahme behält alle Nummern – Antrags-, Helfer- und Schichtnummern,
-auf die Mails, Karten und Einteilungen zeigen – und damit auch die Links für
-Monitor, Tablet und Durchfahrtsliste. Sie läuft für alle drei Bereiche in
-einer Transaktion und verweigert sich, wenn in PostgreSQL schon etwas steht:
-ein zweiter Lauf verdoppelt nichts.
+Danach wie in Abschnitt 1 das erste Admin-Konto anlegen und unter
+**Veranstaltungen** die erste Veranstaltung. Dann:
 
-Danach im Backoffice nachsehen, ob alles da ist. Dann:
-
-- die Zeilen `DB_PATH=` aus den drei `.env`-Dateien nehmen – sie wirken
-  nicht mehr;
+- die Zeilen `DB_PATH=` aus den drei `.env`-Dateien nehmen, dazu `TAGE=` aus
+  `helfer.env` – sie wirken nicht mehr;
 - die SQLite-Dateien unter `/var/lib/abfahrt` löschen und das Verzeichnis
   dazu. **Sie enthalten Personendaten**; liegen lassen hieße, sie beim
-  Löschlauf nach der Veranstaltung zu vergessen. Die alten `.db`-Sicherungen
-  unter `/var/backups/abfahrt` laufen nach 30 Tagen von selbst aus.
+  Löschlauf zu vergessen. Die alten `.db`-Sicherungen unter
+  `/var/backups/abfahrt` laufen nach 30 Tagen von selbst aus.
 
 ### Lokale Änderungen am Server
 
@@ -506,7 +498,7 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 | Monitor zeigt dauerhaft die orange „Keine Verbindung"-Leiste, obwohl die Seite lädt | `connect-src 'self'` fehlt in der Content-Security-Policy. Die Seite selbst kommt durch, ihre Nachladeanfragen nicht. In der Browserkonsole steht die geblockte Anfrage. Siehe `nginx-dienst.conf`. |
 | Zeitplan-Abruf schlägt immer fehl | Der Container kommt nicht nach draußen (Egress auf 443 und DNS), oder `ca-certificates` fehlt. Der genaue Text steht im Backoffice unter *Einstellungen › Zeitplan-Abruf* bei den bisherigen Abrufen. |
 | Monitor zeigt eine Uhrzeit, die nicht stimmt | Entweder steht `JETZT_FEST` noch gesetzt (Warnung im Journal), oder die Containeruhr geht falsch – `timedatectl`. Die Uhr auf dem Bildschirm kommt vom Server, nicht vom Bildschirmrechner. |
-| Monitor zeigt nichts, obwohl Schichten erfasst sind | `TAGE` oder die Daten in den CSV-Dateien liegen in einem anderen Jahr als die Containeruhr. Im Backoffice unter *Schichten* steht, für welche Tage etwas erfasst ist. |
+| Monitor zeigt nichts, obwohl Schichten erfasst sind | Der Monitor zeigt die nächste Veranstaltung, die noch nicht vorbei ist – die Schichten hängen an einer anderen, oder deren Tage stimmen nicht. Unter **Veranstaltungen** nachsehen. |
 | Eine Adresse zeigt den falschen Bereich | Der Host-Kopf kommt nicht durch. `proxy_set_header Host $host;` fehlt im Schnipsel, oder der Name steht nicht in `HOST_…`. Ohne Treffer landet alles beim Pfad-Rückfall. |
 | Anmeldung gilt nur in einem Bereich | Das Konto ist nur für diesen Bereich freigegeben – unter **Konten** nachsehen. Sonst: `APP_SECRET_KEY` fehlt in `dienst.env`, und jeder Bereich hat einen eigenen. |
 | Das gemeinsame Passwort geht nicht mehr | So gewollt: es gibt einen Admin mit eigenem Konto. Jeder meldet sich mit seinem eigenen an. |
@@ -658,7 +650,8 @@ Energiesparen aus. Die Seite hält sich selbst aktuell und braucht kein F5.
 Zusätzlich zu Abschnitt 4:
 
 - [ ] `JETZT_FEST` ist leer, im Journal steht keine Warnung dazu
-- [ ] `TAGE` nennt die richtigen drei Renntage im richtigen Jahr
+- [ ] Die Veranstaltung steht unter **Veranstaltungen** mit den richtigen
+      Tagen, und oben im Helferbereich ist sie gewählt
 - [ ] Uhr des Containers geht richtig (`timedatectl`) – sie steht auf dem
       Monitor
 - [ ] Import beider Listen gelaufen (Abruf oder Hochladen), Bericht durchgesehen

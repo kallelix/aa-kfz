@@ -48,7 +48,6 @@ def freier_hafen():
 
 db_url = testdb.wegwerf("helfer_material")
 os.environ["DATABASE_URL"] = db_url
-os.environ["TAGE"] = "2026-08-28,2026-08-29,2026-08-30"
 
 from app import db, normalisieren  # noqa: E402
 
@@ -60,9 +59,16 @@ for roh, erwartet in (("il-a 123", "ILA123"), ("IL A 123", "ILA123"),
            repr(roh) + " -> " + repr(normalisieren.kennzeichen(roh)))
 
 db.init()
+
+# Alles im Helferbereich gehört zu einer Veranstaltung: diese hier, auf die
+# Tage der Testdaten. Sie ist die einzige, also auch die, die der Server ohne
+# eigene Wahl nimmt.
+VA = db.VERANSTALTUNGEN.anlegen({"name": "Die absolute Abfahrt 2026", "kurz": "AA 2026",
+                                 "beginn": "2026-08-28", "ende": "2026-08-30",
+                                 "ort": "Ilmenau"})
 con = db.verbinden()
 with con:
-    schicht_id, _ = db.schicht_sichern(con, "Shuttle", "2026-08-29 08:00",
+    schicht_id, _ = db.schicht_sichern(con, VA, "Shuttle", "2026-08-29 08:00",
                                        "2026-08-29 16:00", "2026-08-29",
                                        bedarf=2)
     anna, _ = db.helfer_anlegen(con, {"name": "Anna Berg",
@@ -327,8 +333,10 @@ try:
 
     print("Einstellungen: was aus der .env kommt")
     _, _, seite = anfrage("GET", "/helfer/einstellungen")
-    pruefe("TAGE" in seite and "MONITOR_VORSCHAU" in seite,
+    pruefe("MONITOR_VORSCHAU" in seite,
            "die Werte aus der Konfiguration stehen zum Nachsehen dabei")
+    pruefe("Veranstaltungstage" not in seite,
+           "die Tage nicht mehr - die kommen aus der Veranstaltung")
     pruefe("nach einem Neustart" in seite,
            "mit dem Hinweis, dass eine Aenderung dort erst dann wirkt")
 

@@ -6,6 +6,9 @@ Backoffice jederzeit auf Knopfdruck.
 
 Schlägt der Abruf fehl, bleibt der letzte erfolgreiche Stand einfach stehen.
 Das Backoffice zeigt, wann er zuletzt geklappt hat.
+
+Beide gelten der Vorgabe-Veranstaltung – der nächsten, die noch nicht vorbei
+ist. Für eine andere geht es im Backoffice von Hand.
 """
 
 from __future__ import annotations
@@ -42,7 +45,8 @@ async def schleife(stop: asyncio.Event) -> None:
         try:
             # Der Abruf blockiert (urllib), deshalb in einen Thread, damit die
             # Anwendung derweil weiter antwortet.
-            berichte = await asyncio.to_thread(zeitplan.alle_abrufen, "automatisch")
+            berichte = await asyncio.to_thread(
+                zeitplan.alle_abrufen, db.veranstaltung(), "automatisch")
         except Exception:  # noqa: BLE001 – die Schleife darf nie sterben
             protokoll.exception("Zeitplan-Abruf ist unerwartet gescheitert")
             continue
@@ -80,9 +84,13 @@ async def import_schleife(stop: asyncio.Event) -> None:
         except asyncio.TimeoutError:
             pass
 
+        veranstaltung = db.veranstaltung()
+        if veranstaltung is None:
+            protokoll.info("Helferabgleich: keine Veranstaltung angelegt")
+            continue
         try:
             # urllib blockiert; im Thread bleibt die Anwendung ansprechbar.
-            bericht = await asyncio.to_thread(csv_import.abrufen,
+            bericht = await asyncio.to_thread(csv_import.abrufen, veranstaltung["id"],
                                               "automatisch", True)
         except csv_import.Fehler as fehler:
             # Erwartbar: abgelaufener Login-Link, Dienst nicht erreichbar,

@@ -43,8 +43,8 @@ Reverse Proxy davor, siehe [deploy/](deploy/).
 
 ```text
 dienst/        setzt die drei zusammen und verteilt nach Hostname
-kern/          was alle drei teilen: Konten und Anmeldung, Backoffice-Rahmen,
-               Stilblatt, Suche, Datenbank, Mailversand, python -m kern.konto
+kern/          was alle drei teilen: Konten und Anmeldung, Veranstaltungen,
+               Backoffice-Rahmen, Stilblatt, Suche, Datenbank, Mailversand
 kennzeichen/   Kennzeichen-Anträge     ┐
 presse/        Presse-Akkreditierung   ├ je app/, .env.example, README.md
 helfer/        Helfer-Dashboard        ┘
@@ -177,6 +177,20 @@ setzt jeder selbst über *Passwort vergessen* zurück. Konten, Sitzungen und
 Links stehen im Schema `kern` ([kern/konten.py](kern/konten.py)); die Seiten
 dazu in [kern/konten_app.py](kern/konten_app.py).
 
+## Veranstaltungen
+
+Der ILRC hat mehr als eine Veranstaltung, die Helfer braucht. Jede steht
+unter `admin.example.de/veranstaltungen` mit Name, Kurzname, Tagen, Ort,
+Anmeldezeitraum und Status (*in Planung*, *angekündigt*, *Anmeldung offen*,
+*geschlossen*, *archiviert*). Schichten, Programm, Aufgaben und Ausgaben des
+Helferbereichs gehören immer zu einer; Helfer und Fahrzeugstamm gehören
+keiner, es sind Jahr für Jahr dieselben.
+
+Mit welcher gearbeitet wird, wählt jeder oben im Helferbereich, gemerkt im
+Browser. Ohne Wahl gilt die nächste, die noch nicht vorbei ist – und die
+nehmen auch Monitor, Zeitplan-Abruf und Helferabgleich. Kennzeichen und
+Presse hängen noch an keiner Veranstaltung.
+
 Den ersten Admin legt `python -m kern.konto admin` an. Wer bisher mit dem
 gemeinsamen Passwort (`ADMIN_PASSWORD_HASH`) gearbeitet hat, kann sich damit
 auch weiter anmelden und unter **Konten** sein eigenes anlegen – bis ein
@@ -192,7 +206,7 @@ Rückgabewert 0 heißt bestanden. Alles aus dem Hauptordner:
 .venv/Scripts/python.exe tests/test_konten.py     # Konten: Einladung, Rechte, Sperren, Passwort vergessen
 .venv/Scripts/python.exe tests/test_kern_konten.py # Konten, Sitzungen und Links in der Datenbank
 .venv/Scripts/python.exe tests/test_kern_db.py    # Datenbankzugriff und Migrationen
-.venv/Scripts/python.exe tests/test_uebernahme.py # SQLite-Bestände nach PostgreSQL übernehmen
+.venv/Scripts/python.exe tests/test_kern_veranstaltungen.py # Veranstaltungen und die Vorgabe
 .venv/Scripts/python.exe tests/test_auth.py       # Anmeldung, Token, CSRF, Rate Limit
 .venv/Scripts/python.exe tests/test_suchen.py     # Suche mit Umlauten, Python gegen JavaScript
 node tests/test_suchen_js.js

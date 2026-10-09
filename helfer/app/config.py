@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import date, timedelta
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -111,37 +110,11 @@ def nur_localhost() -> bool:
 VERANSTALTUNG = _env("VERANSTALTUNG", "Die absolute Abfahrt")
 ORT = _env("ORT", "Ilmenau")
 
-# Die drei Renntage. Der Zeitplan-Abruf braucht sie, um Wochentage ("Freitag")
-# auf Daten abzubilden; Auf- und Abbauschichten liegen davor und danach.
-TAGE_ROH = _env("TAGE", "2026-08-28,2026-08-29,2026-08-30")
-
-
-def _tage() -> list[date]:
-    ergebnis = []
-    for teil in TAGE_ROH.split(","):
-        teil = teil.strip()
-        if not teil:
-            continue
-        try:
-            ergebnis.append(date.fromisoformat(teil))
-        except ValueError:
-            continue
-    return sorted(set(ergebnis))
-
-
-TAGE = _tage() or [date(2026, 8, 28), date(2026, 8, 29), date(2026, 8, 30)]
+# Die Tage der Veranstaltung standen hier einmal als TAGE. Sie kommen jetzt
+# aus der Veranstaltung selbst (kern/veranstaltungen.py), genau wie ihr Ort.
 
 WOCHENTAGE = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag",
               "Samstag", "Sonntag")
-
-
-def tag_zu_datum(wochentag: str) -> date | None:
-    """'Samstag' -> das Datum des Renntags. Nur innerhalb von TAGE; kommt ein
-    Wochentag zweimal vor, ist die Zuordnung mehrdeutig und wir geben nichts
-    zurück, statt zu raten."""
-    name = wochentag.strip().casefold()
-    treffer = [t for t in TAGE if WOCHENTAGE[t.weekday()].casefold() == name]
-    return treffer[0] if len(treffer) == 1 else None
 
 
 # --- Zeitplan der Rennserien -----------------------------------------------

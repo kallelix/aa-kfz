@@ -69,9 +69,8 @@ def wortlaut(art: str, vorgang_id: int, richtung: str) -> tuple[str, str, str]:
                 "T-Shirt in Größe " + groesse, person["name"])
 
     if art == "material":
-        for zeile in db.ausleihen_liste():
-            if zeile["id"] != vorgang_id:
-                continue
+        zeile = db.ausleihe_mit_name(vorgang_id)
+        if zeile is not None:
             # Bei der Rücknahme zählt, was zurückkam, nicht was einmal
             # rausging: wer das Funkgerät bringt und den Akku behält, soll
             # nicht quittieren, alles abgegeben zu haben.
@@ -98,9 +97,8 @@ def wortlaut(art: str, vorgang_id: int, richtung: str) -> tuple[str, str, str]:
         return "", "", ""
 
     if art == "schluessel":
-        for zeile in db.schluessel_liste():
-            if zeile["id"] != vorgang_id:
-                continue
+        zeile = db.schluessel_mit_fahrzeug(vorgang_id)
+        if zeile is not None:
             text = "Fahrzeugschlüssel " + zeile["kennzeichen"]
             if zeile["bemerkung"]:
                 text += " – " + zeile["bemerkung"]

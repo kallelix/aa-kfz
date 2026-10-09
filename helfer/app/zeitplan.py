@@ -29,7 +29,7 @@ import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from html.parser import HTMLParser
 
 from . import config, normalisieren
@@ -231,8 +231,17 @@ def _spalten(kopf: list[str]) -> tuple[int, int, int]:
     return tag, (rest[0] if rest else 1), zeit
 
 
+def tag_zu_datum(wochentag: str, tage: list[date]) -> date | None:
+    """'Samstag' -> das Datum dieses Wochentags unter den Tagen der
+    Veranstaltung. Kommt ein Wochentag zweimal vor, ist die Zuordnung
+    mehrdeutig und es gibt nichts zurück, statt zu raten."""
+    name = wochentag.strip().casefold()
+    treffer = [t for t in tage if config.WOCHENTAGE[t.weekday()].casefold() == name]
+    return treffer[0] if len(treffer) == 1 else None
+
+
 def auswerten(serie: str, ueberschrift: str,
-              zeilen: list[list[str]]) -> Ergebnis:
+              zeilen: list[list[str]], tage: list[date]) -> Ergebnis:
     ergebnis = Ergebnis(serie=serie, ueberschrift=ueberschrift)
     spalte_tag, spalte_titel, spalte_zeit = _spalten(zeilen[0])
 
@@ -255,7 +264,7 @@ def auswerten(serie: str, ueberschrift: str,
             continue
         letzter_tag = tag_roh
 
-        datum = config.tag_zu_datum(tag_roh)
+        datum = tag_zu_datum(tag_roh, tage)
         if datum is None:
             ergebnis.probleme.append(
                 "Zeile " + str(nummer) + " (" + titel + "): " + repr(tag_roh) +
@@ -322,10 +331,10 @@ def holen(url: str) -> str:
     return rohdaten.decode(kodierung, errors="replace")
 
 
-def abrufen(serie: str, url: str, abschnitt: str) -> Ergebnis:
+def abrufen(serie: str, url: str, abschnitt: str, tage: list[date]) -> Ergebnis:
     """Holt eine Seite und liest den passenden Zeitplan heraus."""
     ueberschrift, zeilen = tabelle_waehlen(holen(url), abschnitt)
-    return auswerten(serie, ueberschrift, zeilen)
+    return auswerten(serie, ueberschrift, zeilen, tage)
 
 
 # --- Übernehmen ------------------------------------------------------------
@@ -338,7 +347,7 @@ def _beschreibe(zeile) -> str:
     return zeile["zeit_roh"] or "ohne Zeit"
 
 
-def uebernehmen(ergebnis: Ergebnis, ausloeser: str = "") -> dict:
+def uebernehmen(ergebnis: Ergebnis, vid: int, ausloeser: str = "") -> dict:
     """Schreibt das Abrufergebnis in die Datenbank und sagt, was sich geändert
     hat.
 
@@ -361,8 +370,8 @@ def uebernehmen(ergebnis: Ergebnis, ausloeser: str = "") -> dict:
         with con:
             vorhanden = {
                 z["titel"] + "|" + z["datum"]: z for z in con.execute(
-                    "SELECT * FROM programm WHERE serie = ?",
-                    (ergebnis.serie,))}
+                    "SELECT * FROM programm WHERE serie = ? AND veranstaltung_id = ?",
+                    (ergebnis.serie, vid))}
 
             gesehen = set()
             for eintrag in ergebnis.eintraege:
@@ -372,10 +381,10 @@ def uebernehmen(ergebnis: Ergebnis, ausloeser: str = "") -> dict:
 
                 if alt is None:
                     con.execute(
-                        "INSERT INTO programm (serie, titel, datum, beginn,"
-                        " ende, tag_roh, zeit_roh, angelegt_am)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (eintrag.serie, eintrag.titel, eintrag.datum,
+                        "INSERT INTO programm (veranstaltung_id, serie, titel,"
+                        " datum, beginn, ende, tag_roh, zeit_roh, angelegt_am)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (vid, eintrag.serie, eintrag.titel, eintrag.datum,
                          eintrag.beginn, eintrag.ende, eintrag.tag_roh,
                          eintrag.zeit_roh, db.jetzt()))
                     neu.append(eintrag.titel + " am " + eintrag.tag_roh +
@@ -468,17 +477,21 @@ def unveraendert(bericht: dict) -> bool:
                    ("neu", "geaendert", "geschuetzt", "entfallen", "zurueck"))
 
 
-def alle_abrufen(ausloeser: str = "") -> list[dict]:
-    """Ruft jede eingerichtete Serie ab. Ein Fehler bei einer Serie hält die
-    anderen nicht auf – er wird vermerkt und gemeldet."""
+def alle_abrufen(veranstaltung, ausloeser: str = "") -> list[dict]:
+    """Ruft jede eingerichtete Serie für diese Veranstaltung ab: die
+    Wochentage auf den Seiten werden ihren Tagen zugeordnet. Ein Fehler bei
+    einer Serie hält die anderen nicht auf – er wird vermerkt und gemeldet."""
     from . import db
 
+    if veranstaltung is None:
+        return []
+    tage = db.tage_der(veranstaltung)
     berichte = []
     for eintrag in config.serien():
         try:
             ergebnis = abrufen(eintrag["schluessel"], eintrag["url"],
-                               eintrag["abschnitt"])
-            bericht = uebernehmen(ergebnis, ausloeser)
+                               eintrag["abschnitt"], tage)
+            bericht = uebernehmen(ergebnis, veranstaltung["id"], ausloeser)
             bericht["titel"] = eintrag["titel"]
             bericht["fehler"] = ""
         except Fehler as fehler:

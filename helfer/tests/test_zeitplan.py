@@ -18,7 +18,6 @@ sys.path.insert(0, str(WURZEL.parent))
 from kern import testdb  # noqa: E402
 
 os.environ["DATABASE_URL"] = testdb.wegwerf("helfer_zeitplan")
-os.environ.setdefault("TAGE", "2026-08-28,2026-08-29,2026-08-30")
 
 from app import config, db, zeitplan  # noqa: E402
 
@@ -75,6 +74,14 @@ KIDS = seite("<h1>Zeitplan</h1>", "<h2>Zeitplan allgemein:</h2>",
                      kopf=("Tag", "Bezeichnung", "Zeit")))
 
 db.init()
+
+# Alles im Helferbereich gehört zu einer Veranstaltung: diese hier, auf die
+# Tage der Testdaten. Sie ist die einzige, also auch die, die der Server ohne
+# eigene Wahl nimmt.
+VA = db.VERANSTALTUNGEN.anlegen({"name": "Die absolute Abfahrt 2026", "kurz": "AA 2026",
+                                 "beginn": "2026-08-28", "ende": "2026-08-30",
+                                 "ort": "Ilmenau"})
+TAGE = db.tage_der(db.VERANSTALTUNGEN.laden(VA))
 
 print("Tabellen erkennen")
 gefunden = zeitplan.abschnitte(DHC)
@@ -135,7 +142,7 @@ for roh, erwartet in [
            repr(roh) + " -> " + str(zeitplan.zeiten("2026-08-28", roh)))
 
 print("Auswerten")
-ergebnis = zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(DHC, "allgemein"))
+ergebnis = zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(DHC, "allgemein"), TAGE)
 pruefe(len(ergebnis.eintraege) == 6, "sechs Eintraege")
 nach_titel = {e.titel: e for e in ergebnis.eintraege}
 pruefe(nach_titel["Track Walk"].tag_roh == "Freitag",
@@ -156,21 +163,21 @@ print("Unbekannter Wochentag")
 mit_montag = seite("<h2>allgemein</h2>", tabelle(
     ("Freitag", "Aufbau", "09.00 - 18.00 Uhr"),
     ("Montag", "Abbau", "09.00 - 12.00 Uhr")))
-teil = zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(mit_montag, "allgemein"))
+teil = zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(mit_montag, "allgemein"), TAGE)
 pruefe(len(teil.eintraege) == 1, "der Montag faellt raus")
 pruefe(any("Montag" in p for p in teil.probleme), "und wird gemeldet")
 
 print("Uebernehmen: erster Lauf")
-bericht = zeitplan.uebernehmen(ergebnis, "test")
+bericht = zeitplan.uebernehmen(ergebnis, VA, "test")
 pruefe(len(bericht["neu"]) == 6, "sechs neue Eintraege")
 pruefe(not bericht["geaendert"], "nichts geaendert")
-pruefe(len(db.programm(serie="dhc")) == 6, "sechs stehen in der Datenbank")
+pruefe(len(db.programm(VA, serie="dhc")) == 6, "sechs stehen in der Datenbank")
 
 print("Uebernehmen: zweiter Lauf, nichts geaendert")
 bericht = zeitplan.uebernehmen(
-    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(DHC, "allgemein")), "test")
+    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(DHC, "allgemein"), TAGE), VA, "test")
 pruefe(zeitplan.unveraendert(bericht), "wird als unveraendert gemeldet")
-pruefe(len(db.programm(serie="dhc")) == 6, "und legt nichts doppelt an")
+pruefe(len(db.programm(VA, serie="dhc")) == 6, "und legt nichts doppelt an")
 
 print("Uebernehmen: die Website aendert eine Zeit")
 geaendert = seite("<h2>allgemein</h2>", tabelle(
@@ -181,12 +188,12 @@ geaendert = seite("<h2>allgemein</h2>", tabelle(
     ("Sonntag", "Rennlauf", "ab 11.30 Uhr"),
     ("", "Siegerehrung", "ca. 30 min nach Rennschluss")))
 bericht = zeitplan.uebernehmen(
-    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(geaendert, "allgemein")),
+    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(geaendert, "allgemein"), TAGE), VA,
     "test")
 pruefe(len(bericht["geaendert"]) == 1, "genau eine Aenderung")
 pruefe("10:00–12:00 wird 10.30 - 12.30 Uhr" in bericht["geaendert"][0],
        "alter und neuer Wert stehen drin: " + bericht["geaendert"][0])
-walk = [z for z in db.programm(serie="dhc") if z["titel"] == "Track Walk"][0]
+walk = [z for z in db.programm(VA, serie="dhc") if z["titel"] == "Track Walk"][0]
 pruefe(walk["beginn"] == "2026-08-28 10:30", "die neue Zeit steht drin")
 
 print("Was von Hand geaendert wurde, gewinnt")
@@ -197,10 +204,10 @@ with con:
                 ("2026-08-28 09:00", "2026-08-28 11:00", walk["id"]))
 con.close()
 bericht = zeitplan.uebernehmen(
-    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(DHC, "allgemein")), "test")
+    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(DHC, "allgemein"), TAGE), VA, "test")
 pruefe(len(bericht["geschuetzt"]) == 1, "die Abweichung wird gemeldet")
 pruefe("deine Fassung bleibt" in bericht["geschuetzt"][0], "mit klarer Ansage")
-walk = [z for z in db.programm(serie="dhc") if z["titel"] == "Track Walk"][0]
+walk = [z for z in db.programm(VA, serie="dhc") if z["titel"] == "Track Walk"][0]
 pruefe(walk["beginn"] == "2026-08-28 09:00", "und nichts wird ueberschrieben")
 
 print("Was verschwindet, bleibt sichtbar")
@@ -208,33 +215,33 @@ kuerzer = seite("<h2>allgemein</h2>", tabelle(
     ("Freitag", "Startnummerausgabe", "09.00 - 18.00 Uhr"),
     ("Sonntag", "Rennlauf", "ab 11.30 Uhr")))
 bericht = zeitplan.uebernehmen(
-    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(kuerzer, "allgemein")),
+    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(kuerzer, "allgemein"), TAGE), VA,
     "test")
 pruefe(len(bericht["entfallen"]) == 4, "vier Eintraege sind entfallen: "
        + str(len(bericht["entfallen"])))
-pruefe(len(db.programm(serie="dhc")) == 6, "geloescht wurde nichts")
-pruefe(len(db.programm(serie="dhc", mit_entfallenen=False)) == 2,
+pruefe(len(db.programm(VA, serie="dhc")) == 6, "geloescht wurde nichts")
+pruefe(len(db.programm(VA, serie="dhc", mit_entfallenen=False)) == 2,
        "aber nur zwei gelten noch")
 
 print("Und taucht wieder auf")
 bericht = zeitplan.uebernehmen(
-    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(DHC, "allgemein")), "test")
+    zeitplan.auswerten("dhc", *zeitplan.tabelle_waehlen(DHC, "allgemein"), TAGE), VA, "test")
 pruefe(len(bericht["zurueck"]) >= 3, "die entfallenen leben wieder auf")
-pruefe(len(db.programm(serie="dhc", mit_entfallenen=False)) == 6,
+pruefe(len(db.programm(VA, serie="dhc", mit_entfallenen=False)) == 6,
        "alle sechs gelten wieder")
 
 print("Zweite Serie stoert die erste nicht")
-kids = zeitplan.auswerten("kids", *zeitplan.tabelle_waehlen(KIDS, "allgemein"))
+kids = zeitplan.auswerten("kids", *zeitplan.tabelle_waehlen(KIDS, "allgemein"), TAGE)
 pruefe(len(kids.eintraege) == 3, "drei Eintraege beim Kids Cup")
 pruefe(kids.eintraege[1].beginn == "2026-08-29 14:00",
        "'ab circa 14.00 Uhr' wird gelesen")
-zeitplan.uebernehmen(kids, "test")
-pruefe(len(db.programm(serie="dhc")) == 6, "der DHC bleibt bei sechs")
-pruefe(len(db.programm(serie="kids")) == 3, "der Kids Cup hat drei")
-pruefe(len(db.programm()) == 9, "zusammen neun")
+zeitplan.uebernehmen(kids, VA, "test")
+pruefe(len(db.programm(VA, serie="dhc")) == 6, "der DHC bleibt bei sechs")
+pruefe(len(db.programm(VA, serie="kids")) == 3, "der Kids Cup hat drei")
+pruefe(len(db.programm(VA)) == 9, "zusammen neun")
 
 print("Sortierung")
-alle = db.programm(serie="kids")
+alle = db.programm(VA, serie="kids")
 pruefe(alle[-1]["titel"] == "Siegerehrung",
        "der Eintrag ohne Uhrzeit steht hinten, nicht vorn")
 

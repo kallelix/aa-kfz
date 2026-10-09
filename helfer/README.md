@@ -66,8 +66,9 @@ Siehe [.env.example](.env.example). Gelesen wird `helfer/.env`, im Betrieb die
 Datei, auf die `HELFER_ENV` zeigt. Was für alle drei Bereiche gilt, steht in
 der [Übersicht](../README.md#konfiguration). Erwähnenswert:
 
-- `TAGE`, `ZEITZONE` – die Renntage und die Uhr, nach der Dashboard und Monitor
-  gehen, unabhängig davon, wie der Server gestellt ist
+- `ZEITZONE` – die Uhr, nach der Dashboard und Monitor gehen, unabhängig
+  davon, wie der Server gestellt ist. Die Renntage stehen nicht mehr hier,
+  sondern an der Veranstaltung (siehe unten)
 - `JETZT_FEST` – stellt die Uhr auf einen festen Zeitpunkt, für Durchsichten
   außerhalb der Veranstaltung. **Im Betrieb leer lassen.** Eine gestellte Uhr
   schaltet außerdem Zeitplan-Abruf und Helferabgleich ab.

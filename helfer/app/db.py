@@ -2,6 +2,12 @@
 
 Wie in den Schwester-Apps: eine Verbindung je Anfrage, Schreibvorgänge in
 einem `with con`-Block, damit sie ganz oder gar nicht passieren.
+
+Schichten, Programm, Aufgaben, Ausleihen und Schlüssel gehören zu einer
+Veranstaltung (kern/veranstaltungen.py). Wer sie liest oder anlegt, nennt
+sie: ``vid`` ist überall der erste Parameter. Was über eine Nummer geht –
+eine Schicht, eine Aufgabe –, braucht sie nicht; die Nummer gehört ohnehin
+zu genau einer.
 """
 
 from __future__ import annotations
@@ -9,12 +15,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from kern import veranstaltungen as va
 from kern.db import Datenbank, IntegrityError, Verbindung, Zeile
 
 from . import config, normalisieren
 
 _DATENBANK = Datenbank(lambda: config.DATABASE_URL, config.DB_SCHEMA,
                        Path(__file__).resolve().parent / "migrationen")
+
+VERANSTALTUNGEN = va.Veranstaltungen(lambda: config.DATABASE_URL)
 
 
 # --- Uhr -------------------------------------------------------------------
@@ -58,8 +67,21 @@ def verbinden() -> Verbindung:
 
 
 def init() -> list[str]:
-    """Spielt fehlende Migrationen ein und liefert ihre Namen fürs Protokoll."""
-    return _DATENBANK.init()
+    """Spielt fehlende Migrationen ein und liefert ihre Namen fürs Protokoll.
+
+    Erst die von kern: die Tabellen hier zeigen auf kern.veranstaltung.
+    """
+    return VERANSTALTUNGEN.init() + _DATENBANK.init()
+
+
+def veranstaltung(gewaehlt="") -> Zeile | None:
+    """Die gewählte Veranstaltung, sonst die Vorgabe – nach der Uhr des
+    Dashboards, damit JETZT_FEST auch hier greift."""
+    return VERANSTALTUNGEN.gewaehlt(gewaehlt, jetzt_lokal().date())
+
+
+def tage_der(veranstaltung_zeile) -> list:
+    return va.tage(veranstaltung_zeile)
 
 
 def _mit_suche(zeilen, *felder):
@@ -159,14 +181,16 @@ def helfer_anlegen(con: Verbindung, daten: dict) -> tuple[int, bool]:
     return int(vorhanden["id"]), False
 
 
-def helfer_liste() -> list[Zeile]:
+def helfer_liste(vid: int) -> list[Zeile]:
+    """Alle Helfer – sie gehören keiner Veranstaltung –, gezählt werden ihre
+    Schichten in dieser."""
     con = verbinden()
     try:
         return _mit_suche(con.execute(
             "SELECT h.*,"
-            " (SELECT COUNT(*) FROM einteilung e WHERE e.helfer_id = h.id)"
-            "   AS schichten"
-            " FROM helfer h ORDER BY lower(h.name)").fetchall(),
+            " (SELECT COUNT(*) FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            "  WHERE e.helfer_id = h.id AND s.veranstaltung_id = ?) AS schichten"
+            " FROM helfer h ORDER BY lower(h.name)", (vid,)).fetchall(),
             "name", "email", "tshirt_roh")
     finally:
         con.close()
@@ -181,20 +205,21 @@ def helfer_laden(helfer_id: int) -> Zeile | None:
         con.close()
 
 
-def helfer_schichten(helfer_id: int) -> list[Zeile]:
+def helfer_schichten(vid: int, helfer_id: int) -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
             "SELECT e.id AS einteilung_id, e.quelle, s.*"
             " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
-            " WHERE e.helfer_id = ? ORDER BY s.beginn", (helfer_id,)).fetchall()
+            " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? ORDER BY s.beginn",
+            (helfer_id, vid)).fetchall()
     finally:
         con.close()
 
 
 # --- Schichten -------------------------------------------------------------
 
-def schicht_sichern(con: Verbindung, liste: str, beginn: str,
+def schicht_sichern(con: Verbindung, vid: int, liste: str, beginn: str,
                     ende: str, datum: str,
                     bedarf: int | None = None) -> tuple[int, bool]:
     """Legt eine Schicht an oder aktualisiert sie. Gibt (id, neu) zurück.
@@ -204,13 +229,13 @@ def schicht_sichern(con: Verbindung, liste: str, beginn: str,
     Lauf derselben Dateien den Bedarf. None lässt den Wert stehen.
     """
     vorhanden = con.execute(
-        "SELECT id FROM schicht WHERE liste = ? AND beginn = ? AND ende = ?",
-        (liste, beginn, ende)).fetchone()
+        "SELECT id FROM schicht WHERE veranstaltung_id = ? AND liste = ?"
+        " AND beginn = ? AND ende = ?", (vid, liste, beginn, ende)).fetchone()
     if vorhanden is None:
         zeiger = con.execute(
-            "INSERT INTO schicht (liste, beginn, ende, datum, bedarf, angelegt_am)"
-            " VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-            (liste, beginn, ende, datum, bedarf or 0, jetzt()))
+            "INSERT INTO schicht (veranstaltung_id, liste, beginn, ende, datum,"
+            " bedarf, angelegt_am) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (vid, liste, beginn, ende, datum, bedarf or 0, jetzt()))
         return int(zeiger.fetchone()[0]), True
     if bedarf is not None:
         con.execute(
@@ -232,9 +257,9 @@ _SCHICHT_SPALTEN = (
 _SCHICHT_SUCHE = ("liste", "ort")
 
 
-def schichten(liste: str = "", tag: str = "",
+def schichten(vid: int, liste: str = "", tag: str = "",
               nur_luecken: bool = False) -> list[Zeile]:
-    bedingungen, werte = [], []
+    bedingungen, werte = ["s.veranstaltung_id = ?"], [vid]
     if liste:
         bedingungen.append("s.liste = ?")
         werte.append(liste)
@@ -245,7 +270,7 @@ def schichten(liste: str = "", tag: str = "",
         bedingungen.append(
             "s.bedarf > (SELECT COUNT(*) FROM einteilung e"
             " WHERE e.schicht_id = s.id)")
-    wo = (" WHERE " + " AND ".join(bedingungen)) if bedingungen else ""
+    wo = " WHERE " + " AND ".join(bedingungen)
 
     con = verbinden()
     try:
@@ -281,20 +306,22 @@ def besetzung(schicht_id: int) -> list[Zeile]:
         con.close()
 
 
-def listen() -> list[str]:
+def listen(vid: int) -> list[str]:
     con = verbinden()
     try:
         return [z["liste"] for z in con.execute(
-            "SELECT liste FROM schicht GROUP BY liste ORDER BY lower(liste)")]
+            "SELECT liste FROM schicht WHERE veranstaltung_id = ?"
+            " GROUP BY liste ORDER BY lower(liste)", (vid,))]
     finally:
         con.close()
 
 
-def tage() -> list[str]:
+def tage(vid: int) -> list[str]:
     con = verbinden()
     try:
         return [z["datum"] for z in con.execute(
-            "SELECT DISTINCT datum FROM schicht ORDER BY datum")]
+            "SELECT DISTINCT datum FROM schicht WHERE veranstaltung_id = ?"
+            " ORDER BY datum", (vid,))]
     finally:
         con.close()
 
@@ -343,7 +370,7 @@ def steht_schon_drin(schicht_id: int, helfer_id: int) -> bool:
 
 # --- Auswertung ------------------------------------------------------------
 
-def konflikte() -> list[dict]:
+def konflikte(vid: int) -> list[dict]:
     """Wer ist zur selben Zeit auf zwei Schichten eingeteilt?
 
     Reine Überlappung der Zeitstempel, deshalb geht das in einer Abfrage –
@@ -364,13 +391,14 @@ def konflikte() -> list[dict]:
             " JOIN schicht b ON b.id = eb.schicht_id"
             " JOIN helfer h ON h.id = ea.helfer_id"
             " WHERE a.id < b.id AND a.beginn < b.ende AND b.beginn < a.ende"
+            "   AND a.veranstaltung_id = ? AND b.veranstaltung_id = ?"
             " GROUP BY h.id, a.id, b.id"
-            " ORDER BY a.beginn, lower(h.name)").fetchall()]
+            " ORDER BY a.beginn, lower(h.name)", (vid, vid)).fetchall()]
     finally:
         con.close()
 
 
-def doppelt_besetzt() -> list[dict]:
+def doppelt_besetzt(vid: int) -> list[dict]:
     """Dieselbe Person mehrfach auf demselben Platz. Kommt in den
     Bestandsdaten vor und ist immer entweder ein Sammeleintrag oder eine
     Doppelanmeldung – die Orga muss draufschauen."""
@@ -382,29 +410,36 @@ def doppelt_besetzt() -> list[dict]:
             " FROM einteilung e"
             " JOIN helfer h ON h.id = e.helfer_id"
             " JOIN schicht s ON s.id = e.schicht_id"
+            " WHERE s.veranstaltung_id = ?"
             " GROUP BY h.id, s.id HAVING COUNT(*) > 1"
-            " ORDER BY s.beginn, lower(h.name)").fetchall()]
+            " ORDER BY s.beginn, lower(h.name)", (vid,)).fetchall()]
     finally:
         con.close()
 
 
-def zaehler() -> dict:
+def zaehler(vid: int) -> dict:
+    """Schichten und Besetzung zählen für die Veranstaltung; Helfer,
+    T-Shirt-Größen und Verpflegung für alle – sie gehören keiner."""
     con = verbinden()
     try:
-        def eine(sql: str) -> int:
-            return con.execute(sql).fetchone()[0]
+        def eine(sql: str, *werte) -> int:
+            return con.execute(sql, werte).fetchone()[0]
 
-        bedarf = eine("SELECT COALESCE(SUM(bedarf), 0) FROM schicht")
-        besetzt = eine("SELECT COUNT(*) FROM einteilung")
+        bedarf = eine("SELECT COALESCE(SUM(bedarf), 0) FROM schicht"
+                      " WHERE veranstaltung_id = ?", vid)
+        besetzt = eine("SELECT COUNT(*) FROM einteilung e JOIN schicht s"
+                       " ON s.id = e.schicht_id WHERE s.veranstaltung_id = ?", vid)
         return {
-            "schichten": eine("SELECT COUNT(*) FROM schicht"),
+            "schichten": eine("SELECT COUNT(*) FROM schicht WHERE veranstaltung_id = ?",
+                              vid),
             "helfer": eine("SELECT COUNT(*) FROM helfer WHERE aktiv = 1"),
             "bedarf": bedarf,
             "besetzt": besetzt,
             "offen": max(0, bedarf - besetzt),
             "luecken": eine(
-                "SELECT COUNT(*) FROM schicht s WHERE s.bedarf >"
-                " (SELECT COUNT(*) FROM einteilung e WHERE e.schicht_id = s.id)"),
+                "SELECT COUNT(*) FROM schicht s WHERE s.veranstaltung_id = ?"
+                " AND s.bedarf > (SELECT COUNT(*) FROM einteilung e"
+                "                 WHERE e.schicht_id = s.id)", vid),
             "tshirts": {z["tshirt"]: z["anzahl"] for z in con.execute(
                 "SELECT tshirt, COUNT(*) AS anzahl FROM helfer"
                 " WHERE tshirt IS NOT NULL GROUP BY tshirt")},
@@ -421,9 +456,9 @@ def zaehler() -> dict:
 
 # --- Programm der Rennserien -----------------------------------------------
 
-def programm(serie: str = "", tag: str = "",
+def programm(vid: int, serie: str = "", tag: str = "",
              mit_entfallenen: bool = True) -> list[Zeile]:
-    bedingungen, werte = [], []
+    bedingungen, werte = ["veranstaltung_id = ?"], [vid]
     if serie:
         bedingungen.append("serie = ?")
         werte.append(serie)
@@ -432,7 +467,7 @@ def programm(serie: str = "", tag: str = "",
         werte.append(tag)
     if not mit_entfallenen:
         bedingungen.append("entfallen_am IS NULL")
-    wo = (" WHERE " + " AND ".join(bedingungen)) if bedingungen else ""
+    wo = " WHERE " + " AND ".join(bedingungen)
 
     con = verbinden()
     try:
@@ -598,7 +633,7 @@ def _schichten_mit_namen(con: Verbindung, bedingung: str,
     return zeilen
 
 
-def monitor_tage() -> list[dict]:
+def monitor_tage(vid: int) -> list[dict]:
     """Alle Tage, an denen etwas ansteht – für die Tagesleiste im Monitor.
 
     Schicht- und Programmtage zusammen: der Aufbau am 25.08. hat kein
@@ -608,9 +643,10 @@ def monitor_tage() -> list[dict]:
     con = verbinden()
     try:
         tage = {z["datum"] for z in con.execute(
-            "SELECT DISTINCT datum FROM schicht")}
+            "SELECT DISTINCT datum FROM schicht WHERE veranstaltung_id = ?", (vid,))}
         tage |= {z["datum"] for z in con.execute(
-            "SELECT DISTINCT datum FROM programm WHERE entfallen_am IS NULL")}
+            "SELECT DISTINCT datum FROM programm WHERE entfallen_am IS NULL"
+            " AND veranstaltung_id = ?", (vid,))}
     finally:
         con.close()
 
@@ -628,7 +664,7 @@ def monitor_tage() -> list[dict]:
     return ergebnis
 
 
-def tagesstand(datum: str, zeitpunkt: datetime) -> dict:
+def tagesstand(vid: int, datum: str, zeitpunkt: datetime) -> dict:
     """Ein ganzer Tag am Stück – der Blick voraus, den die Kollegen brauchen.
 
     Bewusst eine eigene Ansicht und nicht derselbe Aufbau mit anderem Datum:
@@ -638,11 +674,13 @@ def tagesstand(datum: str, zeitpunkt: datetime) -> dict:
     """
     con = verbinden()
     try:
-        schichten = _schichten_mit_namen(con, "s.datum = ?", (datum,))
+        schichten = _schichten_mit_namen(
+            con, "s.veranstaltung_id = ? AND s.datum = ?", (vid, datum))
         programm = [dict(z) for z in con.execute(
-            "SELECT * FROM programm WHERE entfallen_am IS NULL AND datum = ?"
+            "SELECT * FROM programm WHERE entfallen_am IS NULL"
+            " AND veranstaltung_id = ? AND datum = ?"
             " ORDER BY beginn IS NULL, beginn, lower(titel)",
-            (datum,))]
+            (vid, datum))]
     finally:
         con.close()
 
@@ -669,7 +707,8 @@ def tagesstand(datum: str, zeitpunkt: datetime) -> dict:
     }
 
 
-def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
+def monitor_stand(vid: int, zeitpunkt: datetime,
+                  vorschau_minuten: int = 120) -> dict:
     """Alles, was der Monitor anzeigt, in einem Rutsch.
 
     Die Uhr kommt von außen, damit sich die Ansicht für eine Durchsicht auf
@@ -683,10 +722,12 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
 
     con = verbinden()
     try:
-        laufend = _schichten_mit_namen(con, "s.beginn <= ? AND s.ende > ?",
-                                       (jetzt, jetzt))
-        demnaechst = _schichten_mit_namen(con, "s.beginn > ? AND s.beginn <= ?",
-                                          (jetzt, bis))
+        laufend = _schichten_mit_namen(
+            con, "s.veranstaltung_id = ? AND s.beginn <= ? AND s.ende > ?",
+            (vid, jetzt, jetzt))
+        demnaechst = _schichten_mit_namen(
+            con, "s.veranstaltung_id = ? AND s.beginn > ? AND s.beginn <= ?",
+            (vid, jetzt, bis))
 
         # NUR der heutige Tag. Vorher stand hier zusätzlich "beginn >= jetzt",
         # und damit zog die Jetzt-Ansicht am 25.08. das Programm vom 28.08.
@@ -694,13 +735,15 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
         # Die Schichten daneben halten sich ans Vorschaufenster; das Programm
         # war als einziges unbegrenzt.
         programm = [dict(z) for z in con.execute(
-            "SELECT * FROM programm WHERE entfallen_am IS NULL AND datum = ?"
-            " ORDER BY beginn IS NULL, beginn", (heute,))]
+            "SELECT * FROM programm WHERE entfallen_am IS NULL"
+            " AND veranstaltung_id = ? AND datum = ?"
+            " ORDER BY beginn IS NULL, beginn", (vid, heute))]
 
         # Damit die Tafel vor der Veranstaltung nicht bloß leer dasteht.
         naechster = con.execute(
             "SELECT datum FROM programm WHERE entfallen_am IS NULL"
-            " AND datum > ? ORDER BY datum LIMIT 1", (heute,)).fetchone()
+            " AND veranstaltung_id = ? AND datum > ? ORDER BY datum LIMIT 1",
+            (vid, heute)).fetchone()
 
         laufendes_programm = [
             p for p in programm
@@ -732,7 +775,7 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
             except ValueError:
                 naechster_tag = None
 
-        gesamt = zaehler()
+        gesamt = zaehler(vid)
         return {
             "jetzt": zeitpunkt,
             "heute": heute,
@@ -759,14 +802,14 @@ def monitor_stand(zeitpunkt: datetime, vorschau_minuten: int = 120) -> dict:
 
 # --- Aufgabenplan ----------------------------------------------------------
 
-def aufgaben(phase: str = "", status: str = "",
+def aufgaben(vid: int, phase: str = "", status: str = "",
              tag: str = "") -> list[Zeile]:
-    bedingungen, werte = [], []
+    bedingungen, werte = ["veranstaltung_id = ?"], [vid]
     for spalte, wert in (("phase", phase), ("status", status), ("datum", tag)):
         if wert:
             bedingungen.append(spalte + " = ?")
             werte.append(wert)
-    wo = (" WHERE " + " AND ".join(bedingungen)) if bedingungen else ""
+    wo = " WHERE " + " AND ".join(bedingungen)
 
     con = verbinden()
     try:
@@ -794,16 +837,16 @@ _AUFGABE_SPALTEN = ("titel", "phase", "datum", "beginn", "ende", "ort",
                     "verantwortlich", "kontakt", "notiz", "status")
 
 
-def aufgabe_anlegen(werte: dict, kuerzel: str = "") -> int:
+def aufgabe_anlegen(vid: int, werte: dict, kuerzel: str = "") -> int:
     con = verbinden()
     try:
         with con:
             zeiger = con.execute(
-                "INSERT INTO aufgabe (" + ", ".join(_AUFGABE_SPALTEN) +
-                ", angelegt_am, geaendert_am, kuerzel) VALUES (" +
+                "INSERT INTO aufgabe (veranstaltung_id, " + ", ".join(_AUFGABE_SPALTEN) +
+                ", angelegt_am, geaendert_am, kuerzel) VALUES (?, " +
                 ", ".join("?" for _ in _AUFGABE_SPALTEN) + ", ?, ?, ?)"
                 " RETURNING id",
-                (*[werte.get(s) for s in _AUFGABE_SPALTEN],
+                (vid, *[werte.get(s) for s in _AUFGABE_SPALTEN],
                  jetzt(), jetzt(), kuerzel))
             nummer = int(zeiger.fetchone()[0])
         return nummer
@@ -880,18 +923,20 @@ def aufgabe_loeschen(aufgabe_id: int) -> bool:
         con.close()
 
 
-def aufgaben_zaehler() -> dict:
+def aufgaben_zaehler(vid: int) -> dict:
     con = verbinden()
     try:
         je_status = {z["status"]: z["anzahl"] for z in con.execute(
-            "SELECT status, COUNT(*) AS anzahl FROM aufgabe GROUP BY status")}
+            "SELECT status, COUNT(*) AS anzahl FROM aufgabe"
+            " WHERE veranstaltung_id = ? GROUP BY status", (vid,))}
         return {
             "gesamt": sum(je_status.values()),
             "offen": je_status.get("offen", 0),
             "arbeit": je_status.get("arbeit", 0),
             "erledigt": je_status.get("erledigt", 0),
             "pool": con.execute(
-                "SELECT COUNT(*) FROM aufgabe WHERE datum IS NULL").fetchone()[0],
+                "SELECT COUNT(*) FROM aufgabe WHERE veranstaltung_id = ?"
+                " AND datum IS NULL", (vid,)).fetchone()[0],
         }
     finally:
         con.close()
@@ -1102,6 +1147,29 @@ def helfer_umbenennen(helfer_id: int, name: str) -> bool:
         con.close()
 
 
+def ausleihe_mit_name(ausleihe_id: int) -> Zeile | None:
+    """Eine Ausleihe samt Name der Person – für den Wortlaut am Tablet."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT a.*, h.name FROM ausleihe a JOIN helfer h ON h.id = a.helfer_id"
+            " WHERE a.id = ?", (ausleihe_id,)).fetchone()
+    finally:
+        con.close()
+
+
+def schluessel_mit_fahrzeug(schluessel_id: int) -> Zeile | None:
+    """Ein Schlüsselvorgang samt Kennzeichen – für den Wortlaut am Tablet."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT s.*, f.kennzeichen FROM schluessel s"
+            " JOIN fahrzeug f ON f.id = s.fahrzeug_id WHERE s.id = ?",
+            (schluessel_id,)).fetchone()
+    finally:
+        con.close()
+
+
 def ausleihe_laden(ausleihe_id: int) -> Zeile | None:
     con = verbinden()
     try:
@@ -1181,7 +1249,7 @@ def material_vorgaben_setzen(werte: dict) -> dict[str, int]:
     return material_vorgaben()
 
 
-def ausleihen(helfer_id: int, mengen: dict, datum: str | None = None,
+def ausleihen(vid: int, helfer_id: int, mengen: dict, datum: str | None = None,
               bemerkung: str = "", kuerzel: str = "") -> int | None:
     def menge(stueck):
         try:
@@ -1196,10 +1264,10 @@ def ausleihen(helfer_id: int, mengen: dict, datum: str | None = None,
     try:
         with con:
             zeiger = con.execute(
-                "INSERT INTO ausleihe (helfer_id, datum, funke, headset,"
-                " ersatzakku, bemerkung, ausgegeben_am, ausgegeben_von)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
-                (helfer_id, datum or None, *[menge(s) for s in MATERIAL],
+                "INSERT INTO ausleihe (veranstaltung_id, helfer_id, datum, funke,"
+                " headset, ersatzakku, bemerkung, ausgegeben_am, ausgegeben_von)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                (vid, helfer_id, datum or None, *[menge(s) for s in MATERIAL],
                  normalisieren.text(bemerkung), jetzt(), kuerzel))
             nummer = int(zeiger.fetchone()[0])
         return nummer
@@ -1257,7 +1325,7 @@ def ausleihe_loeschen(ausleihe_id: int) -> bool:
         con.close()
 
 
-def ausleihen_liste(nur_offen: bool = False) -> list[Zeile]:
+def ausleihen_liste(vid: int, nur_offen: bool = False) -> list[Zeile]:
     con = verbinden()
     try:
         return _mit_suche(con.execute(
@@ -1266,15 +1334,16 @@ def ausleihen_liste(nur_offen: bool = False) -> list[Zeile]:
             " (a.headset - a.headset_zurueck) AS headset_offen,"
             " (a.ersatzakku - a.ersatzakku_zurueck) AS ersatzakku_offen"
             " FROM ausleihe a"
-            " JOIN helfer h ON h.id = a.helfer_id" +
-            (" WHERE a.zurueck_am IS NULL" if nur_offen else "") +
-            " ORDER BY a.zurueck_am IS NOT NULL, a.ausgegeben_am DESC"
+            " JOIN helfer h ON h.id = a.helfer_id"
+            " WHERE a.veranstaltung_id = ?" +
+            (" AND a.zurueck_am IS NULL" if nur_offen else "") +
+            " ORDER BY a.zurueck_am IS NOT NULL, a.ausgegeben_am DESC", (vid,)
         ).fetchall(), "name", "bemerkung")
     finally:
         con.close()
 
 
-def material_zaehler() -> dict:
+def material_zaehler(vid: int) -> dict:
     """Was insgesamt herausging und was davon noch draußen ist."""
     con = verbinden()
     try:
@@ -1284,7 +1353,8 @@ def material_zaehler() -> dict:
             teile.append("COALESCE(SUM(" + stueck + " - " + stueck +
                          "_zurueck), 0) AS " + stueck + "_offen")
         zeile = con.execute("SELECT " + ", ".join(teile) +
-                            " FROM ausleihe").fetchone()
+                            " FROM ausleihe WHERE veranstaltung_id = ?",
+                            (vid,)).fetchone()
         return {s: {"raus": zeile[s + "_raus"], "offen": zeile[s + "_offen"]}
                 for s in MATERIAL}
     finally:
@@ -1396,16 +1466,16 @@ def fahrzeug_suchen(kennzeichen: str) -> Zeile | None:
         con.close()
 
 
-def schluessel_ausgeben(fahrzeug_id: int, name: str, bemerkung: str = "",
+def schluessel_ausgeben(vid: int, fahrzeug_id: int, name: str, bemerkung: str = "",
                         kuerzel: str = "") -> int:
     con = verbinden()
     try:
         with con:
             zeiger = con.execute(
-                "INSERT INTO schluessel (fahrzeug_id, name, bemerkung,"
-                " ausgegeben_am, ausgegeben_von) VALUES (?, ?, ?, ?, ?)"
-                " RETURNING id",
-                (fahrzeug_id, normalisieren.text(name),
+                "INSERT INTO schluessel (veranstaltung_id, fahrzeug_id, name,"
+                " bemerkung, ausgegeben_am, ausgegeben_von)"
+                " VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+                (vid, fahrzeug_id, normalisieren.text(name),
                  normalisieren.text(bemerkung), jetzt(), kuerzel))
             nummer = int(zeiger.fetchone()[0])
         return nummer
@@ -1437,21 +1507,22 @@ def schluessel_loeschen(schluessel_id: int) -> bool:
         con.close()
 
 
-def schluessel_liste(nur_offen: bool = False) -> list[Zeile]:
+def schluessel_liste(vid: int, nur_offen: bool = False) -> list[Zeile]:
     con = verbinden()
     try:
         return _mit_suche(con.execute(
             "SELECT s.*, f.kennzeichen, f.kennzeichen_norm,"
             " f.name AS halter"
-            " FROM schluessel s JOIN fahrzeug f ON f.id = s.fahrzeug_id" +
-            (" WHERE s.zurueck_am IS NULL" if nur_offen else "") +
-            " ORDER BY s.zurueck_am IS NOT NULL, s.ausgegeben_am DESC"
+            " FROM schluessel s JOIN fahrzeug f ON f.id = s.fahrzeug_id"
+            " WHERE s.veranstaltung_id = ?" +
+            (" AND s.zurueck_am IS NULL" if nur_offen else "") +
+            " ORDER BY s.zurueck_am IS NOT NULL, s.ausgegeben_am DESC", (vid,)
         ).fetchall(), "kennzeichen", "kennzeichen_norm", "name", "bemerkung")
     finally:
         con.close()
 
 
-def namen_vorschlaege() -> list[str]:
+def namen_vorschlaege(vid: int) -> list[str]:
     """Helfernamen für die Vorschlagsliste bei der Schlüsselausgabe.
 
     Die vom Shuttle zuerst: dort werden die meisten Schlüssel gebraucht. Alle
@@ -1464,8 +1535,8 @@ def namen_vorschlaege() -> list[str]:
             "SELECT h.name FROM helfer h"
             " JOIN einteilung e ON e.helfer_id = h.id"
             " JOIN schicht s ON s.id = e.schicht_id"
-            " WHERE s.liste ILIKE '%shuttle%'"
-            " GROUP BY h.name ORDER BY lower(h.name)")]
+            " WHERE s.liste ILIKE '%shuttle%' AND s.veranstaltung_id = ?"
+            " GROUP BY h.name ORDER BY lower(h.name)", (vid,))]
         gesehen = set(shuttle)
         rest = [z["name"] for z in con.execute(
             "SELECT name FROM helfer ORDER BY lower(name)")

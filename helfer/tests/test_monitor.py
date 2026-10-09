@@ -51,33 +51,39 @@ db_url = testdb.wegwerf("helfer_monitor")
 
 # Datenbank vor dem Start füllen – der Server liest sie dann nur noch.
 os.environ["DATABASE_URL"] = db_url
-os.environ["TAGE"] = "2026-08-28,2026-08-29,2026-08-30"
 from app import db  # noqa: E402
 
 db.init()
+
+# Alles im Helferbereich gehört zu einer Veranstaltung: diese hier, auf die
+# Tage der Testdaten. Sie ist die einzige, also auch die, die der Server ohne
+# eigene Wahl nimmt.
+VA = db.VERANSTALTUNGEN.anlegen({"name": "Die absolute Abfahrt 2026", "kurz": "AA 2026",
+                                 "beginn": "2026-08-28", "ende": "2026-08-30",
+                                 "ort": "Ilmenau"})
 con = db.verbinden()
 with con:
     # Läuft gerade, mit Lücke.
-    lueckig, _ = db.schicht_sichern(con, "Ordner Zeltplatz",
+    lueckig, _ = db.schicht_sichern(con, VA, "Ordner Zeltplatz",
                                     "2026-08-29 08:00", "2026-08-29 13:00",
                                     "2026-08-29", bedarf=4)
     # Läuft gerade, voll besetzt.
-    voll, _ = db.schicht_sichern(con, "Orgabüro", "2026-08-29 09:00",
+    voll, _ = db.schicht_sichern(con, VA, "Orgabüro", "2026-08-29 09:00",
                                  "2026-08-29 18:00", "2026-08-29", bedarf=2)
     # Beginnt in 90 Minuten – im Vorschaufenster.
-    bald, _ = db.schicht_sichern(con, "Shuttle", "2026-08-29 12:00",
+    bald, _ = db.schicht_sichern(con, VA, "Shuttle", "2026-08-29 12:00",
                                  "2026-08-29 18:00", "2026-08-29", bedarf=3)
     # Beginnt erst in fünf Stunden – außerhalb des Fensters.
-    spaeter, _ = db.schicht_sichern(con, "Merchandise", "2026-08-29 15:30",
+    spaeter, _ = db.schicht_sichern(con, VA, "Merchandise", "2026-08-29 15:30",
                                     "2026-08-29 18:00", "2026-08-29", bedarf=2)
     # Schon vorbei.
-    vorbei, _ = db.schicht_sichern(con, "Aufbau", "2026-08-29 06:00",
+    vorbei, _ = db.schicht_sichern(con, VA, "Aufbau", "2026-08-29 06:00",
                                    "2026-08-29 09:00", "2026-08-29", bedarf=2)
     # Nachtschicht über Mitternacht, läuft am Abend.
-    nacht, _ = db.schicht_sichern(con, "Nachtwache", "2026-08-29 20:00",
+    nacht, _ = db.schicht_sichern(con, VA, "Nachtwache", "2026-08-29 20:00",
                                   "2026-08-30 08:00", "2026-08-29", bedarf=2)
     # Am Folgetag – nur über den Tagesblick zu sehen.
-    sonntag, _ = db.schicht_sichern(con, "Sonntagsdienst", "2026-08-30 09:00",
+    sonntag, _ = db.schicht_sichern(con, VA, "Sonntagsdienst", "2026-08-30 09:00",
                                     "2026-08-30 17:00", "2026-08-30", bedarf=3)
 
     anna, _ = db.helfer_anlegen(con, {"name": "Anna Berg",
@@ -97,21 +103,21 @@ with con:
             ("Seeding Run", "2026-08-29 13:30", None, "ab 13.30 Uhr"),
             ("Siegerehrung", None, None, "anschließend")):
         con.execute(
-            "INSERT INTO programm (serie, titel, datum, beginn, ende,"
-            " tag_roh, zeit_roh, angelegt_am) VALUES ('dhc', ?, ?, ?, ?,"
+            "INSERT INTO programm (veranstaltung_id, serie, titel, datum, beginn,"
+            " ende, tag_roh, zeit_roh, angelegt_am) VALUES (?, 'dhc', ?, ?, ?, ?,"
             " 'Samstag', ?, ?)",
-            (titel, "2026-08-29", beginn, ende, roh, db.jetzt()))
+            (VA, titel, "2026-08-29", beginn, ende, roh, db.jetzt()))
     con.execute(
-        "INSERT INTO programm (serie, titel, datum, beginn, ende, tag_roh,"
-        " zeit_roh, angelegt_am) VALUES ('dhc', 'Sonntagsprogramm',"
+        "INSERT INTO programm (veranstaltung_id, serie, titel, datum, beginn, ende,"
+        " tag_roh, zeit_roh, angelegt_am) VALUES (?, 'dhc', 'Sonntagsprogramm',"
         " '2026-08-30', '2026-08-30 11:30', NULL, 'Sonntag', 'ab 11.30 Uhr', ?)",
-        (db.jetzt(),))
+        (VA, db.jetzt()))
     # Weit voraus – darf in der Jetzt-Ansicht nie auftauchen.
     con.execute(
-        "INSERT INTO programm (serie, titel, datum, beginn, ende, tag_roh,"
-        " zeit_roh, angelegt_am) VALUES ('dhc', 'Uebernaechster Tag',"
+        "INSERT INTO programm (veranstaltung_id, serie, titel, datum, beginn, ende,"
+        " tag_roh, zeit_roh, angelegt_am) VALUES (?, 'dhc', 'Uebernaechster Tag',"
         " '2026-08-31', '2026-08-31 09:00', NULL, 'Montag', 'ab 9 Uhr', ?)",
-        (db.jetzt(),))
+        (VA, db.jetzt()))
 con.close()
 
 

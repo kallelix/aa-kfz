@@ -47,7 +47,6 @@ def freier_hafen():
 
 # --- Der reine Teil: Prüfen und Umformen ----------------------------------
 
-os.environ["TAGE"] = "2026-08-28,2026-08-29,2026-08-30"
 db_url = testdb.wegwerf("helfer_aufgaben")
 os.environ["DATABASE_URL"] = db_url
 
@@ -104,6 +103,13 @@ pruefe(werte["zeit_roh"] == "10:00 - 12:00 Uhr",
 # --- Der Rest: über HTTP ---------------------------------------------------
 
 db.init()
+
+# Alles im Helferbereich gehört zu einer Veranstaltung: diese hier, auf die
+# Tage der Testdaten. Sie ist die einzige, also auch die, die der Server ohne
+# eigene Wahl nimmt.
+VA = db.VERANSTALTUNGEN.anlegen({"name": "Die absolute Abfahrt 2026", "kurz": "AA 2026",
+                                 "beginn": "2026-08-28", "ende": "2026-08-30",
+                                 "ort": "Ilmenau"})
 hafen = freier_hafen()
 
 prozess = subprocess.Popen(
@@ -285,9 +291,9 @@ try:
 
     print("Programmpunkt von Hand")
     zeilen(
-        "INSERT INTO programm (serie, titel, datum, beginn, ende, tag_roh,"
-        " zeit_roh, angelegt_am) VALUES ('dhc', 'Rennlauf', '2026-08-30',"
-        " '2026-08-30 11:30', NULL, 'Sonntag', 'ab 11.30 Uhr', '2026-01-01')")
+        "INSERT INTO programm (veranstaltung_id, serie, titel, datum, beginn, ende,"
+        " tag_roh, zeit_roh, angelegt_am) VALUES (?, 'dhc', 'Rennlauf', '2026-08-30',"
+        " '2026-08-30 11:30', NULL, 'Sonntag', 'ab 11.30 Uhr', '2026-01-01')", VA)
     pid = zeilen("SELECT id FROM programm")[0][0]
 
     _, _, formular = anfrage("GET", "/helfer/programm/%d" % pid)

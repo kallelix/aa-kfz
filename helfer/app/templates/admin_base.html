@@ -28,6 +28,22 @@
     {# details/summary klappt ohne Skript auf und zu - admin_menue.js
        schliesst das Menue nur wieder, wenn man daneben tippt oder Esc
        drueckt. #}
+    {# Mit welcher Veranstaltung dieser Browser arbeitet. Die Wahl merkt
+       sich ein Keks; ohne sie gilt die naechste, die noch nicht vorbei ist. #}
+    <details class="nav-gruppe" data-menue>
+      <summary class="nav-gruppe-knopf" title="Veranstaltung wechseln">
+        {{ va_aktuell.kurz if va_aktuell else 'Veranstaltung' }}
+        <span class="nav-pfeil" aria-hidden="true"></span>
+      </summary>
+      <div class="nav-klappe">
+        {% for eintrag in va_auswahl %}
+          <a href="/helfer/veranstaltung?id={{ eintrag.id }}&amp;weiter={{ request.url.path|urlencode }}"
+             {% if va_aktuell and eintrag.id == va_aktuell.id %}class="gewaehlt" aria-current="true"{% endif %}
+             >{{ eintrag.kurz }}{% if eintrag.status == 'archiviert' %} <span class="gedaempft">(archiviert)</span>{% endif %}</a>
+        {% endfor %}
+        {% if va_verwaltung %}<a href="/veranstaltungen">Veranstaltungen verwalten …</a>{% endif %}
+      </div>
+    </details>
     <details class="nav-gruppe" data-menue>
       <summary class="nav-gruppe-knopf{% if unternav_hier %} ist-hier{% endif %}">
         Einstellungen

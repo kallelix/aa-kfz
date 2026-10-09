@@ -35,7 +35,7 @@ def wirft(aufruf, enthaelt=""):
 
 url = testdb.wegwerf("test_konten")
 konten = Konten(lambda: url)
-pruefe(konten.init() == ["0001_konten.sql"], "Schema kern wird angelegt")
+pruefe("0001_konten.sql" in konten.init(), "Schema kern wird angelegt")
 pruefe(konten.init() == [], "und beim zweiten Start nicht noch einmal")
 
 print("Anlegen")

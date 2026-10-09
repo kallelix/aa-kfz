@@ -97,6 +97,14 @@ try:
     else:
         raise RuntimeError("Server ist nicht hochgekommen")
 
+    # Alles im Helferbereich gehört zu einer Veranstaltung. Der Server hat
+    # das Schema kern beim Start angelegt; diese ist die einzige, also auch
+    # die, die er ohne eigene Wahl nimmt.
+    testdb.abfrage(db_url, "kern",
+                   "INSERT INTO veranstaltung (name, kurz, beginn, ende, ort)"
+                   " VALUES ('Die absolute Abfahrt 2026', 'AA 2026', '2026-08-28',"
+                   " '2026-08-30', 'Ilmenau')")
+
     keks = {"wert": ""}
 
     def anfrage(methode, pfad, daten=None, dateien=None):

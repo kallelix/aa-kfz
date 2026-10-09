@@ -187,6 +187,12 @@ den Umsetzungsplan in Abschnitt 9.
 | V-06 | Schichten lassen sich als *intern* markieren – sie erscheinen nicht in der öffentlichen Anmeldung (z. B. Orgabüro). | S | 2 |
 | V-07 | **Je Veranstaltung einstellbar, ob und welche Goodies es gibt**: das Helfershirt und frei benannte kleine Goodies – etwa ein Bier am Bierwagen, eine Eistüte, ein Getränkegutschein für die After-Hour. Nicht jede Veranstaltung bietet Goodies an. Verpflegung gibt es in der Regel ohnehin und ist kein Goodie; ob sie gestellt wird, ist ebenfalls einstellbar. Danach richtet sich, was bei der Anmeldung gefragt wird – ohne Shirt keine Größe, ohne Verpflegung keine Verpflegungsfrage (I-02) – und was Stempelkarte und Belohnungsstufen zeigen (G-01, G-02). | M | 2 |
 
+**Stand 09.10.2026:** V-01 und V-02 sind umgesetzt (Schritt 1.2).
+Veranstaltungen stehen im Schema `kern`; Schichten, Programm, Aufgaben und
+Ausgaben des Helferbereichs gehören zu einer. Mit welcher das Backoffice
+arbeitet, wählt jeder im Browser; ohne Wahl gilt die nächste, die noch nicht
+vorbei ist. Kennzeichen und Presse hängen noch an keiner.
+
 ### 5.2 Anmeldung (A)
 
 | Nr. | Anforderung | Prio | Phase |
@@ -525,10 +531,10 @@ Migrationen als nummerierte SQL-Dateien.
 **Stand Oktober 2026: umgesetzt, für alle drei Bereiche.** Statt erst den
 Helferbereich umzuziehen, sind Kennzeichen und Presse gleich mitgegangen –
 sie sind klein, und zwei Arten Datenbank im selben Dienst hätten Sicherung,
-Löschlauf und Tests doppelt gebraucht. `deploy/sqlite-uebernehmen.py`
-übernimmt die bisherigen SQLite-Bestände samt aller Nummern; an den echten
-Beständen lokal erprobt. Das gemeinsame `kern`-Schema für Personen und
-Benutzer kommt mit Phase 1.2.
+Löschlauf und Tests doppelt gebraucht. Aus der SQLite-Zeit wird nichts
+übernommen: PostgreSQL beginnt leer (Abschnitt 8). Im Schema `kern` stehen
+schon die Backoffice-Konten und die Veranstaltungen; die Personen folgen mit
+Phase 2.
 
 ### 7.4 Anmeldung der Helfer
 
@@ -606,9 +612,10 @@ nimmt Reserve, Warteliste, Absage und Check-in mit auf.
 2. Bis die neue Anmeldung öffnet, bleibt helferliste.online für nichts
    Neues in Benutzung.
 3. Der Abruf bleibt bis nach der Veranstaltung 2027 als Rückfallebene im Code.
-4. Die Schichten 2026 werden zur Vorlage für 2027 (V-04). Die AA 2027 hat
-   einen Tag mehr – Donnerstag bis Sonntag statt Freitag bis Sonntag. Die
-   Vorlage verschiebt nach Wochentag; der Donnerstag wird von Hand ergänzt.
+4. **Begonnen wird mit leerer Datenbank** (entschieden am 09.10.2026). Aus
+   der SQLite-Zeit wird nichts übernommen, auch nicht die Schichten 2026 –
+   die Schichten 2027 entstehen neu (0.4). Eine Vorlage (V-04) gibt es ab der
+   zweiten Veranstaltung im neuen System.
 5. Die **Personendaten aus 2026** waren nach der Veranstaltung zu löschen
    (Deployment-Doku, Abschnitt 8). Sind sie gelöscht, beginnt der
    Helferstamm 2027 neu – über die WhatsApp-Gruppen und die Ankündigung. Sind
@@ -642,7 +649,7 @@ gebaut ist.
 | # | Schritt | Aufwand |
 | --- | --- | --- |
 | 1.1 | PostgreSQL im Container, Verbindung, Migrationen, frische Testdatenbank je Lauf | **erledigt** |
-| 1.2 | Veranstaltungen als eigene Größe (der Umzug auf PostgreSQL samt Datenübernahme ist schon erledigt) | 6 h |
+| 1.2 | Veranstaltungen als eigene Größe | **erledigt** |
 | 1.3 | ~~Mailversand nach `kern` ziehen~~ (erledigt); **DKIM für die Absenderdomain fertigstellen** | 2 h |
 
 1.3 ist kein Nebenschauplatz: ohne verlässliche Zustellung landet der
@@ -678,8 +685,8 @@ Bestehendes umgebaut.
 
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – rund 74 Stunden. Davon sind der Prototyp (0.2)
-und der Umzug auf PostgreSQL (1.1 und ein Teil von 1.2) schon erledigt; es
-bleiben rund 60 Stunden, die 8 Stunden pro Woche haben also etwas Luft.
+und Phase 1 bis auf DKIM schon erledigt; es bleiben rund 50 Stunden, die
+8 Stunden pro Woche haben also Luft.
 
 | Öffnung | Bauzeit pro Woche ab 12. Oktober |
 | --- | --- |
@@ -730,7 +737,7 @@ Fehler beheben, nichts Neues.
 
 | Phase | Aufwand |
 | --- | --- |
-| 1 Fundament | ~20 h, davon ~12 h erledigt |
+| 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~50 h |
 | 3 Assistent, Helferstamm, Backoffice-Konten | ~39 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
@@ -800,6 +807,12 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
   Passwort; Rollen *Admin*, *Orga*, *Lesend* und je Konto die freigegebenen
   Bereiche; Einladung per Mail über den vorhandenen Versand. Das gemeinsame
   Passwort gilt nur, bis ein Admin sein eigenes Konto hat (B-01 bis B-04).
+- **Datenstand 0** (09.10.2026): Aus der SQLite-Zeit wird nichts
+  übernommen; PostgreSQL beginnt leer (Abschnitt 8).
+- **Veranstaltungen** (09.10.2026): Mit welcher das Backoffice arbeitet,
+  wählt jeder im Browser; ohne Wahl gilt die nächste, die noch nicht vorbei
+  ist. Kennzeichen und Presse kommen dazu, wenn eine zweite Veranstaltung
+  sie braucht (V-01, V-02).
 
 ### Offen
 

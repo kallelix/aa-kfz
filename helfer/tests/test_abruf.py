@@ -24,7 +24,6 @@ from kern import testdb  # noqa: E402
 
 os.environ["DATABASE_URL"] = testdb.wegwerf("helfer_abruf")
 os.environ["APP_SECRET_KEY"] = "test-schluessel"
-os.environ["TAGE"] = "2026-08-28,2026-08-29,2026-08-30"
 
 from app import config, csv_import, db  # noqa: E402
 
@@ -131,10 +130,17 @@ def zeilen(sql, *parameter):
 
 db.init()
 
+# Alles im Helferbereich gehört zu einer Veranstaltung: diese hier, auf die
+# Tage der Testdaten. Sie ist die einzige, also auch die, die der Server ohne
+# eigene Wahl nimmt.
+VA = db.VERANSTALTUNGEN.anlegen({"name": "Die absolute Abfahrt 2026", "kurz": "AA 2026",
+                                 "beginn": "2026-08-28", "ende": "2026-08-30",
+                                 "ort": "Ilmenau"})
+
 print("Ohne Konfiguration geht es nicht")
 stellen(login_url="", vergeben_url="", offen_url="")
 try:
-    csv_import.abrufen("KK")
+    csv_import.abrufen(VA, "KK")
     pruefe(False, "es haette einen Fehler geben muessen")
 except csv_import.Fehler as f:
     pruefe("IMPORT_LOGIN_URL" in str(f) and "IMPORT_URL_OFFEN" in str(f),
@@ -147,7 +153,7 @@ pruefe(not config.IMPORT_ABRUF_MOEGLICH,
 
 print("Der Abruf")
 oeffner = stellen()
-bericht = csv_import.abrufen("KK")
+bericht = csv_import.abrufen(VA, "KK")
 pruefe([a.split("?")[0].rsplit("/", 1)[-1] for a in oeffner.aufgerufen]
        == ["home.php", "helfer.php", "helfer.php"],
        "drei Aufrufe: erst anmelden, dann die beiden Listen")
@@ -171,7 +177,7 @@ pruefe(lauf["kuerzel"] == "KK", "mit dem Kuerzel dessen, der abgerufen hat")
 
 print("Derselbe Abruf ein zweites Mal")
 vorher = zeilen("SELECT COUNT(*) FROM schicht")[0][0]
-zweiter = csv_import.abrufen("KK")
+zweiter = csv_import.abrufen(VA, "KK")
 pruefe(zeilen("SELECT COUNT(*) FROM schicht")[0][0] == vorher,
        "legt nichts doppelt an")
 pruefe(zweiter["schichten_neu"] == 0 and zweiter["ersetzt"] == 3,
@@ -189,7 +195,7 @@ for name, antworten in (
         ])):
     stellen(antworten=antworten)
     try:
-        csv_import.abrufen("KK")
+        csv_import.abrufen(VA, "KK")
         pruefe(False, name + ": es haette einen Fehler geben muessen")
     except csv_import.Fehler as f:
         pruefe("Login-Link" in str(f) and "Vergebene Posten" in str(f),
@@ -199,7 +205,7 @@ for name, antworten in (
 print("Nur https")
 stellen(login_url=LOGIN.replace("https://", "http://"))
 try:
-    csv_import.abrufen("KK")
+    csv_import.abrufen(VA, "KK")
     pruefe(False, "es haette einen Fehler geben muessen")
 except csv_import.Fehler as f:
     pruefe("https" in str(f), "http wird abgelehnt: " + str(f))
@@ -212,7 +218,7 @@ stellen(antworten=[
                                ziel="http://dienst.example/anders.csv")),
 ])
 try:
-    csv_import.abrufen("KK")
+    csv_import.abrufen(VA, "KK")
     pruefe(False, "es haette einen Fehler geben muessen")
 except csv_import.Fehler as f:
     pruefe("https" in str(f), "die Umleitung wird bemerkt: " + str(f)[:70])
@@ -243,7 +249,7 @@ stellen(antworten=[
     ("download_csv=2", Antwort(NUR_KOPF_OFFEN)),
 ])
 try:
-    csv_import.abrufen("automatisch", automatisch=True)
+    csv_import.abrufen(VA, "automatisch", automatisch=True)
     pruefe(False, "eine leere Ausfuhr haette abgelehnt werden muessen")
 except csv_import.Fehler as f:
     pruefe("keine einzige Zeile" in str(f),
@@ -264,7 +270,7 @@ stellen(antworten=[
     ("download_csv=2", Antwort(NUR_KOPF_OFFEN)),
 ])
 try:
-    csv_import.abrufen("automatisch", automatisch=True)
+    csv_import.abrufen(VA, "automatisch", automatisch=True)
     pruefe(False, "der Schwund haette auffallen muessen")
 except csv_import.Fehler as f:
     pruefe("zuletzt waren es" in str(f),
@@ -283,7 +289,7 @@ stellen(antworten=[
     ("download_csv=1", Antwort(HALB_VERGEBEN)),
     ("download_csv=2", Antwort(NUR_KOPF_OFFEN)),
 ])
-bericht = csv_import.abrufen("KK")
+bericht = csv_import.abrufen(VA, "KK")
 pruefe(bericht["zeilen_vergeben"] == 1 and bericht["zeilen_offen"] == 0,
        "derselbe Abruf geht von Hand durch - wer hinschaut, darf das")
 pruefe(zeilen("SELECT erfolg FROM import_lauf ORDER BY id DESC LIMIT 1")[0][0] == 1,

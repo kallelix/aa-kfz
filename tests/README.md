@@ -19,7 +19,7 @@ wieder ab; was ein abgebrochener Lauf liegen lässt, entfernt
 .venv/Scripts/python.exe tests/test_konten.py
 .venv/Scripts/python.exe tests/test_kern_konten.py
 .venv/Scripts/python.exe tests/test_kern_db.py
-.venv/Scripts/python.exe tests/test_uebernahme.py
+.venv/Scripts/python.exe tests/test_kern_veranstaltungen.py
 .venv/Scripts/python.exe tests/test_auth.py
 .venv/Scripts/python.exe tests/test_mail.py
 .venv/Scripts/python.exe tests/test_versand.py
@@ -46,10 +46,8 @@ node tests/test_durchfahrt_js.js
 - `test_kern_db.py` – der gemeinsame Datenbankzugriff: `?` als Platzhalter,
   Zeilen wie `sqlite3.Row`, Migrationen (einmal, ganz oder gar nicht), Schemas
   getrennt.
-- `test_uebernahme.py` – `deploy/sqlite-uebernehmen.py`: Probelauf ohne
-  Wirkung, Nummern und Verweise bleiben, die nächste neue Nummer passt, ein
-  zweiter Lauf verdoppelt nichts, ein Regelverstoß rollt alle drei Bereiche
-  zurück.
+- `test_kern_veranstaltungen.py` – Veranstaltungen anlegen und prüfen, welche
+  ohne eigene Wahl gilt (die nächste, die noch nicht vorbei ist).
 - `test_auth.py` – Passwort-Hashing, Session-Token (Signatur, getauschte
   Nutzlast, Ablauf), CSRF-Bindung, Login-Rate-Limit.
 - `test_mail.py` – Vorlagen, Kopplung von Entscheidung und Mail, Fälligkeit,

@@ -238,6 +238,11 @@ class Auth:
         # auto: der Proxy meldet über X-Forwarded-Proto, was der Browser sieht.
         return request.url.scheme == "https"
 
+    def keks_sicher(self, request: Request) -> bool:
+        """Ob ein Keks das Secure-Flag bekommt – für Kekse der Bereiche, die
+        nicht die Sitzung sind (etwa die gewählte Veranstaltung)."""
+        return self._secure(request)
+
     def cookie_setzen(self, antwort: Response, request: Request,
                       token: str) -> None:
         antwort.set_cookie(

@@ -95,7 +95,7 @@ label { display: block; font-weight: 600; margin-bottom: .3rem; }
 .pflicht { color: var(--fehler); }
 .optional { font-weight: 400; color: var(--gedaempft); font-size: .85rem; }
 
-input[type="text"], input[type="email"], input[type="tel"], textarea {
+input[type="text"], input[type="email"], input[type="tel"], input[type="date"], textarea {
   width: 100%;
   padding: .55rem .65rem;
   font: inherit;
@@ -548,6 +548,13 @@ details[open] > .nav-gruppe-knopf .nav-pfeil {
   background: var(--flaeche);
   text-decoration: none;
   color: var(--text);
+}
+/* Die gewaehlte Veranstaltung: eine Wahl, nicht die offene Seite - deshalb
+   eine eigene Klasse, aber dieselbe Flaeche. */
+.nav-klappe a.gewaehlt {
+  background: var(--flaeche);
+  color: var(--text);
+  font-weight: 600;
 }
 
 td .hilfe { display: block; margin-top: .2rem; }

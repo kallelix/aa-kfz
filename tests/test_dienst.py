@@ -57,8 +57,7 @@ hafen = freier_hafen()
 # einem Prozess vorher nicht ging. Die Datenbank teilen sich alle drei.
 for name in ("kennzeichen", "presse", "helfer"):
     (verzeichnis / (name + ".env")).write_text(
-        "COOKIE_SECURE=0\n"
-        + ("TAGE=2026-08-28,2026-08-29,2026-08-30\n" if name == "helfer" else ""),
+        "COOKIE_SECURE=0\n",
         encoding="utf-8")
 
 umgebung = {

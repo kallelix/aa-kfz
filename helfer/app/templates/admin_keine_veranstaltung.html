@@ -1,0 +1,17 @@
+{% extends "admin_base.html" %}
+{% block titel %}Noch keine Veranstaltung{% endblock %}
+{% block ueberschrift %}Noch keine Veranstaltung{% endblock %}
+
+{% block inhalt %}
+  <p>Schichten, Programm, Aufgaben und Ausgaben gehören immer zu einer
+    Veranstaltung. Es gibt noch keine – leg zuerst eine an.</p>
+  {% if va_verwaltung %}
+    <div class="knopfreihe">
+      <a class="knopf" href="/veranstaltungen/neu">Veranstaltung anlegen</a>
+    </div>
+  {% else %}
+    <p class="hilfe">Veranstaltungen werden im Backoffice unter
+      <strong>Veranstaltungen</strong> angelegt; dieser Bereich läuft hier für
+      sich allein, ohne diese Seite.</p>
+  {% endif %}
+{% endblock %}

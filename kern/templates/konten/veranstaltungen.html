@@ -27,7 +27,7 @@
                 <span class="gedaempft">{{ v.name }}</span>
                 {% if v.id == vorgabe_id %}<span class="marke marke-neu" title="Mit dieser arbeitet das Backoffice, solange niemand eine andere wählt">Vorgabe</span>{% endif %}
               </td>
-              <td class="nowrap">{{ v.beginn.strftime('%d.%m.') }}–{{ v.ende.strftime('%d.%m.%Y') }}</td>
+              <td class="nowrap">{% if v.beginn == v.ende %}{{ v.beginn.strftime('%d.%m.%Y') }}{% else %}{{ v.beginn.strftime('%d.%m.') }}–{{ v.ende.strftime('%d.%m.%Y') }}{% endif %}</td>
               <td>{{ v.ort }}</td>
               <td class="nowrap">
                 {% if v.anmeldung_ab or v.anmeldung_bis %}
