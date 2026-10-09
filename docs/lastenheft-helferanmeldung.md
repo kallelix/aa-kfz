@@ -301,6 +301,15 @@ stehen sie auch auf dem Monitor, ohne Namen. Bei S-05 zählt nur, was an der Per
 | I-06 | **Zusammenführen im Backoffice**: zwei Personen zu einer machen, Schichten und Ausgaben wandern mit. | S | 3 |
 | I-07 | Social Login (Google, Apple …) – geprüft und **nicht empfohlen**, siehe Abschnitt 7.4. | – | – |
 
+**Stand 09.10.2026, Schritt 3.2:** I-06 ist umgesetzt. Die Orga vergleicht
+zwei Einträge nebeneinander – aus der Übersicht oder über die Nummer – und
+wählt, wer bleibt. Mit dem anderen wandern Schichten, Warteliste,
+Springer-Zeiten, Teilnahmen, Einsatzgrenzen, Ausleihen, die Shirt-Ausgabe
+samt Unterschrift, Absagen, Mails, Verlauf und wen er mitangemeldet hat;
+Doppeltes bleibt einmal, ein so frei gewordener Platz geht an Reserve und
+Warteliste. Fehlende Angaben kommen vom anderen. Paare, die zwei Menschen
+sind, lassen sich als solche vermerken und verschwinden aus der Liste.
+
 ### 5.5 Konflikte, Belastung und Einsatzgrenzen (K)
 
 | Nr. | Anforderung | Prio | Phase |
@@ -870,7 +879,7 @@ Phase Vorrang.
 | # | Schritt | Aufwand |
 | --- | --- | --- |
 | 3.1 | **Assistent**: Verfügbarkeit, Vorlieben, Vorschläge nach Dringlichkeit, Springer | **erledigt** |
-| 3.2 | Dubletten zusammenführen (I-06); das Erkennen kommt mit 2.4 | 3 h |
+| 3.2 | Dubletten zusammenführen (I-06); das Erkennen kommt mit 2.4 | **erledigt** |
 | 3.3 | Mail bei Anmeldestart an die Vorgemerkten (C-08); das Vormerken kommt mit 2.2 | 2 h |
 | 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | 5 h |
 | 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | 3 h |
@@ -900,7 +909,7 @@ Fehler beheben, nichts Neues.
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
-| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~19 h erledigt |
+| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~22 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |
 

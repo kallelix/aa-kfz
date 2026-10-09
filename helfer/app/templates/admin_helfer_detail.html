@@ -174,6 +174,27 @@
     </section>
   {% endif %}
 
+  {% if fuehrt_zusammen %}
+    {# I-06: zwei Einträge, ein Mensch. #}
+    <section id="zusammenfuehren">
+      <h2>Zusammenführen</h2>
+      {% for d in dubletten %}
+        {% set andere = (d.b_id, d.b_name, d.b_email) if d.a_id == person.id else (d.a_id, d.a_name, d.a_email) %}
+        <p>Vielleicht dieselbe Person: <a href="/helfer/helfer/{{ andere[0] }}">{{ andere[1] }}</a>
+          <span class="gedaempft">{{ andere[2] }}</span> –
+          <a href="/helfer/zusammenfuehren?a={{ person.id }}&amp;b={{ andere[0] }}">vergleichen</a></p>
+      {% endfor %}
+      <form method="get" action="/helfer/zusammenfuehren" class="einteilen">
+        <input type="hidden" name="a" value="{{ person.id }}">
+        <label for="zusammen-b">Mit Nr.</label>
+        <input type="number" id="zusammen-b" name="b" min="1" inputmode="numeric" required>
+        <button type="submit" class="knopf-schlicht">vergleichen</button>
+        <p class="hilfe">Diese Person hat Nr. {{ person.id }}. Die Nummer der anderen steht auf
+          ihrer Seite hier unten.</p>
+      </form>
+    </section>
+  {% endif %}
+
   {% if nur_eigene %}
     <p class="zurueck-zeile"><a href="/helfer/schichten">Zurück zu den Schichten</a></p>
   {% else %}

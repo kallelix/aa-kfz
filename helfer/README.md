@@ -240,6 +240,28 @@ kein Feld.
   Grenzen und Protokoll mit. Die Vorlage aus dem Vorjahr nimmt Grenzen auf
   ganze Bereiche mit, die auf einzelne Schichten nicht.
 
+## Dubletten
+
+Wer zweimal angelegt ist – „Lena Müller“ und „Lena Mueller“ mit derselben
+Adresse –, steht in der Übersicht unter „Vielleicht dieselbe Person“
+(Lastenheft 2.4, I-05). Zusammengeführt wird im Backoffice (3.2, I-06): aus
+der Übersicht oder von der Seite der Person, auch über die Nummer einer
+anderen. Die Vergleichsseite zeigt beide nebeneinander; die Orga wählt, wer
+bleibt.
+
+- Mit dem zweiten Eintrag wandern Schichten, Warteliste, Springer-Zeiten,
+  Teilnahmen mit Vorlieben und Bemerkung, Einsatzgrenzen, Ausleihen, die
+  Unterschrift unter der Shirt-Ausgabe, Absagen, Mails und der Verlauf;
+  wen er mitangemeldet hatte, hat danach der bleibende mitangemeldet. Was
+  doppelt wäre, bleibt einmal.
+- Stand die Person zweimal auf einer Schicht, wird ein Platz frei. Der geht
+  wie jeder andere an Reserve und Warteliste.
+- Was dem bleibenden fehlt – Nummer, Größe, Verpflegung, Alter, ausgegebenes
+  Shirt –, kommt vom anderen; sein Name bleibt.
+- Sind es zwei Menschen, etwa Geschwister mit einer Adresse, merkt die Orga
+  das an; das Paar steht dann nicht mehr in der Liste.
+- Das darf nur die Orga, nicht die Bereichsleitung und kein lesendes Konto.
+
 ## Starten
 
 Im Alltag als Teil des Dienstes, siehe [Übersicht](../README.md#lokal-starten).
@@ -359,6 +381,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_datenschutz.py  # Einwilligung, Eltern, Löschwerkzeug
 .venv/Scripts/python.exe helfer/tests/test_last.py         # 200 gleichzeitig, Tauschen gegeneinander
 .venv/Scripts/python.exe helfer/tests/test_assistent.py    # Zeit, Vorlieben, Vorschläge, Springer
+.venv/Scripts/python.exe helfer/tests/test_dubletten.py    # zusammenführen, auseinanderhalten
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

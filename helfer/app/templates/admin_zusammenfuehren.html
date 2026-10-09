@@ -1,0 +1,77 @@
+{% extends "admin_base.html" %}
+{% block titel %}Zusammenführen{% endblock %}
+{% block ueberschrift %}Dieselbe Person?{% endblock %}
+
+{# I-06: zwei Einträge nebeneinander. Einer bleibt, der andere geht in ihm
+   auf – mit allem, was an ihm hängt (db.zusammenfuehren). #}
+{% block inhalt %}
+  <p>Beim Zusammenführen bleibt ein Eintrag, der andere wird gelöscht. Seine Schichten,
+    Wartelisten, Springer-Zeiten, Ausgaben, Einsatzgrenzen und sein Verlauf wandern mit.
+    Was beim bleibenden fehlt – Nummer, Größe, Verpflegung –, kommt vom anderen.</p>
+
+  {% set a, b = paar %}
+  <form method="post" action="/helfer/zusammenfuehren">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="a" value="{{ a.person.id }}">
+    <input type="hidden" name="b" value="{{ b.person.id }}">
+    <div class="tabelle-huelle">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            {% for v in paar %}
+              <th scope="col">
+                <label><input type="radio" name="behalten" value="{{ v.person.id }}"
+                              {% if v.person.id == vorschlag %}checked{% endif %}>
+                  Diesen behalten</label>
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Name</th>
+            {% for v in paar %}<td><a href="/helfer/helfer/{{ v.person.id }}">{{ v.person.name }}</a>
+              <span class="gedaempft">Nr. {{ v.person.id }}</span></td>{% endfor %}</tr>
+          <tr><th scope="row">E-Mail</th>
+            {% for v in paar %}<td>{{ v.person.email or '–' }}
+              {%- if v.person.email and v.person.email_bestaetigt_am %} <span class="gedaempft">bestätigt</span>{% endif %}</td>{% endfor %}</tr>
+          <tr><th scope="row">Telefon</th>
+            {% for v in paar %}<td>{{ v.person.telefon or '–' }}</td>{% endfor %}</tr>
+          <tr><th scope="row">Alter</th>
+            {% for v in paar %}<td>
+              {%- if v.person.geburtsdatum %}geboren {{ v.person.geburtsdatum }}
+              {%- elif v.person.volljaehrig == 1 %}18 oder älter
+              {%- elif v.person.volljaehrig == 0 %}unter 18
+              {%- else %}–{% endif %}</td>{% endfor %}</tr>
+          <tr><th scope="row">T-Shirt</th>
+            {% for v in paar %}<td>{{ v.person.tshirt or '–' }}
+              {%- if v.person.tshirt_ausgegeben_am %} <span class="gedaempft">ausgegeben</span>{% endif %}</td>{% endfor %}</tr>
+          <tr><th scope="row">Schichten</th>
+            {% for v in paar %}<td>{{ v.schichten }}
+              {%- if v.warteliste %} <span class="gedaempft">+ {{ v.warteliste }} auf der Warteliste</span>{% endif %}</td>{% endfor %}</tr>
+          <tr><th scope="row">Springer-Zeiten</th>
+            {% for v in paar %}<td>{{ v.springer }}</td>{% endfor %}</tr>
+          <tr><th scope="row">Ausleihen</th>
+            {% for v in paar %}<td>{{ v.ausleihen }}</td>{% endfor %}</tr>
+          <tr><th scope="row">Bringt mit</th>
+            {% for v in paar %}<td>{{ v.mitgebracht }}</td>{% endfor %}</tr>
+          <tr><th scope="row">Angelegt</th>
+            {% for v in paar %}<td class="gedaempft">{{ v.person.angelegt_am[:10] }}</td>{% endfor %}</tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="knopfreihe">
+      <button type="submit" class="knopf">Zusammenführen</button>
+      <a class="knopf-schlicht" href="/helfer/helfer/{{ a.person.id }}">Abbrechen</a>
+    </div>
+  </form>
+
+  <form method="post" action="/helfer/zusammenfuehren/verschieden">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="a" value="{{ a.person.id }}">
+    <input type="hidden" name="b" value="{{ b.person.id }}">
+    <p class="hilfe">Zwei Menschen, etwa Geschwister mit einer Adresse? Dann steht das Paar
+      nicht mehr unter „Vielleicht dieselbe Person“.</p>
+    <button type="submit" class="knopf-schlicht">Das sind zwei verschiedene Menschen</button>
+  </form>
+{% endblock %}

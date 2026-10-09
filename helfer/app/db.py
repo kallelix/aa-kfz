@@ -1380,10 +1380,11 @@ def verfallen_lassen(helfer_id: int) -> list[int]:
         con.close()
 
 
-def moegliche_dubletten() -> list[dict]:
+def moegliche_dubletten(helfer_id: int | None = None) -> list[dict]:
     """Paare, die vielleicht derselbe Mensch sind (I-05): Name in irgendeiner
-    Schreibweise gleich und dazu Adresse oder Nummer. Zusammenführen kommt
-    mit I-06; bis dahin sieht die Orga sie wenigstens."""
+    Schreibweise gleich und dazu Adresse oder Nummer. Ohne die, von denen die
+    Orga gesagt hat, es sind zwei (I-06). Mit `helfer_id` nur die Paare mit
+    dieser Person."""
     con = verbinden()
     try:
         paare = con.execute(
@@ -1392,10 +1393,195 @@ def moegliche_dubletten() -> list[dict]:
             " FROM helfer a JOIN helfer b ON a.id < b.id"
             " AND ((a.email <> '' AND lower(a.email) = lower(b.email))"
             "      OR (a.telefon <> '' AND a.telefon = b.telefon))"
-            " ORDER BY a.id, b.id").fetchall()
+            " WHERE NOT EXISTS (SELECT 1 FROM keine_dublette k"
+            "                   WHERE k.a_id = a.id AND k.b_id = b.id)" +
+            (" AND ? IN (a.id, b.id)" if helfer_id else "") +
+            " ORDER BY a.id, b.id", (helfer_id,) if helfer_id else ()).fetchall()
     finally:
         con.close()
     return [dict(z) for z in paare if _gleicher_name(z["a_name"], z["b_name"])]
+
+
+# --- Dubletten zusammenführen (Lastenheft 3.2: I-06) ------------------------
+
+# Was die bleibende Person von der anderen übernimmt, wenn es ihr fehlt.
+_ERGAENZEN = ("vorname", "nachname", "email", "telefon", "veggie", "tshirt", "tshirt_roh",
+              "volljaehrig", "geburtsdatum", "stamm_einwilligung_am")
+# Was nur zusammen übernommen wird – sonst passte das eine nicht zum anderen.
+_ERGAENZEN_ZUSAMMEN = (("tshirt_ausgegeben_am", "tshirt_ausgegeben", "tshirt_kuerzel"),
+                       ("eltern_email", "eltern_name", "eltern_bestaetigt_am"))
+
+
+def _leer(wert) -> bool:
+    return wert is None or wert == ""
+
+
+def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
+    """Zwei Personen zu einer (I-06): `weg` geht in `behalten` auf.
+
+    Schichten, Warteliste, Springer-Zeiten, Teilnahmen, Einsatzgrenzen,
+    Ausleihen, die Shirt-Unterschrift, Absagen, Mails und der Verlauf
+    wandern mit; was danach doppelt wäre, bleibt einmal. Wen `weg`
+    mitangemeldet hatte, hat jetzt `behalten` mitangemeldet. Fehlt
+    `behalten` eine Angabe, kommt sie von `weg`.
+
+    Stand dieselbe Person zweimal auf einer Schicht, wird ein Platz frei –
+    der geht wie jeder andere an Reserve und Warteliste. Zurück kommen die
+    Angebote dafür; None, wenn es eine der beiden nicht gibt.
+    """
+    if behalten == weg:
+        return None
+    beide = [behalten, weg]
+    con = verbinden()
+    try:
+        with con:
+            # Erst die Schichten, dann die Personen – in dieser Reihenfolge
+            # sperrt auch die Anmeldung.
+            _sperren(con, [z["schicht_id"] for z in con.execute(
+                "SELECT schicht_id FROM einteilung WHERE helfer_id = ANY(?)"
+                " UNION SELECT schicht_id FROM warteliste WHERE helfer_id = ANY(?)",
+                (beide, beide)).fetchall()])
+            zeilen = {z["id"]: z for z in con.execute(
+                "SELECT * FROM helfer WHERE id = ANY(?) ORDER BY id FOR UPDATE",
+                (beide,)).fetchall()}
+            if len(zeilen) != 2:
+                return None
+            neu, alt = zeilen[behalten], zeilen[weg]
+
+            # Schichten. Steht `behalten` schon drauf, bleibt die eine
+            # Einteilung – als Platz, wenn eine der beiden einer war.
+            frei: list[int] = []
+            for e in con.execute("SELECT * FROM einteilung WHERE helfer_id = ? ORDER BY id",
+                                 (weg,)).fetchall():
+                da = con.execute("SELECT id, art FROM einteilung WHERE helfer_id = ?"
+                                 " AND schicht_id = ? ORDER BY id", (behalten, e["schicht_id"])).fetchone()
+                if da is None:
+                    con.execute("UPDATE einteilung SET helfer_id = ? WHERE id = ?",
+                                (behalten, e["id"]))
+                    continue
+                if da["art"] == "reserve" and e["art"] == "platz":
+                    con.execute("UPDATE einteilung SET art = 'platz' WHERE id = ?", (da["id"],))
+                elif e["art"] == "platz":
+                    frei.append(e["schicht_id"])
+                con.execute("DELETE FROM einteilung WHERE id = ?", (e["id"],))
+
+            # Warteliste: einmal je Schicht, und nicht, wo man schon drin ist.
+            con.execute("DELETE FROM warteliste w WHERE helfer_id = ? AND EXISTS"
+                        " (SELECT 1 FROM warteliste x WHERE x.helfer_id = ?"
+                        "  AND x.schicht_id = w.schicht_id)", (weg, behalten))
+            con.execute("UPDATE warteliste SET helfer_id = ? WHERE helfer_id = ?", (behalten, weg))
+            con.execute("DELETE FROM warteliste w WHERE helfer_id = ? AND EXISTS"
+                        " (SELECT 1 FROM einteilung e WHERE e.helfer_id = ?"
+                        "  AND e.schicht_id = w.schicht_id)", (behalten, behalten))
+
+            # Teilnahme je Veranstaltung: eine, mit beiden Bemerkungen und
+            # allen Vorlieben.
+            for t in con.execute("SELECT * FROM teilnahme WHERE helfer_id = ?",
+                                 (weg,)).fetchall():
+                da = con.execute("SELECT * FROM teilnahme WHERE helfer_id = ?"
+                                 " AND veranstaltung_id = ?",
+                                 (behalten, t["veranstaltung_id"])).fetchone()
+                if da is None:
+                    con.execute("UPDATE teilnahme SET helfer_id = ? WHERE helfer_id = ?"
+                                " AND veranstaltung_id = ?", (behalten, weg, t["veranstaltung_id"]))
+                    continue
+                con.execute(
+                    "UPDATE teilnahme SET vorlieben = CAST(? AS TEXT[]), bemerkung = ?,"
+                    " angemeldet_am = LEAST(angemeldet_am, ?)"
+                    " WHERE helfer_id = ? AND veranstaltung_id = ?",
+                    (list(dict.fromkeys([*da["vorlieben"], *t["vorlieben"]])),
+                     "\n".join(x for x in dict.fromkeys([da["bemerkung"], t["bemerkung"]]) if x),
+                     t["angemeldet_am"], behalten, t["veranstaltung_id"]))
+                con.execute("DELETE FROM teilnahme WHERE helfer_id = ? AND veranstaltung_id = ?",
+                            (weg, t["veranstaltung_id"]))
+
+            # Springer-Zeiten und Einsatzgrenzen: dieselbe nur einmal.
+            con.execute("DELETE FROM verfuegbarkeit v WHERE helfer_id = ? AND EXISTS"
+                        " (SELECT 1 FROM verfuegbarkeit x WHERE x.helfer_id = ?"
+                        "  AND x.veranstaltung_id = v.veranstaltung_id"
+                        "  AND x.beginn = v.beginn AND x.ende = v.ende)", (weg, behalten))
+            con.execute("DELETE FROM einsatzgrenze g WHERE helfer_id = ? AND EXISTS"
+                        " (SELECT 1 FROM einsatzgrenze x WHERE x.helfer_id = ?"
+                        "  AND x.bereich_id IS NOT DISTINCT FROM g.bereich_id"
+                        "  AND x.schicht_id IS NOT DISTINCT FROM g.schicht_id)", (weg, behalten))
+            for tabelle in ("verfuegbarkeit", "einsatzgrenze", "ausleihe", "protokoll",
+                            "absage", "mail_out"):
+                con.execute("UPDATE " + tabelle + " SET helfer_id = ? WHERE helfer_id = ?",
+                            (behalten, weg))
+            # Die Unterschrift unter der Shirt-Ausgabe hängt an der Person.
+            con.execute("UPDATE unterschrift SET vorgang_id = ? WHERE art = 'tshirt'"
+                        " AND vorgang_id = ?", (behalten, weg))
+            con.execute("UPDATE helfer SET angemeldet_von = ? WHERE angemeldet_von = ?"
+                        " AND id <> ?", (behalten, weg, behalten))
+
+            # Die Angaben: was `behalten` fehlt, kommt von `weg`.
+            werte = {f: alt[f] for f in _ERGAENZEN if _leer(neu[f]) and not _leer(alt[f])}
+            for gruppe in _ERGAENZEN_ZUSAMMEN:
+                if _leer(neu[gruppe[0]]) and not _leer(alt[gruppe[0]]):
+                    werte.update({f: alt[f] for f in gruppe})
+            email = werte.get("email", neu["email"])
+            if neu["email_bestaetigt_am"] is None and alt["email_bestaetigt_am"] \
+                    and email.lower() == alt["email"].lower():
+                werte["email_bestaetigt_am"] = alt["email_bestaetigt_am"]
+            if alt["bemerkung"] and alt["bemerkung"] not in neu["bemerkung"]:
+                werte["bemerkung"] = (neu["bemerkung"] + "\n" + alt["bemerkung"]).strip()
+            if neu["angemeldet_von"] == weg:
+                werte["angemeldet_von"] = None
+            werte["aktiv"] = max(neu["aktiv"], alt["aktiv"])
+
+            con.execute("DELETE FROM helfer WHERE id = ?", (weg,))
+            # Mit einer neuen Adresse auch der Schlüssel, an dem Import und
+            # Anmeldung die Person wiederfinden – wenn ihn niemand sonst hat.
+            schluessel = normalisieren.schluessel(neu["name"], email)
+            if schluessel != neu["schluessel"] and con.execute(
+                    "SELECT 1 FROM helfer WHERE schluessel = ?", (schluessel,)).fetchone() is None:
+                werte["schluessel"] = schluessel
+            con.execute("UPDATE helfer SET " + ", ".join(f + " = ?" for f in werte) +
+                        ", geaendert_am = ? WHERE id = ?", (*werte.values(), jetzt(), behalten))
+            _protokollieren(con, behalten, wer,
+                            f"Zusammengeführt mit {alt['name']} (Nr. {weg})")
+
+            angebote: list[dict] = []
+            for schicht_id in sorted(set(frei)):
+                angebote += _nachruecken(con, schicht_id)
+            return angebote
+    finally:
+        con.close()
+
+
+def vergleich(helfer_id: int) -> dict | None:
+    """Was an einer Person hängt – für die Entscheidung, wer bleibt (I-06)."""
+    con = verbinden()
+    try:
+        person = con.execute("SELECT * FROM helfer WHERE id = ?", (helfer_id,)).fetchone()
+        if person is None:
+            return None
+
+        def zahl(sql: str) -> int:
+            return int(con.execute(sql, (helfer_id,)).fetchone()[0])
+        return {"person": person,
+                "schichten": zahl("SELECT COUNT(*) FROM einteilung WHERE helfer_id = ?"),
+                "warteliste": zahl("SELECT COUNT(*) FROM warteliste WHERE helfer_id = ?"),
+                "springer": zahl("SELECT COUNT(*) FROM verfuegbarkeit WHERE helfer_id = ?"),
+                "ausleihen": zahl("SELECT COUNT(*) FROM ausleihe WHERE helfer_id = ?"),
+                "mitgebracht": zahl("SELECT COUNT(*) FROM helfer WHERE angemeldet_von = ?")}
+    finally:
+        con.close()
+
+
+def keine_dublette(a: int, b: int, wer: str) -> None:
+    """Die Orga sagt: das sind zwei Menschen. Das Paar steht dann nicht mehr
+    unter den möglichen Dubletten."""
+    a, b = sorted((a, b))
+    if a == b:
+        return
+    con = verbinden()
+    try:
+        with con:
+            con.execute("INSERT INTO keine_dublette (a_id, b_id, wer, am) VALUES (?, ?, ?, ?)"
+                        " ON CONFLICT DO NOTHING", (a, b, wer, jetzt()))
+    finally:
+        con.close()
 
 
 # --- Selbstbedienung (Lastenheft 2.5: S-01 bis S-08, R-04) -----------------

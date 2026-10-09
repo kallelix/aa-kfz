@@ -353,6 +353,9 @@ def _eigen(sitzung, pruefung, nummer: int) -> None:
 # Helferbereichs. Die gibt es nicht mehr - die gemeinsame zeigt nur noch, was
 # ihr gereicht wird.
 MELDUNGEN = {
+    'zusammengefuehrt': 'Zusammengeführt. Was zur anderen Person gehörte, steht jetzt hier.',
+    'verschieden': 'Vermerkt: zwei verschiedene Menschen.',
+    'zusammen-nr': 'Diese Person gibt es nicht – bitte die Nummer prüfen.',
     'eingeteilt': 'Eingeteilt.',
     'ausgetragen': 'Ausgetragen.',
     'schon-drin': 'Diese Person steht bereits auf der Schicht.',
@@ -577,6 +580,7 @@ async def uebersicht(request: Request, hinweis: str = "",
                konflikte=db.konflikte(v["id"]), doppelt=db.doppelt_besetzt(v["id"]),
                allein=db.allein(v["id"]) if _sieht_grenzen(sitzung) else [],
                dubletten=db.moegliche_dubletten(),
+               fuehrt_zusammen=_pflegt_grenzen(sitzung),
                jugendschutz=db.jugendschutz(v["id"]),
                kurzfristig=db.kurzfristige_absagen(v["id"]),
                springer=db.springer_lage(v["id"]),
@@ -1231,11 +1235,79 @@ async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
                if person["angemeldet_von"] else None,
                mitgebracht=db.mitangemeldete(helfer_id),
                vorlieben=[_VORLIEBE_NAMEN.get(k, k) for k in db.vorlieben(v["id"], helfer_id)],
+               fuehrt_zusammen=_pflegt_grenzen(sitzung),
+               dubletten=db.moegliche_dubletten(helfer_id) if _pflegt_grenzen(sitzung) else [],
                grenzen=db.grenzen(v["id"], helfer_id, _leitung(sitzung))
                if _sieht_grenzen(sitzung) else [],
                grenz_ziele=_grenz_ziele(v["id"]) if pflegt else [],
                grenz_arten=db.GRENZ_ARTEN,
                verlauf=db.protokoll(helfer_id) if pflegt else []))
+
+
+# --- Dubletten zusammenführen (Lastenheft 3.2: I-06) ------------------------
+
+def _nur_orga(sitzung) -> None:
+    """Zusammenführen ändert zwei Personen auf einmal – das macht die Orga."""
+    if not _pflegt_grenzen(sitzung):
+        raise kern_auth.KeinZugang("lesend")
+
+
+def _paar(a: str, b: str):
+    """Die beiden Nummern, wenn es zwei verschiedene Personen sind."""
+    if not (str(a).isdigit() and str(b).isdigit()) or int(a) == int(b):
+        return None
+    paar = [db.vergleich(int(a)), db.vergleich(int(b))]
+    return None if None in paar else paar
+
+
+@app.get("/helfer/zusammenfuehren")
+async def zusammenfuehren_formular(request: Request, a: str = "", b: str = "",
+                                   sitzung: auth.Sitzung = Depends(_sitzung)):
+    """Zwei Personen nebeneinander, und wer bleibt (I-06)."""
+    _nur_orga(sitzung)
+    paar = _paar(a, b)
+    if paar is None:
+        ziel = f"/helfer/helfer/{a}" if str(a).isdigit() else "/helfer"
+        return _zurueck(ziel, "zusammen-nr", sprung="zusammenfuehren")
+    # Vorschlag: wer mehr mitbringt, bleibt – sonst die bestätigte Adresse,
+    # sonst die ältere.
+    vorschlag = max(paar, key=lambda v: (v["schichten"] + v["ausleihen"] + v["springer"],
+                                         bool(v["person"]["email_bestaetigt_am"]),
+                                         -v["person"]["id"]))["person"]["id"]
+    return templates.TemplateResponse(
+        "admin_zusammenfuehren.html",
+        _admin(request, sitzung, hinweis="", paar=paar, vorschlag=vorschlag))
+
+
+@app.post("/helfer/zusammenfuehren")
+async def zusammenfuehren(request: Request, sitzung: auth.Sitzung = Depends(_sitzung)):
+    _nur_orga(sitzung)
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    a, b, behalten = (str(daten.get(k) or "") for k in ("a", "b", "behalten"))
+    if _paar(a, b) is None or behalten not in (a, b):
+        return _zurueck("/helfer", "zusammen-nr")
+    weg = b if behalten == a else a
+    angebote = db.zusammenfuehren(int(behalten), int(weg), sitzung.kuerzel)
+    if angebote is None:
+        return _zurueck("/helfer", "zusammen-nr")
+    # Stand dieselbe Person zweimal auf einer Schicht, ist jetzt ein Platz frei.
+    versand.angebot_mails(angebote, _basis(request))
+    return _zurueck(f"/helfer/helfer/{behalten}", "zusammengefuehrt")
+
+
+@app.post("/helfer/zusammenfuehren/verschieden")
+async def keine_dublette(request: Request, sitzung: auth.Sitzung = Depends(_sitzung)):
+    _nur_orga(sitzung)
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    a, b = str(daten.get("a") or ""), str(daten.get("b") or "")
+    if _paar(a, b) is None:
+        return _zurueck("/helfer", "zusammen-nr")
+    db.keine_dublette(int(a), int(b), sitzung.kuerzel)
+    return _zurueck("/helfer", "verschieden")
 
 
 def _grenz_ziele(vid: int) -> list[dict]:
