@@ -1,0 +1,92 @@
+{% extends "admin_base.html" %}
+{% block titel %}{{ va_zeile.kurz if va_zeile else 'Veranstaltung anlegen' }}{% endblock %}
+{% block breite %}{% endblock %}
+{% block ueberschrift %}{{ va_zeile.kurz if va_zeile else 'Veranstaltung anlegen' }}{% endblock %}
+
+{% block inhalt %}
+  <p class="zurueck-zeile"><a href="/veranstaltungen">‹ Alle Veranstaltungen</a></p>
+
+  {% if fehler %}
+    <p class="hinweis hinweis-fehler" role="alert">{{ fehler }}</p>
+  {% endif %}
+
+  <form method="post" action="{{ '/veranstaltungen/' ~ va_zeile.id if va_zeile else '/veranstaltungen/neu' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="spalten">
+      <div class="feld">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required value="{{ werte.name or '' }}"
+               placeholder="z. B. Die absolute Abfahrt 2027">
+      </div>
+      <div class="feld">
+        <label for="kurz">Kurzname</label>
+        <input type="text" id="kurz" name="kurz" required maxlength="20"
+               value="{{ werte.kurz or '' }}" placeholder="z. B. AA 2027">
+        <p class="hilfe">Steht in der Auswahl oben im Helferbereich.</p>
+      </div>
+    </div>
+
+    <div class="spalten">
+      <div class="feld">
+        <label for="beginn">Erster Tag</label>
+        <input type="date" id="beginn" name="beginn" required value="{{ werte.beginn or '' }}">
+      </div>
+      <div class="feld">
+        <label for="ende">Letzter Tag</label>
+        <input type="date" id="ende" name="ende" required value="{{ werte.ende or '' }}">
+      </div>
+    </div>
+    <p class="hilfe">Die Tage der Veranstaltung selbst. Auf- und Abbau gehören über
+      ihre Schichten trotzdem dazu.</p>
+
+    <div class="feld">
+      <label for="ort">Ort</label>
+      <input type="text" id="ort" name="ort" value="{{ werte.ort or '' }}">
+    </div>
+
+    <div class="feld">
+      <label for="beschreibung">Beschreibung <span class="optional">(optional)</span></label>
+      <textarea id="beschreibung" name="beschreibung" rows="3">{{ werte.beschreibung or '' }}</textarea>
+    </div>
+
+    <fieldset class="feld">
+      <legend>Status</legend>
+      {% for schluessel, name in status_werte.items() %}
+        <label class="auswahl">
+          <input type="radio" name="status" value="{{ schluessel }}"
+                 {% if (werte.status or 'planung') == schluessel %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">{{ name }}</span>
+            <span class="auswahl-hilfe">{{ status_text[schluessel] }}</span>
+          </span>
+        </label>
+      {% endfor %}
+    </fieldset>
+
+    <div class="spalten">
+      <div class="feld">
+        <label for="anmeldung_ab">Anmeldung ab <span class="optional">(optional)</span></label>
+        <input type="date" id="anmeldung_ab" name="anmeldung_ab" value="{{ werte.anmeldung_ab or '' }}">
+      </div>
+      <div class="feld">
+        <label for="anmeldung_bis">Anmeldung bis <span class="optional">(optional)</span></label>
+        <input type="date" id="anmeldung_bis" name="anmeldung_bis" value="{{ werte.anmeldung_bis or '' }}">
+      </div>
+    </div>
+
+    <div class="knopfreihe">
+      <button type="submit">{{ 'Speichern' if va_zeile else 'Anlegen' }}</button>
+    </div>
+  </form>
+
+  {% if va_zeile %}
+    <h2>Löschen</h2>
+    <p class="hilfe">Geht nur, solange noch keine Schichten, Aufgaben oder Ausgaben
+      daran hängen. Danach archivieren.</p>
+    <form method="post" action="/veranstaltungen/{{ va_zeile.id }}/loeschen">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="knopf-gefahr">Veranstaltung löschen</button>
+    </form>
+  {% endif %}
+{% endblock %}

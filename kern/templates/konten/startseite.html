@@ -16,6 +16,12 @@
         <span class="kachel-text">{{ texte[b.schluessel] }}</span>
       </a>
     {% endfor %}
+    {% if veranstaltungen_offen %}
+      <a class="kachel" href="/veranstaltungen">
+        <span class="kachel-titel">Veranstaltungen</span>
+        <span class="kachel-text">Tage, Ort, Anmeldezeitraum, Status</span>
+      </a>
+    {% endif %}
     {% if sitzung.ist_admin %}
       <a class="kachel" href="/konten">
         <span class="kachel-titel">Konten</span>

@@ -1,8 +1,9 @@
-"""Die Kontenverwaltung des Backoffice und seine Startseite.
+"""Was dem Backoffice als ganzem gehört: Startseite, Konten, Veranstaltungen.
 
 Liegt unter der Backoffice-Adresse neben den drei Bereichen:
 
     /                    Startseite: die Bereiche, die das Konto sehen darf
+    /veranstaltungen     Veranstaltungen anlegen und ändern (Admin, Helfer-Orga)
     /konten              alle Konten (nur Admin): anlegen, ändern, sperren
     /konto               das eigene Konto: Passwort ändern
     /konto/passwort/…    Link aus der Mail: Passwort setzen
@@ -29,6 +30,7 @@ from jinja2 import ChoiceLoader, FileSystemLoader
 from kern import anmeldung, navigation
 from kern import mail as kern_mail
 from kern.auth import Auth
+from kern import veranstaltungen as va
 from kern.konten import (BEREICHE, EINLADUNG_GILT, ROLLEN, ROLLEN_TEXT,
                          ZURUECKSETZEN_GILT, Fehler)
 
@@ -43,7 +45,15 @@ MELDUNGEN = {
     "abgemeldet": "Das Konto ist auf allen Geräten abgemeldet.",
     "passwort": "Dein neues Passwort gilt. Andere Geräte sind abgemeldet.",
     "willkommen": "Dein Passwort ist gesetzt – du bist angemeldet.",
+    "va-angelegt": "Veranstaltung angelegt.",
+    "va-geloescht": "Veranstaltung gelöscht.",
 }
+
+
+def darf_veranstaltungen(sitzung) -> bool:
+    """Veranstaltungen pflegt, wer den Helferbereich sieht – an ihnen hängen
+    bis jetzt nur dessen Daten. Admins sowieso."""
+    return sitzung.ist_admin or sitzung.darf("helfer")
 
 
 def _zeit(wert) -> str:
@@ -60,6 +70,7 @@ def bauen(config, mail_config=None) -> FastAPI:
     mail_config = mail_config or config
     auth = Auth(config)
     konten = auth.konten
+    veranstaltungen = va.Veranstaltungen(lambda: config.DATABASE_URL)
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
     templates = Jinja2Templates(directory=str(VORLAGEN / "konten"))
@@ -74,7 +85,11 @@ def bauen(config, mail_config=None) -> FastAPI:
                 "veranstaltung": config.VERANSTALTUNG, **extra}
 
     def admin_kontext(request: Request, sitzung, **extra) -> dict:
-        nav = [("/konto", "Mein Konto", ())] if sitzung.konto_id else []
+        nav = []
+        if darf_veranstaltungen(sitzung):
+            nav.append(("/veranstaltungen", "Veranstaltungen", ("/veranstaltungen",)))
+        if sitzung.konto_id:
+            nav.append(("/konto", "Mein Konto", ()))
         if sitzung.ist_admin:
             nav.append(("/konten", "Konten", ("/konten",)))
         hinweis = MELDUNGEN.get(request.query_params.get("hinweis", ""), "")
@@ -89,7 +104,13 @@ def bauen(config, mail_config=None) -> FastAPI:
         )
 
     anmeldung.einrichten(app, auth=auth, templates=templates, kontext=kontext,
-                         bereich="konto", erlaubt=("/konten", "/"))
+                         bereich="konto", erlaubt=("/konten", "/veranstaltungen", "/"))
+
+    def veranstaltungen_erforderlich(request: Request):
+        sitzung = auth.sitzung_erforderlich(request)
+        if not darf_veranstaltungen(sitzung):
+            raise auth.KeinZugang("bereich")
+        return sitzung
 
     async def csrf_formular(request: Request, sitzung) -> dict:
         daten = await request.form()
@@ -162,7 +183,87 @@ def bauen(config, mail_config=None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     async def startseite(request: Request, sitzung=Depends(auth.angemeldet)):
         return templates.TemplateResponse(
-            "startseite.html", admin_kontext(request, sitzung, titel="Backoffice"))
+            "startseite.html",
+            admin_kontext(request, sitzung, titel="Backoffice",
+                          veranstaltungen_offen=darf_veranstaltungen(sitzung)))
+
+    # --- Veranstaltungen --------------------------------------------------------
+
+    def va_formular(request, sitzung, *, werte, veranstaltung=None, fehler="",
+                    status_code=200):
+        return templates.TemplateResponse(
+            "veranstaltung_form.html",
+            admin_kontext(request, sitzung, werte=werte, va_zeile=veranstaltung,
+                          fehler=fehler, status_werte=va.STATUS,
+                          status_text=va.STATUS_TEXT),
+            status_code=status_code)
+
+    def va_werte(daten) -> dict:
+        return {feld: str(daten.get(feld) or "") for feld in
+                ("name", "kurz", "beginn", "ende", "ort", "beschreibung", "status",
+                 "anmeldung_ab", "anmeldung_bis")}
+
+    @app.get("/veranstaltungen", response_class=HTMLResponse)
+    async def va_liste(request: Request, sitzung=Depends(veranstaltungen_erforderlich)):
+        vorgabe = veranstaltungen.vorgabe()
+        return templates.TemplateResponse(
+            "veranstaltungen.html",
+            admin_kontext(request, sitzung, liste=veranstaltungen.liste(),
+                          vorgabe_id=vorgabe["id"] if vorgabe else None,
+                          status_werte=va.STATUS))
+
+    @app.get("/veranstaltungen/neu", response_class=HTMLResponse)
+    async def va_neu(request: Request, sitzung=Depends(veranstaltungen_erforderlich)):
+        return va_formular(request, sitzung, werte={"status": "planung"})
+
+    @app.post("/veranstaltungen/neu", response_class=HTMLResponse)
+    async def va_anlegen(request: Request, sitzung=Depends(veranstaltungen_erforderlich)):
+        daten = await csrf_formular(request, sitzung)
+        werte = va_werte(daten)
+        try:
+            veranstaltungen.anlegen(werte)
+        except va.Fehler as fehler:
+            return va_formular(request, sitzung, werte=werte, fehler=str(fehler),
+                               status_code=400)
+        return RedirectResponse("/veranstaltungen?hinweis=va-angelegt", status_code=303)
+
+    @app.get("/veranstaltungen/{veranstaltung_id}", response_class=HTMLResponse)
+    async def va_zeigen(request: Request, veranstaltung_id: int,
+                        sitzung=Depends(veranstaltungen_erforderlich)):
+        zeile = veranstaltungen.laden(veranstaltung_id)
+        if zeile is None:
+            return RedirectResponse("/veranstaltungen", status_code=303)
+        return va_formular(request, sitzung, werte=dict(zeile), veranstaltung=zeile)
+
+    @app.post("/veranstaltungen/{veranstaltung_id}", response_class=HTMLResponse)
+    async def va_aendern(request: Request, veranstaltung_id: int,
+                         sitzung=Depends(veranstaltungen_erforderlich)):
+        daten = await csrf_formular(request, sitzung)
+        zeile = veranstaltungen.laden(veranstaltung_id)
+        if zeile is None:
+            return RedirectResponse("/veranstaltungen", status_code=303)
+        werte = va_werte(daten)
+        try:
+            veranstaltungen.aendern(veranstaltung_id, werte)
+        except va.Fehler as fehler:
+            return va_formular(request, sitzung, werte=werte, veranstaltung=zeile,
+                               fehler=str(fehler), status_code=400)
+        return RedirectResponse(f"/veranstaltungen/{veranstaltung_id}?hinweis=gespeichert",
+                                status_code=303)
+
+    @app.post("/veranstaltungen/{veranstaltung_id}/loeschen", response_class=HTMLResponse)
+    async def va_loeschen(request: Request, veranstaltung_id: int,
+                          sitzung=Depends(veranstaltungen_erforderlich)):
+        await csrf_formular(request, sitzung)
+        zeile = veranstaltungen.laden(veranstaltung_id)
+        if zeile is None:
+            return RedirectResponse("/veranstaltungen", status_code=303)
+        try:
+            veranstaltungen.loeschen(veranstaltung_id)
+        except va.Fehler as fehler:
+            return va_formular(request, sitzung, werte=dict(zeile), veranstaltung=zeile,
+                               fehler=str(fehler), status_code=400)
+        return RedirectResponse("/veranstaltungen?hinweis=va-geloescht", status_code=303)
 
     # --- Alle Konten (Admin) ----------------------------------------------------
 

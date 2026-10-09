@@ -1,0 +1,47 @@
+{% extends "admin_base.html" %}
+{% block titel %}Veranstaltungen{% endblock %}
+{% block ueberschrift %}Veranstaltungen{% endblock %}
+
+{% block inhalt %}
+  <div class="knopfreihe">
+    <a class="knopf" href="/veranstaltungen/neu">Veranstaltung anlegen</a>
+  </div>
+
+  {% if liste %}
+    <div class="tabelle-huelle">
+      <table>
+        <thead>
+          <tr>
+            <th>Veranstaltung</th>
+            <th>Tage</th>
+            <th>Ort</th>
+            <th>Anmeldung</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in liste %}
+            <tr{% if v.status == 'archiviert' %} class="gedaempft"{% endif %}>
+              <td>
+                <a href="/veranstaltungen/{{ v.id }}">{{ v.kurz }}</a>
+                <span class="gedaempft">{{ v.name }}</span>
+                {% if v.id == vorgabe_id %}<span class="marke marke-neu" title="Mit dieser arbeitet das Backoffice, solange niemand eine andere wählt">Vorgabe</span>{% endif %}
+              </td>
+              <td class="nowrap">{{ v.beginn.strftime('%d.%m.') }}–{{ v.ende.strftime('%d.%m.%Y') }}</td>
+              <td>{{ v.ort }}</td>
+              <td class="nowrap">
+                {% if v.anmeldung_ab or v.anmeldung_bis %}
+                  {{ v.anmeldung_ab.strftime('%d.%m.%Y') if v.anmeldung_ab else '' }}–{{ v.anmeldung_bis.strftime('%d.%m.%Y') if v.anmeldung_bis else '' }}
+                {% endif %}
+              </td>
+              <td>{{ status_werte[v.status] }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="leer">Noch keine Veranstaltung. Leg die erste an – ohne sie hat der
+      Helferbereich nichts, woran er Schichten hängen kann.</p>
+  {% endif %}
+{% endblock %}
