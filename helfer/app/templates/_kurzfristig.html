@@ -1,0 +1,29 @@
+{# Kurzfristige Absagen (S-07) – oben, weil am Veranstaltungstag niemand
+   Mails liest. Mit den Springern, die jetzt einspringen könnten (R-06). #}
+<section class="kasten kasten-warnung">
+  <h2>Kurzfristig abgesagt ({{ kurzfristig | length }})</h2>
+  <div class="tabelle-huelle">
+    <table>
+      <tbody>
+        {% for a in kurzfristig %}
+          <tr>
+            <td><a href="/helfer/schicht/{{ a.schicht_id }}">{{ a.bereich }}</a>
+              <span class="gedaempft nowrap">{{ a.beginn | zeitpunkt }}</span></td>
+            <td>{{ a.name or 'jemand, der seine Daten gelöscht hat' }}
+              {%- if a.grund %} <span class="gedaempft">– {{ a.grund }}</span>{% endif %}</td>
+            <td class="nowrap">{{ a.besetzt }} von {{ a.soll }}
+              {%- if a.besetzt < a.minimum %} <span class="marke marke-luecke">unter Minimum</span>{% endif %}</td>
+            <td>
+              {% if a.springer %}
+                Springer frei:
+                {% for s in a.springer %}<a href="/helfer/helfer/{{ s.id }}">{{ s.name }}</a>
+                  {%- if s.telefon %} <span class="gedaempft">{{ s.telefon }}</span>{% endif %}
+                  {%- if not loop.last %}, {% endif %}{% endfor %}
+              {% else %}<span class="gedaempft">kein Springer frei</span>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>

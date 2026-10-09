@@ -38,6 +38,13 @@
         {% if s.art == 'reserve' %}<span class="marke reserve">Du bist Reserve – danke, das hilft uns sehr</span>{% endif %}
       </div>
     {% endfor %}
+    {% for s in eintrag.warteliste %}
+      <div class="karte schicht">
+        <h3>{{ s.bereich }}</h3>
+        <div class="zeit">{{ s.datum|tag }} · {{ s|spanne }}</div>
+        <span class="marke voll">Warteliste – wird ein Platz frei, melden wir uns</span>
+      </div>
+    {% endfor %}
     {% for f in eintrag.fenster %}
       <div class="karte"><h3>Springer</h3><p>{{ f.beginn|zeitpunkt }} bis {{ f.ende|uhr }} – wir setzen dich ein, wo gerade jemand fehlt.</p></div>
     {% endfor %}

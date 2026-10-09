@@ -1,0 +1,90 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Angaben ändern{% endblock %}
+{% block zurueck %}<a class="zurueck" href="/platz/{{ token }}">‹ Mein Helferplatz</a>{% endblock %}
+{% block ueberschrift %}Angaben ändern{% endblock %}
+
+{# S-04: Telefon, Shirt, Verpflegung, Bemerkung. Eine neue Adresse gilt erst,
+   wenn sie bestätigt ist. S-06: dasselbe für die Mitangemeldeten – mit
+   eigener Adresse verwalten sie sich danach selbst. Name und Alter ändert
+   hier niemand; dafür gibt es die Orga. #}
+{% macro shirt_essen(p) %}
+  {% if angebot.shirt %}
+    <label for="{{ p }}tshirt">T-Shirt</label>
+    <div class="zeile">
+      {% if angebot.schnitte %}
+        <div class="{% if fehler[p ~ 'schnitt'] %}feld-fehler{% endif %}">
+          <select id="{{ p }}schnitt" name="{{ p }}schnitt" aria-label="Schnitt">
+            <option value="">Schnitt</option>
+            {% for wert, name in schnitte.items() %}
+              <option value="{{ wert }}" {% if eingabe.get(p ~ 'schnitt') == wert %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      <div class="{% if fehler[p ~ 'tshirt'] %}feld-fehler{% endif %}">
+        <select id="{{ p }}tshirt" name="{{ p }}tshirt">
+          <option value="">Größe</option>
+          {% for g in groessen %}<option value="{{ g }}" {% if eingabe.get(p ~ 'tshirt') == g %}selected{% endif %}>{{ g }}</option>{% endfor %}
+          <option value="kein" {% if eingabe.get(p ~ 'tshirt') == 'kein' %}selected{% endif %}>kein Shirt</option>
+        </select>
+      </div>
+    </div>
+    {% for f in ('schnitt', 'tshirt') %}{% if fehler[p ~ f] %}<p class="fehler">{{ fehler[p ~ f] }}</p>{% endif %}{% endfor %}
+  {% endif %}
+  {% if angebot.verpflegung %}
+    <div class="{% if fehler[p ~ 'verpflegung'] %}feld-fehler{% endif %}">
+      <label for="{{ p }}verpflegung">Essen</label>
+      <select id="{{ p }}verpflegung" name="{{ p }}verpflegung">
+        <option value="">Bitte wählen</option>
+        {% for wert, name in verpflegung.items() %}
+          <option value="{{ wert }}" {% if eingabe.get(p ~ 'verpflegung') == wert %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+      {% if fehler[p ~ 'verpflegung'] %}<p class="fehler">{{ fehler[p ~ 'verpflegung'] }}</p>{% endif %}
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% block inhalt %}
+  {% if fehler %}<div class="hinweis warn" role="alert">Bitte schau noch einmal auf die markierten Felder.</div>{% endif %}
+  <form method="post" action="/platz/{{ token }}/angaben" novalidate>
+    <div class="karte">
+      <h2>{{ person.name }}</h2>
+      <p class="leise">E-Mail: {{ person.email }}</p>
+      <div class="{% if fehler['ich-telefon'] %}feld-fehler{% endif %}">
+        <label for="ich-telefon">Handy</label>
+        <input type="tel" id="ich-telefon" name="ich-telefon" maxlength="40" autocomplete="tel"
+               inputmode="tel" value="{{ eingabe.get('ich-telefon', '') }}">
+        {% if fehler['ich-telefon'] %}<p class="fehler">{{ fehler['ich-telefon'] }}</p>{% endif %}
+      </div>
+      {{ shirt_essen('ich-') }}
+      <div class="{% if fehler['ich-email_neu'] %}feld-fehler{% endif %}">
+        <label for="ich-email_neu">Neue Mailadresse <span class="leise">– gilt, sobald du sie bestätigt hast</span></label>
+        <input type="email" id="ich-email_neu" name="ich-email_neu" maxlength="120"
+               inputmode="email" value="{{ eingabe.get('ich-email_neu', '') }}">
+        {% if fehler['ich-email_neu'] %}<p class="fehler">{{ fehler['ich-email_neu'] }}</p>{% endif %}
+      </div>
+      {% for b in bemerkungen %}
+        <label for="{{ b.feld }}">Noch etwas zu {{ b.va.kurz }}? <span class="leise">– freiwillig</span></label>
+        <textarea id="{{ b.feld }}" name="{{ b.feld }}" rows="2" maxlength="1000">{{ eingabe.get(b.feld, '') }}</textarea>
+      {% endfor %}
+    </div>
+
+    {% for m in mit %}
+      {% set p = 'm' ~ m.id ~ '-' %}
+      <div class="karte">
+        <h2>{{ m.name }}</h2>
+        {{ shirt_essen(p) }}
+        <div class="{% if fehler[p ~ 'email_neu'] %}feld-fehler{% endif %}">
+          <label for="{{ p }}email_neu">Eigene Mailadresse <span class="leise">– dann verwaltet
+            {{ m.vorname or m.name }} sich selbst</span></label>
+          <input type="email" id="{{ p }}email_neu" name="{{ p }}email_neu" maxlength="120"
+                 inputmode="email" value="{{ eingabe.get(p ~ 'email_neu', '') }}">
+          {% if fehler[p ~ 'email_neu'] %}<p class="fehler">{{ fehler[p ~ 'email_neu'] }}</p>{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+
+    <button type="submit" class="knopf">Speichern</button>
+  </form>
+{% endblock %}

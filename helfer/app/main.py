@@ -298,7 +298,7 @@ def _veranstaltung(request: Request):
 _BEREICHSLEITUNG_PFADE = re.compile(
     r"^/helfer(/veranstaltung|/bereiche|/bereich/\d+(/schicht/neu)?"
     r"|/schichten|/schicht/\d+(/aendern|/loeschen|/einteilen)?"
-    r"|/einteilung/\d+/austragen|/helfer/\d+)?$")
+    r"|/einteilung/\d+/austragen|/helfer/\d+|/aenderungen)?$")
 
 
 def _sitzung(request: Request) -> kern_auth.Sitzung:
@@ -399,7 +399,8 @@ def _helfer_gruppen(aktuell) -> list:
         vor_ort.append(("/helfer/shirts", "Shirts & Goodies", ()))
     vor_ort.append(("/helfer/monitor", "Monitor", ()))
     return [
-        ("Übersicht", [("/helfer", "Übersicht", ())]),
+        ("Übersicht", [("/helfer", "Übersicht", ()),
+                       ("/helfer/aenderungen", "Änderungen", ())]),
         ("Planen", [
             ("/helfer/bereiche", "Bereiche & Schichten",
              ("/helfer/bereich", "/helfer/schichten", "/helfer/schicht")),
@@ -414,7 +415,8 @@ def _helfer_gruppen(aktuell) -> list:
 GRUPPEN_BEREICHSLEITUNG = [
     ("Meine Bereiche", [("/helfer/bereiche", "Meine Bereiche",
                          ("/helfer/bereich", "/helfer/schichten", "/helfer/schicht",
-                          "/helfer/helfer"))]),
+                          "/helfer/helfer")),
+                        ("/helfer/aenderungen", "Änderungen", ())]),
 ]
 
 # Der Reiter Ausgabe. Bis die Materialausgabe verallgemeinert ist (3.8),
@@ -557,6 +559,7 @@ async def uebersicht(request: Request, hinweis: str = "",
                konflikte=db.konflikte(v["id"]), doppelt=db.doppelt_besetzt(v["id"]),
                allein=db.allein(v["id"]) if _sieht_grenzen(sitzung) else [],
                dubletten=db.moegliche_dubletten(),
+               kurzfristig=db.kurzfristige_absagen(v["id"]),
                importe=db.importe()[:1], jetzt=db.jetzt_lokal()))
 
 
@@ -598,6 +601,7 @@ async def schicht(request: Request, schicht_id: int, hinweis: str = "",
         "admin_schicht.html",
         _admin(request, sitzung, hinweis=hinweis, schicht=eintrag,
                besetzung=besetzt, suche=suche, trotzdem=trotzdem,
+               warteliste=db.warteliste_von(schicht_id),
                sieht_grenzen=_sieht_grenzen(sitzung),
                allein=db.allein(v["id"], schicht_id=schicht_id)
                if _sieht_grenzen(sitzung) else [],
@@ -652,7 +656,8 @@ async def austragen(request: Request, einteilung_id: int,
         return Response("Ungültiger CSRF-Token", status_code=400)
     ziel = _weiter_pfad(str(daten.get("weiter") or "/helfer/schichten"))
     _eigen(sitzung, db.leitet_einteilung, einteilung_id)
-    db.austragen(einteilung_id)
+    # Der Platz ist frei: Reserve und Warteliste rücken nach (R-04).
+    versand.angebot_mails(db.austragen(einteilung_id, sitzung.kuerzel), _basis(request))
     return _zurueck(ziel, "ausgetragen")
 
 
@@ -674,6 +679,8 @@ async def bereiche(request: Request, hinweis: str = "",
                leitungen=db.leitungen([b["id"] for b in liste]),
                # Die Orga sieht den Hinweis in der Übersicht.
                allein=db.allein(v["id"], sitzung.konto_id)
+               if sitzung.ist_bereichsleitung else [],
+               kurzfristig=db.kurzfristige_absagen(v["id"], sitzung.konto_id)
                if sitzung.ist_bereichsleitung else [],
                vorlagen=[] if liste or sitzung.ist_bereichsleitung
                else db.vorlagen(v["id"])))
@@ -2389,15 +2396,21 @@ async def interesse(request: Request, adresse: str):
     return ziel
 
 
-def _auswahl(v, schicht_roh, fenster_roh):
+def _auswahl(v, schicht_roh, fenster_roh, warte_roh=()):
     """Die gewählten Schichten (nur öffentliche, noch nicht begonnene) und
-    Springer-Zeiten aus dem Formular."""
+    Springer-Zeiten aus dem Formular. `w` heißt: ist sie voll, dann auf die
+    Warteliste (R-04)."""
     alle = {s["id"]: s for s in db.oeffentliche_schichten(v["id"])}
-    ids = []
+    ids, warte = [], set()
     for roh in schicht_roh:
         if str(roh).isdigit() and int(roh) in alle and int(roh) not in ids:
             ids.append(int(roh))
-    gewaehlte = sorted((alle[i] for i in ids), key=lambda s: s["beginn"])
+    for roh in warte_roh:
+        if str(roh).isdigit() and int(roh) in alle and int(roh) not in ids:
+            ids.append(int(roh))
+            warte.add(int(roh))
+    gewaehlte = sorted(({**alle[i], "warteliste": i in warte} for i in ids),
+                       key=lambda s: s["beginn"])
     namen = {k: n for k, n, *_ in selbstanmeldung.TAGESZEITEN}
     fenster = [{"schluessel": k, "beginn": von, "ende": bis,
                 "text": _tag(k.split("|")[0]) + " " + namen[k.split("|")[1]]}
@@ -2406,8 +2419,12 @@ def _auswahl(v, schicht_roh, fenster_roh):
 
 
 def _auswahl_query(gewaehlte, fenster) -> str:
-    return urlencode([("s", s["id"]) for s in gewaehlte] +
+    return urlencode([("w" if s["warteliste"] else "s", s["id"]) for s in gewaehlte] +
                      [("z", f["schluessel"]) for f in fenster])
+
+
+def _warte(gewaehlte) -> set[int]:
+    return {s["id"] for s in gewaehlte if s["warteliste"]}
 
 
 @app.get("/{adresse:adresse}/schichten")
@@ -2417,9 +2434,11 @@ async def oeffentliche_schichten(request: Request, adresse: str, hinweis: str = 
         return _nicht_da(request) if v is None else RedirectResponse(f"/{adresse}", 303)
     schichten = db.oeffentliche_schichten(v["id"])
     auswahl = {int(x) for x in request.query_params.getlist("s") if x.isdigit()}
+    warte_auswahl = {int(x) for x in request.query_params.getlist("w") if x.isdigit()}
     return templates.TemplateResponse(
         "anmeldung_schichten.html",
         _oeffentlich(request, v, schichten=schichten, auswahl=auswahl,
+                     warte_auswahl=warte_auswahl,
                      bereichsnamen=sorted({s["bereich"] for s in schichten}, key=str.lower),
                      fenster_gewaehlt=set(request.query_params.getlist("z")),
                      tage=[{"datum": t.isoformat(), "lang": _tag_lang(t.isoformat())}
@@ -2487,7 +2506,8 @@ async def angaben(request: Request, adresse: str):
     if v is None or _zustand(v) != "offen":
         return _nicht_da(request) if v is None else RedirectResponse(f"/{adresse}", 303)
     gewaehlte, fenster = _auswahl(v, request.query_params.getlist("s"),
-                                  request.query_params.getlist("z"))
+                                  request.query_params.getlist("z"),
+                                  request.query_params.getlist("w"))
     if not gewaehlte and not fenster:
         return RedirectResponse(f"/{adresse}/schichten?hinweis=leer", status_code=303)
     return _angaben_seite(request, v, gewaehlte, fenster, {}, {"voraussetzung": []}, [])
@@ -2501,7 +2521,8 @@ async def angaben_absenden(request: Request, adresse: str):
     daten = await request.form()
     if normalisieren.text(daten.get("webseite")):
         return RedirectResponse(f"/{adresse}", status_code=303)
-    gewaehlte, fenster = _auswahl(v, daten.getlist("s"), daten.getlist("z"))
+    gewaehlte, fenster = _auswahl(v, daten.getlist("s"), daten.getlist("z"),
+                                  daten.getlist("w"))
     if not gewaehlte and not fenster:
         return RedirectResponse(f"/{adresse}/schichten?hinweis=leer", status_code=303)
 
@@ -2542,7 +2563,8 @@ async def angaben_absenden(request: Request, adresse: str):
     try:
         ergebnis = db.anmelden(v["id"], personen, [s["id"] for s in gewaehlte],
                                [(f["schluessel"], f["beginn"], f["ende"]) for f in fenster],
-                               bemerkung=str(daten.get("bemerkung") or "").strip()[:1000])
+                               bemerkung=str(daten.get("bemerkung") or "").strip()[:1000],
+                               warteliste=_warte(gewaehlte))
     except db.AnmeldeFehler as ausnahme:
         return _angaben_seite(request, v, gewaehlte, fenster, werte, liste,
                               personen_roh, gruende=ausnahme.gruende, status_code=409)
@@ -2672,6 +2694,19 @@ def _kommende(vids) -> list:
 _PLATZ_HINWEISE = {
     "bestaetigt": "Danke – deine Adresse ist bestätigt. Du bist dabei!",
     "dazu": "Eingetragen. Eine Mail mit allem ist unterwegs.",
+    "abgesagt": "Abgesagt – danke, dass du Bescheid sagst! Das hilft uns sehr.",
+    "getauscht": "Getauscht. Eine Mail mit allem ist unterwegs.",
+    "abgemeldet": "Abgemeldet – danke, dass du Bescheid sagst. Vielleicht beim nächsten Mal!",
+    "angenommen": "Prima – der Platz gehört dir.",
+    "abgelehnt": "Danke für die Antwort – wir geben den Platz weiter.",
+    "vorbei": "Dieses Angebot gilt leider nicht mehr.",
+    "warteliste-weg": "Du stehst nicht mehr auf der Warteliste.",
+    "springer-weg": "Die Springer-Zeit ist abgesagt – danke für Bescheid.",
+    "angaben": "Gespeichert.",
+    "adresse": "Wir haben eine Mail an die neue Adresse geschickt – bitte bestätige sie dort.",
+    "adresse-bestaetigt": "Die neue Adresse ist bestätigt.",
+    "geloescht": "Gelöscht.",
+    "wartet": "Gelöscht wird, sobald alles Ausgeliehene zurück ist.",
 }
 
 
@@ -2698,6 +2733,7 @@ async def platz(request: Request, tok: str, hinweis: str = ""):
         "platz.html",
         _oeffentlich(request, None, person=person, token=tok, veranstaltungen=veranstaltungen,
                      weitere=weitere, links=_links(request, person),
+                     mit=db.mitangemeldete(person["id"]),
                      hinweis=_PLATZ_HINWEISE.get(hinweis, "")))
 
 
@@ -2769,9 +2805,11 @@ async def platz_schichten(request: Request, tok: str, adresse: str, hinweis: str
                     m["beginn"], m["ende"], s["beginn"], s["ende"]):
                 konflikte[s["id"]] = m["bereich"]
     auswahl = {int(x) for x in request.query_params.getlist("s") if x.isdigit()}
+    warte_auswahl = {int(x) for x in request.query_params.getlist("w") if x.isdigit()}
     return templates.TemplateResponse(
         "anmeldung_schichten.html",
         _oeffentlich(request, v, schichten=schichten, auswahl=auswahl,
+                     warte_auswahl=warte_auswahl,
                      bereichsnamen=sorted({s["bereich"] for s in schichten}, key=str.lower),
                      fenster_gewaehlt=set(request.query_params.getlist("z")),
                      tage=[{"datum": t.isoformat(), "lang": _tag_lang(t.isoformat())}
@@ -2800,7 +2838,8 @@ async def platz_angaben(request: Request, tok: str, adresse: str):
     if _zustand(v) != "offen":
         return RedirectResponse(f"/platz/{tok}", status_code=303)
     gewaehlte, fenster = _auswahl(v, request.query_params.getlist("s"),
-                                  request.query_params.getlist("z"))
+                                  request.query_params.getlist("z"),
+                                  request.query_params.getlist("w"))
     if not gewaehlte and not fenster:
         return RedirectResponse(f"/platz/{tok}/{adresse}/schichten?hinweis=leer",
                                 status_code=303)
@@ -2818,7 +2857,8 @@ async def platz_angaben_absenden(request: Request, tok: str, adresse: str):
     if _zustand(v) != "offen":
         return RedirectResponse(f"/platz/{tok}", status_code=303)
     daten = await request.form()
-    gewaehlte, fenster = _auswahl(v, daten.getlist("s"), daten.getlist("z"))
+    gewaehlte, fenster = _auswahl(v, daten.getlist("s"), daten.getlist("z"),
+                                  daten.getlist("w"))
     if not gewaehlte and not fenster:
         return RedirectResponse(f"/platz/{tok}/{adresse}/schichten?hinweis=leer",
                                 status_code=303)
@@ -2844,7 +2884,8 @@ async def platz_angaben_absenden(request: Request, tok: str, adresse: str):
     try:
         db.dazunehmen(v["id"], person["id"], wer, neue, [s["id"] for s in gewaehlte],
                       [(f["schluessel"], f["beginn"], f["ende"]) for f in fenster],
-                      bemerkung=str(daten.get("bemerkung") or "").strip()[:1000])
+                      bemerkung=str(daten.get("bemerkung") or "").strip()[:1000],
+                      warteliste=_warte(gewaehlte))
     except db.AnmeldeFehler as ausnahme:
         return _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste,
                            personen_roh, wer, gruende=ausnahme.gruende, status_code=409)
@@ -2891,3 +2932,366 @@ async def kalender(request: Request, datei: str):
                     media_type="text/calendar; charset=utf-8",
                     headers={"Cache-Control": "no-store"})
 
+
+# --- Selbstbedienung (Lastenheft 2.5) -----------------------------------------
+#
+# Alles in Mein Helferplatz, ohne Frist (S-01 bis S-06): absagen, tauschen,
+# abmelden, Angaben ändern, löschen – für sich und für die, die man
+# mitangemeldet hat. Jede Absage geht sofort an die Bereichsleitung, wenn sie
+# kurzfristig ist oder die Schicht unter ihr Minimum fällt (S-07); ein frei
+# gewordener Platz geht an die Warteliste (R-04).
+
+def _nach_abgabe(request: Request, abgaben) -> None:
+    """Was jeder Absage folgt: Bescheid an die Bereichsleitung, Angebote an
+    die Warteliste."""
+    versand.absage_mails(abgaben)
+    versand.angebot_mails([a for abgabe in abgaben for a in abgabe["angebote"]],
+                          _basis(request))
+
+
+def _frage(request: Request, tok: str, titel: str, text: str, ziel: str, knopf: str,
+           grund: bool = False, liste=(), personen=(), status_code: int = 200):
+    """Die Rückfrage vor allem, was sich nicht zurücknehmen lässt."""
+    return templates.TemplateResponse(
+        "platz_frage.html",
+        _oeffentlich(request, None, token=tok, titel=titel, text=text, ziel=ziel,
+                     knopf=knopf, mit_grund=grund, liste=list(liste), personen=list(personen)),
+        status_code=status_code)
+
+
+@app.get("/platz/{tok}/absagen/{einteilung_id}")
+async def platz_absagen_frage(request: Request, tok: str, einteilung_id: int):
+    person = _person_mit(zugang.PLATZ, tok)
+    e = db.einteilung_fuer(person["id"], einteilung_id) if person else None
+    if e is None:
+        return _nicht_da(request)
+    wer = db.helfer_laden(e["helfer_id"])
+    return _frage(request, tok, "Schicht absagen?",
+                  ("Du sagst ab" if wer["id"] == person["id"] else f"{wer['vorname'] or wer['name']} sagt ab")
+                  + f": {e['text']}. Danke, dass du Bescheid sagst – auch kurzfristig ist "
+                  "das besser, als nicht zu kommen.",
+                  f"/platz/{tok}/absagen/{einteilung_id}", "Ja, absagen", grund=True)
+
+
+@app.post("/platz/{tok}/absagen/{einteilung_id}")
+async def platz_absagen(request: Request, tok: str, einteilung_id: int):
+    """S-01: jederzeit, auch kurz vorher und während der Veranstaltung."""
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None:
+        return _nicht_da(request)
+    daten = await request.form()
+    grund = normalisieren.text(daten.get("grund"))[:300]
+    ergebnis = db.stornieren(person["id"], einteilung_id, grund)
+    if ergebnis is None:
+        return _nicht_da(request)
+    _nach_abgabe(request, [ergebnis])
+    v = db.VERANSTALTUNGEN.laden(ergebnis["schicht"]["veranstaltung_id"])
+    wer = ergebnis["person"]
+    zeile = ergebnis["schicht"]["text"] + ("" if wer["id"] == person["id"]
+                                           else f" ({wer['vorname'] or wer['name']})")
+    db.mail_einreihen(person["id"], mail.abgesagt(
+        person, selbstanmeldung.va_text(v), [zeile], _links(request, person)["platz"]))
+    return RedirectResponse(f"/platz/{tok}?hinweis=abgesagt", status_code=303)
+
+
+@app.post("/platz/{tok}/angebot/{einteilung_id}")
+async def platz_angebot(request: Request, tok: str, einteilung_id: int):
+    """R-04: Ja oder Nein zum Platz von der Warteliste."""
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None:
+        return _nicht_da(request)
+    daten = await request.form()
+    if daten.get("antwort") == "ja":
+        hinweis = "angenommen" if db.angebot_annehmen(person["id"], einteilung_id) else "vorbei"
+    else:
+        e = db.einteilung_fuer(person["id"], einteilung_id)
+        if e is None or e["bestaetigen_bis"] is None:
+            hinweis = "vorbei"
+        else:
+            _nach_abgabe(request, [db.stornieren(person["id"], einteilung_id)])
+            hinweis = "abgelehnt"
+    return RedirectResponse(f"/platz/{tok}?hinweis={hinweis}", status_code=303)
+
+
+@app.post("/platz/{tok}/warteliste/{warteliste_id}/weg")
+async def platz_warteliste_weg(request: Request, tok: str, warteliste_id: int):
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None or not db.warteliste_verlassen(person["id"], warteliste_id):
+        return _nicht_da(request)
+    return RedirectResponse(f"/platz/{tok}?hinweis=warteliste-weg", status_code=303)
+
+
+@app.post("/platz/{tok}/springer/{fenster_id}/weg")
+async def platz_springer_weg(request: Request, tok: str, fenster_id: int):
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None or not db.springer_absagen(person["id"], fenster_id):
+        return _nicht_da(request)
+    return RedirectResponse(f"/platz/{tok}?hinweis=springer-weg", status_code=303)
+
+
+def _alternativen(e, person_id: int) -> list[dict]:
+    """Wogegen sich eine Schicht tauschen lässt (S-02): zuerst am selben Tag
+    im selben Bereich, dann am selben Tag, dann alles Weitere. Ohne volle
+    und ohne das, was hinter einer Einsatzgrenze liegt."""
+    gesperrt = db.gesperrt(e["veranstaltung_id"], person_id)
+    liste = [s for s in db.oeffentliche_schichten(e["veranstaltung_id"])
+             if s["id"] != e["schicht_id"] and s["id"] not in gesperrt and s["lage"] != "voll"]
+    for s in liste:
+        s["naehe"] = (0 if s["datum"] == e["datum"] and s["bereich_id"] == e["bereich_id"]
+                      else 1 if s["datum"] == e["datum"] else 2)
+    return sorted(liste, key=lambda s: (s["naehe"], s["beginn"]))
+
+
+def _tauschen_seite(request, tok, e, gruende=(), status_code=200, gewaehlt=None, noetig=()):
+    return templates.TemplateResponse(
+        "platz_tauschen.html",
+        _oeffentlich(request, None, token=tok, einteilung=e,
+                     alternativen=_alternativen(e, e["helfer_id"]), gruende=list(gruende),
+                     gewaehlt=gewaehlt, noetig=list(noetig)),
+        status_code=status_code)
+
+
+@app.get("/platz/{tok}/tauschen/{einteilung_id}")
+async def platz_tauschen_seite(request: Request, tok: str, einteilung_id: int):
+    person = _person_mit(zugang.PLATZ, tok)
+    e = db.einteilung_fuer(person["id"], einteilung_id) if person else None
+    if e is None:
+        return _nicht_da(request)
+    return _tauschen_seite(request, tok, e)
+
+
+@app.post("/platz/{tok}/tauschen/{einteilung_id}")
+async def platz_tauschen(request: Request, tok: str, einteilung_id: int):
+    """S-02: die neue zuerst, dann die alte frei – geht die neue nicht,
+    bleibt die alte."""
+    person = _person_mit(zugang.PLATZ, tok)
+    e = db.einteilung_fuer(person["id"], einteilung_id) if person else None
+    if e is None:
+        return _nicht_da(request)
+    daten = await request.form()
+    neu = str(daten.get("s") or "")
+    if not neu.isdigit():
+        return _tauschen_seite(request, tok, e, ["Bitte eine Schicht wählen."], 400)
+    # Was die neue Schicht verlangt, wird bestätigt – wie beim Anmelden.
+    ziel = next((s for s in _alternativen(e, e["helfer_id"]) if s["id"] == int(neu)), None)
+    noetig = planung.voraussetzungen(ziel["voraussetzungen"] or "") if ziel else []
+    if noetig and not daten.get("voraussetzung_ok"):
+        return _tauschen_seite(
+            request, tok, e, [f"Für {ziel['bereich']} brauchst du: {', '.join(noetig)} – "
+                              "bitte bestätige das unten."], 400, gewaehlt=ziel["id"], noetig=noetig)
+    try:
+        ergebnis = db.umbuchen(e["veranstaltung_id"], person["id"], einteilung_id, int(neu))
+    except db.AnmeldeFehler as ausnahme:
+        return _tauschen_seite(request, tok, e, ausnahme.gruende, 409)
+    _nach_abgabe(request, [ergebnis])
+    v = db.VERANSTALTUNGEN.laden(e["veranstaltung_id"])
+    db.mail_einreihen(person["id"], mail.getauscht(
+        person, selbstanmeldung.va_text(v), e["text"], ergebnis["neu"]["text"],
+        _links(request, person)["platz"]))
+    return RedirectResponse(f"/platz/{tok}?hinweis=getauscht", status_code=303)
+
+
+@app.get("/platz/{tok}/{adresse:adresse}/abmelden")
+async def platz_abmelden_frage(request: Request, tok: str, adresse: str):
+    person, v = _platz_va(tok, adresse)
+    if person is None:
+        return _nicht_da(request)
+    personen = [person] + list(db.mitangemeldete(person["id"]))
+    return _frage(request, tok, "Ganz abmelden?",
+                  f"Alle Schichten, Wartelisten und Springer-Zeiten bei {v['name']} werden "
+                  "abgesagt. Ein Grund ist freiwillig – er hilft uns beim Planen.",
+                  f"/platz/{tok}/{adresse}/abmelden", "Ja, abmelden", grund=True,
+                  personen=personen)
+
+
+@app.post("/platz/{tok}/{adresse:adresse}/abmelden")
+async def platz_abmelden(request: Request, tok: str, adresse: str):
+    """S-03: alle Schichten auf einmal."""
+    person, v = _platz_va(tok, adresse)
+    if person is None:
+        return _nicht_da(request)
+    daten = await request.form()
+    wer = [int(x) for x in daten.getlist("wer") if str(x).isdigit()] or [person["id"]]
+    namen = {p["id"]: p["vorname"] or p["name"] for p in [person, *db.mitangemeldete(person["id"])]}
+    abgaben = db.abmelden(v["id"], person["id"], wer,
+                          normalisieren.text(daten.get("grund"))[:300])
+    _nach_abgabe(request, abgaben)
+    db.mail_einreihen(person["id"], mail.abgemeldet(
+        person, selbstanmeldung.va_text(v), [namen[w] for w in wer if w in namen]))
+    return RedirectResponse(f"/platz/{tok}?hinweis=abgemeldet", status_code=303)
+
+
+def _angebot_fuer(person_ids) -> dict:
+    """Shirt und Essen fragen, wenn eine der kommenden Veranstaltungen sie
+    anbietet."""
+    angebot = {"shirt": 0, "schnitte": 0, "verpflegung": 0}
+    for v in _kommende(db.teilnahmen(person_ids)):
+        for k, w in db.angebot(v["id"]).items():
+            if k in angebot and w:
+                angebot[k] = 1
+    return angebot
+
+
+def _angaben_aendern_seite(request, tok, person, eingabe, fehler=None, status_code=200):
+    mit = db.mitangemeldete(person["id"])
+    ids = [person["id"]] + [m["id"] for m in mit]
+    bemerkungen = []
+    for v in _kommende(db.teilnahmen([person["id"]])):
+        bemerkungen.append({"va": v, "feld": f"bemerkung-{v['id']}"})
+    return templates.TemplateResponse(
+        "platz_angaben.html",
+        _oeffentlich(request, None, token=tok, person=person, mit=mit, eingabe=eingabe,
+                     fehler=fehler or {}, angebot=_angebot_fuer(ids),
+                     groessen=normalisieren.GROESSEN, schnitte=selbstanmeldung.SCHNITTE,
+                     verpflegung=selbstanmeldung.VERPFLEGUNG, bemerkungen=bemerkungen),
+        status_code=status_code)
+
+
+@app.get("/platz/{tok}/angaben")
+async def platz_angaben_aendern_seite(request: Request, tok: str):
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None:
+        return _nicht_da(request)
+    eingabe = selbstanmeldung.vorbelegen(person, "ich-")
+    for m in db.mitangemeldete(person["id"]):
+        eingabe.update(selbstanmeldung.vorbelegen(m, f"m{m['id']}-"))
+    for v in _kommende(db.teilnahmen([person["id"]])):
+        eingabe[f"bemerkung-{v['id']}"] = db.bemerkung(v["id"], person["id"])
+    return _angaben_aendern_seite(request, tok, person, eingabe)
+
+
+@app.post("/platz/{tok}/angaben")
+async def platz_angaben_aendern(request: Request, tok: str):
+    """S-04: Telefon, Shirt, Verpflegung, Bemerkung – und eine neue Adresse,
+    die erst gilt, wenn sie bestätigt ist. S-06: für Mitangemeldete dasselbe,
+    und mit eigener Adresse stehen sie auf eigenen Füßen."""
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None:
+        return _nicht_da(request)
+    daten = await request.form()
+    mit = db.mitangemeldete(person["id"])
+    angebot = _angebot_fuer([person["id"]] + [m["id"] for m in mit])
+    eingabe = {k: str(w) for k, w in daten.items()}
+    fehler: dict[str, str] = {}
+    aenderungen = []
+    for wer, praefix, mit_telefon in [(person, "ich-", True)] + [(m, f"m{m['id']}-", False) for m in mit]:
+        werte, f = selbstanmeldung.angaben_pruefen(daten, praefix, angebot, mit_telefon)
+        fehler.update(f)
+        aenderungen.append((wer, werte))
+    neue_adressen = []
+    for wer, praefix in [(person, "ich-")] + [(m, f"m{m['id']}-") for m in mit]:
+        email = normalisieren.text(daten.get(praefix + "email_neu")).lower()[:120]
+        if not email or email == wer["email"]:
+            continue
+        if not selbstanmeldung._EMAIL.match(email):
+            fehler[praefix + "email_neu"] = "Diese Mailadresse sieht nicht vollständig aus."
+        else:
+            neue_adressen.append((wer, praefix, email))
+    if fehler:
+        return _angaben_aendern_seite(request, tok, person, eingabe, fehler, 400)
+    for wer, werte in aenderungen:
+        geaendert = {k: w for k, w in werte.items() if wer[k] != w}
+        if geaendert:
+            db.angaben_aendern(person["id"], wer["id"], geaendert)
+    for v in _kommende(db.teilnahmen([person["id"]])):
+        feld = f"bemerkung-{v['id']}"
+        if feld in daten:
+            db.bemerkung_setzen(v["id"], person["id"], person["id"],
+                                str(daten.get(feld) or "").strip())
+    hinweis = "angaben"
+    for wer, praefix, email in neue_adressen:
+        grund = db.email_vormerken(person["id"], wer["id"], email)
+        if grund:
+            return _angaben_aendern_seite(request, tok, person, eingabe,
+                                          {praefix + "email_neu": grund}, 409)
+        wer = db.helfer_laden(wer["id"])
+        db.mail_einreihen(wer["id"], mail.neue_adresse(
+            wer, _basis(request) + "/email/" + zugang.token(zugang.EMAIL, wer)))
+        hinweis = "adresse"
+    return RedirectResponse(f"/platz/{tok}?hinweis={hinweis}", status_code=303)
+
+
+def _person_mit_neuer_adresse(roh: str):
+    person = _person_mit(zugang.EMAIL, roh)
+    return person if person is not None and person["email_neu"] else None
+
+
+@app.get("/email/{tok}")
+async def email_bestaetigen_seite(request: Request, tok: str):
+    """Wie beim ersten Bestätigen: nur eine Seite mit Knopf (7.4)."""
+    person = _person_mit_neuer_adresse(tok)
+    if person is None:
+        return _nicht_da(request)
+    return templates.TemplateResponse(
+        "anmeldung_bestaetigen.html",
+        _oeffentlich(request, None, person={**person, "email": person["email_neu"]},
+                     token=tok, ziel=f"/email/{tok}"))
+
+
+@app.post("/email/{tok}")
+async def email_bestaetigen(request: Request, tok: str):
+    person = _person_mit_neuer_adresse(tok)
+    if person is None or not db.email_uebernehmen(person["id"]):
+        return _nicht_da(request)
+    person = db.helfer_laden(person["id"])
+    return RedirectResponse("/platz/" + zugang.token(zugang.PLATZ, person)
+                            + "?hinweis=adresse-bestaetigt", status_code=303)
+
+
+@app.get("/platz/{tok}/loeschen")
+async def platz_loeschen_frage(request: Request, tok: str, wer: str = ""):
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None:
+        return _nicht_da(request)
+    mit = list(db.mitangemeldete(person["id"]))
+    if wer.isdigit() and int(wer) in {m["id"] for m in mit}:
+        andere = next(m for m in mit if m["id"] == int(wer))
+        return _frage(request, tok, f"Daten von {andere['vorname'] or andere['name']} löschen?",
+                      "Künftige Schichten werden abgesagt, dann ist alles weg.",
+                      f"/platz/{tok}/loeschen?wer={wer}", "Ja, löschen")
+    liste = ["deine Angaben und deine Schichten – künftige werden abgesagt"]
+    if mit:
+        liste.append("ebenso die von " + ", ".join(m["vorname"] or m["name"] for m in mit))
+    liste.append("dein Link zu Mein Helferplatz gilt danach nicht mehr")
+    return _frage(request, tok, "Deine Daten löschen?",
+                  "Das lässt sich nicht zurücknehmen. Gelöscht werden:",
+                  f"/platz/{tok}/loeschen", "Ja, alles löschen", liste=liste)
+
+
+@app.post("/platz/{tok}/loeschen")
+async def platz_loeschen(request: Request, tok: str, wer: str = ""):
+    """S-05: alles auf einmal – außer, es ist noch etwas ausgeliehen."""
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None:
+        return _nicht_da(request)
+    mit = list(db.mitangemeldete(person["id"]))
+    if wer.isdigit():
+        ids = [int(wer)] if int(wer) in {m["id"] for m in mit} else []
+    else:
+        ids = [m["id"] for m in mit] + [person["id"]]
+    if not ids:
+        return _nicht_da(request)
+    ergebnis = db.loeschen(person["id"], ids)
+    _nach_abgabe(request, ergebnis["abgaben"])
+    selbst_weg = any(p["id"] == person["id"] for p in ergebnis["geloescht"])
+    selbst_wartet = any(p["id"] == person["id"] for p in ergebnis["wartet"])
+    if selbst_weg or selbst_wartet:
+        db.mail_einreihen(None if selbst_weg else person["id"],
+                          mail.geloescht(person, wartet=selbst_wartet))
+    if selbst_weg:
+        return templates.TemplateResponse("platz_geloescht.html", _oeffentlich(request, None))
+    hinweis = "wartet" if ergebnis["wartet"] else "geloescht"
+    return RedirectResponse(f"/platz/{tok}?hinweis={hinweis}", status_code=303)
+
+
+# --- Änderungen seit gestern (S-08) ------------------------------------------
+
+@app.get("/helfer/aenderungen")
+async def aenderungen(request: Request, stunden: int = 24,
+                      sitzung: auth.Sitzung = Depends(_sitzung),
+                      v=Depends(_veranstaltung)):
+    stunden = stunden if stunden in (24, 72, 168) else 24
+    return templates.TemplateResponse(
+        "admin_aenderungen.html",
+        _admin(request, sitzung, stunden=stunden,
+               **db.aenderungen(v["id"], _leitung(sitzung), stunden)))

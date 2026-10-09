@@ -268,6 +268,15 @@ sofort bei der richtigen Person ankommt.
 | S-07 | Fällt eine Schicht durch Storno oder Umbuchen unter ihr Minimum, bekommt die Bereichsleitung sofort Bescheid. **Kurzfristige Absagen** – weniger als 24 Stunden vorher oder während der Veranstaltung – erscheinen zusätzlich oben im Dashboard und auf dem Monitor, zusammen mit den Springern, die jetzt einspringen könnten (R-06): am Veranstaltungstag liest niemand Mails. Ein frei gewordener Platz geht an die Warteliste (R-04). | M | 2 |
 | S-08 | Jede Selbstbedienung steht im Protokoll (B-05) und in einer Übersicht „Änderungen seit gestern" für Orga und Bereichsleitung. | S | 2 |
 
+**Stand 09.10.2026, Schritt 2.5:** S-01 bis S-08 sind umgesetzt, dazu die
+Warteliste (R-04): wer eine volle Schicht ankreuzt, steht darauf; wird ein
+Platz frei, rückt erst die Reserve auf, dann bekommt die Erste der
+Warteliste ihn angeboten und hält ihn 24 Stunden. Beim Tauschen wird bestätigt,
+was die neue Schicht verlangt (Führerschein). Kurzfristige Absagen stehen
+oben in der Übersicht und gehen per Mail an die Bereichsleitung – auf den
+Monitor kommen sie mit 2.7. Bei S-05 zählt nur, was an der Person hängt
+(Funkgeräte); Schlüssel sind nur über den Namen vermerkt.
+
 ### 5.4 Identität und Datenqualität (I)
 
 | Nr. | Anforderung | Prio | Phase |
@@ -420,7 +429,9 @@ Ankündigungsgruppe niemanden mit @ erwähnen: das zeigt dessen Nummer allen.
 Backoffice-Bereiche. Dazu seit Schritt 2.1a die *Bereichsleitung*: ein
 Konto, das am Bereich eingetragen ist und im Helferbereich nur diese Bereiche
 sieht – mit ihren Schichten und den Leuten darauf. Die Nummer steht am Konto
-und wird selbst gepflegt. Offen: Passkeys (B-03), das Protokoll (B-05).
+und wird selbst gepflegt. Offen: Passkeys (B-03). Das Protokoll (B-05) steht
+seit 2.3 und 2.5 an jeder Person: Einsatzgrenzen, Einteilen und Austragen von
+Hand mit Kürzel, alles, was Helfer selbst tun, und was nachrückt.
 
 ### 5.12 Datenschutz und Recht (D)
 
@@ -669,6 +680,13 @@ Presse. Statt `zugangslink` trägt `helfer` eine `zugang_version`: die Links
 sind ein Siegel über Person, Zweck und Version, und wer die Version
 hochzählt, macht alle alten ungültig.
 
+**Mit 2.5** kamen `warteliste` (eigene Tabelle, damit sie nirgends
+mitzählt, wo Einteilungen gezählt werden) und `absage` dazu; an
+`einteilung` hält `bestaetigen_bis` einen angebotenen Platz, an `helfer`
+stehen `email_neu` und `loeschen_beantragt_am`, am `protokoll` Veranstaltung
+und Bereich. `zusage` aus der Skizze bleibt damit `einteilung` plus
+`warteliste` plus `absage`.
+
 ---
 
 ## 8. Ablösung von helferliste.online
@@ -741,7 +759,7 @@ Selbstbedienung.
 | 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten; **Interesse vormerken** bei angekündigten Veranstaltungen (aus 3.3); Verfügbarkeit und Vorlieben schon im Datenmodell, für den Assistenten | **erledigt** |
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | **erledigt** |
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | **erledigt** |
-| 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; **Warteliste mit Nachrücken** (R-04, aus 3.6); Meldung kurzfristiger Absagen; Protokoll | 11 h |
+| 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; **Warteliste mit Nachrücken** (R-04, aus 3.6); Meldung kurzfristiger Absagen; Protokoll | **erledigt** |
 | 2.6 | „Noch eine Schicht?" nach dem Eintragen, Tagesbalken auf der Startseite | 3 h |
 | 2.7 | Dashboard und Monitor: Stufen statt Bedarf, Reserve, Springer, kurzfristige Absagen | 4 h |
 | 2.8 | Druckansichten und Notfallmappe | 3 h |
@@ -767,14 +785,14 @@ Bestehendes umgebaut.
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
 89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 bis
-2.4 schon erledigt; es bleiben rund 30 Stunden, die 8 Stunden pro Woche haben
+2.5 schon erledigt; es bleiben rund 19 Stunden, die 8 Stunden pro Woche haben
 also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~30 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~19 h, ab 12. Oktober |
 | --- | --- |
-| Anfang Dezember 2026 | ~4 h |
-| **Mitte Dezember 2026** | **~3 h** |
-| Rückfallebene: Anfang März 2027 | ~2 h |
+| Anfang Dezember 2026 | ~3 h |
+| **Mitte Dezember 2026** | **~2 h** |
+| Rückfallebene: Anfang März 2027 | ~1 h |
 
 Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
 bis Ende April gut 3 Stunden pro Woche – mit sechs Wochen Puffer bis zum
@@ -821,7 +839,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~65 h, davon ~37 h erledigt |
+| 2 Öffnung | ~65 h, davon ~48 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |

@@ -102,7 +102,8 @@
   <div class="karte">
     {% for s in gewaehlte %}
       <p><strong>{{ s.bereich }}</strong> · {{ s.datum|tag }} {{ s|spanne }}
-        {%- if s.lage == 'reserve' %} <span class="marke reserve">als Reserve</span>{% endif %}</p>
+        {%- if s.warteliste %} <span class="marke voll">Warteliste</span>
+        {%- elif s.lage == 'reserve' %} <span class="marke reserve">als Reserve</span>{% endif %}</p>
     {% endfor %}
     {% for f in fenster %}
       <p><strong>Springer</strong> · {{ f.text }}</p>
@@ -110,7 +111,7 @@
   </div>
 
   <form method="post" action="{{ basis }}/angaben" novalidate>
-    {% for s in gewaehlte %}<input type="hidden" name="s" value="{{ s.id }}">{% endfor %}
+    {% for s in gewaehlte %}<input type="hidden" name="{{ 'w' if s.warteliste else 's' }}" value="{{ s.id }}">{% endfor %}
     {% for f in fenster %}<input type="hidden" name="z" value="{{ f.schluessel }}">{% endfor %}
     <input type="hidden" name="weitere" value="{{ weitere|length }}">
 

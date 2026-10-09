@@ -8,7 +8,7 @@
 {% block inhalt %}
   <p>Bitte bestätige, dass <strong>{{ person.email }}</strong> deine Adresse ist –
     dann steht deine Anmeldung fest.</p>
-  <form method="post" action="/bestaetigen/{{ token }}">
+  <form method="post" action="{{ ziel or '/bestaetigen/' ~ token }}">
     <button type="submit" class="knopf">Ja, das bin ich</button>
   </form>
   <p class="leise">Du hast dich nicht angemeldet? Dann schließ die Seite einfach –

@@ -1,0 +1,30 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}{{ titel }}{% endblock %}
+{% block zurueck %}<a class="zurueck" href="/platz/{{ token }}">‹ Mein Helferplatz</a>{% endblock %}
+{% block ueberschrift %}{{ titel }}{% endblock %}
+
+{# Die Rückfrage vor Absagen, Abmelden und Löschen – ein Klick und eine
+   Rückfrage (S-01), nicht mehr. #}
+{% block inhalt %}
+  <p>{{ text }}</p>
+  {% if liste %}<ul>{% for z in liste %}<li>{{ z }}</li>{% endfor %}</ul>{% endif %}
+  <form method="post" action="{{ ziel }}">
+    {% if personen|length > 1 %}
+      <fieldset class="karte">
+        <legend>Für wen?</legend>
+        {% for p in personen %}
+          <label class="haken"><input type="checkbox" name="wer" value="{{ p.id }}" checked>
+            <span>{{ p.name }}{% if loop.first %} <span class="leise">(du)</span>{% endif %}</span></label>
+        {% endfor %}
+      </fieldset>
+    {% elif personen %}
+      <input type="hidden" name="wer" value="{{ personen[0].id }}">
+    {% endif %}
+    {% if mit_grund %}
+      <label for="grund">Magst du uns sagen, warum? <span class="leise">– freiwillig</span></label>
+      <textarea id="grund" name="grund" rows="2" maxlength="300"></textarea>
+    {% endif %}
+    <button type="submit" class="knopf warnung">{{ knopf }}</button>
+    <a class="knopf zweit" href="/platz/{{ token }}">Doch nicht</a>
+  </form>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "admin_base.html" %}
+{% block titel %}Änderungen{% endblock %}
+{% block ueberschrift %}Änderungen{% endblock %}
+
+{# S-08: was Helfer selbst erledigt haben – Absagen zuerst. Eine
+   Bereichsleitung sieht nur ihre Bereiche. #}
+{% block inhalt %}
+  <p class="unterzeile">Seit {{ seit[:16] }} ·
+    {% for h, name in ((24, 'gestern'), (72, 'drei Tagen'), (168, 'einer Woche')) %}
+      {%- if h == stunden %}<strong>seit {{ name }}</strong>{% else %}<a href="/helfer/aenderungen?stunden={{ h }}">seit {{ name }}</a>{% endif %}
+      {%- if not loop.last %} · {% endif %}
+    {%- endfor %}</p>
+
+  <section>
+    <h2>Absagen ({{ absagen | length }})</h2>
+    {% if not absagen %}
+      <p class="leer">Keine.</p>
+    {% else %}
+      <div class="tabelle-huelle">
+        <table>
+          <tbody>
+            {% for a in absagen %}
+              <tr>
+                <td class="gedaempft nowrap">{{ a.am[:16] }}</td>
+                <td>{% if a.helfer_id %}<a href="/helfer/helfer/{{ a.helfer_id }}">{{ a.name }}</a>
+                  {%- else %}{{ a.name or 'jemand, der seine Daten gelöscht hat' }}{% endif %}</td>
+                <td><a href="/helfer/schicht/{{ a.schicht_id }}">{{ a.bereich }}</a>
+                  <span class="gedaempft nowrap">{{ a.beginn | zeitpunkt }}</span></td>
+                <td>{% if a.kurzfristig %}<span class="marke marke-luecke">kurzfristig</span>{% endif %}
+                  {%- if a.grund %} <span class="gedaempft">{{ a.grund }}</span>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Weitere Änderungen ({{ sonst | length }})</h2>
+    {% if not sonst %}
+      <p class="leer">Keine.</p>
+    {% else %}
+      <div class="tabelle-huelle">
+        <table>
+          <tbody>
+            {% for p in sonst %}
+              <tr>
+                <td class="gedaempft nowrap">{{ p.am[:16] }}</td>
+                <td><a href="/helfer/helfer/{{ p.helfer_id }}">{{ p.name }}</a></td>
+                <td>{{ p.was }}</td>
+                <td class="gedaempft">{{ 'selbst' if p.wer == 'selbst' else p.wer }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

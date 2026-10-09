@@ -75,6 +75,7 @@
                 <td class="gedaempft">{{ {'import': 'Import', 'hand': 'von Hand', 'selbst': 'selbst angemeldet'}[h.quelle] }}
                   {%- if h.art == 'reserve' %} <span class="marke">Reserve</span>{% endif %}
                   {%- if h.unbestaetigt %} <span class="marke">unbestätigt</span>{% endif %}
+                  {%- if h.bestaetigen_bis %} <span class="marke">von der Warteliste, angeboten bis {{ h.bestaetigen_bis | zeitpunkt }}</span>{% endif %}
                   {%- if h.vermerk and sieht_grenzen %} <span class="marke" title="{{ h.vermerk }}">mit Vermerk</span>{% endif %}</td>
                 <td class="rechts">
                   <form method="post"
@@ -92,6 +93,19 @@
       </div>
     {% endif %}
   </section>
+
+  {% if warteliste %}
+    {# R-04: wird ein Platz frei, bekommt die Erste ihn angeboten. #}
+    <section>
+      <h2>Warteliste ({{ warteliste | length }})</h2>
+      <ol>
+        {% for w in warteliste %}
+          <li><a href="/helfer/helfer/{{ w.helfer_id }}">{{ w.name }}</a>
+            <span class="gedaempft">seit {{ w.angelegt_am[:16] }}</span></li>
+        {% endfor %}
+      </ol>
+    </section>
+  {% endif %}
 
   <section>
     <h2>Jemanden einteilen</h2>

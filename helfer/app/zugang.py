@@ -7,10 +7,10 @@ ihn einfach noch einmal, und eine Kopie der Datenbank verrät keinen.
 Zählt man ``zugang_version`` hoch, gilt keiner der alten mehr; wechselt
 APP_SECRET_KEY, ebenso.
 
-Drei Zwecke, damit ein Link nicht mehr kann, als er soll: Mein Helferplatz,
-das Bestätigen der Adresse (gebunden an genau diese Adresse) und das
-Kalender-Abo, das ein Kalenderprogramm jahrelang abfragt und deshalb nur
-lesen darf.
+Vier Zwecke, damit ein Link nicht mehr kann, als er soll: Mein Helferplatz,
+das Bestätigen der Adresse und einer neuen Adresse (gebunden an genau diese)
+und das Kalender-Abo, das ein Kalenderprogramm jahrelang abfragt und deshalb
+nur lesen darf.
 """
 
 from __future__ import annotations
@@ -23,6 +23,8 @@ from . import config
 PLATZ = "platz"
 BESTAETIGEN = "bestaetigen"
 KALENDER = "kalender"
+# Eine neue Adresse bestätigen (S-04) – gebunden an genau diese.
+EMAIL = "email"
 
 # Ab so vielen falschen Codes gilt nur noch der Link aus der Mail.
 CODE_VERSUCHE = 5
@@ -35,8 +37,8 @@ def _siegel(*teile) -> str:
 
 
 def _bindung(zweck: str, person) -> tuple:
-    # Der Bestätigungslink gilt nur für die Adresse, an die er ging.
-    extra = person["email"] if zweck == BESTAETIGEN else ""
+    # Ein Bestätigungslink gilt nur für die Adresse, an die er ging.
+    extra = {BESTAETIGEN: person["email"], EMAIL: person.get("email_neu") or ""}.get(zweck, "")
     return (zweck, person["id"], person["zugang_version"], extra)
 
 

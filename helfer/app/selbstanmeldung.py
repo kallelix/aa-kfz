@@ -109,36 +109,76 @@ def person_pruefen(daten: dict, praefix: str, angebot: dict, stichtag: date,
             elif alter >= 18:
                 volljaehrig = 1
 
-    tshirt = tshirt_roh = None
-    if angebot.get("shirt"):
-        groesse = feld("tshirt")
-        schnitt = feld("schnitt")
-        if groesse == KEIN_SHIRT:
-            tshirt_roh = "kein Shirt"
-        elif groesse not in normalisieren.GROESSEN:
-            fehler[praefix + "tshirt"] = "Bitte eine Größe wählen – oder „kein Shirt“."
-        elif angebot.get("schnitte") and schnitt not in SCHNITTE:
-            fehler[praefix + "schnitt"] = "Bitte Damen- oder Herrenschnitt."
-        else:
-            tshirt = groesse
-            tshirt_roh = (SCHNITTE[schnitt] + " " + groesse) if angebot.get("schnitte") else groesse
-
-    veggie = None
-    if angebot.get("verpflegung"):
-        essen = feld("verpflegung")
-        if essen not in VERPFLEGUNG:
-            fehler[praefix + "verpflegung"] = "Bitte wählen, damit genug von allem da ist."
-        else:
-            veggie = 1 if essen == "vegetarisch" else 0
-
+    shirt_essen = _shirt_essen(feld, praefix, angebot, fehler)
     werte = {
         "vorname": vorname, "nachname": nachname,
         "name": (vorname + " " + nachname).strip(),
         "email": email, "telefon": telefon,
         "volljaehrig": volljaehrig, "geburtsdatum": geburtsdatum, "alter": alter,
-        "tshirt": tshirt, "tshirt_roh": tshirt_roh or "", "veggie": veggie,
+        "tshirt": None, "tshirt_roh": "", "veggie": None, **shirt_essen,
     }
     return werte, fehler
+
+
+def _shirt_essen(feld, praefix: str, angebot: dict, fehler: dict) -> dict:
+    """Shirt (mit Schnitt) und Verpflegung – nur, was die Veranstaltung
+    anbietet (I-02). Zurück kommen nur die Felder, nach denen gefragt war."""
+    werte: dict = {}
+    if angebot.get("shirt"):
+        groesse = feld("tshirt")
+        schnitt = feld("schnitt")
+        if groesse == KEIN_SHIRT:
+            werte.update(tshirt=None, tshirt_roh="kein Shirt")
+        elif groesse not in normalisieren.GROESSEN:
+            fehler[praefix + "tshirt"] = "Bitte eine Größe wählen – oder „kein Shirt“."
+        elif angebot.get("schnitte") and schnitt not in SCHNITTE:
+            fehler[praefix + "schnitt"] = "Bitte Damen- oder Herrenschnitt."
+        else:
+            werte.update(tshirt=groesse, tshirt_roh=(SCHNITTE[schnitt] + " " + groesse)
+                         if angebot.get("schnitte") else groesse)
+    if angebot.get("verpflegung"):
+        essen = feld("verpflegung")
+        if essen not in VERPFLEGUNG:
+            fehler[praefix + "verpflegung"] = "Bitte wählen, damit genug von allem da ist."
+        else:
+            werte["veggie"] = 1 if essen == "vegetarisch" else 0
+    return werte
+
+
+def angaben_pruefen(daten: dict, praefix: str, angebot: dict,
+                    mit_telefon: bool) -> tuple[dict, dict]:
+    """Angaben ändern aus Mein Helferplatz (S-04): Telefon, Shirt,
+    Verpflegung. Name und Alter ändert hier niemand."""
+    fehler: dict[str, str] = {}
+
+    def feld(name: str) -> str:
+        return normalisieren.text(daten.get(praefix + name))
+
+    werte = _shirt_essen(feld, praefix, angebot, fehler)
+    if mit_telefon:
+        telefon = normalisieren.telefon(feld("telefon"))
+        if telefon is None:
+            fehler[praefix + "telefon"] = "Diese Nummer können wir nicht lesen."
+        else:
+            werte["telefon"] = telefon
+    return werte, fehler
+
+
+def vorbelegen(person, praefix: str) -> dict:
+    """Die Formularfelder aus dem, was gespeichert ist – Umkehrung von
+    angaben_pruefen."""
+    werte = {praefix + "telefon": person["telefon"] or ""}
+    roh = person["tshirt_roh"] or ""
+    if roh == "kein Shirt":
+        werte[praefix + "tshirt"] = KEIN_SHIRT
+    elif person["tshirt"]:
+        werte[praefix + "tshirt"] = person["tshirt"]
+        for wert, name in SCHNITTE.items():
+            if roh.startswith(name + " "):
+                werte[praefix + "schnitt"] = wert
+    if person["veggie"] is not None:
+        werte[praefix + "verpflegung"] = "vegetarisch" if person["veggie"] else "fleisch"
+    return werte
 
 
 def springer_fenster(roh_werte, tage: list[date]) -> list[tuple[str, str, str]]:

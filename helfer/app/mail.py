@@ -63,7 +63,9 @@ def schichten_text(eintraege) -> str:
             zeilen.append(zeile)
         for f in eintrag["fenster"]:
             zeilen.append(f"  {_zeit(f['beginn'], f['ende'])}  Springer")
-        if not eintrag["schichten"] and not eintrag["fenster"]:
+        for s in eintrag.get("warteliste", []):
+            zeilen.append(f"  {_zeit(s['beginn'], s['ende'])}  {s['bereich']} (Warteliste)")
+        if not eintrag["schichten"] and not eintrag["fenster"] and not eintrag.get("warteliste"):
             zeilen.append("  (noch keine Schicht)")
     return "\n".join(zeilen)
 
@@ -187,3 +189,120 @@ def dazu(person, va_text: str, eintraege, platz: str) -> tuple:
         _fuss(),
     ])
     return ("dazu", person["email"], "Neue Schicht eingetragen", text)
+
+
+# --- Selbstbedienung (Lastenheft 2.5) ---------------------------------------
+
+def abgesagt(person, va_text: str, zeilen: list[str], platz: str) -> tuple:
+    """S-01: die Seite bedankt sich für die Absage, die Mail auch."""
+    text = "\n".join([
+        f"Hallo {_vorname(person)},",
+        "",
+        f"danke, dass du Bescheid sagst! Für {va_text} ist abgesagt:",
+        "",
+        *[f"  {z}" for z in zeilen],
+        "",
+        "Wer absagt, statt einfach nicht zu kommen, hilft uns sehr.",
+        "Deine übrigen Schichten und alles Weitere:",
+        f"  {platz}",
+        _fuss(),
+    ])
+    return ("abgesagt", person["email"], "Abgesagt – danke für Bescheid", text)
+
+
+def getauscht(person, va_text: str, alt: str, neu: str, platz: str) -> tuple:
+    text = "\n".join([
+        f"Hallo {_vorname(person)},",
+        "",
+        f"getauscht für {va_text}:",
+        "",
+        f"  statt {alt}",
+        f"  jetzt {neu}",
+        "",
+        "Alles auf einen Blick:",
+        f"  {platz}",
+        _fuss(),
+    ])
+    return ("getauscht", person["email"], "Schicht getauscht", text)
+
+
+def abgemeldet(person, va_text: str, namen: list[str]) -> tuple:
+    wer = "dich" if namen == [_vorname(person)] else ", ".join(namen)
+    text = "\n".join([
+        f"Hallo {_vorname(person)},",
+        "",
+        f"wir haben {wer} von {va_text} abgemeldet. Danke, dass du Bescheid sagst –",
+        "vielleicht klappt es beim nächsten Mal!",
+        _fuss(),
+    ])
+    return ("abgemeldet", person["email"], "Abgemeldet", text)
+
+
+def angebot(person, fuer: str, schicht_text: str, bis: str, platz: str) -> tuple:
+    """R-04: ein Platz von der Warteliste, mit Frist."""
+    wer = "dich" if fuer == _vorname(person) else fuer
+    text = "\n".join([
+        f"Hallo {_vorname(person)},",
+        "",
+        f"gute Nachricht: In {schicht_text} ist ein Platz frei geworden – wir halten",
+        f"ihn für {wer} bis {bis}. Bitte sag in Mein Helferplatz Ja oder Nein:",
+        "",
+        f"  {platz}",
+        "",
+        "Ohne Antwort geben wir ihn an die Nächste auf der Warteliste weiter.",
+        _fuss(),
+    ])
+    return ("angebot", person["email"], "Ein Platz ist frei geworden", text)
+
+
+def neue_adresse(person, link: str) -> tuple:
+    """S-04/S-06: die neue Adresse bestätigen – die Mail geht an sie."""
+    text = "\n".join([
+        f"Hallo {_vorname(person)},",
+        "",
+        "bitte bestätige, dass dies deine Adresse ist – dann schreiben wir dir",
+        "künftig hierhin:",
+        "",
+        f"  {link}",
+        "",
+        "Warst du das nicht? Dann ignoriere diese Mail einfach.",
+        _fuss(),
+    ])
+    return ("neue_adresse", person["email_neu"], "Bitte bestätige deine Adresse", text)
+
+
+def geloescht(person, wartet: bool) -> tuple:
+    """S-05: zum Abschied, oder warum es noch dauert."""
+    if wartet:
+        absatz = ["deine künftigen Schichten sind abgesagt. Löschen können wir deine",
+                  "Daten erst, wenn alles zurück ist, was du ausgeliehen hast (etwa ein",
+                  "Funkgerät) – danach geschieht es von selbst, samt der Unterschrift",
+                  "bei der Ausgabe."]
+    else:
+        absatz = ["deine Daten sind gelöscht, künftige Schichten abgesagt. Danke, dass",
+                  "du dabei warst – du bist jederzeit wieder willkommen!"]
+    text = "\n".join([f"Hallo {_vorname(person)},", "", *absatz, _fuss()])
+    return ("geloescht", person["email"], "Deine Daten", text)
+
+
+def leitung_absage(empfaenger: str, abgabe: dict) -> tuple:
+    """S-07: an die Bereichsleitung, sofort – bei kurzfristigen Absagen und
+    wenn die Schicht unter ihr Minimum fällt."""
+    s = abgabe["schicht"]
+    zeilen = [
+        "Hallo,",
+        "",
+        f"{abgabe['person']['name']} hat abgesagt: {s['text']}.",
+    ]
+    if abgabe.get("grund"):
+        zeilen.append(f"Grund: {abgabe['grund']}")
+    zeilen += ["", f"Jetzt fest eingeplant: {abgabe['fest']} – Minimum {s['minimum']}, Soll {s['soll']}."]
+    if abgabe["unter_minimum"]:
+        zeilen.append("Damit ist die Schicht unter ihrem Minimum.")
+    if abgabe["kurzfristig"]:
+        zeilen.append("Die Absage ist kurzfristig – sie steht auch oben in der Übersicht.")
+    if abgabe["angebote"]:
+        zeilen.append("Der Platz ist der Warteliste angeboten.")
+    zeilen += ["", "Die Helferplanung"]
+    betreff = ("Kurzfristige Absage: " if abgabe["kurzfristig"] else "Absage: ") + s["text"]
+    return ("leitung", empfaenger, betreff, "\n".join(zeilen))

@@ -59,6 +59,13 @@
               <input type="checkbox" name="s" value="{{ s.id }}" {% if gewaehlt %}checked{% endif %}>
               {{ 'Als Reserve eintragen' if s.lage == 'reserve' else 'Eintragen' }}
             </label>
+          {% else %}
+            {# R-04: wird ein Platz frei, bekommt ihn die Erste auf der Warteliste angeboten. #}
+            <label class="eintragen">
+              <input type="checkbox" name="w" value="{{ s.id }}"
+                     {% if warte_auswahl and s.id in warte_auswahl %}checked{% endif %}>
+              Auf die Warteliste
+            </label>
           {% endif %}
           <div class="grund" data-grund></div>
         </div>

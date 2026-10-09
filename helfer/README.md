@@ -77,6 +77,38 @@ Mails gehen wie in Kennzeichen und Presse über `mail_out` und einen Worker
 und `MAIL_FROM` gesetzt sind. Verschickte Mails werden nach einem Monat
 gelöscht.
 
+## Selbstbedienung
+
+Was Helfer heute die Orga anschreiben müssten, erledigen sie in Mein
+Helferplatz selbst – ohne Frist, auch kurz vorher und während der
+Veranstaltung (Lastenheft 2.5, 5.3):
+
+- **Absagen** mit einer Rückfrage und freiwilligem Grund; die Seite bedankt
+  sich. **Tauschen** in einem Schritt – die neue Schicht zuerst, dann wird
+  die alte frei; geht die neue nicht, bleibt die alte. **Ganz abmelden**,
+  **Springer-Zeiten absagen**.
+- **Angaben ändern**: Handy, Shirt, Essen, Bemerkung. Eine neue Adresse gilt
+  erst, wenn sie bestätigt ist; eine mitangemeldete Person mit eigener
+  Adresse verwaltet sich danach selbst.
+- **Daten löschen**, auch einzeln für Mitangemeldete. Ist noch ein
+  Funkgerät ausgeliehen, wird nach der Rückgabe gelöscht, samt Unterschrift.
+  Schlüssel hängen nur am Namen, nicht an der Person – die zählen hier nicht.
+- **Warteliste**: Ist eine Schicht voll, lässt sie sich ankreuzen. Wird ein
+  Platz frei – durch Absage, Tausch, Austragen von Hand oder eine verfallene
+  Anmeldung –, rückt erst die Reserve auf, dann bekommt die Erste auf der
+  Warteliste den Platz angeboten und hält ihn 24 Stunden (höchstens bis
+  Schichtbeginn). Ohne Antwort geht er an die Nächste.
+- **Meldung**: Ist eine Absage kurzfristig (unter 24 Stunden oder während
+  der Veranstaltung) oder fällt die Schicht unter ihr Minimum, geht sofort
+  eine Mail an die Bereichsleitung, ohne Bereichsleitung an `KONTAKT_MAIL`.
+  Kurzfristige Absagen stehen oben in der Übersicht und unter „Meine
+  Bereiche“, mit den Springern, die jetzt könnten. Auf den Monitor kommen sie
+  mit Schritt 2.7.
+- **Protokoll und „Änderungen“**: Was Helfer selbst tun, was die Orga von
+  Hand ein- und austrägt und was nachrückt, steht im Protokoll der Person und
+  unter Übersicht → Änderungen (seit gestern, drei Tagen, einer Woche); die
+  Bereichsleitung sieht dort nur ihre Bereiche.
+
 ## Einsatzgrenzen
 
 Für Helfer mit Einschränkungen, die aus dem Gedanken der Inklusion dabei sind
@@ -211,6 +243,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_anmeldung.py    # die öffentliche Anmeldung
 .venv/Scripts/python.exe helfer/tests/test_grenzen.py      # Einsatzgrenzen
 .venv/Scripts/python.exe helfer/tests/test_helferplatz.py  # Bestätigen, Mein Helferplatz, Kalender
+.venv/Scripts/python.exe helfer/tests/test_selbstbedienung.py  # Absagen, Tauschen, Warteliste, Löschen
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

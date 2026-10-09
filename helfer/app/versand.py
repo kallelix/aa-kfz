@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from . import config, db, mail, normalisieren, selbstanmeldung, zugang
 
@@ -54,13 +54,55 @@ def link(pfad: str) -> str:
     return config.BASIS_URL + pfad
 
 
+def _zeitpunkt(marke: str) -> str:
+    """'Sa 03.07. 10:00 Uhr' – für Fristen in Mails."""
+    try:
+        zeit = datetime.fromisoformat(marke)
+    except ValueError:
+        return marke
+    return config.WOCHENTAGE[zeit.weekday()][:2] + zeit.strftime(" %d.%m. %H:%M Uhr")
+
+
+def angebot_mails(angebote, basis: str) -> None:
+    """R-04: wem die Warteliste einen Platz anbietet, der bekommt Bescheid –
+    bei Mitangemeldeten die Person, die sie angemeldet hat."""
+    for a in angebote:
+        person = db.helfer_laden(a["helfer_id"])
+        if person is None:
+            continue
+        anmelder = db.helfer_laden(person["angemeldet_von"]) if person["angemeldet_von"] else person
+        if anmelder is None or not anmelder["email"]:
+            continue
+        db.mail_einreihen(anmelder["id"], mail.angebot(
+            anmelder, person["vorname"] or person["name"], a["schicht"]["text"],
+            _zeitpunkt(a["bis"]), basis + "/platz/" + zugang.token(zugang.PLATZ, anmelder)))
+
+
+def absage_mails(abgaben) -> None:
+    """S-07: kurzfristige Absagen und solche, nach denen die Schicht unter
+    ihrem Minimum ist, gehen sofort an die Bereichsleitung – gibt es keine,
+    an die Orga."""
+    for abgabe in abgaben:
+        if abgabe["angebot"] or not (abgabe["unter_minimum"] or abgabe["kurzfristig"]):
+            continue
+        empfaenger = [k["email"] for k in db.leitung_empfaenger(abgabe["schicht"]["bereich_id"])]
+        if not empfaenger and config.KONTAKT_MAIL:
+            empfaenger = [config.KONTAKT_MAIL]
+        for adresse in empfaenger:
+            db.mail_einreihen(None, mail.leitung_absage(adresse, abgabe))
+
+
 def fristen() -> tuple[int, int]:
-    """Erinnern und verfallen lassen (I-03). Liefert (erinnert, verfallen)."""
+    """Erinnern und verfallen lassen (I-03), abgelaufene Angebote der
+    Warteliste weitergeben (R-04), nach der Rückgabe löschen (S-05).
+    Liefert (erinnert, verfallen)."""
     erinnert = verfallen = 0
     frist = config.BESTAETIGEN_FRIST_STUNDEN
+    angebote = db.angebote_abgelaufen()
     for person in db.unbestaetigt(frist):
         v = db.VERANSTALTUNGEN.laden(person["veranstaltung_id"])
         frei = db.verfallen_lassen(person["id"])
+        angebote += db.nachruecken(frei)
         if v is not None:
             # Ohne helfer_id: die Person ist danach meist gelöscht, und mit ihr
             # gingen sonst auch ihre ungesendeten Mails.
@@ -80,6 +122,8 @@ def fristen() -> tuple[int, int]:
             zugang.code(person), rest))
         db.erinnert(person["id"])
         erinnert += 1
+    angebot_mails(angebote, config.BASIS_URL)
+    db.nach_rueckgabe_loeschen()
     db.mails_aufraeumen()
     return erinnert, verfallen
 

@@ -3,7 +3,8 @@
 {% block ueberschrift %}Hallo {{ person.vorname or person.name }}!{% endblock %}
 
 {# Mein Helferplatz (A-09): alles, was jemand für seine Schichten wissen
-   muss, ohne Konto – der Link ist der Zugang. #}
+   muss, und alles, was er selbst erledigen kann (5.3) – ohne Konto, der
+   Link ist der Zugang. Absagen geht jederzeit, ohne Frist. #}
 {% block inhalt %}
   {% if hinweis %}<div class="hinweis gut">{{ hinweis }}</div>{% endif %}
 
@@ -32,14 +33,42 @@
             <div class="leise">Ansprechpartner: {{ k.name }}
               {%- if k.telefon %} · <a href="tel:{{ k.telefon|replace(' ', '') }}">{{ k.telefon }}</a>{% endif %}</div>
           {% endfor %}
-          {% if s.art == 'reserve' %}<span class="marke reserve">Reserve – danke, das hilft uns sehr</span>{% endif %}
+          {% if s.bestaetigen_bis %}
+            {# R-04: von der Warteliste – der Platz wird bis dahin gehalten. #}
+            <form method="post" action="/platz/{{ token }}/angebot/{{ s.einteilung_id }}" class="hinweis">
+              <strong>Ein Platz ist frei geworden!</strong> Wir halten ihn bis
+              {{ s.bestaetigen_bis|zeitpunkt }}.
+              <button type="submit" class="knopf klein" name="antwort" value="ja">Ja, ich komme</button>
+              <button type="submit" class="knopf klein zweit" name="antwort" value="nein">Nein, danke</button>
+            </form>
+          {% else %}
+            {% if s.art == 'reserve' %}<span class="marke reserve">Reserve – danke, das hilft uns sehr</span>{% endif %}
+            <p class="aktionen">
+              <a href="/platz/{{ token }}/tauschen/{{ s.einteilung_id }}">Tauschen</a> ·
+              <a href="/platz/{{ token }}/absagen/{{ s.einteilung_id }}">Absagen</a>
+            </p>
+          {% endif %}
+        </div>
+      {% endfor %}
+      {% for s in eintrag.warteliste %}
+        <div class="karte schicht">
+          <h3>{{ s.bereich }}</h3>
+          <div class="zeit">{{ s.datum|tag }} · {{ s|spanne }}</div>
+          <span class="marke voll">Warteliste – wird ein Platz frei, melden wir uns</span>
+          <form method="post" action="/platz/{{ token }}/warteliste/{{ s.warteliste_id }}/weg" class="aktionen">
+            <button type="submit" class="knopf klein zweit">Von der Warteliste nehmen</button>
+          </form>
         </div>
       {% endfor %}
       {% for f in eintrag.fenster %}
         <div class="karte"><h3>Springer</h3>
-          <p>{{ f.beginn|zeitpunkt }} bis {{ f.ende|uhr }} – wir setzen dich ein, wo gerade jemand fehlt.</p></div>
+          <p>{{ f.beginn|zeitpunkt }} bis {{ f.ende|uhr }} – wir setzen dich ein, wo gerade jemand fehlt.</p>
+          <form method="post" action="/platz/{{ token }}/springer/{{ f.id }}/weg" class="aktionen">
+            <button type="submit" class="knopf klein zweit">Diese Zeit absagen</button>
+          </form>
+        </div>
       {% endfor %}
-      {% if not eintrag.schichten and not eintrag.fenster %}
+      {% if not eintrag.schichten and not eintrag.fenster and not eintrag.warteliste %}
         <p class="leise">Noch keine Schicht.</p>
       {% endif %}
     {% endfor %}
@@ -47,6 +76,7 @@
     {% if x.zustand == 'offen' %}
       <a class="knopf zweit" href="/platz/{{ token }}/{{ x.adresse }}/schichten">Schichten dazunehmen</a>
     {% endif %}
+    <p class="aktionen"><a href="/platz/{{ token }}/{{ x.adresse }}/abmelden">Ganz abmelden von {{ x.va.kurz }}</a></p>
   {% endfor %}
 
   {% for x in weitere %}
@@ -68,6 +98,16 @@
     <p class="leise">Klappt der Knopf nicht, füge diese Adresse in deinem Kalender als
       Abo hinzu: <br><code class="umbruch">{{ links.kalender }}</code></p>
   {% endif %}
+
+  <h2>Deine Angaben</h2>
+  <p class="aktionen">
+    <a href="/platz/{{ token }}/angaben">Angaben ändern</a> ·
+    <a href="/platz/{{ token }}/loeschen">Meine Daten löschen</a>
+  </p>
+  {% for m in mit %}
+    <p class="aktionen leise">{{ m.name }}:
+      <a href="/platz/{{ token }}/loeschen?wer={{ m.id }}">Daten löschen</a></p>
+  {% endfor %}
 
   <p class="leise">Bitte sei 15 Minuten vor Beginn am Treffpunkt. Diese Seite ist dein
     Zugang – gib den Link nicht weiter.</p>

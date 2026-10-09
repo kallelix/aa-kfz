@@ -1,0 +1,42 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Schicht tauschen{% endblock %}
+{% block zurueck %}<a class="zurueck" href="/platz/{{ token }}">‹ Mein Helferplatz</a>{% endblock %}
+{% block ueberschrift %}Schicht tauschen{% endblock %}
+
+{# S-02: in einem Schritt. Die neue wird zuerst gebucht, erst dann die alte
+   freigegeben – geht die neue nicht, bleibt die alte. #}
+{% block inhalt %}
+  {% if gruende %}
+    <div class="hinweis warn" role="alert">
+      <strong>Das ging leider nicht – {{ einteilung.text }} bleibt:</strong>
+      <ul>{% for g in gruende %}<li>{{ g }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  <p>Statt <strong>{{ einteilung.text }}</strong> lieber:</p>
+  {% if not alternativen %}
+    <p class="leise">Gerade ist keine andere Schicht frei.</p>
+  {% else %}
+    <form method="post" action="/platz/{{ token }}/tauschen/{{ einteilung.id }}">
+      {% for naehe, liste in alternativen|groupby('naehe') %}
+        <h2>{{ ['Am selben Tag, im selben Bereich', 'Am selben Tag', 'Weitere Schichten'][naehe] }}</h2>
+        {% for s in liste %}
+          <label class="karte schicht wahl-zeile">
+            <input type="radio" name="s" value="{{ s.id }}" required {% if s.id == gewaehlt %}checked{% endif %}>
+            <span><strong>{{ s.bereich }}</strong> · {{ s.datum|tag }} {{ s|spanne }}
+              {%- if s.lage == 'reserve' %} <span class="marke reserve">als Reserve</span>
+              {%- else %} <span class="marke frei">noch {{ s.frei }} frei</span>{% endif %}
+              {%- if s.alter_ab %} <span class="marke voll">ab {{ s.alter_ab }}</span>{% endif %}
+              {%- for v in (s.voraussetzungen or '').splitlines() if v.strip() %} <span class="marke voll">{{ v }}</span>{% endfor %}</span>
+          </label>
+        {% endfor %}
+      {% endfor %}
+      {% if noetig %}
+        <label class="haken"><input type="checkbox" name="voraussetzung_ok" value="1">
+          <span>Ich habe: {{ noetig | join(', ') }}</span></label>
+      {% endif %}
+      <div class="leiste">
+        <button type="submit" class="knopf">Tauschen</button>
+      </div>
+    </form>
+  {% endif %}
+{% endblock %}

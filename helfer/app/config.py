@@ -309,6 +309,10 @@ MAIL_AKTIV = bool(SMTP_HOST and MAIL_FROM)
 BESTAETIGEN_ERINNERN_STUNDEN = _zahl("BESTAETIGEN_ERINNERN_STUNDEN", 24)
 BESTAETIGEN_FRIST_STUNDEN = _zahl("BESTAETIGEN_FRIST_STUNDEN", 72)
 
+# Wird ein Platz frei, hält die Warteliste ihn so lange für die erste Person
+# (R-04) – höchstens bis die Schicht beginnt.
+WARTELISTE_STUNDEN = _zahl("WARTELISTE_STUNDEN", 24)
+
 # --- Backoffice / Anmeldung ------------------------------------------------
 
 import secrets as _secrets  # noqa: E402  (bewusst erst hier, nur für den Fallback)

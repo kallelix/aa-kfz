@@ -523,7 +523,9 @@ try:
     # Pfad und wuerde bei einem blossen "faengt damit an" ueberall mitleuchten.
     print("Wo man gerade steht")
     for pfad, erwartet in (
-            ("/helfer", ("Helfer", "Übersicht", None)),
+            # Seit 2.5 hat die Übersicht zwei Punkte, also eine dritte Ebene.
+            ("/helfer", ("Helfer", "Übersicht", "Übersicht")),
+            ("/helfer/aenderungen", ("Helfer", "Übersicht", "Änderungen")),
             ("/helfer/band", ("Helfer", "Planen", "Zeitplan")),
             ("/helfer/aufgabe/neu", ("Helfer", "Planen", "Aufgaben")),
             ("/helfer/bereich/neu", ("Helfer", "Planen", "Bereiche & Schichten")),

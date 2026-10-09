@@ -3,6 +3,8 @@
 {% block ueberschrift %}Übersicht{% endblock %}
 
 {% block inhalt %}
+  {% if kurzfristig %}{% include "_kurzfristig.html" %}{% endif %}
+
   {% if not zaehler.schichten %}
     <div class="kasten">
       <h2>Noch keine Daten</h2>

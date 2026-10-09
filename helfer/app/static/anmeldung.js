@@ -37,7 +37,9 @@
         }
       });
       var springer = form.querySelectorAll('input[name="z"]:checked').length;
-      var n = gewaehlt.length;
+      // Die Warteliste (R-04) zählt mit, sperrt aber nichts: ob es sich mit
+      // etwas überschneidet, zählt erst, wenn ein Platz frei wird.
+      var n = gewaehlt.length + form.querySelectorAll('input[name="w"]:checked').length;
       weiter.textContent = n ? "Weiter mit " + n + (n === 1 ? " Schicht" : " Schichten")
         : springer ? "Weiter als Springer" : "Erst eine Schicht wählen";
       weiter.disabled = !n && !springer;

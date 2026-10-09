@@ -7,6 +7,8 @@
   <p class="unterzeile">Wo geholfen wird – Streckenposten, Shuttle, Orgabüro … –
     und darin die Schichten.</p>
 
+  {% if kurzfristig %}{% include "_kurzfristig.html" %}{% endif %}
+
   {% if allein %}
     <section class="kasten kasten-warnung">
       <h2>Bitte eine zweite Person dazu planen</h2>
