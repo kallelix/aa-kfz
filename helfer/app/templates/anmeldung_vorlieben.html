@@ -1,0 +1,30 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Was machst du gern?{% endblock %}
+{% block zurueck %}<a class="zurueck" href="/{{ adresse }}/zeit?{{ zurueck_query }}">‹ Zeiten ändern</a>{% endblock %}
+{% block ueberschrift %}Was machst du gern?{% endblock %}
+
+{# Der Assistent, Schritt 2 (A-03): Mehrfachauswahl. Ohne Wahl passt alles –
+   auch das ist eine Antwort. #}
+{% block inhalt %}
+  <p>Wähl aus, was dir liegt – gern auch mehreres.</p>
+
+  <form method="get" action="/{{ adresse }}/vorschlaege" class="vorlieben">
+    {% for z in zeit %}<input type="hidden" name="zeit" value="{{ z }}">{% endfor %}
+    {% for schluessel, name, hilfe in liste %}
+      <label class="wahl">
+        <input type="checkbox" name="vorliebe" value="{{ schluessel }}"
+               {% if schluessel in vorlieben %}checked{% endif %}>
+        <span><span class="name">{{ name }}</span><span class="spanne">{{ hilfe }}</span></span>
+      </label>
+    {% endfor %}
+    <label class="wahl">
+      <input type="checkbox" name="vorliebe" value="{{ egal }}"
+             {% if egal in vorlieben %}checked{% endif %}>
+      <span><span class="name">Egal</span><span class="spanne">Setzt mich ein, wo es brennt.</span></span>
+    </label>
+
+    <div class="leiste">
+      <button type="submit" class="knopf">Passende Schichten zeigen</button>
+    </div>
+  </form>
+{% endblock %}

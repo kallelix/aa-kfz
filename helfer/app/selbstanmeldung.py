@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from . import normalisieren
 
@@ -25,6 +25,26 @@ TAGESZEITEN = (
     ("mittag", "Nachmittag", "12 bis 18 Uhr", "12:00", "18:00"),
     ("abend", "Abend", "ab 17 Uhr", "17:00", "24:00"),
 )
+
+# Der Assistent (A-03): was einem liegt. Die Orga hakt je Bereich an, wozu
+# er passt (bereich.vorlieben); die Person wählt hier. Schlüssel, Name, und
+# was darunter fällt.
+VORLIEBEN = (
+    ("strecke", "Draußen an der Strecke", "Posten, Sperren, Ordner – an der frischen Luft"),
+    ("menschen", "Mit Menschen", "Einlass, Stand, Fragen beantworten"),
+    ("anpacken", "Anpacken", "Aufbauen, tragen, abbauen"),
+    ("fahren", "Fahren", "Shuttle und Transporte – mit Führerschein"),
+)
+# A-05: setzt mich ein, wo es brennt. Passt zu allem und legt den Springer
+# nahe.
+EGAL = "egal"
+
+# A-04: so viel einer Schicht muss in den angetippten Zeiten liegen.
+ANTEIL = 0.75
+
+# Für die Vorschläge reicht der Abend bis drei Uhr: eine Nachtschicht gehört
+# zum Abend ihres ersten Tages. Als Springer-Zeit endet er um Mitternacht.
+ABEND_BIS = "03:00"
 
 VERPFLEGUNG = {"fleisch": "mit Fleisch", "vegetarisch": "vegetarisch"}
 SCHNITTE = {"damen": "Damen", "herren": "Herren"}
@@ -217,6 +237,65 @@ def springer_fenster(roh_werte, tage: list[date]) -> list[tuple[str, str, str]]:
             ende = tag + " " + bis
         fenster.append((tag + "|" + zeit, beginn, ende))
     return sorted(set(fenster), key=lambda f: f[1])
+
+
+def vorlieben_aus(roh_werte) -> list[str]:
+    """Die gewählten Vorlieben, in fester Reihenfolge – Unbekanntes fällt
+    weg."""
+    gewaehlt = {str(r) for r in roh_werte}
+    return [k for k in [k for k, *_ in VORLIEBEN] + [EGAL] if k in gewaehlt]
+
+
+def zeitspannen(roh_werte, tage: list[date]) -> list[tuple[str, str]]:
+    """Die angetippten Tageszeiten (A-02) als zusammenhängende Spannen:
+    überlappende verschmolzen, nach Beginn sortiert."""
+    spannen = []
+    for schluessel, beginn, ende in springer_fenster(roh_werte, tage):
+        if schluessel.endswith("|abend"):
+            ende = ende[:11] + ABEND_BIS
+        spannen.append((beginn, ende))
+    vereint: list[tuple[str, str]] = []
+    for von, bis in sorted(spannen):
+        if vereint and von <= vereint[-1][1]:
+            vereint[-1] = (vereint[-1][0], max(vereint[-1][1], bis))
+        else:
+            vereint.append((von, bis))
+    return vereint
+
+
+def _minuten(von: str, bis: str) -> float:
+    return (datetime.fromisoformat(bis) - datetime.fromisoformat(von)).total_seconds() / 60
+
+
+def passt_zur_zeit(beginn: str, ende: str, spannen: list[tuple[str, str]]) -> bool:
+    """Mindestens drei Viertel der Schicht liegen in den angetippten Zeiten
+    (A-04). Die Tageszeiten überlappen, damit eine Schicht von 8 bis 14 Uhr
+    auch zu „Vormittag“ allein passt."""
+    dauer = _minuten(beginn, ende)
+    drin = sum(_minuten(max(von, beginn), min(bis, ende))
+               for von, bis in spannen if von < ende and beginn < bis)
+    return dauer > 0 and drin >= ANTEIL * dauer
+
+
+def passt_zu_vorlieben(bereich: list[str], gewaehlt: list[str]) -> bool:
+    """Ohne Wahl, mit „egal“ oder bei einem Bereich ohne Haken passt alles."""
+    if not gewaehlt or EGAL in gewaehlt or not bereich:
+        return True
+    return bool(set(bereich) & set(gewaehlt))
+
+
+def vorschlaege(schichten: list[dict], spannen: list[tuple[str, str]],
+                vorlieben: list[str]) -> list[dict]:
+    """A-04: was in die Zeit passt und zu den Vorlieben, ohne volle – die
+    dringendsten zuerst: unter Minimum, dann unter Soll, dann als Reserve;
+    gleich dringende nach Beginn."""
+    def rang(s):
+        return 0 if s["dringend"] else 1 if s["lage"] == "frei" else 2
+    passend = [s for s in schichten
+               if s["lage"] != "voll"
+               and passt_zur_zeit(s["beginn"], s["ende"], spannen)
+               and passt_zu_vorlieben(s.get("vorlieben") or [], vorlieben)]
+    return sorted(passend, key=lambda s: (rang(s), s["beginn"]))
 
 
 def ueberschneiden(a_beginn: str, a_ende: str, b_beginn: str, b_ende: str) -> bool:

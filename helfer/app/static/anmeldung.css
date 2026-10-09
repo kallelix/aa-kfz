@@ -279,6 +279,16 @@ details.karte > summary { cursor: pointer; font-weight: 600; }
 .aktionen { margin: .6rem 0 0; font-size: .95rem; }
 .aktionen .knopf { width: auto; }
 .wahl-zeile { display: flex; gap: .75rem; align-items: flex-start; cursor: pointer; }
+
+/* Der Assistent (A-03): Vorlieben als breite Kacheln, eine je Zeile. */
+.vorlieben label.wahl {
+  display: flex; gap: .7rem; align-items: center; margin: 0 0 .5rem;
+  padding: .55rem .8rem; font-weight: 400; text-align: left; cursor: pointer;
+}
+.vorlieben label.wahl input { width: 1.2rem; height: 1.2rem; margin: 0; flex: none; }
+.vorlieben label.wahl:has(input:checked) { border-color: var(--akzent); background: var(--akzent-hell); }
+.vorlieben .name { font-weight: 600; }
+.gruppe-kopf { margin-top: 1.2rem; }
 .wahl-zeile input { margin-top: .3rem; }
 
 /* Das gemeinsame Ziel (G-04): <progress> statt einer Breite im style-

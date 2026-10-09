@@ -125,6 +125,24 @@
       <p class="hilfe">Eine je Zeile. Bei der Anmeldung bestätigt man jede einzeln.</p>
     </div>
 
+    {# A-03: der Assistent fragt, was jemandem liegt, und schlägt Schichten
+       aus passenden Bereichen vor. #}
+    <fieldset class="feld">
+      <legend>Passt zu <span class="optional">für den Assistenten</span></legend>
+      <p class="hilfe">Wer sich Schichten vorschlagen lässt, sagt, was ihm liegt. Ohne
+        Haken passt der Bereich zu allem.</p>
+      {% for schluessel, name, hilfe in vorlieben_liste %}
+        <label class="auswahl">
+          <input type="checkbox" name="vorliebe-{{ schluessel }}" value="1"
+                 {% if schluessel in (werte.vorlieben or []) %}checked{% endif %}>
+          <span class="auswahl-text">
+            <span class="auswahl-titel">{{ name }}</span>
+            <span class="auswahl-hilfe">{{ hilfe }}</span>
+          </span>
+        </label>
+      {% endfor %}
+    </fieldset>
+
     <fieldset class="feld">
       <legend>Sichtbarkeit</legend>
       <label class="auswahl">

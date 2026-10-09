@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from . import normalisieren
+from . import normalisieren, selbstanmeldung
 from .eintraege import _uhrzeit
 
 # Welche Schwelle ein Goodie hat.
@@ -55,6 +55,9 @@ def bereich_pruefen(daten: dict) -> tuple[dict, dict]:
         "voraussetzungen": "\n".join(z[:200] for z in voraussetzungen(
             str(daten.get("voraussetzungen") or "")))[:2000],
         "intern": _haken(daten.get("intern")),
+        # A-03: wozu der Bereich passt, für die Vorschläge des Assistenten.
+        "vorlieben": [k for k, *_ in selbstanmeldung.VORLIEBEN
+                      if _haken(daten.get("vorliebe-" + k))],
     }
     return werte, fehler
 

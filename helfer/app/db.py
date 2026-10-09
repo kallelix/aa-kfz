@@ -223,7 +223,7 @@ def helfer_schichten(vid: int, helfer_id: int) -> list[Zeile]:
 # --- Bereiche --------------------------------------------------------------
 
 _BEREICH_FELDER = ("name", "beschreibung", "treffpunkt", "mindestalter",
-                   "voraussetzungen", "intern")
+                   "voraussetzungen", "intern", "vorlieben")
 
 # Nur die Bereiche, die dieses Konto leitet - für die Rolle Bereichsleitung.
 _GELEITET = ("EXISTS (SELECT 1 FROM bereich_leitung bl"
@@ -261,6 +261,7 @@ def bereich_laden(bereich_id: int) -> Zeile | None:
 
 def bereich_anlegen(vid: int, werte: dict) -> int | None:
     """None, wenn es den Namen in dieser Veranstaltung schon gibt."""
+    werte = {"vorlieben": [], **werte}
     con = verbinden()
     try:
         with con:
@@ -278,6 +279,7 @@ def bereich_anlegen(vid: int, werte: dict) -> int | None:
 def bereich_aendern(bereich_id: int, werte: dict) -> bool | None:
     """False, wenn es den Bereich nicht mehr gibt; None, wenn der Name
     schon vergeben ist."""
+    werte = {"vorlieben": [], **werte}
     con = verbinden()
     try:
         with con:
@@ -807,8 +809,8 @@ def oeffentliche_schichten(vid: int) -> list[dict]:
     con = verbinden()
     try:
         zeilen = [dict(z) for z in con.execute(
-            "SELECT " + _SCHICHT_SPALTEN + ", b.beschreibung, b.voraussetzungen"
-            + _SCHICHT_VON +
+            "SELECT " + _SCHICHT_SPALTEN + ", b.beschreibung, b.voraussetzungen,"
+            " b.vorlieben" + _SCHICHT_VON +
             " WHERE s.veranstaltung_id = ? AND s.intern = 0 AND b.intern = 0"
             " AND s.beginn > ? ORDER BY s.datum, s.beginn, lower(b.name)",
             (vid, marke(jetzt_lokal())))]
@@ -994,18 +996,22 @@ def _pruefen(con: Verbindung, vid: int, schichten: list[dict],
 
 def _eintragen(con: Verbindung, vid: int, ids: list[int], schichten: list[dict],
                verteilung: dict[int, list[str]], fenster: list[tuple[str, str, str]],
-               bemerkung: str = "", bemerkung_von: int | None = None) -> None:
+               bemerkung: str = "", bemerkung_von: int | None = None,
+               vorlieben: list[str] = ()) -> None:
     """Teilnahme, Einteilungen, Wartelisten und Springer-Zeiten – nach
-    _pruefen."""
+    _pruefen. Die Vorlieben aus dem Assistenten (A-03) gelten für alle, die
+    zusammen angemeldet werden; ohne bleiben die alten stehen."""
     for i, helfer_id in enumerate(ids):
         eigene_bemerkung = bemerkung if helfer_id == (bemerkung_von or ids[0]) else ""
         con.execute(
             "INSERT INTO teilnahme (veranstaltung_id, helfer_id, quelle, bemerkung,"
-            " angemeldet_am) VALUES (?, ?, 'selbst', ?, ?)"
+            " vorlieben, angemeldet_am) VALUES (?, ?, 'selbst', ?, CAST(? AS TEXT[]), ?)"
             " ON CONFLICT (veranstaltung_id, helfer_id) DO UPDATE SET bemerkung ="
             " CASE WHEN excluded.bemerkung <> '' THEN excluded.bemerkung"
-            " ELSE teilnahme.bemerkung END",
-            (vid, helfer_id, eigene_bemerkung, jetzt()))
+            " ELSE teilnahme.bemerkung END, vorlieben ="
+            " CASE WHEN cardinality(excluded.vorlieben) > 0 THEN excluded.vorlieben"
+            " ELSE teilnahme.vorlieben END",
+            (vid, helfer_id, eigene_bemerkung, list(vorlieben), jetzt()))
         for s in schichten:
             art = verteilung[s["id"]][i]
             if art == "warteliste":
@@ -1026,7 +1032,7 @@ def _eintragen(con: Verbindung, vid: int, ids: list[int], schichten: list[dict],
 
 def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
              fenster: list[tuple[str, str, str]], bemerkung: str = "",
-             warteliste=frozenset()) -> dict:
+             warteliste=frozenset(), vorlieben: list[str] = ()) -> dict:
     """Trägt eine Anmeldung ein – alles oder nichts.
 
     `personen[0]` meldet an, die übrigen kommen mit (A-08) und stehen auf
@@ -1055,7 +1061,8 @@ def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
             for i, person in enumerate(personen):
                 ids.append(_person_sichern(con, person, anmelder_email,
                                            None if i == 0 else ids[0]))
-            _eintragen(con, vid, ids, schichten, verteilung, fenster, bemerkung)
+            _eintragen(con, vid, ids, schichten, verteilung, fenster, bemerkung,
+                       vorlieben=vorlieben)
         return {"anmelder": ids[0], "personen": ids,
                 "schichten": [{**s, "arten": verteilung[s["id"]]} for s in schichten]}
     finally:
@@ -1737,6 +1744,17 @@ def bemerkung(vid: int, helfer_id: int) -> str:
         zeile = con.execute("SELECT bemerkung FROM teilnahme WHERE veranstaltung_id = ?"
                             " AND helfer_id = ?", (vid, helfer_id)).fetchone()
         return zeile["bemerkung"] if zeile else ""
+    finally:
+        con.close()
+
+
+def vorlieben(vid: int, helfer_id: int) -> list[str]:
+    """Was der Person liegt – aus dem Assistenten (A-03)."""
+    con = verbinden()
+    try:
+        zeile = con.execute("SELECT vorlieben FROM teilnahme WHERE veranstaltung_id = ?"
+                            " AND helfer_id = ?", (vid, helfer_id)).fetchone()
+        return list(zeile["vorlieben"]) if zeile else []
     finally:
         con.close()
 

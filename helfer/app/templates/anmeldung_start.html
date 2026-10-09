@@ -7,6 +7,12 @@
   {% if zustand == 'offen' %}
     <p>Ohne Helfer gibt es kein Rennen – schön, dass du dabei sein willst! Schon eine
       Schicht hilft uns sehr.</p>
+    {# A-01: zwei Wege. Der Assistent zuerst – er zielt auf alle, die noch
+       nicht wissen, was es gibt; wer es weiß, findet die Liste darunter. #}
+    <a class="weg" href="/{{ adresse }}/zeit">
+      <strong>Ich sage, wann ich Zeit habe</strong>
+      <span>Wir suchen dir passende Schichten heraus.</span>
+    </a>
     <a class="weg" href="/{{ adresse }}/schichten">
       <strong>Ich suche mir Schichten aus</strong>
       <span>Alle Schichten auf einen Blick – oder sag uns, wann du als Springer Zeit hast.</span>

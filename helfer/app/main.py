@@ -730,7 +730,7 @@ async def bereiche_aus_vorlage(request: Request,
 
 def _bereich_werte(zeile) -> dict:
     return {f: zeile[f] for f in ("name", "beschreibung", "treffpunkt", "mindestalter",
-                                  "voraussetzungen", "intern")}
+                                  "voraussetzungen", "intern", "vorlieben")}
 
 
 def _leitung_aus(daten) -> list[int]:
@@ -750,6 +750,7 @@ def _bereich_seite(request, sitzung, bereich, werte, fehler, status_code=200,
         "admin_bereich.html",
         _admin(request, sitzung, hinweis=hinweis, bereich=bereich, werte=werte,
                fehler=fehler, leitung_moeglich=db.leitung_moeglich(),
+               vorlieben_liste=selbstanmeldung.VORLIEBEN,
                schichten=db.schichten(bereich["veranstaltung_id"],
                                       bereich_id=bereich["id"]) if bereich else []),
         status_code=status_code)
@@ -1203,6 +1204,11 @@ async def helfer_anlegen_von_hand(
     return _zurueck("/helfer/helfer", "angelegt", sprung="helfer-" + str(nummer))
 
 
+# Für die Orga: was jemandem im Assistenten liegt (A-03).
+_VORLIEBE_NAMEN = {**{k: n for k, n, _ in selbstanmeldung.VORLIEBEN},
+                   selbstanmeldung.EGAL: "egal, wo es brennt"}
+
+
 @app.get("/helfer/helfer/{helfer_id}")
 async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
                         sitzung: auth.Sitzung = Depends(_sitzung),
@@ -1224,6 +1230,7 @@ async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
                anmelder=db.helfer_laden(person["angemeldet_von"])
                if person["angemeldet_von"] else None,
                mitgebracht=db.mitangemeldete(helfer_id),
+               vorlieben=[_VORLIEBE_NAMEN.get(k, k) for k in db.vorlieben(v["id"], helfer_id)],
                grenzen=db.grenzen(v["id"], helfer_id, _leitung(sitzung))
                if _sieht_grenzen(sitzung) else [],
                grenz_ziele=_grenz_ziele(v["id"]) if pflegt else [],
@@ -2418,6 +2425,20 @@ async def interesse(request: Request, adresse: str):
     return ziel
 
 
+def _anmeldetage(v, schichten) -> list[dict]:
+    """Die Tage, an denen man helfen kann: die der Veranstaltung und die mit
+    Schichten davor und danach – Auf- und Abbau (A-02)."""
+    tage = {t.isoformat() for t in db.tage_der(v)} | {str(s["datum"]) for s in schichten}
+    beginn, ende = v["beginn"].isoformat(), v["ende"].isoformat()
+    return [{"datum": t, "lang": _tag_lang(t),
+             "art": "aufbau" if t < beginn else "abbau" if t > ende else "veranstaltung"}
+            for t in sorted(tage)]
+
+
+def _tage_als_datum(tage: list[dict]) -> list[date]:
+    return [date.fromisoformat(t["datum"]) for t in tage]
+
+
 def _auswahl(v, schicht_roh, fenster_roh, warte_roh=()):
     """Die gewählten Schichten (nur öffentliche, noch nicht begonnene) und
     Springer-Zeiten aus dem Formular. `w` heißt: ist sie voll, dann auf die
@@ -2436,13 +2457,24 @@ def _auswahl(v, schicht_roh, fenster_roh, warte_roh=()):
     namen = {k: n for k, n, *_ in selbstanmeldung.TAGESZEITEN}
     fenster = [{"schluessel": k, "beginn": von, "ende": bis,
                 "text": _tag(k.split("|")[0]) + " " + namen[k.split("|")[1]]}
-               for k, von, bis in selbstanmeldung.springer_fenster(fenster_roh, db.tage_der(v))]
+               for k, von, bis in selbstanmeldung.springer_fenster(
+                   fenster_roh, _tage_als_datum(_anmeldetage(v, alle.values())))]
     return gewaehlte, fenster
 
 
-def _auswahl_query(gewaehlte, fenster) -> str:
+def _assistent_aus(quelle) -> dict:
+    """Was im Assistenten gewählt wurde – Zeiten und Vorlieben. Es reist mit
+    bis zur Anmeldung: für den Weg zurück zu den Vorschlägen und damit die
+    Vorlieben an der Teilnahme stehen (A-03)."""
+    return {"zeit": [str(z) for z in quelle.getlist("zeit")][:60],
+            "vorliebe": selbstanmeldung.vorlieben_aus(quelle.getlist("vorliebe"))}
+
+
+def _auswahl_query(gewaehlte, fenster, assistent=None) -> str:
     return urlencode([("w" if s["warteliste"] else "s", s["id"]) for s in gewaehlte] +
-                     [("z", f["schluessel"]) for f in fenster])
+                     [("z", f["schluessel"]) for f in fenster] +
+                     [(k, w) for k in ("zeit", "vorliebe")
+                      for w in (assistent or {}).get(k, [])])
 
 
 def _warte(gewaehlte) -> set[int]:
@@ -2463,11 +2495,93 @@ def oeffentliche_schichten(request: Request, adresse: str, hinweis: str = ""):
                      warte_auswahl=warte_auswahl,
                      bereichsnamen=sorted({s["bereich"] for s in schichten}, key=str.lower),
                      fenster_gewaehlt=set(request.query_params.getlist("z")),
-                     tage=[{"datum": t.isoformat(), "lang": _tag_lang(t.isoformat())}
-                           for t in db.tage_der(v)],
+                     tage=_anmeldetage(v, schichten),
                      tageszeiten=selbstanmeldung.TAGESZEITEN,
                      hinweis={"leer": "Wähle mindestens eine Schicht – oder trag dich "
                               "unten als Springer ein."}.get(hinweis, "")))
+
+
+# --- Der Assistent (Lastenheft 3.1: A-02 bis A-05) --------------------------
+#
+# Drei Seiten, die nichts speichern – wie die Liste: was gewählt ist, reist
+# als Parameter mit (zeit, vorliebe, dann s und z) und landet bei denselben
+# Angaben. Ohne Skript geht alles; mit anmeldung.js graut die Vorschlagsliste
+# aus, was sich überschneidet (K-01).
+
+def _assistent_va(request: Request, adresse: str):
+    v = _nach_adresse(adresse)
+    if v is None:
+        return None, _nicht_da(request)
+    if _zustand(v) != "offen":
+        return None, RedirectResponse(f"/{adresse}", status_code=303)
+    return v, None
+
+
+@app.get("/{adresse:adresse}/zeit")
+def assistent_zeit(request: Request, adresse: str, hinweis: str = ""):
+    """A-02: wann hast du Zeit? Je Tag Vormittag, Nachmittag und Abend, Auf-
+    und Abbau getrennt."""
+    v, umweg = _assistent_va(request, adresse)
+    if umweg:
+        return umweg
+    assistent = _assistent_aus(request.query_params)
+    return templates.TemplateResponse(
+        "anmeldung_zeit.html",
+        _oeffentlich(request, v, tage=_anmeldetage(v, db.oeffentliche_schichten(v["id"])),
+                     tageszeiten=selbstanmeldung.TAGESZEITEN,
+                     zeit=set(assistent["zeit"]), vorlieben=assistent["vorliebe"],
+                     hinweis="Tippe mindestens eine Zeit an." if hinweis == "leer" else ""))
+
+
+@app.get("/{adresse:adresse}/vorlieben")
+def assistent_vorlieben(request: Request, adresse: str):
+    """A-03: was liegt dir? Mehrfachauswahl."""
+    v, umweg = _assistent_va(request, adresse)
+    if umweg:
+        return umweg
+    assistent = _assistent_aus(request.query_params)
+    if not assistent["zeit"]:
+        return RedirectResponse(f"/{adresse}/zeit?hinweis=leer", status_code=303)
+    return templates.TemplateResponse(
+        "anmeldung_vorlieben.html",
+        _oeffentlich(request, v, zeit=assistent["zeit"], vorlieben=assistent["vorliebe"],
+                     liste=selbstanmeldung.VORLIEBEN, egal=selbstanmeldung.EGAL,
+                     zurueck_query=urlencode([("zeit", z) for z in assistent["zeit"]] +
+                                             [("vorliebe", w) for w in assistent["vorliebe"]])))
+
+
+@app.get("/{adresse:adresse}/vorschlaege")
+def assistent_vorschlaege(request: Request, adresse: str, hinweis: str = ""):
+    """A-04, A-05: was passt, die dringendsten zuerst – und der Springer für
+    alle, die lieber flexibel sind oder nichts Passendes finden."""
+    v, umweg = _assistent_va(request, adresse)
+    if umweg:
+        return umweg
+    assistent = _assistent_aus(request.query_params)
+    schichten = db.oeffentliche_schichten(v["id"])
+    tage = _tage_als_datum(_anmeldetage(v, schichten))
+    namen = {k: n for k, n, *_ in selbstanmeldung.TAGESZEITEN}
+    zeiten = [{"schluessel": k, "text": _tag(k.split("|")[0]) + " " + namen[k.split("|")[1]]}
+              for k, _, _ in selbstanmeldung.springer_fenster(assistent["zeit"], tage)]
+    if not zeiten:
+        return RedirectResponse(f"/{adresse}/zeit?hinweis=leer", status_code=303)
+    auswahl = {int(x) for x in request.query_params.getlist("s") if x.isdigit()}
+    liste = selbstanmeldung.vorschlaege(
+        schichten, selbstanmeldung.zeitspannen(assistent["zeit"], tage), assistent["vorliebe"])
+    # Was schon gewählt war, bleibt stehen – auch wenn es nach einer neuen
+    # Wahl nicht mehr passt. Sonst ginge es beim Zurückblättern verloren.
+    gezeigt = {s["id"] for s in liste}
+    liste += [s for s in schichten if s["id"] in auswahl and s["id"] not in gezeigt]
+    return templates.TemplateResponse(
+        "anmeldung_vorschlaege.html",
+        _oeffentlich(request, v, vorschlaege=liste, auswahl=auswahl, zeiten=zeiten,
+                     springer_gewaehlt=set(request.query_params.getlist("z")),
+                     hinweis="Tipp eine Schicht an – oder hilf unten als Springer."
+                     if hinweis == "leer" else "",
+                     egal=selbstanmeldung.EGAL in assistent["vorliebe"],
+                     assistent=assistent,
+                     zurueck_query=urlencode([("zeit", z) for z in assistent["zeit"]] +
+                                             [("vorliebe", w) for w in assistent["vorliebe"]])))
 
 
 def _noetig(gewaehlte) -> list[str]:
@@ -2506,13 +2620,18 @@ def _formular(daten):
 
 def _angaben_seite(request, v, gewaehlte, fenster, eingabe, liste, weitere,
                    fehler=None, gruende=None, status_code=200, rueckfrage=False,
-                   platz=None, basis=None):
+                   platz=None, basis=None, assistent=None):
     voraussetzungen = _noetig(gewaehlte)
     extra = {"basis": basis} if basis else {}
     return templates.TemplateResponse(
         "anmeldung_angaben.html",
         _oeffentlich(request, v, gewaehlte=gewaehlte, fenster=fenster,
-                     auswahl_query=_auswahl_query(gewaehlte, fenster),
+                     auswahl_query=_auswahl_query(gewaehlte, fenster, assistent),
+                     # Zurück dorthin, wo gewählt wurde: Assistent oder Liste.
+                     zur_auswahl=("/vorschlaege?" if assistent and assistent["zeit"]
+                                  else "/schichten?") + _auswahl_query(gewaehlte, fenster,
+                                                                       assistent),
+                     assistent=assistent or {"zeit": [], "vorliebe": []},
                      eingabe=eingabe, eingabe_liste=liste, weitere=weitere,
                      max_weitere=MAX_WEITERE, angebot=db.angebot(v["id"]),
                      groessen=normalisieren.GROESSEN, schnitte=selbstanmeldung.SCHNITTE,
@@ -2530,9 +2649,14 @@ def angaben(request: Request, adresse: str):
     gewaehlte, fenster = _auswahl(v, request.query_params.getlist("s"),
                                   request.query_params.getlist("z"),
                                   request.query_params.getlist("w"))
+    assistent = _assistent_aus(request.query_params)
     if not gewaehlte and not fenster:
+        if assistent["zeit"]:
+            return RedirectResponse(f"/{adresse}/vorschlaege?" + _auswahl_query(
+                [], [], assistent) + "&hinweis=leer", status_code=303)
         return RedirectResponse(f"/{adresse}/schichten?hinweis=leer", status_code=303)
-    return _angaben_seite(request, v, gewaehlte, fenster, {}, {"voraussetzung": []}, [])
+    return _angaben_seite(request, v, gewaehlte, fenster, {}, {"voraussetzung": []}, [],
+                          assistent=assistent)
 
 
 @app.post("/{adresse:adresse}/angaben")
@@ -2557,11 +2681,14 @@ def _angaben_absenden(request: Request, adresse: str, daten):
     if not gewaehlte and not fenster:
         return RedirectResponse(f"/{adresse}/schichten?hinweis=leer", status_code=303)
 
+    assistent = _assistent_aus(daten)
+
     # Weitere Person dazu oder weg – das Formular kommt nur neu, gespeichert
     # wird nichts.
     aktion, werte, personen_roh, liste = _formular(daten)
     if aktion not in ("anmelden", "bin-ich", "neu-anlegen"):
-        return _angaben_seite(request, v, gewaehlte, fenster, werte, liste, personen_roh)
+        return _angaben_seite(request, v, gewaehlte, fenster, werte, liste, personen_roh,
+                              assistent=assistent)
 
     stichtag = v["beginn"]
     angebot = db.angebot(v["id"])
@@ -2575,7 +2702,8 @@ def _angaben_absenden(request: Request, adresse: str, daten):
         fehler["voraussetzungen"] = "Bitte bestätigen – sonst können wir dich dort nicht einsetzen."
     if fehler:
         return _angaben_seite(request, v, gewaehlte, fenster, werte, liste,
-                              personen_roh, fehler=fehler, status_code=400)
+                              personen_roh, fehler=fehler, status_code=400,
+                              assistent=assistent)
 
     # Wer schon da ist, wird nicht ein zweites Mal angelegt (A-11, I-05): er
     # bekommt seinen Link, die Auswahl steht darin schon. Auf der Seite steht
@@ -2589,16 +2717,17 @@ def _angaben_absenden(request: Request, adresse: str, daten):
             "anmeldung_post.html", _oeffentlich(request, v, art=art, mitbringen=bool(personen_roh)))
     if art == "vielleicht" and aktion != "neu-anlegen":
         return _angaben_seite(request, v, gewaehlte, fenster, werte, liste, personen_roh,
-                              rueckfrage=True)
+                              rueckfrage=True, assistent=assistent)
 
     try:
         ergebnis = db.anmelden(v["id"], personen, [s["id"] for s in gewaehlte],
                                [(f["schluessel"], f["beginn"], f["ende"]) for f in fenster],
                                bemerkung=str(daten.get("bemerkung") or "").strip()[:1000],
-                               warteliste=_warte(gewaehlte))
+                               warteliste=_warte(gewaehlte), vorlieben=assistent["vorliebe"])
     except db.AnmeldeFehler as ausnahme:
         return _angaben_seite(request, v, gewaehlte, fenster, werte, liste,
-                              personen_roh, gruende=ausnahme.gruende, status_code=409)
+                              personen_roh, gruende=ausnahme.gruende, status_code=409,
+                              assistent=assistent)
     _bestaetigungsmail(request, v, ergebnis["anmelder"])
     if daten.get("stamm"):
         db.stamm_einwilligung(ergebnis["anmelder"], ergebnis["anmelder"], True)
@@ -2891,8 +3020,7 @@ def platz_schichten(request: Request, tok: str, adresse: str, hinweis: str = "")
                      warte_auswahl=warte_auswahl,
                      bereichsnamen=sorted({s["bereich"] for s in schichten}, key=str.lower),
                      fenster_gewaehlt=set(request.query_params.getlist("z")),
-                     tage=[{"datum": t.isoformat(), "lang": _tag_lang(t.isoformat())}
-                           for t in db.tage_der(v)],
+                     tage=_anmeldetage(v, schichten),
                      tageszeiten=selbstanmeldung.TAGESZEITEN,
                      basis=f"/platz/{tok}/{adresse}", platz={"token": tok, "person": person},
                      eigene={k: ", ".join(w) for k, w in eigene.items()}, konflikte=konflikte,

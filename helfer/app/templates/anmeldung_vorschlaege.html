@@ -1,0 +1,74 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Vorschläge{% endblock %}
+{% block zurueck %}<a class="zurueck" href="/{{ adresse }}/vorlieben?{{ zurueck_query }}">‹ Vorlieben ändern</a>{% endblock %}
+{% block ueberschrift %}{{ 'Das passt zu dir' if vorschlaege else 'Gerade passt nichts genau' }}{% endblock %}
+
+{# Der Assistent, Schritt 3 (A-04, A-05): nur, was in die Zeiten passt und
+   zu den Vorlieben, die dringendsten zuerst. Antippen genügt. Dasselbe
+   Formular wie in der Liste – mit Skript graut es aus, was sich
+   überschneidet (K-01); geprüft wird beim Absenden ohnehin. #}
+{% block inhalt %}
+  {% if hinweis %}<div class="hinweis warn">{{ hinweis }}</div>{% endif %}
+  {% if vorschlaege %}
+    <p>Ganz oben steht, wo wir dich am dringendsten brauchen. Tipp an, was du machen
+      möchtest.</p>
+  {% else %}
+    <p>Zu deinen Zeiten ist gerade nichts Passendes frei – als Springer bist du trotzdem
+      eine große Hilfe.</p>
+  {% endif %}
+
+  <form method="get" action="/{{ adresse }}/angaben" data-auswahl>
+    {% for z in assistent.zeit %}<input type="hidden" name="zeit" value="{{ z }}">{% endfor %}
+    {% for w in assistent.vorliebe %}<input type="hidden" name="vorliebe" value="{{ w }}">{% endfor %}
+
+    {% for s in vorschlaege %}
+      {% set gewaehlt = s.id in auswahl %}
+      <div class="karte schicht{% if gewaehlt %} gewaehlt{% endif %}" data-schicht
+           data-tag="{{ s.datum }}" data-bereich="{{ s.bereich }}"
+           data-beginn="{{ s.beginn }}" data-ende="{{ s.ende }}"
+           data-text="{{ s.bereich }} {{ s.datum|tag }} {{ s|spanne }}">
+        <h3>{{ s.bereich }}</h3>
+        <div class="zeit">{{ s.datum|tag_lang }} · {{ s|spanne }}</div>
+        <div class="ort">Treffpunkt: {{ s.ort or s.treffpunkt or 'kommt noch' }}</div>
+        {% if s.beschreibung %}<p class="beschreibung leise">{{ s.beschreibung }}</p>{% endif %}
+        <div>
+          {% if s.dringend %}<span class="marke dringend">Wird dringend gebraucht</span>{% endif %}
+          {% if s.lage == 'frei' %}<span class="marke frei">noch {{ s.frei }} frei</span>
+          {% elif s.lage == 'reserve' %}<span class="marke reserve">als Reserve</span>
+          {% else %}<span class="marke voll">voll</span>{% endif %}
+          {% if s.alter_ab %}<span class="marke voll">ab {{ s.alter_ab }}</span>{% endif %}
+          {% for v in s.voraussetzungen.splitlines() if v.strip() %}<span class="marke voll">{{ v }}</span>{% endfor %}
+        </div>
+        {% if s.lage != 'voll' or gewaehlt %}
+          <label class="eintragen">
+            <input type="checkbox" name="s" value="{{ s.id }}" {% if gewaehlt %}checked{% endif %}>
+            {{ 'Als Reserve eintragen' if s.lage == 'reserve' else 'Eintragen' }}
+          </label>
+        {% endif %}
+        <div class="grund" data-grund></div>
+      </div>
+    {% endfor %}
+
+    {# A-05: wer „egal“ sagt oder nichts findet, hilft als Springer – in den
+       Zeiten, die er angetippt hat (R-05). #}
+    <details class="karte"{% if egal or not vorschlaege or springer_gewaehlt %} open{% endif %}>
+      <summary>Lieber flexibel? Als Springer helfen</summary>
+      <p>Als <strong>Springer</strong> hilfst du, wo gerade jemand fehlt – damit rettest du
+        uns oft den Tag.</p>
+      {% for z in zeiten %}
+        <label class="haken">
+          <input type="checkbox" name="z" value="{{ z.schluessel }}" data-springer
+                 {% if z.schluessel in springer_gewaehlt %}checked{% endif %}>
+          <span>{{ z.text }}</span>
+        </label>
+      {% endfor %}
+    </details>
+
+    <div class="leiste">
+      <button type="submit" class="knopf" id="weiter">Weiter</button>
+    </div>
+  </form>
+  <p class="leise"><a href="/{{ adresse }}/schichten">Lieber alle Schichten sehen</a></p>
+{% endblock %}
+
+{% block skript %}<script src="/static/anmeldung.js"></script>{% endblock %}

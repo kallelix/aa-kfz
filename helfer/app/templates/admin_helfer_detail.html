@@ -48,6 +48,11 @@
         {%- else %}<span class="gedaempft">nicht angegeben</span>{% endif %}
       </dd>
 
+      {% if vorlieben %}
+        {# Aus dem Assistenten (A-03) – hilft beim Einsetzen von Springern. #}
+        <dt>Macht gern</dt><dd>{{ vorlieben | join(', ') }}</dd>
+      {% endif %}
+
       {% if person.bemerkung %}
         <dt>Bemerkung</dt><dd class="mehrzeilig">{{ person.bemerkung }}</dd>
       {% endif %}

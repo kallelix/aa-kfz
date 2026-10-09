@@ -45,6 +45,29 @@ Wer sich anmeldet, steht danach in denselben Tabellen wie importierte oder von
 Hand eingeteilte Helfer – im Backoffice mit der Quelle „selbst angemeldet“ und
 gegebenenfalls als Reserve.
 
+## Der Assistent
+
+Neben der Liste der zweite Weg (Lastenheft 3.1, A-01 bis A-05): *Ich sage,
+wann ich Zeit habe*. Drei Seiten, die nichts speichern – die Wahl reist als
+Parameter mit, bis zu denselben Angaben wie aus der Liste.
+
+1. **Wann hast du Zeit?** Je Tag Vormittag, Nachmittag und Abend. Tage mit
+   Schichten vor und nach der Veranstaltung stehen als Aufbau und Abbau
+   getrennt davor und danach; als Springer geht es dort jetzt auch aus der
+   Liste.
+2. **Was machst du gern?** Draußen an der Strecke, mit Menschen, anpacken,
+   fahren, egal. Wozu ein Bereich passt, hakt die Orga im Bereich an
+   („Passt zu“). Ein Bereich ohne Haken passt zu allem.
+3. **Das passt zu dir.** Nur Schichten, von denen mindestens drei Viertel in
+   den angetippten Zeiten liegen – eine Nachtschicht zählt zum Abend ihres
+   ersten Tages – und die zu den Vorlieben passen; volle nicht. Unter
+   Minimum zuerst, dann unter Soll, dann als Reserve. Antippen genügt; mit
+   Skript graut aus, was sich überschneidet. Darunter der Springer für die
+   angetippten Zeiten, offen, wenn jemand „egal“ sagt oder nichts passt.
+
+Die Vorlieben stehen danach an der Teilnahme; die Orga sieht sie bei der
+Person unter „Macht gern“.
+
 ## Mein Helferplatz
 
 Nach der Anmeldung geht es ohne Konto und ohne Passwort weiter (Lastenheft
@@ -335,6 +358,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_stufen.py       # Stufen, Springer, Absagen auf dem Monitor
 .venv/Scripts/python.exe helfer/tests/test_datenschutz.py  # Einwilligung, Eltern, Löschwerkzeug
 .venv/Scripts/python.exe helfer/tests/test_last.py         # 200 gleichzeitig, Tauschen gegeneinander
+.venv/Scripts/python.exe helfer/tests/test_assistent.py    # Zeit, Vorlieben, Vorschläge, Springer
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

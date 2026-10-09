@@ -1,0 +1,45 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Wann hast du Zeit?{% endblock %}
+{% block zurueck %}<a class="zurueck" href="/{{ adresse }}">‹ Zurück</a>{% endblock %}
+{% block ueberschrift %}Wann hast du Zeit?{% endblock %}
+
+{# Der Assistent, Schritt 1 (A-02): je Tag Vormittag, Nachmittag und Abend,
+   Auf- und Abbau getrennt. Ein Formular, das nichts speichert – die Wahl
+   reist als Parameter weiter, wie in der Liste. #}
+{% block inhalt %}
+  {% if hinweis %}<div class="hinweis warn">{{ hinweis }}</div>{% endif %}
+  <p>Tippe alles an, was bei dir geht – aussuchen kannst du danach.</p>
+
+  <form method="get" action="/{{ adresse }}/vorlieben">
+    {% for w in vorlieben %}<input type="hidden" name="vorliebe" value="{{ w }}">{% endfor %}
+    {% set mehrere = tage|map(attribute='art')|unique|list|length > 1 %}
+    {% for art, titel in (('aufbau', 'Aufbau'), ('veranstaltung', 'Veranstaltung'), ('abbau', 'Abbau')) %}
+      {% set gruppe = tage|selectattr('art', 'equalto', art)|list %}
+      {% if gruppe %}
+        {% if mehrere %}<h2 class="gruppe-kopf">{{ titel }}</h2>{% endif %}
+        {% for tag in gruppe %}
+          <div class="tag">
+            <div class="tagname">{{ tag.lang }}</div>
+            <div class="drei">
+              {% for schluessel, name, spanne, _, _ in tageszeiten %}
+                {% set wert = tag.datum ~ '|' ~ schluessel %}
+                <label class="wahl">
+                  <input type="checkbox" name="zeit" value="{{ wert }}"
+                         aria-label="{{ tag.lang }} {{ name }}, {{ spanne }}"
+                         {% if wert in zeit %}checked{% endif %}>
+                  <span class="name">{{ name }}</span>
+                  <span class="spanne">{{ spanne }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+
+    <div class="leiste">
+      <button type="submit" class="knopf">Weiter</button>
+    </div>
+  </form>
+  <p class="leise"><a href="/{{ adresse }}/schichten">Lieber alle Schichten sehen</a></p>
+{% endblock %}

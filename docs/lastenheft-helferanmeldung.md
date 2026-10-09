@@ -248,6 +248,18 @@ die Person. Unbestätigt halten die Plätze 72 Stunden, nach 24 kommt eine
 Erinnerung. Mögliche Dubletten zeigt die Übersicht; zusammenführen kommt mit
 I-06.
 
+**Stand 09.10.2026, Schritt 3.1:** Der Assistent steht – A-01 mit beiden
+Wegen, der Assistent zuerst, und A-02 bis A-05. Die Tageszeiten sind die
+der Springer (Vormittag bis 13, Nachmittag 12 bis 18, Abend ab 17 Uhr); für
+die Vorschläge reicht der Abend bis 3 Uhr, damit eine Nachtschicht zum
+Abend ihres ersten Tages zählt. Eine Schicht passt, wenn drei Viertel davon
+in den angetippten Zeiten liegen. Wozu ein Bereich passt, hakt die Orga im
+Bereich an; ohne Haken passt er zu allem, damit nichts verschwindet, nur
+weil die Haken fehlen. Die Vorlieben stehen an der Teilnahme und bei der
+Person im Backoffice. Auf- und Abbautage ergeben sich aus den Schichten vor
+und nach der Veranstaltung; als Springer kann man sich dort jetzt auch aus
+der Liste eintragen.
+
 ### 5.3 Selbstbedienung (S)
 
 Entschieden: Helfer erledigen selbst, wofür sie heute die Orga anschreiben
@@ -857,7 +869,7 @@ Phase Vorrang.
 
 | # | Schritt | Aufwand |
 | --- | --- | --- |
-| 3.1 | **Assistent**: Verfügbarkeit, Vorlieben, Vorschläge nach Dringlichkeit, Springer | 10 h |
+| 3.1 | **Assistent**: Verfügbarkeit, Vorlieben, Vorschläge nach Dringlichkeit, Springer | **erledigt** |
 | 3.2 | Dubletten zusammenführen (I-06); das Erkennen kommt mit 2.4 | 3 h |
 | 3.3 | Mail bei Anmeldestart an die Vorgemerkten (C-08); das Vormerken kommt mit 2.2 | 2 h |
 | 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | 5 h |
@@ -888,7 +900,7 @@ Fehler beheben, nichts Neues.
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
-| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
+| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~19 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |
 
