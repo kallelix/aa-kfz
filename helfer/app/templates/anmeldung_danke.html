@@ -3,10 +3,30 @@
 {% block ueberschrift %}Danke, {{ anmeldung.anmelder.vorname or anmeldung.anmelder.name }}!{% endblock %}
 
 {% block inhalt %}
-  {# Bis die Bestätigung per Mail steht (Schritt 2.4), sagt die Seite nur,
-     was sicher stimmt. #}
-  <div class="hinweis gut">Du stehst drin. Die Orga meldet sich bei dir unter
-    <strong>{{ anmeldung.anmelder.email }}</strong>.</div>
+  {% if anmeldung.anmelder.email_bestaetigt_am %}
+    <div class="hinweis gut">Du bist dabei. Deine Schichten und alles Weitere findest du
+      in Mein Helferplatz – der Link steht in deiner Mail.</div>
+  {% else %}
+    {# I-03: bis zur Bestätigung halten die Plätze eine Weile. #}
+    <div class="hinweis">
+      <strong>Fast geschafft:</strong> Wir haben dir eine Mail an
+      <strong>{{ anmeldung.anmelder.email }}</strong> geschickt. Bitte bestätige darin
+      deine Adresse – bis dahin halten wir deine Plätze frei.
+    </div>
+    {% if code_gesperrt %}
+      <p class="leise">Zu viele falsche Codes – bitte nimm den Link aus der Mail.</p>
+    {% else %}
+      <form method="post" action="/{{ adresse }}/danke?p={{ p }}&amp;t={{ t }}" class="karte">
+        <label for="code">Mail auf einem anderen Gerät? Gib den Code daraus hier ein:</label>
+        <div class="{% if fehler %}feld-fehler{% endif %}">
+          <input type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="7" pattern="[0-9 ]*">
+          {% if fehler %}<p class="fehler">{{ fehler }}</p>{% endif %}
+        </div>
+        <button type="submit" class="knopf zweit">Bestätigen</button>
+      </form>
+    {% endif %}
+  {% endif %}
 
   {% for eintrag in anmeldung.personen %}
     <h2>{{ 'Deine Schichten' if loop.first else 'Schichten von ' ~ eintrag.person.vorname }}</h2>
@@ -24,5 +44,4 @@
   {% endfor %}
 
   <p class="leise">Bitte sei 15 Minuten vor Beginn am Treffpunkt.</p>
-  <a class="knopf zweit" href="/{{ adresse }}/schichten">Noch eine Schicht dazunehmen</a>
 {% endblock %}

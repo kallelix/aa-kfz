@@ -9,7 +9,21 @@
       <dd>
         {%- if person.email %}<a href="mailto:{{ person.email }}">{{ person.email }}</a>
         {%- else %}<span class="gedaempft">nicht angegeben</span>{% endif %}
+        {%- if person.email %}
+          <span class="gedaempft">· {{ 'bestätigt am ' ~ person.email_bestaetigt_am[:10]
+            if person.email_bestaetigt_am else 'noch nicht bestätigt' }}</span>
+        {%- endif %}
       </dd>
+
+      {% if anmelder %}
+        <dt>Angemeldet von</dt>
+        <dd><a href="/helfer/helfer/{{ anmelder.id }}">{{ anmelder.name }}</a></dd>
+      {% endif %}
+      {% if mitgebracht %}
+        <dt>Bringt mit</dt>
+        <dd>{% for m in mitgebracht %}<a href="/helfer/helfer/{{ m.id }}">{{ m.name }}</a>
+          {%- if not loop.last %}, {% endif %}{% endfor %}</dd>
+      {% endif %}
 
       <dt>Telefon</dt>
       <dd>

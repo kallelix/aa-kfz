@@ -1,0 +1,27 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Schau in dein Postfach{% endblock %}
+{% block ueberschrift %}Schau in dein Postfach{% endblock %}
+
+{# Für alle drei Fälle dieselbe Art Seite, und keine verrät etwas über die
+   Person: wer Name und Adresse eines anderen kennt, erfährt hier nicht, ob
+   und wofür der eingetragen ist (A-11, I-05). #}
+{% block inhalt %}
+  {% if art == 'bekannt' %}
+    <div class="hinweis gut">Schön, dass du wieder dabei bist! Dich kennen wir schon.</div>
+    <p>Damit niemand in deinem Namen Schichten bucht, haben wir dir einen Link zu
+      <strong>Mein Helferplatz</strong> geschickt. Darüber nimmst du die Schichten
+      dazu – deine Auswahl ist darin schon vorgemerkt.</p>
+    {% if mitbringen %}<p>Wen du mitbringen willst, trägst du dort ebenfalls ein.</p>{% endif %}
+  {% elif art == 'vielleicht' %}
+    <p>Wir haben dir einen Link zu <strong>Mein Helferplatz</strong> geschickt – an
+      die Adresse, die wir von dir kennen. Darüber nimmst du die Schichten dazu;
+      deine Auswahl ist darin schon vorgemerkt.</p>
+    {% if mitbringen %}<p>Wen du mitbringen willst, trägst du dort ebenfalls ein.</p>{% endif %}
+  {% else %}
+    <p>Wenn wir die Adresse kennen, ist der Link zu <strong>Mein Helferplatz</strong>
+      jetzt unterwegs.</p>
+  {% endif %}
+  <p class="leise">Nichts angekommen? Schau auch im Spam-Ordner nach – oder melde dich
+    bei uns, die Nummer steht unten.</p>
+  <a class="knopf zweit" href="/{{ adresse }}">Zur Startseite</a>
+{% endblock %}

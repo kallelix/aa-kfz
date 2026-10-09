@@ -271,3 +271,6 @@ details.karte > summary { cursor: pointer; font-weight: 600; }
 
 .fuss { margin-top: 2rem; }
 @media (max-width: 22rem) { .zeile { flex-direction: column; gap: 0; } }
+
+/* Lange Adressen (Kalender-Abo) brechen um, statt die Seite zu verbreitern. */
+.umbruch { overflow-wrap: anywhere; }

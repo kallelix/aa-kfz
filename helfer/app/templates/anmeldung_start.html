@@ -42,4 +42,24 @@
     <div class="hinweis">Die Anmeldung ist geschlossen. Danke an alle, die dabei sind!</div>
     <p>Du willst trotzdem noch helfen? Ruf uns an – oft wird kurzfristig noch jemand gebraucht.</p>
   {% endif %}
+
+  {% if zustand != 'bald' %}
+    {# A-11, 7.4: der Link zu Mein Helferplatz, jederzeit neu. #}
+    <details class="karte" id="link"{% if link_fehler %} open{% endif %}>
+      <summary>Schon angemeldet? Link zu Mein Helferplatz</summary>
+      <p class="leise">Dort siehst du deine Schichten und nimmst weitere dazu. Wir
+        schicken dir den Link an die Adresse, mit der du dich angemeldet hast.</p>
+      <form method="post" action="/{{ adresse }}/link">
+        {% if link_fehler %}<div class="hinweis warn">{{ link_fehler }}</div>{% endif %}
+        <label for="link-email">E-Mail</label>
+        <input type="email" id="link-email" name="email" maxlength="120" required
+               autocomplete="email" inputmode="email" value="{{ link_eingabe }}">
+        <div class="verborgen" aria-hidden="true">
+          <label for="link-webseite">Webseite</label>
+          <input type="text" id="link-webseite" name="webseite" tabindex="-1" autocomplete="off">
+        </div>
+        <button type="submit" class="knopf zweit">Link schicken</button>
+      </form>
+    </details>
+  {% endif %}
 {% endblock %}

@@ -33,6 +33,26 @@ KEIN_SHIRT = "kein"
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+MONATE = ("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
+          "September", "Oktober", "November", "Dezember")
+
+
+def tage_text(v) -> str:
+    """'1. bis 4. Juli 2027' – oder ein einzelner Tag. Für Seiten und Mails."""
+    beginn, ende = v["beginn"], v["ende"]
+    if beginn == ende:
+        return f"{beginn.day}. {MONATE[beginn.month - 1]} {beginn.year}"
+    if (beginn.month, beginn.year) == (ende.month, ende.year):
+        return f"{beginn.day}. bis {ende.day}. {MONATE[ende.month - 1]} {ende.year}"
+    return (f"{beginn.day}. {MONATE[beginn.month - 1]} bis "
+            f"{ende.day}. {MONATE[ende.month - 1]} {ende.year}")
+
+
+def va_text(v) -> str:
+    """'Die absolute Abfahrt 2027 (1. bis 4. Juli 2027)' – für Mails."""
+    return f"{v['name']} ({tage_text(v)})"
+
+
 def alter_am(geburtsdatum: date, stichtag: date) -> int:
     jahre = stichtag.year - geburtsdatum.year
     if (stichtag.month, stichtag.day) < (geburtsdatum.month, geburtsdatum.day):

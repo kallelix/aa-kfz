@@ -1,0 +1,16 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Bestätigen{% endblock %}
+{% block ueberschrift %}Hallo {{ person.vorname or person.name }}!{% endblock %}
+
+{# Der Link aus der Mail zeigt nur diese Seite; eingelöst wird erst mit dem
+   Knopf. Mailscanner rufen Links vorab auf – ein Link, der sich beim Aufruf
+   verbraucht, wäre sonst schon tot (Lastenheft 7.4). #}
+{% block inhalt %}
+  <p>Bitte bestätige, dass <strong>{{ person.email }}</strong> deine Adresse ist –
+    dann steht deine Anmeldung fest.</p>
+  <form method="post" action="/bestaetigen/{{ token }}">
+    <button type="submit" class="knopf">Ja, das bin ich</button>
+  </form>
+  <p class="leise">Du hast dich nicht angemeldet? Dann schließ die Seite einfach –
+    ohne Bestätigung löschen wir die Angaben wieder.</p>
+{% endblock %}

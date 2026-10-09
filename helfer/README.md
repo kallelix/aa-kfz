@@ -43,8 +43,39 @@ die Angaben, dann eine Dankeseite. Was dabei gilt:
 
 Wer sich anmeldet, steht danach in denselben Tabellen wie importierte oder von
 Hand eingeteilte Helfer – im Backoffice mit der Quelle „selbst angemeldet“ und
-gegebenenfalls als Reserve. Bestätigung per Mail und „Mein Helferplatz“ folgen
-mit Schritt 2.4.
+gegebenenfalls als Reserve.
+
+## Mein Helferplatz
+
+Nach der Anmeldung geht es ohne Konto und ohne Passwort weiter (Lastenheft
+2.4, 7.4) – jeder Weg hängt an einem persönlichen Link:
+
+- **Bestätigen:** Die erste Mail enthält einen Link und einen sechsstelligen
+  Code. Der Link öffnet nur eine Seite mit dem Knopf „Ja, das bin ich“, weil
+  Mailscanner Links vorab aufrufen; den Code nimmt die Dankeseite, für wen die
+  Mail auf einem anderen Gerät ankommt (nach fünf falschen nur noch der Link).
+  Unbestätigt halten die Plätze 72 Stunden, nach 24 kommt eine Erinnerung;
+  danach sind sie frei und die Angaben gelöscht.
+- **Mein Helferplatz** (`/platz/<link>`): alle Schichten mit Treffpunkt und
+  Ansprechpartner samt Nummer, auch die der Mitangemeldeten; Schichten
+  dazunehmen für sich, für die eigenen Leute und für neue, die mitkommen.
+  Was hinter einer Einsatzgrenze liegt, steht dort gar nicht erst.
+- **Kalender-Abo** (`/kalender/<link>.ics`): aktualisiert sich selbst und
+  darf nur lesen – der Link zu Mein Helferplatz steht nicht darin.
+- **Wer wiederkommt**, wird an Name und Adresse erkannt und bekommt seinen
+  Link mit der eben getroffenen Auswahl, statt ein zweites Mal angelegt zu
+  werden. Ein Name in anderer Schreibweise mit derselben Adresse oder Nummer
+  löst „Bist du schon bei uns?“ aus; solche Paare stehen in der Übersicht.
+  „Link anfordern“ auf der Startseite verrät nicht, ob eine Adresse bekannt ist.
+
+Die Links stehen nirgends gespeichert: sie sind ein Siegel über Person und
+Zweck mit `APP_SECRET_KEY` (`app/zugang.py`). Wer den Schlüssel wechselt,
+macht jeden Link in jeder verschickten Mail ungültig.
+
+Mails gehen wie in Kennzeichen und Presse über `mail_out` und einen Worker
+(`app/versand.py`), der auch die Fristen wahrt – beides nur, wenn `SMTP_HOST`
+und `MAIL_FROM` gesetzt sind. Verschickte Mails werden nach einem Monat
+gelöscht.
 
 ## Einsatzgrenzen
 
@@ -179,6 +210,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_bereiche.py     # Bereiche, Schichten, Goodies, Vorlage
 .venv/Scripts/python.exe helfer/tests/test_anmeldung.py    # die öffentliche Anmeldung
 .venv/Scripts/python.exe helfer/tests/test_grenzen.py      # Einsatzgrenzen
+.venv/Scripts/python.exe helfer/tests/test_helferplatz.py  # Bestätigen, Mein Helferplatz, Kalender
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

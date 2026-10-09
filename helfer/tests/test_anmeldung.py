@@ -257,14 +257,17 @@ try:
     status, _, seite = angaben([MITTAG, POSTEN], {"ich-vorname": "Dora", "ich-email": "dora@example.org"},
                                voraussetzung="Führerschein Klasse B")
     pruefe(status == 409 and "überschneiden sich" in seite, "zwei Schichten zur selben Zeit nicht (K-01)")
-    status, _, seite = angaben([POSTEN], voraussetzung="Führerschein Klasse B")
-    pruefe(status == 409 and "überschneidet sich mit Shuttle" in seite,
-           "auch nicht mit dem, was jemand schon hat")
-    status, _, seite = angaben([FRUEH], voraussetzung="Führerschein Klasse B")
-    pruefe(status == 409 and "schon eingetragen" in seite, "dieselbe Schicht nicht zweimal")
-    status, ort, _ = angaben([POSTEN_SA])
-    pruefe(status == 303 and zeilen("SELECT COUNT(*) FROM einteilung WHERE helfer_id = ?", anna)
-           == [(2,)], "wer wiederkommt, bekommt die neue Schicht dazu – derselbe Mensch")
+    # Wer wiederkommt, wird erkannt (A-11, 2.4): kein zweiter Datensatz, keine
+    # Buchung ohne Link – und die Seite verrät nichts über die Person.
+    status, ort, seite = angaben([POSTEN_SA])
+    pruefe(status == 200 and "Schau in dein Postfach" in seite and "Shuttle" not in seite,
+           "wer wiederkommt, bekommt seinen Link statt einer zweiten Anmeldung")
+    pruefe(zeilen("SELECT COUNT(*) FROM einteilung WHERE helfer_id = ?", anna) == [(1,)]
+           and zeilen("SELECT COUNT(*) FROM helfer WHERE email = 'anna@example.org'") == [(1,)],
+           "nichts gebucht, niemand doppelt – das geht über Mein Helferplatz")
+    pruefe(any(f"/aa-2027/angaben?s={POSTEN_SA}" in body for (body,) in zeilen(
+        "SELECT body FROM mail_out WHERE helfer_id = ? AND typ = 'link'", anna)),
+           "der Link in der Mail trägt die Auswahl schon")
 
     print("Alter und Mitanmeldung")
     jung = {"ich-vorname": "Emil", "ich-email": "emil@example.org", "ich-volljaehrig": "nein",

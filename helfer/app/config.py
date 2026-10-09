@@ -283,6 +283,32 @@ KONTAKT_NAME = _env("KONTAKT_NAME", "Orga-Team Absolute Abfahrt")
 KONTAKT_MAIL = _env("KONTAKT_MAIL", "")
 KONTAKT_TELEFON = _env("KONTAKT_TELEFON", "")
 
+# --- Mails an Helfer (Lastenheft 2.4) --------------------------------------
+#
+# Wie in Kennzeichen und Presse. Ohne SMTP_HOST und MAIL_FROM sammeln sich die
+# Mails in mail_out, und nichts verfällt: wer keine Mail bekommt, kann auch
+# nichts bestätigen.
+
+SMTP_HOST = _env("SMTP_HOST", "").strip()
+SMTP_PORT = _zahl("SMTP_PORT", 587)
+SMTP_USER = _env("SMTP_USER", "").strip()
+SMTP_PASS = _env("SMTP_PASS", "")
+SMTP_TLS = _env("SMTP_TLS", "starttls").strip().lower()
+SMTP_TIMEOUT = _zahl("SMTP_TIMEOUT", 20)
+
+MAIL_FROM = _env("MAIL_FROM", "").strip()
+MAIL_REPLY_TO = _env("MAIL_REPLY_TO", "").strip()
+
+MAIL_INTERVALL = _zahl("MAIL_INTERVALL", 30)
+MAIL_MAX_VERSUCHE = _zahl("MAIL_MAX_VERSUCHE", 5)
+
+MAIL_AKTIV = bool(SMTP_HOST and MAIL_FROM)
+
+# Unbestätigte Anmeldungen halten ihre Plätze so lange (I-03): nach der
+# ersten Frist kommt eine Erinnerung, nach der zweiten sind die Plätze frei.
+BESTAETIGEN_ERINNERN_STUNDEN = _zahl("BESTAETIGEN_ERINNERN_STUNDEN", 24)
+BESTAETIGEN_FRIST_STUNDEN = _zahl("BESTAETIGEN_FRIST_STUNDEN", 72)
+
 # --- Backoffice / Anmeldung ------------------------------------------------
 
 import secrets as _secrets  # noqa: E402  (bewusst erst hier, nur für den Fallback)

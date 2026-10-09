@@ -29,8 +29,9 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader
 from starlette.convertors import StringConvertor, register_url_convertor
 
-from . import (band, config, csv_import, db, eintraege, normalisieren,
-               planung, selbstanmeldung, unterschriften, worker, zeitplan)
+from . import (band, config, csv_import, db, eintraege, ical, mail, normalisieren,
+               planung, selbstanmeldung, unterschriften, versand, worker, zeitplan,
+               zugang)
 
 # Die Repo-Wurzel steht schon auf dem Suchpfad - siehe __init__.py.
 from . import WURZEL as _WURZELPFAD
@@ -200,6 +201,17 @@ async def lifespan(app: FastAPI):
         protokoll.info(
             "Kein selbsttaetiger Helferabgleich - im Backoffice geht er von Hand."
         )
+
+    # Mails an Helfer (2.4). Ohne Mail auch keine Fristen: wer keine Mail
+    # bekommt, kann nichts bestätigen.
+    if config.MAIL_AKTIV:
+        if not config.BASIS_URL:
+            protokoll.warning("BASIS_URL ist nicht gesetzt - Links in Erinnerungen "
+                              "aus dem Hintergrund bleiben ohne Adresse.")
+        aufgaben.append(asyncio.create_task(versand.schleife(stop)))
+    else:
+        protokoll.info("Kein Mailversand an Helfer - die Mails sammeln sich in mail_out, "
+                       "und unbestätigte Anmeldungen verfallen nicht.")
 
     try:
         yield
@@ -544,6 +556,7 @@ async def uebersicht(request: Request, hinweis: str = "",
                luecken=luecken[:12], luecken_gesamt=len(luecken),
                konflikte=db.konflikte(v["id"]), doppelt=db.doppelt_besetzt(v["id"]),
                allein=db.allein(v["id"]) if _sieht_grenzen(sitzung) else [],
+               dubletten=db.moegliche_dubletten(),
                importe=db.importe()[:1], jetzt=db.jetzt_lokal()))
 
 
@@ -1181,6 +1194,9 @@ async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
         "admin_helfer_detail.html",
         _admin(request, sitzung, hinweis=hinweis, person=person,
                schichten=schichten, sieht_grenzen=_sieht_grenzen(sitzung),
+               anmelder=db.helfer_laden(person["angemeldet_von"])
+               if person["angemeldet_von"] else None,
+               mitgebracht=db.mitangemeldete(helfer_id),
                grenzen=db.grenzen(v["id"], helfer_id, _leitung(sitzung))
                if _sieht_grenzen(sitzung) else [],
                grenz_ziele=_grenz_ziele(v["id"]) if pflegt else [],
@@ -2255,22 +2271,13 @@ async def import_abrufen(request: Request,
 # Tablet. Jede Veranstaltung hat ihren Kurzlink: /aa-2027. Diese Routen
 # stehen am Ende, damit /{adresse} nichts überdeckt, was vorher kommt.
 
-_MONATE = ("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August",
-           "September", "Oktober", "November", "Dezember")
 # Mehr Leute auf einmal meldet niemand mit an, der nicht ein ganzer Verein
 # ist – und der ruft besser an.
 MAX_WEITERE = 6
 
 
 def _tage_text(v) -> str:
-    """'1. bis 4. Juli 2027' – oder ein einzelner Tag."""
-    beginn, ende = v["beginn"], v["ende"]
-    if beginn == ende:
-        return f"{beginn.day}. {_MONATE[beginn.month - 1]} {beginn.year}"
-    if (beginn.month, beginn.year) == (ende.month, ende.year):
-        return f"{beginn.day}. bis {ende.day}. {_MONATE[ende.month - 1]} {ende.year}"
-    return (f"{beginn.day}. {_MONATE[beginn.month - 1]} bis "
-            f"{ende.day}. {_MONATE[ende.month - 1]} {ende.year}")
+    return selbstanmeldung.tage_text(v)
 
 
 def _zustand(v) -> str:
@@ -2294,7 +2301,8 @@ class _Adresse(StringConvertor):
     """Der Kurzlink einer Veranstaltung – aber nie einer der festen ersten
     Pfadteile. Sonst passte '/monitor/' ohne Schrägstrich auf '/{adresse}',
     und Starlette leitete dorthin um, statt 404 zu geben."""
-    regex = r"(?!(?:helfer|monitor|unterschrift|static|gemeinsam)(?![^/]))[^/]+"
+    regex = (r"(?!(?:helfer|monitor|unterschrift|static|gemeinsam|platz|bestaetigen"
+             r"|kalender)(?![^/]))[^/]+")
 
 
 register_url_convertor("adresse", _Adresse())
@@ -2312,8 +2320,13 @@ def _nach_adresse(adresse: str):
 
 
 def _oeffentlich(request: Request, v=None, **extra) -> dict:
+    adresse = normalisieren.kurzadresse(v["kurz"]) if v else ""
+    # Wohin die Formulare der Anmeldung gehen: öffentlich unter dem Kurzlink,
+    # aus Mein Helferplatz unter dem persönlichen Link (2.4).
+    extra.setdefault("basis", "/" + adresse)
+    extra.setdefault("platz", None)
     return _kontext(request, va=v, va_tage=_tage_text(v) if v else "",
-                    adresse=normalisieren.kurzadresse(v["kurz"]) if v else "", **extra)
+                    adresse=adresse, **extra)
 
 
 def _nicht_da(request: Request):
@@ -2416,13 +2429,45 @@ async def oeffentliche_schichten(request: Request, adresse: str, hinweis: str = 
                               "unten als Springer ein."}.get(hinweis, "")))
 
 
-def _angaben_seite(request, v, gewaehlte, fenster, eingabe, liste, weitere,
-                   fehler=None, gruende=None, status_code=200):
+def _noetig(gewaehlte) -> list[str]:
+    """Die Voraussetzungen der gewählten Schichten, jede einmal."""
     voraussetzungen = []
     for s in gewaehlte:
         for zeile in planung.voraussetzungen(s.get("voraussetzungen") or ""):
             if zeile not in voraussetzungen:
                 voraussetzungen.append(zeile)
+    return voraussetzungen
+
+
+def _formular(daten):
+    """Was im Formular stand – auch um es nach einem Fehler oder nach
+    „+ Weitere Person“ wieder hinzustellen. Liefert Aktion, die Eingaben
+    (neu nummeriert), die weiteren Personen und die Häkchen."""
+    try:
+        anzahl = max(0, min(MAX_WEITERE, int(str(daten.get("weitere") or "0"))))
+    except ValueError:
+        anzahl = 0
+    eingabe = {k: str(w) for k, w in daten.items() if not k.startswith("p")}
+    personen_roh = [{k[len(f"p{i}-"):]: str(w) for k, w in daten.items()
+                     if k.startswith(f"p{i}-")} for i in range(anzahl)]
+    liste = {"voraussetzung": daten.getlist("voraussetzung")}
+    aktion = str(daten.get("aktion") or "")
+    if aktion == "dazu" and anzahl < MAX_WEITERE:
+        personen_roh.append({})
+    elif aktion.startswith("weg-") and aktion[4:].isdigit():
+        weg = int(aktion[4:])
+        personen_roh = [p for i, p in enumerate(personen_roh) if i != weg]
+    werte = dict(eingabe)
+    for i, person in enumerate(personen_roh):
+        werte.update({f"p{i}-{k}": w for k, w in person.items()})
+    return aktion, werte, personen_roh, liste
+
+
+def _angaben_seite(request, v, gewaehlte, fenster, eingabe, liste, weitere,
+                   fehler=None, gruende=None, status_code=200, rueckfrage=False,
+                   platz=None, basis=None):
+    voraussetzungen = _noetig(gewaehlte)
+    extra = {"basis": basis} if basis else {}
     return templates.TemplateResponse(
         "anmeldung_angaben.html",
         _oeffentlich(request, v, gewaehlte=gewaehlte, fenster=fenster,
@@ -2431,7 +2476,8 @@ def _angaben_seite(request, v, gewaehlte, fenster, eingabe, liste, weitere,
                      max_weitere=MAX_WEITERE, angebot=db.angebot(v["id"]),
                      groessen=normalisieren.GROESSEN, schnitte=selbstanmeldung.SCHNITTE,
                      verpflegung=selbstanmeldung.VERPFLEGUNG, voraussetzungen=voraussetzungen,
-                     fehler=fehler or {}, gruende=gruende or []),
+                     fehler=fehler or {}, gruende=gruende or [], rueckfrage=rueckfrage,
+                     platz=platz, **extra),
         status_code=status_code)
 
 
@@ -2459,32 +2505,11 @@ async def angaben_absenden(request: Request, adresse: str):
     if not gewaehlte and not fenster:
         return RedirectResponse(f"/{adresse}/schichten?hinweis=leer", status_code=303)
 
-    # Was im Formular stand – auch um es nach einem Fehler wieder hinzustellen.
-    try:
-        anzahl = max(0, min(MAX_WEITERE, int(str(daten.get("weitere") or "0"))))
-    except ValueError:
-        anzahl = 0
-    eingabe = {k: str(w) for k, w in daten.items() if not k.startswith("p")}
-    personen_roh = [{k[len(f"p{i}-"):]: str(w) for k, w in daten.items()
-                     if k.startswith(f"p{i}-")} for i in range(anzahl)]
-    liste = {"voraussetzung": daten.getlist("voraussetzung")}
-
     # Weitere Person dazu oder weg – das Formular kommt nur neu, gespeichert
     # wird nichts.
-    aktion = str(daten.get("aktion") or "")
-    if aktion == "dazu" and anzahl < MAX_WEITERE:
-        personen_roh.append({})
-    elif aktion.startswith("weg-") and aktion[4:].isdigit():
-        weg = int(aktion[4:])
-        personen_roh = [p for i, p in enumerate(personen_roh) if i != weg]
-    def neu_nummeriert() -> dict:
-        werte = dict(eingabe)
-        for i, person in enumerate(personen_roh):
-            werte.update({f"p{i}-{k}": w for k, w in person.items()})
-        return werte
-    if aktion != "anmelden":
-        return _angaben_seite(request, v, gewaehlte, fenster, neu_nummeriert(), liste,
-                              personen_roh)
+    aktion, werte, personen_roh, liste = _formular(daten)
+    if aktion not in ("anmelden", "bin-ich", "neu-anlegen"):
+        return _angaben_seite(request, v, gewaehlte, fenster, werte, liste, personen_roh)
 
     stichtag = v["beginn"]
     angebot = db.angebot(v["id"])
@@ -2494,37 +2519,375 @@ async def angaben_absenden(request: Request, adresse: str):
         werte, f = selbstanmeldung.person_pruefen(daten, f"p{i}-", angebot, stichtag, False)
         personen.append(werte)
         fehler.update(f)
-    noetig = []
-    for s in gewaehlte:
-        noetig += [z for z in planung.voraussetzungen(s.get("voraussetzungen") or "")
-                   if z not in noetig]
-    if set(noetig) - set(liste["voraussetzung"]):
+    if set(_noetig(gewaehlte)) - set(liste["voraussetzung"]):
         fehler["voraussetzungen"] = "Bitte bestätigen – sonst können wir dich dort nicht einsetzen."
     if fehler:
-        return _angaben_seite(request, v, gewaehlte, fenster, neu_nummeriert(), liste,
+        return _angaben_seite(request, v, gewaehlte, fenster, werte, liste,
                               personen_roh, fehler=fehler, status_code=400)
+
+    # Wer schon da ist, wird nicht ein zweites Mal angelegt (A-11, I-05): er
+    # bekommt seinen Link, die Auswahl steht darin schon. Auf der Seite steht
+    # nichts über ihn – sonst sähe jeder, der Name und Adresse kennt, wofür
+    # jemand eingetragen ist.
+    art, treffer = db.erkennen(ich)
+    if art == "bekannt" or (art == "vielleicht" and aktion == "bin-ich"):
+        for person in treffer:
+            _link_mail(request, person, v, _auswahl_query(gewaehlte, fenster))
+        return templates.TemplateResponse(
+            "anmeldung_post.html", _oeffentlich(request, v, art=art, mitbringen=bool(personen_roh)))
+    if art == "vielleicht" and aktion != "neu-anlegen":
+        return _angaben_seite(request, v, gewaehlte, fenster, werte, liste, personen_roh,
+                              rueckfrage=True)
 
     try:
         ergebnis = db.anmelden(v["id"], personen, [s["id"] for s in gewaehlte],
                                [(f["schluessel"], f["beginn"], f["ende"]) for f in fenster],
                                bemerkung=str(daten.get("bemerkung") or "").strip()[:1000])
     except db.AnmeldeFehler as ausnahme:
-        return _angaben_seite(request, v, gewaehlte, fenster, neu_nummeriert(), liste,
+        return _angaben_seite(request, v, gewaehlte, fenster, werte, liste,
                               personen_roh, gruende=ausnahme.gruende, status_code=409)
+    _bestaetigungsmail(request, v, ergebnis["anmelder"])
     zeichen = selbstanmeldung.zeichen(config.APP_SECRET_KEY, v["id"], ergebnis["anmelder"])
     return RedirectResponse(f"/{adresse}/danke?p={ergebnis['anmelder']}&t={zeichen}",
                             status_code=303)
 
 
-@app.get("/{adresse:adresse}/danke")
-async def danke(request: Request, adresse: str, p: str = "", t: str = ""):
+def _danke_seite(request, v, ergebnis, p, t, fehler="", status_code=200):
+    return templates.TemplateResponse(
+        "anmeldung_danke.html",
+        _oeffentlich(request, v, anmeldung=ergebnis, p=p, t=t, fehler=fehler,
+                     code_gesperrt=ergebnis["anmelder"]["code_versuche"] >= zugang.CODE_VERSUCHE),
+        status_code=status_code)
+
+
+def _danke_laden(adresse: str, p: str, t: str):
     v = _nach_adresse(adresse)
     if v is None or not p.isdigit() or not selbstanmeldung.zeichen_stimmt(
             config.APP_SECRET_KEY, t, v["id"], int(p)):
-        return _nicht_da(request)
-    ergebnis = db.anmeldung_laden(v["id"], int(p))
+        return None, None
+    return v, db.anmeldung_laden(v["id"], int(p))
+
+
+@app.get("/{adresse:adresse}/danke")
+async def danke(request: Request, adresse: str, p: str = "", t: str = ""):
+    v, ergebnis = _danke_laden(adresse, p, t)
     if ergebnis is None:
         return _nicht_da(request)
-    return templates.TemplateResponse("anmeldung_danke.html",
-                                      _oeffentlich(request, v, anmeldung=ergebnis))
+    return _danke_seite(request, v, ergebnis, p, t)
+
+
+@app.post("/{adresse:adresse}/danke")
+async def danke_code(request: Request, adresse: str, p: str = "", t: str = ""):
+    """Der Code aus der Mail, für wen sie auf einem anderen Gerät ankommt
+    (7.4). Nach fünf falschen gilt nur noch der Link."""
+    v, ergebnis = _danke_laden(adresse, p, t)
+    if ergebnis is None:
+        return _nicht_da(request)
+    person = ergebnis["anmelder"]
+    platz = "/platz/" + zugang.token(zugang.PLATZ, person)
+    if person["email_bestaetigt_am"]:
+        return RedirectResponse(platz, status_code=303)
+    if person["code_versuche"] >= zugang.CODE_VERSUCHE:
+        return _danke_seite(request, v, ergebnis, p, t, status_code=429)
+    daten = await request.form()
+    if zugang.code_stimmt(person, str(daten.get("code") or "")):
+        _bestaetigt(request, person)
+        return RedirectResponse(platz + "?hinweis=bestaetigt", status_code=303)
+    db.code_falsch(person["id"])
+    v, ergebnis = _danke_laden(adresse, p, t)
+    return _danke_seite(request, v, ergebnis, p, t, status_code=400,
+                        fehler="Der Code stimmt nicht – schau noch einmal in die Mail.")
+
+
+# --- Mein Helferplatz, Bestätigen, Kalender (Lastenheft 2.4) ----------------
+#
+# Ohne Konto und ohne Passwort: jeder Weg hängt an einem persönlichen Link
+# (zugang.py). Formulare auf diesen Seiten brauchen deshalb kein CSRF-Token –
+# wer den Link nicht hat, kann auch nichts abschicken.
+
+def _basis(request: Request) -> str:
+    """Für Links in Mails: die öffentliche Adresse, sonst aus der Anfrage."""
+    return config.BASIS_URL or str(request.base_url).rstrip("/")
+
+
+def _person_mit(zweck: str, roh: str):
+    """Die Person zu einem persönlichen Link – None, wenn er nicht stimmt."""
+    nummer = zugang.nummer(roh)
+    person = db.helfer_laden(nummer) if nummer is not None else None
+    if person is None or not zugang.stimmt(zweck, roh, person):
+        return None
+    return person
+
+
+def _links(request: Request, person) -> dict:
+    basis = _basis(request)
+    kalender = basis + "/kalender/" + zugang.token(zugang.KALENDER, person) + ".ics"
+    return {"platz": basis + "/platz/" + zugang.token(zugang.PLATZ, person),
+            "bestaetigen": basis + "/bestaetigen/" + zugang.token(zugang.BESTAETIGEN, person),
+            "kalender": kalender, "webcal": "webcal://" + kalender.split("://", 1)[-1]}
+
+
+def _bestaetigungsmail(request: Request, v, anmelder_id: int) -> None:
+    """Gleich nach der Anmeldung: Link und Code (I-03)."""
+    ergebnis = db.anmeldung_laden(v["id"], anmelder_id)
+    person = ergebnis["anmelder"]
+    db.mail_einreihen(anmelder_id, mail.bestaetigen(
+        person, selbstanmeldung.va_text(v), ergebnis["personen"],
+        _links(request, person)["bestaetigen"], zugang.code(person)))
+
+
+def _bestaetigt(request: Request, person) -> None:
+    """Die Adresse ist bestätigt – dann kommt die Mail mit dem persönlichen
+    Link und dem Kalender-Abo (A-10), je Veranstaltung, die noch kommt."""
+    if not db.bestaetigen(person["id"]):
+        return
+    person = db.helfer_laden(person["id"])
+    links = _links(request, person)
+    for v in _kommende(db.teilnahmen([person["id"]])):
+        ergebnis = db.anmeldung_laden(v["id"], person["id"])
+        db.mail_einreihen(person["id"], mail.bestaetigt(
+            person, selbstanmeldung.va_text(v), ergebnis["personen"],
+            links["platz"], links["kalender"]))
+
+
+def _link_mail(request: Request, person, v=None, auswahl: str = "") -> None:
+    """Der Link zu Mein Helferplatz (A-11) – mit der eben getroffenen Auswahl,
+    wenn es eine gibt."""
+    links = _links(request, person)
+    dazu = ""
+    if v is not None and auswahl:
+        dazu = (links["platz"] + "/" + normalisieren.kurzadresse(v["kurz"])
+                + "/angaben?" + auswahl)
+    db.mail_einreihen(person["id"], mail.link(person, links["platz"], dazu))
+
+
+def _kommende(vids) -> list:
+    """Die Veranstaltungen, die noch nicht vorbei sind, nach Beginn."""
+    heute = db.jetzt_lokal().date()
+    liste = [db.VERANSTALTUNGEN.laden(vid) for vid in vids]
+    return sorted((v for v in liste if v is not None and v["status"] != "archiviert"
+                   and v["ende"] >= heute), key=lambda v: v["beginn"])
+
+
+_PLATZ_HINWEISE = {
+    "bestaetigt": "Danke – deine Adresse ist bestätigt. Du bist dabei!",
+    "dazu": "Eingetragen. Eine Mail mit allem ist unterwegs.",
+}
+
+
+@app.get("/platz/{tok}")
+async def platz(request: Request, tok: str, hinweis: str = ""):
+    """Mein Helferplatz (A-09): alle Schichten, Treffpunkt, Ansprechpartner;
+    weitere Schichten dazunehmen."""
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None:
+        return _nicht_da(request)
+    ids = [person["id"]] + [m["id"] for m in db.mitangemeldete(person["id"])]
+    veranstaltungen = []
+    for v in _kommende(db.teilnahmen(ids)):
+        ergebnis = db.anmeldung_laden(v["id"], person["id"])
+        bereiche = {s["bereich_id"] for e in ergebnis["personen"] for s in e["schichten"]}
+        veranstaltungen.append({
+            "va": v, "tage": _tage_text(v), "adresse": normalisieren.kurzadresse(v["kurz"]),
+            "zustand": _zustand(v), "personen": ergebnis["personen"],
+            "leitungen": db.leitungen(sorted(bereiche))})
+    dabei = {x["va"]["id"] for x in veranstaltungen}
+    weitere = [{"va": v, "tage": _tage_text(v), "adresse": normalisieren.kurzadresse(v["kurz"])}
+               for v in _oeffentliche() if _zustand(v) == "offen" and v["id"] not in dabei]
+    return templates.TemplateResponse(
+        "platz.html",
+        _oeffentlich(request, None, person=person, token=tok, veranstaltungen=veranstaltungen,
+                     weitere=weitere, links=_links(request, person),
+                     hinweis=_PLATZ_HINWEISE.get(hinweis, "")))
+
+
+@app.post("/platz/{tok}/bestaetigen")
+async def platz_bestaetigen(request: Request, tok: str):
+    person = _person_mit(zugang.PLATZ, tok)
+    if person is None:
+        return _nicht_da(request)
+    _bestaetigt(request, person)
+    return RedirectResponse(f"/platz/{tok}?hinweis=bestaetigt", status_code=303)
+
+
+@app.get("/bestaetigen/{tok}")
+async def bestaetigen_seite(request: Request, tok: str):
+    """Der Link aus der Mail öffnet nur eine Seite mit einem Knopf – Mailscanner
+    rufen Links vorab auf, eingelöst wird erst beim Klick (7.4)."""
+    person = _person_mit(zugang.BESTAETIGEN, tok)
+    if person is None:
+        return _nicht_da(request)
+    if person["email_bestaetigt_am"]:
+        return RedirectResponse("/platz/" + zugang.token(zugang.PLATZ, person), status_code=303)
+    return templates.TemplateResponse("anmeldung_bestaetigen.html",
+                                      _oeffentlich(request, None, person=person, token=tok))
+
+
+@app.post("/bestaetigen/{tok}")
+async def bestaetigen(request: Request, tok: str):
+    person = _person_mit(zugang.BESTAETIGEN, tok)
+    if person is None:
+        return _nicht_da(request)
+    _bestaetigt(request, person)
+    return RedirectResponse("/platz/" + zugang.token(zugang.PLATZ, person) + "?hinweis=bestaetigt",
+                            status_code=303)
+
+
+def _platz_va(tok: str, adresse: str):
+    person = _person_mit(zugang.PLATZ, tok)
+    v = _nach_adresse(adresse)
+    if person is None or v is None:
+        return None, None
+    return person, v
+
+
+@app.get("/platz/{tok}/{adresse:adresse}/schichten")
+async def platz_schichten(request: Request, tok: str, adresse: str, hinweis: str = ""):
+    """Die Schichtliste aus Mein Helferplatz: ohne das, was hinter einer
+    Einsatzgrenze liegt (K-06), mit dem, wofür man schon eingetragen ist."""
+    person, v = _platz_va(tok, adresse)
+    if person is None:
+        return _nicht_da(request)
+    if _zustand(v) != "offen":
+        return RedirectResponse(f"/platz/{tok}", status_code=303)
+    gesperrt = db.gesperrt(v["id"], person["id"])
+    schichten = [s for s in db.oeffentliche_schichten(v["id"]) if s["id"] not in gesperrt]
+    ergebnis = db.anmeldung_laden(v["id"], person["id"])
+    eigene: dict[int, list[str]] = {}
+    meine = []
+    for e in ergebnis["personen"]:
+        wer = "du" if e["person"]["id"] == person["id"] else (e["person"]["vorname"]
+                                                             or e["person"]["name"])
+        for s in e["schichten"]:
+            eigene.setdefault(s["id"], []).append(wer)
+            if e["person"]["id"] == person["id"]:
+                meine.append(s)
+    konflikte = {}
+    for s in schichten:
+        for m in meine:
+            if m["id"] != s["id"] and selbstanmeldung.ueberschneiden(
+                    m["beginn"], m["ende"], s["beginn"], s["ende"]):
+                konflikte[s["id"]] = m["bereich"]
+    auswahl = {int(x) for x in request.query_params.getlist("s") if x.isdigit()}
+    return templates.TemplateResponse(
+        "anmeldung_schichten.html",
+        _oeffentlich(request, v, schichten=schichten, auswahl=auswahl,
+                     bereichsnamen=sorted({s["bereich"] for s in schichten}, key=str.lower),
+                     fenster_gewaehlt=set(request.query_params.getlist("z")),
+                     tage=[{"datum": t.isoformat(), "lang": _tag_lang(t.isoformat())}
+                           for t in db.tage_der(v)],
+                     tageszeiten=selbstanmeldung.TAGESZEITEN,
+                     basis=f"/platz/{tok}/{adresse}", platz={"token": tok, "person": person},
+                     eigene={k: ", ".join(w) for k, w in eigene.items()}, konflikte=konflikte,
+                     hinweis={"leer": "Wähle mindestens eine Schicht – oder trag dich "
+                              "unten als Springer ein."}.get(hinweis, "")))
+
+
+def _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste, weitere, wer,
+                **extra):
+    return _angaben_seite(
+        request, v, gewaehlte, fenster, werte, liste, weitere,
+        platz={"token": tok, "person": person, "mit": db.mitangemeldete(person["id"]),
+               "wer": wer},
+        basis=f"/platz/{tok}/{normalisieren.kurzadresse(v['kurz'])}", **extra)
+
+
+@app.get("/platz/{tok}/{adresse:adresse}/angaben")
+async def platz_angaben(request: Request, tok: str, adresse: str):
+    person, v = _platz_va(tok, adresse)
+    if person is None:
+        return _nicht_da(request)
+    if _zustand(v) != "offen":
+        return RedirectResponse(f"/platz/{tok}", status_code=303)
+    gewaehlte, fenster = _auswahl(v, request.query_params.getlist("s"),
+                                  request.query_params.getlist("z"))
+    if not gewaehlte and not fenster:
+        return RedirectResponse(f"/platz/{tok}/{adresse}/schichten?hinweis=leer",
+                                status_code=303)
+    return _dazu_seite(request, v, tok, person, gewaehlte, fenster, {},
+                       {"voraussetzung": []}, [], [person["id"]])
+
+
+@app.post("/platz/{tok}/{adresse:adresse}/angaben")
+async def platz_angaben_absenden(request: Request, tok: str, adresse: str):
+    """Schichten dazunehmen (A-09): für sich, für Mitangemeldete, für neue,
+    die mitkommen."""
+    person, v = _platz_va(tok, adresse)
+    if person is None:
+        return _nicht_da(request)
+    if _zustand(v) != "offen":
+        return RedirectResponse(f"/platz/{tok}", status_code=303)
+    daten = await request.form()
+    gewaehlte, fenster = _auswahl(v, daten.getlist("s"), daten.getlist("z"))
+    if not gewaehlte and not fenster:
+        return RedirectResponse(f"/platz/{tok}/{adresse}/schichten?hinweis=leer",
+                                status_code=303)
+    aktion, werte, personen_roh, liste = _formular(daten)
+    wer = [int(x) for x in daten.getlist("wer") if str(x).isdigit()]
+    if aktion != "eintragen":
+        return _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste,
+                           personen_roh, wer)
+
+    angebot = db.angebot(v["id"])
+    neue, fehler = [], {}
+    for i in range(len(personen_roh)):
+        werte_i, f = selbstanmeldung.person_pruefen(daten, f"p{i}-", angebot, v["beginn"], False)
+        neue.append(werte_i)
+        fehler.update(f)
+    if not wer and not neue:
+        fehler["wer"] = "Wähle aus, wer kommt."
+    if set(_noetig(gewaehlte)) - set(liste["voraussetzung"]):
+        fehler["voraussetzungen"] = "Bitte bestätigen – sonst können wir dich dort nicht einsetzen."
+    if fehler:
+        return _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste,
+                           personen_roh, wer, fehler=fehler, status_code=400)
+    try:
+        db.dazunehmen(v["id"], person["id"], wer, neue, [s["id"] for s in gewaehlte],
+                      [(f["schluessel"], f["beginn"], f["ende"]) for f in fenster],
+                      bemerkung=str(daten.get("bemerkung") or "").strip()[:1000])
+    except db.AnmeldeFehler as ausnahme:
+        return _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste,
+                           personen_roh, wer, gruende=ausnahme.gruende, status_code=409)
+    ergebnis = db.anmeldung_laden(v["id"], person["id"])
+    db.mail_einreihen(person["id"], mail.dazu(
+        ergebnis["anmelder"], selbstanmeldung.va_text(v), ergebnis["personen"],
+        _links(request, person)["platz"]))
+    return RedirectResponse(f"/platz/{tok}?hinweis=dazu", status_code=303)
+
+
+@app.post("/{adresse:adresse}/link")
+async def link_anfordern(request: Request, adresse: str):
+    """„Schon angemeldet?“ – den Link zu Mein Helferplatz noch einmal
+    schicken (7.4). Die Seite sagt immer dasselbe: ob eine Adresse bekannt
+    ist, verrät sie nicht."""
+    v = _nach_adresse(adresse)
+    if v is None:
+        return _nicht_da(request)
+    daten = await request.form()
+    antwort = templates.TemplateResponse("anmeldung_post.html",
+                                         _oeffentlich(request, v, art="angefordert"))
+    if normalisieren.text(daten.get("webseite")):
+        return antwort
+    email = normalisieren.text(daten.get("email")).lower()[:120]
+    if not selbstanmeldung._EMAIL.match(email):
+        return templates.TemplateResponse(
+            "anmeldung_start.html",
+            _oeffentlich(request, v, zustand=_zustand(v), vorgemerkt=False, eingabe={},
+                         fehler="", link_fehler="Bitte eine vollständige Mailadresse.",
+                         link_eingabe=email), status_code=400)
+    for person in db.nach_email(email):
+        if person["angemeldet_von"] is None:
+            _link_mail(request, person)
+    return antwort
+
+
+@app.get("/kalender/{datei}")
+async def kalender(request: Request, datei: str):
+    """Das Kalender-Abo (A-10). Das Programm fragt es regelmäßig ab."""
+    person = _person_mit(zugang.KALENDER, datei.removesuffix(".ics"))
+    if person is None:
+        return Response("", status_code=404)
+    return Response(ical.kalender(db.kalender(person["id"]), person),
+                    media_type="text/calendar; charset=utf-8",
+                    headers={"Cache-Control": "no-store"})
 

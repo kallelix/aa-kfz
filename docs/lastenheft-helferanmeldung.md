@@ -238,6 +238,16 @@ Interesse (V-02). Jede Veranstaltung hat ihren Kurzlink, etwa
 Mein Helferplatz (A-09 bis A-11, I-03, I-05) kommen mit 2.4; bis dahin sagt
 die Dankeseite nur, dass sich die Orga meldet.
 
+**Stand 09.10.2026, Schritt 2.4:** A-09 (ansehen und dazunehmen, auch für
+Mitangemeldete und neue, die mitkommen), A-10 mit Kalender-Abo, A-11, I-03
+und I-05 sind umgesetzt, nach 7.4: Link mit Knopf und sechsstelliger Code,
+kein Passwort. Die persönlichen Links sind signiert statt gespeichert (eine
+Tabelle `zugangslink` gibt es deshalb nicht). Wer wiederkommt, bekommt seinen
+Link mit der eben getroffenen Auswahl; die Seite verrät dabei nichts über
+die Person. Unbestätigt halten die Plätze 72 Stunden, nach 24 kommt eine
+Erinnerung. Mögliche Dubletten zeigt die Übersicht; zusammenführen kommt mit
+I-06.
+
 ### 5.3 Selbstbedienung (S)
 
 Entschieden: Helfer erledigen selbst, wofür sie heute die Orga anschreiben
@@ -654,6 +664,11 @@ mit der Ausgabe am Check-in (4.2).
 und `protokoll` (id, helfer_id, wer, was, am) dazu, beide im Schema helfer;
 an `einteilung` steht der Vermerk, wenn die Orga eine Grenze übersteuert.
 
+**Mit 2.4** kam `mail_out` in den Helferbereich, wie in Kennzeichen und
+Presse. Statt `zugangslink` trägt `helfer` eine `zugang_version`: die Links
+sind ein Siegel über Person, Zweck und Version, und wer die Version
+hochzählt, macht alle alten ungültig.
+
 ---
 
 ## 8. Ablösung von helferliste.online
@@ -725,7 +740,7 @@ Selbstbedienung.
 | 2.1b | **Navigation nach dem Klickentwurf**: Veranstaltung im Kopf, Reiter nach dem, was sie nutzt (V-08), Gruppen im Helferbereich (Übersicht, Planen, Leute, Vor Ort), Einrichten bei der Veranstaltung, Goodie-Schalter und Shirt-Schnitt; die Ausgabe als eigener Reiter, vorerst mit den heutigen Seiten für Funk und Schlüssel | **erledigt** |
 | 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten; **Interesse vormerken** bei angekündigten Veranstaltungen (aus 3.3); Verfügbarkeit und Vorlieben schon im Datenmodell, für den Assistenten | **erledigt** |
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | **erledigt** |
-| 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 9 h |
+| 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | **erledigt** |
 | 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; **Warteliste mit Nachrücken** (R-04, aus 3.6); Meldung kurzfristiger Absagen; Protokoll | 11 h |
 | 2.6 | „Noch eine Schicht?" nach dem Eintragen, Tagesbalken auf der Startseite | 3 h |
 | 2.7 | Dashboard und Monitor: Stufen statt Bedarf, Reserve, Springer, kurzfristige Absagen | 4 h |
@@ -752,13 +767,13 @@ Bestehendes umgebaut.
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
 89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 bis
-2.3 schon erledigt; es bleiben rund 39 Stunden, die 8 Stunden pro Woche haben
+2.4 schon erledigt; es bleiben rund 30 Stunden, die 8 Stunden pro Woche haben
 also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~39 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~30 h, ab 12. Oktober |
 | --- | --- |
-| Anfang Dezember 2026 | ~6 h |
-| **Mitte Dezember 2026** | **~4 h** |
+| Anfang Dezember 2026 | ~4 h |
+| **Mitte Dezember 2026** | **~3 h** |
 | Rückfallebene: Anfang März 2027 | ~2 h |
 
 Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
@@ -806,7 +821,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~65 h, davon ~28 h erledigt |
+| 2 Öffnung | ~65 h, davon ~37 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |

@@ -142,13 +142,18 @@ In **`dienst.env`** steht, was für alle gilt: `BIND`,
 `HELFER_ENV`.
 
 In den **drei anderen** steht, was sich unterscheidet – vor allem
-`BASIS_URL`, die Mailkonfiguration (Kennzeichen und Presse) und beim Helfer
-der Abruf der Helferliste.
+`BASIS_URL`, die Mailkonfiguration (seit Lastenheft 2.4 in allen drei) und
+beim Helfer der Abruf der Helferliste.
 
 > `APP_SECRET_KEY` gehört **nur** in `dienst.env`. Die Umgebung schlägt die
 > Datei, also gälte er ohnehin für alle drei – aber daran hängen die
 > CSRF-Token, und stünden in den Bereichen verschiedene Schlüssel, passte das
 > Token eines Formulars nicht zum Bereich, an den es geht.
+>
+> Seit Lastenheft 2.4 hängen daran auch die persönlichen Links der Helfer
+> (Mein Helferplatz, Bestätigen, Kalender-Abo). Ein neuer Schlüssel macht
+> jeden Link in jeder verschickten Mail ungültig – also nicht wechseln, außer
+> genau das ist gewollt.
 
 Alle vier gehören **root und sind 0600**. systemd liest `dienst.env`, bevor
 es die Rechte auf den Benutzer `abfahrt` fallen lässt; die drei anderen liest
@@ -294,6 +299,10 @@ Seit der öffentlichen Helferanmeldung (Lastenheft 2.2) stehen in
 `abfahrt_helfer` oben und im Block der öffentlichen Hostnamen eine
 `location` für `/<veranstaltung>/angaben` und `/<veranstaltung>/interesse`.
 Wer die Config schon eingespielt hat, trägt beides von Hand nach.
+
+Mit Lastenheft 2.4 ist dieselbe `location` breiter geworden: sie zählt auch
+„Link anfordern“ und den Code (`/<veranstaltung>/link`, `…/danke`) und alles
+unter `/platz/` und `/bestaetigen/`. Die Zeile ist von Hand zu ersetzen.
 
 ## 3. Sicherung
 

@@ -1,7 +1,8 @@
 {% extends "anmeldung_base.html" %}
 {% block titel %}Schichten{% endblock %}
-{% block zurueck %}<a class="zurueck" href="/{{ adresse }}">‹ Zurück</a>{% endblock %}
-{% block ueberschrift %}Alle Schichten{% endblock %}
+{% block zurueck %}{% if platz %}<a class="zurueck" href="/platz/{{ platz.token }}">‹ Mein Helferplatz</a>
+{%- else %}<a class="zurueck" href="/{{ adresse }}">‹ Zurück</a>{% endif %}{% endblock %}
+{% block ueberschrift %}{{ 'Schichten dazunehmen' if platz else 'Alle Schichten' }}{% endblock %}
 
 {% block inhalt %}
   {% if hinweis %}<div class="hinweis warn">{{ hinweis }}</div>{% endif %}
@@ -10,7 +11,7 @@
      Parameter zu den Angaben. Ohne Skript geht alles; mit Skript zählt die
      Leiste mit und graut aus, was sich überschneidet (K-01). Geprüft wird
      beim Absenden ohnehin noch einmal. #}
-  <form method="get" action="/{{ adresse }}/angaben" data-auswahl>
+  <form method="get" action="{{ basis }}/angaben" data-auswahl>
 
     {# Die Filter braucht nur, wer Skript hat – ohne bleibt die Liste ganz. #}
     <div class="filter" data-filter="tag" hidden>
@@ -48,6 +49,9 @@
             {% elif s.lage == 'reserve' %}<span class="marke reserve">als Reserve</span>
             {% else %}<span class="marke voll">voll</span>{% endif %}
             {% if s.alter_ab %}<span class="marke voll">ab {{ s.alter_ab }}</span>{% endif %}
+            {# Aus Mein Helferplatz: was man schon hat, und was sich damit beißt. #}
+            {% if eigene and s.id in eigene %}<span class="marke frei">Eingetragen: {{ eigene[s.id] }}</span>{% endif %}
+            {% if konflikte and s.id in konflikte %}<span class="marke voll">überschneidet sich mit deiner Schicht {{ konflikte[s.id] }}</span>{% endif %}
             {% for v in s.voraussetzungen.splitlines() if v.strip() %}<span class="marke voll">{{ v }}</span>{% endfor %}
           </div>
           {% if s.lage != 'voll' or gewaehlt %}

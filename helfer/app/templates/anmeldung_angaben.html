@@ -1,7 +1,7 @@
 {% extends "anmeldung_base.html" %}
-{% block titel %}Deine Angaben{% endblock %}
-{% block zurueck %}<a class="zurueck" href="/{{ adresse }}/schichten?{{ auswahl_query }}">‹ Auswahl ändern</a>{% endblock %}
-{% block ueberschrift %}Fast geschafft – wer bist du?{% endblock %}
+{% block titel %}{{ 'Wer kommt?' if platz else 'Deine Angaben' }}{% endblock %}
+{% block zurueck %}<a class="zurueck" href="{{ basis }}/schichten?{{ auswahl_query }}">‹ Auswahl ändern</a>{% endblock %}
+{% block ueberschrift %}{{ 'Wer kommt?' if platz else 'Fast geschafft – wer bist du?' }}{% endblock %}
 
 {# Felder einer Person. `p` ist der Vorsatz der Feldnamen, `e` die Eingabe,
    `du` sagt, ob es um die anmeldende Person geht. #}
@@ -92,7 +92,7 @@
     <div class="hinweis warn" role="alert">
       <strong>Das ging leider nicht:</strong>
       <ul>{% for g in gruende %}<li>{{ g }}</li>{% endfor %}</ul>
-      <a href="/{{ adresse }}/schichten?{{ auswahl_query }}">Auswahl ändern</a>
+      <a href="{{ basis }}/schichten?{{ auswahl_query }}">Auswahl ändern</a>
     </div>
   {% elif fehler %}
     <div class="hinweis warn" role="alert">Bitte schau noch einmal auf die markierten Felder.</div>
@@ -109,12 +109,40 @@
     {% endfor %}
   </div>
 
-  <form method="post" action="/{{ adresse }}/angaben" novalidate>
+  <form method="post" action="{{ basis }}/angaben" novalidate>
     {% for s in gewaehlte %}<input type="hidden" name="s" value="{{ s.id }}">{% endfor %}
     {% for f in fenster %}<input type="hidden" name="z" value="{{ f.schluessel }}">{% endfor %}
     <input type="hidden" name="weitere" value="{{ weitere|length }}">
 
-    <div class="karte">{{ person('ich-', eingabe, true) }}</div>
+    {% if rueckfrage %}
+      {# I-05: derselbe Name in anderer Schreibweise mit derselben Adresse, oder
+         derselbe Name mit derselben Nummer. Verraten wird nichts – der Link
+         geht an die Adresse, die wir kennen. #}
+      <div class="hinweis warn" role="alert">
+        <strong>Bist du schon bei uns?</strong>
+        <p>Unter diesem Namen kennen wir jemanden mit derselben Mailadresse oder
+          Handynummer. Bist du das, schicken wir dir deinen Link zu Mein Helferplatz –
+          an die Adresse, die wir von dir haben. Dort nimmst du die Schichten dazu.</p>
+        <button type="submit" class="knopf" name="aktion" value="bin-ich">Ja, das bin ich</button>
+        <button type="submit" class="knopf zweit" name="aktion" value="neu-anlegen">Nein, ich bin jemand anderes</button>
+      </div>
+    {% endif %}
+
+    {% if platz %}
+      {# Aus Mein Helferplatz: die Person ist bekannt, gefragt wird nur, wer
+         mitkommt – sie selbst, die schon Mitangemeldeten, neue. #}
+      <fieldset class="karte{% if fehler.wer %} feld-fehler{% endif %}">
+        <legend>Wer kommt zu diesen Schichten?</legend>
+        {% for p in [platz.person] + platz.mit %}
+          <label class="haken"><input type="checkbox" name="wer" value="{{ p.id }}"
+                 {% if p.id in platz.wer %}checked{% endif %}>
+            <span>{{ p.name }}{% if loop.first %} <span class="leise">(du)</span>{% endif %}</span></label>
+        {% endfor %}
+        {% if fehler.wer %}<p class="fehler">{{ fehler.wer }}</p>{% endif %}
+      </fieldset>
+    {% else %}
+      <div class="karte">{{ person('ich-', eingabe, true) }}</div>
+    {% endif %}
 
     {% for w in weitere %}
       <div class="karte">
@@ -135,7 +163,7 @@
         {% for v in voraussetzungen %}
           <label class="haken"><input type="checkbox" name="voraussetzung" value="{{ v }}"
                  {% if v in eingabe_liste.voraussetzung %}checked{% endif %}>
-            <span>{{ 'Alle, die ich anmelde, haben: ' if weitere else 'Ich habe: ' }}{{ v }}</span></label>
+            <span>{{ 'Alle, die kommen, haben: ' if weitere or platz else 'Ich habe: ' }}{{ v }}</span></label>
         {% endfor %}
         {% if fehler.voraussetzungen %}<p class="fehler">{{ fehler.voraussetzungen }}</p>{% endif %}
       </fieldset>
@@ -149,8 +177,12 @@
       <input type="text" id="webseite" name="webseite" tabindex="-1" autocomplete="off">
     </div>
 
-    <p class="leise">Deine Angaben nutzen wir nur, um die Schichten zu planen und dich zu erreichen.</p>
-    <button type="submit" class="knopf" name="aktion" value="anmelden">Anmelden</button>
+    {% if platz %}
+      <button type="submit" class="knopf" name="aktion" value="eintragen">Eintragen</button>
+    {% else %}
+      <p class="leise">Deine Angaben nutzen wir nur, um die Schichten zu planen und dich zu erreichen.</p>
+      <button type="submit" class="knopf" name="aktion" value="anmelden">Anmelden</button>
+    {% endif %}
   </form>
 {% endblock %}
 

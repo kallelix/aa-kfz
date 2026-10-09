@@ -104,7 +104,7 @@
     </div>
   </section>
 
-  {% if konflikte or doppelt or allein %}
+  {% if konflikte or doppelt or allein or dubletten %}
     <section>
       <h2>Bitte prüfen</h2>
 
@@ -126,6 +126,28 @@
                     <span class="gedaempft nowrap">{{ k.beginn_a | zeitpunkt }}</span></td>
                   <td><a href="/helfer/schicht/{{ k.schicht_b }}">{{ k.bereich_b }}</a>
                     <span class="gedaempft nowrap">{{ k.beginn_b | zeitpunkt }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
+      {% if dubletten %}
+        {# I-05: Zusammenführen kommt mit I-06 (Phase 3). #}
+        <h3>Vielleicht dieselbe Person ({{ dubletten | length }})</h3>
+        <p class="hilfe">Gleicher Name in anderer Schreibweise und dieselbe Adresse oder
+          Nummer. Wer bei der Anmeldung „Nein, ich bin jemand anderes“ gewählt hat, steht
+          auch hier.</p>
+        <div class="tabelle-huelle">
+          <table>
+            <tbody>
+              {% for d in dubletten %}
+                <tr>
+                  <td><a href="/helfer/helfer/{{ d.a_id }}">{{ d.a_name }}</a>
+                    <span class="gedaempft">{{ d.a_email }}</span></td>
+                  <td><a href="/helfer/helfer/{{ d.b_id }}">{{ d.b_name }}</a>
+                    <span class="gedaempft">{{ d.b_email }}</span></td>
                 </tr>
               {% endfor %}
             </tbody>

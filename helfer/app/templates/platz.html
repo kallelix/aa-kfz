@@ -1,0 +1,74 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Mein Helferplatz{% endblock %}
+{% block ueberschrift %}Hallo {{ person.vorname or person.name }}!{% endblock %}
+
+{# Mein Helferplatz (A-09): alles, was jemand für seine Schichten wissen
+   muss, ohne Konto – der Link ist der Zugang. #}
+{% block inhalt %}
+  {% if hinweis %}<div class="hinweis gut">{{ hinweis }}</div>{% endif %}
+
+  {% if not person.email_bestaetigt_am %}
+    <form method="post" action="/platz/{{ token }}/bestaetigen" class="hinweis">
+      <strong>Bitte bestätige noch deine Adresse</strong> {{ person.email }} – dann steht
+      deine Anmeldung fest.
+      <button type="submit" class="knopf klein">Ja, das bin ich</button>
+    </form>
+  {% endif %}
+
+  {% for x in veranstaltungen %}
+    <h2>{{ x.va.name }}</h2>
+    <p class="leise">{{ x.tage }}{% if x.va.ort %} · {{ x.va.ort }}{% endif %}</p>
+
+    {% for eintrag in x.personen %}
+      {% if x.personen|length > 1 %}
+        <h3>{{ 'Du' if loop.first else eintrag.person.vorname or eintrag.person.name }}</h3>
+      {% endif %}
+      {% for s in eintrag.schichten %}
+        <div class="karte schicht">
+          <h3>{{ s.bereich }}</h3>
+          <div class="zeit">{{ s.datum|tag }} · {{ s|spanne }}</div>
+          <div class="ort">Treffpunkt: {{ s.ort or s.treffpunkt or 'kommt noch' }}</div>
+          {% for k in x.leitungen.get(s.bereich_id, []) %}
+            <div class="leise">Ansprechpartner: {{ k.name }}
+              {%- if k.telefon %} · <a href="tel:{{ k.telefon|replace(' ', '') }}">{{ k.telefon }}</a>{% endif %}</div>
+          {% endfor %}
+          {% if s.art == 'reserve' %}<span class="marke reserve">Reserve – danke, das hilft uns sehr</span>{% endif %}
+        </div>
+      {% endfor %}
+      {% for f in eintrag.fenster %}
+        <div class="karte"><h3>Springer</h3>
+          <p>{{ f.beginn|zeitpunkt }} bis {{ f.ende|uhr }} – wir setzen dich ein, wo gerade jemand fehlt.</p></div>
+      {% endfor %}
+      {% if not eintrag.schichten and not eintrag.fenster %}
+        <p class="leise">Noch keine Schicht.</p>
+      {% endif %}
+    {% endfor %}
+
+    {% if x.zustand == 'offen' %}
+      <a class="knopf zweit" href="/platz/{{ token }}/{{ x.adresse }}/schichten">Schichten dazunehmen</a>
+    {% endif %}
+  {% endfor %}
+
+  {% for x in weitere %}
+    <div class="karte">
+      <h2>{{ x.va.name }}</h2>
+      <p class="leise">{{ x.tage }}</p>
+      <a class="knopf zweit" href="/platz/{{ token }}/{{ x.adresse }}/schichten">Auch hier mithelfen</a>
+    </div>
+  {% endfor %}
+
+  {% if not veranstaltungen and not weitere %}
+    <p>Gerade gibt es keine Veranstaltung, für die du eingetragen bist.</p>
+  {% endif %}
+
+  {% if veranstaltungen %}
+    <h2>Im Kalender</h2>
+    <p>Abonniere deine Schichten – ändert sich etwas, ändert sich auch dein Kalender.</p>
+    <a class="knopf zweit" href="{{ links.webcal }}">Kalender abonnieren</a>
+    <p class="leise">Klappt der Knopf nicht, füge diese Adresse in deinem Kalender als
+      Abo hinzu: <br><code class="umbruch">{{ links.kalender }}</code></p>
+  {% endif %}
+
+  <p class="leise">Bitte sei 15 Minuten vor Beginn am Treffpunkt. Diese Seite ist dein
+    Zugang – gib den Link nicht weiter.</p>
+{% endblock %}

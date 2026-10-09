@@ -74,6 +74,7 @@
                 </td>
                 <td class="gedaempft">{{ {'import': 'Import', 'hand': 'von Hand', 'selbst': 'selbst angemeldet'}[h.quelle] }}
                   {%- if h.art == 'reserve' %} <span class="marke">Reserve</span>{% endif %}
+                  {%- if h.unbestaetigt %} <span class="marke">unbestätigt</span>{% endif %}
                   {%- if h.vermerk and sieht_grenzen %} <span class="marke" title="{{ h.vermerk }}">mit Vermerk</span>{% endif %}</td>
                 <td class="rechts">
                   <form method="post"

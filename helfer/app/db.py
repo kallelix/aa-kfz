@@ -12,9 +12,10 @@ zu genau einer.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from kern import suchen
 from kern import veranstaltungen as va
 from kern.db import Datenbank, IntegrityError, Verbindung, Zeile
 
@@ -557,8 +558,12 @@ def besetzung(schicht_id: int) -> list[Zeile]:
     try:
         return con.execute(
             "SELECT e.id AS einteilung_id, e.quelle, e.art, e.vermerk,"
-            " e.bemerkung AS notiz, e.eingeteilt_am, h.*"
+            " e.bemerkung AS notiz, e.eingeteilt_am, h.*,"
+            # Selbst angemeldet und noch nicht bestätigt (I-03) – bei
+            # Mitangemeldeten zählt die Adresse dessen, der angemeldet hat.
+            " (e.quelle = 'selbst' AND a.email_bestaetigt_am IS NULL) AS unbestaetigt"
             " FROM einteilung e JOIN helfer h ON h.id = e.helfer_id"
+            " JOIN helfer a ON a.id = COALESCE(h.angemeldet_von, h.id)"
             " WHERE e.schicht_id = ?"
             " ORDER BY lower(h.name), e.id", (schicht_id,)).fetchall()
     finally:
@@ -839,6 +844,151 @@ def _person_sichern(con: Verbindung, werte: dict, schluessel_email: str,
     return int(vorhanden["id"])
 
 
+def _schichten_sperren(con: Verbindung, vid: int, schicht_ids: list[int]) -> list[dict]:
+    """Die gewählten Schichten, gesperrt (FOR UPDATE): wer gleichzeitig auf
+    denselben letzten Platz will, wartet, bis der Erste fertig ist, und sieht
+    dann, dass er weg ist."""
+    schichten = [dict(z) for z in con.execute(
+        "SELECT s.id, s.beginn, s.ende, s.soll, s.reserve, s.minimum,"
+        " b.name AS bereich, COALESCE(s.mindestalter, b.mindestalter) AS alter_ab,"
+        " GREATEST(s.intern, b.intern) AS ist_intern"
+        " FROM schicht s JOIN bereich b ON b.id = s.bereich_id"
+        " WHERE s.id = ANY(?) AND s.veranstaltung_id = ?"
+        " ORDER BY s.id FOR UPDATE OF s", (list(schicht_ids), vid))]
+    if len(schichten) != len(set(schicht_ids)) or any(s["ist_intern"] for s in schichten):
+        raise AnmeldeFehler(["Eine der gewählten Schichten gibt es nicht mehr. "
+                             "Bitte noch einmal auswählen."])
+    for s in schichten:
+        s["text"] = _schicht_text(s)
+    return schichten
+
+
+def _pruefen(con: Verbindung, vid: int, schichten: list[dict],
+             fenster: list[tuple[str, str, str]], teilnehmer: list[dict]) -> dict[int, list[str]]:
+    """Alles, was einer Buchung im Weg steht – für alle Teilnehmer auf einmal.
+
+    `teilnehmer` sind Dicts mit vorname, volljaehrig, alter (None: unbekannt)
+    und helfer_id (None: neu). Wer schon da ist, bringt seine Schichten,
+    Springer-Zeiten und Einsatzgrenzen mit. Gibt je Schicht die Arten
+    zurück (Platz oder Reserve, in der Reihenfolge der Teilnehmer); wirft
+    AnmeldeFehler mit allen Gründen.
+    """
+    gruende: list[str] = []
+    jetzt_marke = marke(jetzt_lokal())
+    for s in schichten:
+        if s["beginn"] <= jetzt_marke:
+            gruende.append(s["text"] + " hat schon begonnen.")
+
+    # K-01 und K-04: nichts darf sich überschneiden – keine zwei Schichten,
+    # keine Schicht mit einer Springer-Zeit.
+    zeiten = [(s["text"], s["beginn"], s["ende"]) for s in schichten]
+    for a, b in selbstanmeldung.ueberschneidungen(zeiten):
+        gruende.append(f"{a} und {b} überschneiden sich.")
+    for _, von, bis in fenster:
+        for s in schichten:
+            if selbstanmeldung.ueberschneiden(von, bis, s["beginn"], s["ende"]):
+                gruende.append(f"Als Springer bist du zur Zeit von {s['text']} "
+                               "schon eingeplant – bitte eins von beiden.")
+
+    # Das Mindestalter (D-07). Volljährig erfüllt jede Grenze bis 18.
+    for person in teilnehmer:
+        alter = 18 if person["volljaehrig"] else person["alter"]
+        for s in schichten:
+            if s["alter_ab"] and alter is not None and alter < s["alter_ab"]:
+                gruende.append(f"{s['text']} ist erst ab {s['alter_ab']} – für "
+                               f"{person['vorname']} geht das noch nicht.")
+
+    # Wer schon da ist: seine Schichten, Springer-Zeiten und Grenzen (K-06).
+    gesperrt: set[int] = set()
+    for person in teilnehmer:
+        if person["helfer_id"] is None:
+            continue
+        eigene = con.execute(
+            "SELECT s.id, s.beginn, s.ende, b.name AS bereich FROM einteilung e"
+            " JOIN schicht s ON s.id = e.schicht_id"
+            " JOIN bereich b ON b.id = s.bereich_id"
+            " WHERE e.helfer_id = ? AND s.veranstaltung_id = ?",
+            (person["helfer_id"], vid)).fetchall()
+        for alt in eigene:
+            for s in schichten:
+                if alt["id"] == s["id"]:
+                    gruende.append(f"{person['vorname']} ist für {s['text']} "
+                                   "schon eingetragen.")
+                elif selbstanmeldung.ueberschneiden(alt["beginn"], alt["ende"],
+                                                    s["beginn"], s["ende"]):
+                    gruende.append(f"{s['text']} überschneidet sich mit "
+                                   f"{_schicht_text(alt)}, für die "
+                                   f"{person['vorname']} schon eingetragen ist.")
+            for _, von, bis in fenster:
+                if selbstanmeldung.ueberschneiden(von, bis, alt["beginn"], alt["ende"]):
+                    gruende.append(f"Als Springer überschneidet sich das mit "
+                                   f"{_schicht_text(alt)}, für die "
+                                   f"{person['vorname']} schon eingetragen ist.")
+        schon = {z["beginn"] for z in con.execute(
+            "SELECT beginn FROM verfuegbarkeit WHERE helfer_id = ? AND veranstaltung_id = ?",
+            (person["helfer_id"], vid)).fetchall()}
+        for _, von, _ in fenster:
+            if von in schon:
+                gruende.append(f"Diese Springer-Zeit hat {person['vorname']} schon.")
+        gesperrt |= _gesperrt(con, vid, person["helfer_id"])
+
+    # Platz, Reserve oder voll – für alle zusammen. Eine Schicht hinter einer
+    # Einsatzgrenze ist für die Person schlicht nicht frei: dieselben Worte
+    # wie bei einer vollen, damit niemand an der Antwort merkt, dass es um
+    # ihn geht (K-06).
+    verteilung: dict[int, list[str]] = {}
+    for s in schichten:
+        zahlen = con.execute(
+            "SELECT COUNT(*) FILTER (WHERE art = 'platz') AS platz,"
+            " COUNT(*) FILTER (WHERE art = 'reserve') AS reserve"
+            " FROM einteilung WHERE schicht_id = ?", (s["id"],)).fetchone()
+        frei = max(0, s["soll"] - zahlen["platz"])
+        reserve_frei = max(0, s["reserve"] - zahlen["reserve"])
+        arten = []
+        for _ in teilnehmer:
+            if frei:
+                arten.append("platz")
+                frei -= 1
+            elif reserve_frei:
+                arten.append("reserve")
+                reserve_frei -= 1
+        if len(arten) < len(teilnehmer) or s["id"] in gesperrt:
+            gruende.append(
+                f"{s['text']} ist gerade nicht frei – in der Liste findest "
+                "du andere, die Hilfe brauchen." if len(teilnehmer) == 1 else
+                f"In {s['text']} ist gerade nicht für alle {len(teilnehmer)} Platz.")
+        verteilung[s["id"]] = arten
+
+    if gruende:
+        raise AnmeldeFehler(list(dict.fromkeys(gruende)))
+    return verteilung
+
+
+def _eintragen(con: Verbindung, vid: int, ids: list[int], schichten: list[dict],
+               verteilung: dict[int, list[str]], fenster: list[tuple[str, str, str]],
+               bemerkung: str = "", bemerkung_von: int | None = None) -> None:
+    """Teilnahme, Einteilungen und Springer-Zeiten – nach _pruefen."""
+    for i, helfer_id in enumerate(ids):
+        eigene_bemerkung = bemerkung if helfer_id == (bemerkung_von or ids[0]) else ""
+        con.execute(
+            "INSERT INTO teilnahme (veranstaltung_id, helfer_id, quelle, bemerkung,"
+            " angemeldet_am) VALUES (?, ?, 'selbst', ?, ?)"
+            " ON CONFLICT (veranstaltung_id, helfer_id) DO UPDATE SET bemerkung ="
+            " CASE WHEN excluded.bemerkung <> '' THEN excluded.bemerkung"
+            " ELSE teilnahme.bemerkung END",
+            (vid, helfer_id, eigene_bemerkung, jetzt()))
+        for s in schichten:
+            con.execute(
+                "INSERT INTO einteilung (schicht_id, helfer_id, quelle, art,"
+                " eingeteilt_am) VALUES (?, ?, 'selbst', ?, ?)",
+                (s["id"], helfer_id, verteilung[s["id"]][i], jetzt()))
+        for _, von, bis in fenster:
+            con.execute(
+                "INSERT INTO verfuegbarkeit (veranstaltung_id, helfer_id, beginn,"
+                " ende, springer, angelegt_am) VALUES (?, ?, ?, ?, 1, ?)",
+                (vid, helfer_id, von, bis, jetzt()))
+
+
 def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
              fenster: list[tuple[str, str, str]], bemerkung: str = "") -> dict:
     """Trägt eine Anmeldung ein – alles oder nichts.
@@ -846,138 +996,97 @@ def anmelden(vid: int, personen: list[dict], schicht_ids: list[int],
     `personen[0]` meldet an, die übrigen kommen mit (A-08) und stehen auf
     denselben Schichten. Je Schicht bekommt, wer zuerst kommt, einen Platz;
     ist das Soll erreicht, Reserve (R-03); ist auch die voll, geht es nicht.
-    Die Schichten werden dafür gesperrt (FOR UPDATE): wer gleichzeitig auf
-    denselben letzten Platz will, wartet, bis der Erste fertig ist, und sieht
-    dann, dass er weg ist.
+    Wer schon da ist (A-11), kommt hier nicht an – das fängt main.py vorher
+    ab und schickt den Link.
 
     Wirft AnmeldeFehler mit allen Gründen auf einmal.
     """
-    gruende: list[str] = []
     con = verbinden()
     try:
         with con:
-            schichten = [dict(z) for z in con.execute(
-                "SELECT s.id, s.beginn, s.ende, s.soll, s.reserve, s.minimum,"
-                " b.name AS bereich, COALESCE(s.mindestalter, b.mindestalter) AS alter_ab,"
-                " GREATEST(s.intern, b.intern) AS ist_intern"
-                " FROM schicht s JOIN bereich b ON b.id = s.bereich_id"
-                " WHERE s.id = ANY(?) AND s.veranstaltung_id = ?"
-                " ORDER BY s.id FOR UPDATE OF s", (list(schicht_ids), vid))]
-            if len(schichten) != len(set(schicht_ids)) or any(s["ist_intern"] for s in schichten):
-                raise AnmeldeFehler(["Eine der gewählten Schichten gibt es nicht mehr. "
-                                     "Bitte noch einmal auswählen."])
-            jetzt_marke = marke(jetzt_lokal())
-            for s in schichten:
-                s["text"] = _schicht_text(s)
-                if s["beginn"] <= jetzt_marke:
-                    gruende.append(s["text"] + " hat schon begonnen.")
-
-            # K-01 und K-04: nichts darf sich überschneiden – keine zwei
-            # Schichten, keine Schicht mit einer Springer-Zeit.
-            zeiten = [(s["text"], s["beginn"], s["ende"]) for s in schichten]
-            for a, b in selbstanmeldung.ueberschneidungen(zeiten):
-                gruende.append(f"{a} und {b} überschneiden sich.")
-            for _, von, bis in fenster:
-                for s in schichten:
-                    if selbstanmeldung.ueberschneiden(von, bis, s["beginn"], s["ende"]):
-                        gruende.append(f"Als Springer bist du zur Zeit von {s['text']} "
-                                       "schon eingeplant – bitte eins von beiden.")
-
-            # Das Mindestalter (D-07). Volljährig erfüllt jede Grenze bis 18.
-            for person in personen:
-                alter = 18 if person["volljaehrig"] else person["alter"]
-                for s in schichten:
-                    if s["alter_ab"] and alter is not None and alter < s["alter_ab"]:
-                        gruende.append(f"{s['text']} ist erst ab {s['alter_ab']} – für "
-                                       f"{person['vorname']} geht das noch nicht.")
-
-            # Wer schon da ist, mit seinen Schichten in dieser Veranstaltung –
-            # und mit seinen Einsatzgrenzen (K-06).
-            ids, belegt = [], {}
-            gesperrt: set[int] = set()
+            schichten = _schichten_sperren(con, vid, schicht_ids)
             anmelder_email = personen[0]["email"]
-            for i, person in enumerate(personen):
+            teilnehmer = []
+            for person in personen:
                 zeile = con.execute(
                     "SELECT id FROM helfer WHERE schluessel = ?",
                     (normalisieren.schluessel(person["name"], anmelder_email),)).fetchone()
-                if zeile is not None:
-                    belegt[i] = con.execute(
-                        "SELECT s.id, s.beginn, s.ende, b.name AS bereich FROM einteilung e"
-                        " JOIN schicht s ON s.id = e.schicht_id"
-                        " JOIN bereich b ON b.id = s.bereich_id"
-                        " WHERE e.helfer_id = ? AND s.veranstaltung_id = ?",
-                        (zeile["id"], vid)).fetchall()
-                    gesperrt |= _gesperrt(con, vid, zeile["id"])
-            for i, eigene in belegt.items():
-                for alt in eigene:
-                    for s in schichten:
-                        if alt["id"] == s["id"]:
-                            gruende.append(f"{personen[i]['vorname']} ist für {s['text']} "
-                                           "schon eingetragen.")
-                        elif selbstanmeldung.ueberschneiden(alt["beginn"], alt["ende"],
-                                                      s["beginn"], s["ende"]):
-                            gruende.append(f"{s['text']} überschneidet sich mit "
-                                           f"{_schicht_text(alt)}, für die "
-                                           f"{personen[i]['vorname']} schon eingetragen ist.")
+                teilnehmer.append({**person, "helfer_id": zeile["id"] if zeile else None})
+            verteilung = _pruefen(con, vid, schichten, fenster, teilnehmer)
 
-            # Platz, Reserve oder voll – für alle Personen zusammen. Eine
-            # Schicht hinter einer Einsatzgrenze ist für die Person schlicht
-            # nicht frei: dieselben Worte wie bei einer vollen, damit niemand
-            # an der Antwort merkt, dass es um ihn geht (K-06).
-            verteilung: dict[int, list[str]] = {}
-            for s in schichten:
-                zahlen = con.execute(
-                    "SELECT COUNT(*) FILTER (WHERE art = 'platz') AS platz,"
-                    " COUNT(*) FILTER (WHERE art = 'reserve') AS reserve"
-                    " FROM einteilung WHERE schicht_id = ?", (s["id"],)).fetchone()
-                frei = max(0, s["soll"] - zahlen["platz"])
-                reserve_frei = max(0, s["reserve"] - zahlen["reserve"])
-                arten = []
-                for _ in personen:
-                    if frei:
-                        arten.append("platz")
-                        frei -= 1
-                    elif reserve_frei:
-                        arten.append("reserve")
-                        reserve_frei -= 1
-                if len(arten) < len(personen) or s["id"] in gesperrt:
-                    gruende.append(
-                        f"{s['text']} ist gerade nicht frei – in der Liste findest "
-                        "du andere, die Hilfe brauchen." if len(personen) == 1 else
-                        f"In {s['text']} ist gerade nicht für alle {len(personen)} Platz.")
-                verteilung[s["id"]] = arten
-
-            if gruende:
-                raise AnmeldeFehler(list(dict.fromkeys(gruende)))
-
-            anmelder = None
+            ids: list[int] = []
             for i, person in enumerate(personen):
-                helfer_id = _person_sichern(con, person, anmelder_email,
-                                            None if i == 0 else anmelder)
-                if i == 0:
-                    anmelder = helfer_id
-                ids.append(helfer_id)
-                con.execute(
-                    "INSERT INTO teilnahme (veranstaltung_id, helfer_id, quelle, bemerkung,"
-                    " angemeldet_am) VALUES (?, ?, 'selbst', ?, ?)"
-                    " ON CONFLICT (veranstaltung_id, helfer_id) DO UPDATE SET bemerkung ="
-                    " CASE WHEN excluded.bemerkung <> '' THEN excluded.bemerkung"
-                    " ELSE teilnahme.bemerkung END",
-                    (vid, helfer_id, bemerkung if i == 0 else "", jetzt()))
-                for s in schichten:
-                    con.execute(
-                        "INSERT INTO einteilung (schicht_id, helfer_id, quelle, art,"
-                        " eingeteilt_am) VALUES (?, ?, 'selbst', ?, ?)",
-                        (s["id"], helfer_id, verteilung[s["id"]][i], jetzt()))
-                for _, von, bis in fenster:
-                    con.execute(
-                        "INSERT INTO verfuegbarkeit (veranstaltung_id, helfer_id, beginn,"
-                        " ende, springer, angelegt_am) VALUES (?, ?, ?, ?, 1, ?)",
-                        (vid, helfer_id, von, bis, jetzt()))
-        return {"anmelder": anmelder, "personen": ids,
+                ids.append(_person_sichern(con, person, anmelder_email,
+                                           None if i == 0 else ids[0]))
+            _eintragen(con, vid, ids, schichten, verteilung, fenster, bemerkung)
+        return {"anmelder": ids[0], "personen": ids,
                 "schichten": [{**s, "arten": verteilung[s["id"]]} for s in schichten]}
     finally:
         con.close()
+
+
+def dazunehmen(vid: int, anmelder_id: int, helfer_ids: list[int], neue: list[dict],
+               schicht_ids: list[int], fenster: list[tuple[str, str, str]],
+               bemerkung: str = "") -> dict:
+    """Schichten dazunehmen aus Mein Helferplatz (A-09): für sich selbst, für
+    die Mitangemeldeten und für neue, die mitkommen. Dieselben Prüfungen wie
+    beim Anmelden. Wer hier bucht, hat den Link aus seiner Mail benutzt –
+    damit ist die Adresse bestätigt."""
+    con = verbinden()
+    try:
+        with con:
+            anmelder = con.execute("SELECT * FROM helfer WHERE id = ?",
+                                   (anmelder_id,)).fetchone()
+            erlaubt = {anmelder_id} | {z["id"] for z in con.execute(
+                "SELECT id FROM helfer WHERE angemeldet_von = ?", (anmelder_id,)).fetchall()}
+            if anmelder is None or not set(helfer_ids) <= erlaubt:
+                raise AnmeldeFehler(["Diese Person gehört nicht zu deiner Anmeldung."])
+            if not helfer_ids and not neue:
+                raise AnmeldeFehler(["Wähle aus, wer kommt."])
+            stichtag = VERANSTALTUNGEN.laden(vid)["beginn"]
+            schichten = _schichten_sperren(con, vid, schicht_ids)
+            teilnehmer = []
+            for helfer_id in helfer_ids:
+                zeile = con.execute("SELECT * FROM helfer WHERE id = ?", (helfer_id,)).fetchone()
+                teilnehmer.append({"vorname": zeile["vorname"] or zeile["name"],
+                                   "volljaehrig": zeile["volljaehrig"],
+                                   "alter": _alter(zeile, stichtag), "helfer_id": helfer_id})
+            for person in neue:
+                zeile = con.execute(
+                    "SELECT id FROM helfer WHERE schluessel = ?",
+                    (normalisieren.schluessel(person["name"], anmelder["email"]),)).fetchone()
+                teilnehmer.append({**person, "helfer_id": zeile["id"] if zeile else None})
+            verteilung = _pruefen(con, vid, schichten, fenster, teilnehmer)
+
+            ids = list(helfer_ids) + [_person_sichern(con, person, anmelder["email"], anmelder_id)
+                                      for person in neue]
+            _eintragen(con, vid, ids, schichten, verteilung, fenster, bemerkung,
+                       bemerkung_von=anmelder_id if anmelder_id in ids else None)
+            con.execute("UPDATE helfer SET email_bestaetigt_am = ? WHERE id = ?"
+                        " AND email_bestaetigt_am IS NULL", (jetzt(), anmelder_id))
+            for helfer_id in ids:
+                for s in schichten:
+                    _protokollieren(con, helfer_id, "selbst", "Dazugenommen: " + s["text"])
+                for _, von, bis in fenster:
+                    _protokollieren(con, helfer_id, "selbst", "Als Springer dazu: "
+                                    + _schicht_text({"bereich": "Springer", "beginn": von,
+                                                     "ende": bis}))
+        return {"personen": ids,
+                "schichten": [{**s, "arten": verteilung[s["id"]]} for s in schichten]}
+    finally:
+        con.close()
+
+
+def _alter(zeile, stichtag) -> int | None:
+    """Das Alter am ersten Veranstaltungstag, soweit bekannt."""
+    if zeile["volljaehrig"]:
+        return 18
+    if not zeile["geburtsdatum"]:
+        return None
+    try:
+        return selbstanmeldung.alter_am(date.fromisoformat(zeile["geburtsdatum"]), stichtag)
+    except ValueError:
+        return None
 
 
 def _schicht_text(s) -> str:
@@ -1003,7 +1112,7 @@ def anmeldung_laden(vid: int, anmelder_id: int) -> dict | None:
         ergebnis = []
         for person in personen:
             schichten = con.execute(
-                "SELECT s.*, b.name AS bereich, b.treffpunkt, e.art"
+                "SELECT s.*, b.name AS bereich, b.treffpunkt, e.art, e.id AS einteilung_id"
                 " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
                 " JOIN bereich b ON b.id = s.bereich_id"
                 " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? ORDER BY s.beginn",
@@ -1027,6 +1136,265 @@ def interesse_vormerken(vid: int, email: str, vorname: str) -> bool:
                 "INSERT INTO interesse (veranstaltung_id, email, vorname, angelegt_am)"
                 " VALUES (?, ?, ?, ?) ON CONFLICT (veranstaltung_id, email) DO NOTHING",
                 (vid, email, vorname, jetzt())).rowcount > 0
+    finally:
+        con.close()
+
+
+# --- Wiedererkennen, Bestätigen, Mein Helferplatz (Lastenheft 2.4) ---------
+
+def _gleicher_name(a: str, b: str) -> bool:
+    """„Müller“, „Mueller“ und „Muller“ sind derselbe Name (kern/suchen.py)."""
+    return bool(set(suchen.varianten(a)) & set(suchen.varianten(b)))
+
+
+def erkennen(person: dict) -> tuple[str, list[Zeile]]:
+    """Ob es die anmeldende Person schon gibt (A-11, I-05).
+
+    'bekannt': gleicher Name, gleiche Adresse – derselbe Mensch.
+    'vielleicht': der Name in anderer Schreibweise mit derselben Adresse,
+    oder derselbe Name mit derselben Nummer – „Bist du das?“. Nur Personen
+    mit eigener Adresse, sonst gäbe es keinen Weg, den Link zu schicken.
+    """
+    con = verbinden()
+    try:
+        genau = con.execute("SELECT * FROM helfer WHERE schluessel = ?",
+                            (normalisieren.schluessel(person["name"], person["email"]),)).fetchone()
+        if genau is not None:
+            return "bekannt", [genau]
+        kandidaten = con.execute(
+            "SELECT * FROM helfer WHERE email <> '' AND (lower(email) = ?"
+            " OR (? <> '' AND telefon = ?)) ORDER BY id",
+            (person["email"].lower(), person["telefon"] or "", person["telefon"] or "")).fetchall()
+    finally:
+        con.close()
+    passend = [k for k in kandidaten if _gleicher_name(k["name"], person["name"])]
+    return ("vielleicht", passend) if passend else ("", [])
+
+
+def nach_email(email: str) -> list[Zeile]:
+    """Wer diese Adresse als eigene hat – für „Link anfordern“."""
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM helfer WHERE lower(email) = ? AND email <> ''"
+                           " ORDER BY id", ((email or "").lower(),)).fetchall()
+    finally:
+        con.close()
+
+
+def bestaetigen(helfer_id: int) -> bool:
+    """Die Adresse ist bestätigt (I-03). True, wenn sie es vorher nicht war."""
+    con = verbinden()
+    try:
+        with con:
+            geaendert = con.execute(
+                "UPDATE helfer SET email_bestaetigt_am = ? WHERE id = ?"
+                " AND email_bestaetigt_am IS NULL", (jetzt(), helfer_id)).rowcount > 0
+            if geaendert:
+                _protokollieren(con, helfer_id, "selbst", "Adresse bestätigt")
+        return geaendert
+    finally:
+        con.close()
+
+
+def code_falsch(helfer_id: int) -> int:
+    """Zählt einen falschen Code; gibt die Zahl der Fehlversuche zurück."""
+    con = verbinden()
+    try:
+        with con:
+            return int(con.execute(
+                "UPDATE helfer SET code_versuche = code_versuche + 1 WHERE id = ?"
+                " RETURNING code_versuche", (helfer_id,)).fetchone()[0])
+    finally:
+        con.close()
+
+
+def teilnahmen(helfer_ids) -> list[int]:
+    """Die Veranstaltungen, bei denen eine dieser Personen mitmacht – mit
+    Teilnahme oder Schicht."""
+    con = verbinden()
+    try:
+        return [int(z["vid"]) for z in con.execute(
+            "SELECT DISTINCT vid FROM ("
+            " SELECT veranstaltung_id AS vid FROM teilnahme WHERE helfer_id = ANY(?)"
+            " UNION SELECT s.veranstaltung_id FROM einteilung e"
+            " JOIN schicht s ON s.id = e.schicht_id WHERE e.helfer_id = ANY(?)) x",
+            (list(helfer_ids), list(helfer_ids))).fetchall()]
+    finally:
+        con.close()
+
+
+def mitangemeldete(helfer_id: int) -> list[Zeile]:
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM helfer WHERE angemeldet_von = ? ORDER BY id",
+                           (helfer_id,)).fetchall()
+    finally:
+        con.close()
+
+
+def kalender(helfer_id: int) -> list[Zeile]:
+    """Alle Schichten und Springer-Zeiten der Person und ihrer
+    Mitangemeldeten in Veranstaltungen, die nicht archiviert sind – fürs
+    Kalender-Abo (A-10)."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT 'e' || e.id AS uid, s.beginn, s.ende, b.name AS bereich,"
+            " COALESCE(NULLIF(s.ort, ''), b.treffpunkt) AS ort, e.art, h.vorname, h.name,"
+            " h.id AS helfer_id, v.kurz FROM einteilung e"
+            " JOIN schicht s ON s.id = e.schicht_id JOIN bereich b ON b.id = s.bereich_id"
+            " JOIN helfer h ON h.id = e.helfer_id"
+            " JOIN kern.veranstaltung v ON v.id = s.veranstaltung_id"
+            " WHERE (h.id = ? OR h.angemeldet_von = ?) AND v.status <> 'archiviert'"
+            " UNION ALL"
+            " SELECT 'v' || f.id, f.beginn, f.ende, 'Springer', '', 'platz', h.vorname, h.name,"
+            " h.id, v.kurz FROM verfuegbarkeit f JOIN helfer h ON h.id = f.helfer_id"
+            " JOIN kern.veranstaltung v ON v.id = f.veranstaltung_id"
+            " WHERE (h.id = ? OR h.angemeldet_von = ?) AND f.springer = 1"
+            " AND v.status <> 'archiviert'"
+            " ORDER BY beginn", (helfer_id, helfer_id, helfer_id, helfer_id)).fetchall()
+    finally:
+        con.close()
+
+
+def unbestaetigt(stunden: int, nur_unerinnert: bool = False) -> list[dict]:
+    """Wer sich selbst angemeldet und vor mehr als `stunden` noch nicht
+    bestätigt hat (I-03) – nur die Anmeldenden, Mitangemeldete hängen an
+    ihnen. Mit der Veranstaltung der ersten Anmeldung."""
+    grenze = (jetzt_lokal() - timedelta(hours=stunden)).strftime("%Y-%m-%d %H:%M:%S")
+    con = verbinden()
+    try:
+        return [dict(z) for z in con.execute(
+            "SELECT DISTINCT ON (h.id) h.*, t.veranstaltung_id, t.angemeldet_am"
+            " FROM helfer h JOIN teilnahme t ON t.helfer_id = h.id AND t.quelle = 'selbst'"
+            " WHERE h.email_bestaetigt_am IS NULL AND h.angemeldet_von IS NULL"
+            " AND h.email <> '' AND t.angemeldet_am <= ?"
+            + (" AND h.erinnert_am IS NULL" if nur_unerinnert else "") +
+            " ORDER BY h.id, t.angemeldet_am", (grenze,)).fetchall()]
+    finally:
+        con.close()
+
+
+def erinnert(helfer_id: int) -> None:
+    con = verbinden()
+    try:
+        with con:
+            con.execute("UPDATE helfer SET erinnert_am = ? WHERE id = ?", (jetzt(), helfer_id))
+    finally:
+        con.close()
+
+
+def verfallen_lassen(helfer_id: int) -> list[int]:
+    """Gibt die Plätze einer nie bestätigten Anmeldung frei (I-03): die
+    selbst gebuchten Einteilungen, Springer-Zeiten und Teilnahmen der Person
+    und ihrer Mitangemeldeten. Wer danach an nichts mehr hängt, wird
+    gelöscht – Angaben, die niemand bestätigt hat, behalten wir nicht.
+    Gibt die frei gewordenen Schichten zurück."""
+    con = verbinden()
+    try:
+        with con:
+            personen = [helfer_id] + [z["id"] for z in con.execute(
+                "SELECT id FROM helfer WHERE angemeldet_von = ?", (helfer_id,)).fetchall()]
+            frei = [int(z["schicht_id"]) for z in con.execute(
+                "DELETE FROM einteilung WHERE helfer_id = ANY(?) AND quelle = 'selbst'"
+                " RETURNING schicht_id", (personen,)).fetchall()]
+            con.execute("DELETE FROM verfuegbarkeit WHERE helfer_id = ANY(?)", (personen,))
+            con.execute("DELETE FROM teilnahme WHERE helfer_id = ANY(?) AND quelle = 'selbst'",
+                        (personen,))
+            # Mitangemeldete zuerst, sonst setzt das Löschen der Anmeldenden
+            # angemeldet_von auf NULL, bevor sie geprüft sind.
+            for nummer in reversed(personen):
+                con.execute(
+                    "DELETE FROM helfer h WHERE h.id = ? AND h.email_bestaetigt_am IS NULL"
+                    " AND h.tshirt_ausgegeben_am IS NULL"
+                    " AND NOT EXISTS (SELECT 1 FROM einteilung WHERE helfer_id = h.id)"
+                    " AND NOT EXISTS (SELECT 1 FROM teilnahme WHERE helfer_id = h.id)"
+                    " AND NOT EXISTS (SELECT 1 FROM ausleihe WHERE helfer_id = h.id)",
+                    (nummer,))
+            if con.execute("SELECT 1 FROM helfer WHERE id = ?", (helfer_id,)).fetchone():
+                _protokollieren(con, helfer_id, "", "Nicht bestätigt – Plätze freigegeben")
+        return sorted(set(frei))
+    finally:
+        con.close()
+
+
+def moegliche_dubletten() -> list[dict]:
+    """Paare, die vielleicht derselbe Mensch sind (I-05): Name in irgendeiner
+    Schreibweise gleich und dazu Adresse oder Nummer. Zusammenführen kommt
+    mit I-06; bis dahin sieht die Orga sie wenigstens."""
+    con = verbinden()
+    try:
+        paare = con.execute(
+            "SELECT a.id AS a_id, a.name AS a_name, a.email AS a_email,"
+            " b.id AS b_id, b.name AS b_name, b.email AS b_email"
+            " FROM helfer a JOIN helfer b ON a.id < b.id"
+            " AND ((a.email <> '' AND lower(a.email) = lower(b.email))"
+            "      OR (a.telefon <> '' AND a.telefon = b.telefon))"
+            " ORDER BY a.id, b.id").fetchall()
+    finally:
+        con.close()
+    return [dict(z) for z in paare if _gleicher_name(z["a_name"], z["b_name"])]
+
+
+# --- Mails (Lastenheft 2.4, C-01) ------------------------------------------
+
+def mail_einreihen(helfer_id: int | None, mail: tuple, con: Verbindung | None = None) -> None:
+    """mail = (typ, empfänger, betreff, text) aus mail.py."""
+    typ, empfaenger, betreff, text = mail
+    eigene = con is None
+    con = con or verbinden()
+    try:
+        with (con if eigene else _offen()):
+            con.execute(
+                "INSERT INTO mail_out (helfer_id, typ, empfaenger, betreff, body, angelegt_am)"
+                " VALUES (?, ?, ?, ?, ?, ?)", (helfer_id, typ, empfaenger, betreff, text, jetzt()))
+    finally:
+        if eigene:
+            con.close()
+
+
+def mails_faellig(grenze: int = 20) -> list[Zeile]:
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT * FROM mail_out WHERE gesendet_am IS NULL AND versuche < ?"
+            " AND (naechster_versuch IS NULL OR naechster_versuch <= ?)"
+            " ORDER BY id LIMIT ?", (config.MAIL_MAX_VERSUCHE, jetzt(), grenze)).fetchall()
+    finally:
+        con.close()
+
+
+def mail_gesendet(mail_id: int) -> None:
+    con = verbinden()
+    try:
+        with con:
+            con.execute("UPDATE mail_out SET gesendet_am = ?, versuche = versuche + 1,"
+                        " letzter_fehler = NULL, naechster_versuch = NULL WHERE id = ?",
+                        (jetzt(), mail_id))
+    finally:
+        con.close()
+
+
+def mail_fehlgeschlagen(mail_id: int, fehler: str, naechster_versuch: str | None) -> None:
+    con = verbinden()
+    try:
+        with con:
+            con.execute("UPDATE mail_out SET versuche = versuche + 1, letzter_fehler = ?,"
+                        " naechster_versuch = ? WHERE id = ?",
+                        (fehler[:500], naechster_versuch, mail_id))
+    finally:
+        con.close()
+
+
+def mails_aufraeumen(tage: int = 30) -> int:
+    """Verschickte Mails nach einem Monat weg – darin stehen Namen, Schichten
+    und Links, und gebraucht wird davon nichts mehr."""
+    grenze = (jetzt_lokal() - timedelta(days=tage)).strftime("%Y-%m-%d %H:%M:%S")
+    con = verbinden()
+    try:
+        with con:
+            return con.execute("DELETE FROM mail_out WHERE gesendet_am IS NOT NULL"
+                               " AND gesendet_am < ?", (grenze,)).rowcount
     finally:
         con.close()
 

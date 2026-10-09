@@ -55,8 +55,10 @@ def tupel(zeilen):
 
 db_url = testdb.wegwerf("helfer_grenzen")
 os.environ["DATABASE_URL"] = db_url
+# Derselbe Schlüssel wie der Server – für die persönlichen Links.
+os.environ["APP_SECRET_KEY"] = "test-schluessel"
 
-from app import db  # noqa: E402
+from app import db, zugang  # noqa: E402
 
 db.init()
 VA = db.VERANSTALTUNGEN.anlegen({"name": "Die absolute Abfahrt 2027", "kurz": "AA 2027",
@@ -213,8 +215,24 @@ try:
            "die Seite zeigt die Grenzen so, dass die Person sie lesen könnte")
     pruefe("Verlauf" in seite and "aufheben" in seite, "mit Verlauf und zum Aufheben")
 
-    print("Still in der Anmeldung (K-06)")
-    status, _, seite = melde_an("Anna", "anna@example.org", [FRUEH])
+    print("Still in Mein Helferplatz (K-06)")
+    # Anna ist bekannt – sie bucht über ihren persönlichen Link (2.4).
+    PLATZ = "/platz/" + zugang.token(zugang.PLATZ, db.helfer_laden(ANNA))
+
+    def dazu(schichten, neue=()):
+        daten = [("s", s) for s in schichten] + [("wer", ANNA), ("aktion", "eintragen"),
+                                                  ("weitere", len(neue))]
+        for i, n in enumerate(neue):
+            daten += [(f"p{i}-vorname", n), (f"p{i}-nachname", "Berg"),
+                      (f"p{i}-volljaehrig", "ja")]
+        return anfrage("POST", PLATZ + "/aa-2027/angaben", daten)
+
+    _, _, seite = anfrage("GET", PLATZ + "/aa-2027/schichten")
+    pruefe('name="s" value="%d"' % POSTEN in seite or "Eingetragen: du" in seite,
+           "Annas Liste lädt")
+    pruefe(all('name="s" value="%d"' % s not in seite for s in (FRUEH, MITTAG, POSTEN_SO)),
+           "was hinter einer Grenze liegt, steht nicht in ihrer Liste")
+    status, _, seite = dazu([FRUEH])
     anna_text = gruende(seite)
     status_voll, _, seite_voll = melde_an("Cleo", "cleo@example.org", [VOLL])
     voll_text = gruende(seite_voll)
@@ -225,13 +243,14 @@ try:
            "Anna bekommt wortgleich dieselbe Antwort wie bei einer vollen Schicht: "
            + (anna_text[0] if anna_text else "–"))
     pruefe("Grenze" not in seite and "Einsatz" not in seite, "kein Wort von einer Grenze")
-    status, _, seite = melde_an("Anna", "anna@example.org", [POSTEN_SO])
-    pruefe(status == 409 and "gerade nicht frei" in seite, "auch nicht die eine gesperrte Schicht")
-    status, _, seite = melde_an("Anna", "anna@example.org", [MITTAG], weitere=["Fritz"])
+    status, _, seite = dazu([POSTEN_SO])
+    pruefe(status == 409 and "gerade nicht frei" in seite,
+           "auch nicht die eine gesperrte Schicht, selbst über einen gebauten Link")
+    status, _, seite = dazu([MITTAG], neue=["Fritz"])
     pruefe(status == 409 and "gerade nicht für alle 2 Platz" in seite,
            "mit einer Mitanmeldung klingt es wie eine knappe Schicht")
-    status, _, _ = melde_an("Bert", "bert@example.org", [FRUEH])
-    pruefe(status == 303, "Bert kommt in dieselbe Schicht – die Grenze gilt nur Anna")
+    status, _, _ = melde_an("Berta", "berta@example.org", [FRUEH])
+    pruefe(status == 303, "Berta kommt in dieselbe Schicht – die Grenze gilt nur Anna")
     _, _, seite = anfrage("GET", "/aa-2027/schichten")
     pruefe('name="s" value="%d"' % MITTAG in seite, "die öffentliche Liste bleibt für alle gleich")
 
@@ -329,7 +348,7 @@ try:
            "die Grenze ist weg")
     pruefe(("AD", "Einsatzgrenze aufgehoben: Shuttle – nicht anbieten") in zeilen(
         "SELECT wer, was FROM protokoll WHERE helfer_id = ?", ANNA), "das steht im Protokoll")
-    status, _, _ = melde_an("Anna", "anna@example.org", [FRUEH])
+    status, _, _ = dazu([FRUEH])
     pruefe(status == 303, "danach kommt Anna in den Shuttle")
     status, ort, _ = anfrage("POST", "/helfer/grenze/99999/aufheben", {"csrf": ACSRF}, ada)
     pruefe("hinweis=unbekannt" in ort, "eine Grenze, die es nicht gibt, meldet sich")
