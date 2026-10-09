@@ -6,9 +6,12 @@
      "monitor" -> Schaltflaeche, die das Overlay oeffnet (siehe monitor.js)
      ""        -> gar nichts, nur ansehen
 
-   Alle Positionen sind Prozentwerte und kommen fertig aus band.py. Im Browser
-   rechnet nichts nach: die Monitoransicht holt sich das Band beim Auffrischen
-   ohnehin neu, samt verschobener Jetzt-Linie. #}
+   Alle Positionen kommen fertig aus band.py, als Klassen auf einem Raster
+   (kern/static/band.css): band-links-N und band-rechts-N sind der Abstand vom
+   linken und vom rechten Rand. Kein style-Attribut - die Content-Security-
+   Policy auf dem Server verwirft Inline-Stile. Im Browser rechnet nichts
+   nach: die Monitoransicht holt sich das Band beim Auffrischen ohnehin neu,
+   samt verschobener Jetzt-Linie. Wer das Makro nutzt, bindet band.css ein. #}
 
 {% macro zeichnen(band, ziel='') %}
 <div class="band">
@@ -16,23 +19,19 @@
 
     {# Stundenraster. Liegt hinter den Balken, deshalb zuerst. #}
     {% for s in band.stunden %}
-      <span class="band-strich{% if s.tageswechsel %} band-tageswechsel{% endif %}{% if s.rand %} band-strich-{{ s.rand }}{% endif %}"
-            style="left: {{ s.prozent }}%"></span>
-      <span class="band-stunde{% if s.tageswechsel %} band-stunde-wechsel{% endif %}{% if s.rand %} band-stunde-{{ s.rand }}{% endif %}"
-            style="left: {{ s.prozent }}%">{{ s.text }}</span>
+      <span class="band-strich band-links-{{ s.raster }}{% if s.tageswechsel %} band-tageswechsel{% endif %}{% if s.rand %} band-strich-{{ s.rand }}{% endif %}"></span>
+      <span class="band-stunde band-links-{{ s.raster }}{% if s.tageswechsel %} band-stunde-wechsel{% endif %}{% if s.rand %} band-stunde-{{ s.rand }}{% endif %}">{{ s.text }}</span>
     {% endfor %}
 
     {% if band.jetzt_prozent is not none %}
-      <span class="band-jetzt{% if band.jetzt_rand %} band-jetzt-{{ band.jetzt_rand }}{% endif %}"
-            style="left: {{ band.jetzt_prozent }}%"
+      <span class="band-jetzt band-links-{{ band.jetzt_raster }}{% if band.jetzt_rand %} band-jetzt-{{ band.jetzt_rand }}{% endif %}"
             role="img" aria-label="jetzt"></span>
     {% endif %}
 
     {% for spur in band.programm_spuren %}
       <div class="band-spur">
         {% for b in spur %}
-          <span class="band-balken band-programm band-serie-{{ b.serie }}{% if b.offen %} band-offen{% endif %}"
-                style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
+          <span class="band-balken band-programm band-serie-{{ b.serie }}{% if b.offen %} band-offen{% endif %} band-links-{{ b.raster_links }} band-rechts-{{ b.raster_rechts }}"
                 title="{{ b.titel }} · {{ b.von_uhr }}{% if b.bis_uhr %}–{{ b.bis_uhr }}{% else %} (offenes Ende){% endif %}">{{ b.beschriftung }}</span>
         {% endfor %}
       </div>
@@ -50,17 +49,14 @@
                          ~ ' · ' ~ b.besetzt ~ ' von ' ~ b.soll
                          ~ (' · ' ~ b.fehlt ~ ' fehlen' if b.fehlt else ' · voll') %}
           {% if ziel == 'admin' %}
-            <a class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
-               style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
+            <a class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %} band-links-{{ b.raster_links }} band-rechts-{{ b.raster_rechts }}"
                href="/helfer/schicht/{{ b.id }}" title="{{ marke }}">{{ beschriftung }}</a>
           {% elif ziel == 'monitor' %}
             <button type="button"
-                    class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
-                    style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
+                    class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %} band-links-{{ b.raster_links }} band-rechts-{{ b.raster_rechts }}"
                     data-schicht="{{ b.id }}" title="{{ marke }}">{{ beschriftung }}</button>
           {% else %}
-            <span class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %}"
-                  style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
+            <span class="band-balken band-schicht{% if b.fehlt %} band-luecke{% endif %} band-links-{{ b.raster_links }} band-rechts-{{ b.raster_rechts }}"
                   title="{{ marke }}">{{ beschriftung }}</span>
           {% endif %}
         {% endfor %}
@@ -73,12 +69,10 @@
           {% for b in spur %}
             {% set marke = b.titel ~ ' · ' ~ b.von_uhr ~ '–' ~ b.bis_uhr %}
             {% if ziel == 'admin' %}
-              <a class="band-balken band-aufgabe band-status-{{ b.status }}"
-                 style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
+              <a class="band-balken band-aufgabe band-status-{{ b.status }} band-links-{{ b.raster_links }} band-rechts-{{ b.raster_rechts }}"
                  href="/helfer/aufgabe/{{ b.id }}" title="{{ marke }}">{{ b.beschriftung }}</a>
             {% else %}
-              <span class="band-balken band-aufgabe band-status-{{ b.status }}"
-                    style="left: {{ b.links }}%;{% if b.rechts_buendig %} right: 0{% else %} width: {{ b.breite }}%{% endif %}"
+              <span class="band-balken band-aufgabe band-status-{{ b.status }} band-links-{{ b.raster_links }} band-rechts-{{ b.raster_rechts }}"
                     title="{{ marke }}">{{ b.beschriftung }}</span>
             {% endif %}
           {% endfor %}

@@ -11,8 +11,8 @@
      gruppen       die Gruppen des offenen Reiters, wenn er welche hat
      bereichsnav   die Punkte der offenen Gruppe
      va_*          die Auswahl der Veranstaltung im Kopf (navigation.kopf)
-   und über Blöcke: `leiste` für eine Zeile unter der Navigation,
-   `skript` für Skripte am Seitenende. #}
+   und über Blöcke: `kopf` für weitere Stylesheets, `leiste` für eine Zeile
+   unter der Navigation, `skript` für Skripte am Seitenende. #}
 <!doctype html>
 <html lang="de">
 <head>
@@ -24,6 +24,7 @@
      Dienst ausgeliefert, nicht von einer der Anwendungen - sonst haenge es
      davon ab, in welchem Bereich man gerade ist. #}
   <link rel="stylesheet" href="/static/admin.css">
+  {% block kopf %}{% endblock %}
 </head>
 <body>
   <div class="huelle {% block breite %}huelle-breit{% endblock %}">

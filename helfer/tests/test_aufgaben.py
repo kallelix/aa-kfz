@@ -327,6 +327,9 @@ try:
     pruefe("band-aufgabe" in seite, "die Aufgaben des Tages stehen im Band")
     pruefe(seite.count('href="/helfer/aufgabe/') >= 2,
            "und führen auf ihre Seite")
+    pruefe("style=" not in seite and "band-links-" in seite
+           and 'href="/helfer/gemeinsam/band.css"' in seite,
+           "Positionen als Rasterklassen aus band.css, kein style-Attribut (CSP)")
     _, _, seite = anfrage("GET", "/helfer/band?tag=2026-08-30")
     pruefe("band-aufgabe" not in seite,
            "an einem Tag ohne Aufgaben steht auch keine im Band")

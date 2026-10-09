@@ -9,6 +9,11 @@ Browser läuft dafür kein Skript: die Monitoransicht holt sich das Band beim
 Auffrischen ohnehin neu, und was der Server schon weiß, muss er nicht zweimal
 sagen.
 
+In die Seite kommen die Positionen als Klassen auf einem Raster, nicht als
+style-Attribut: die Content-Security-Policy auf dem Server (style-src 'self')
+verwirft Inline-Stile, und das Band fiele dort in sich zusammen. Die Klassen
+stehen in kern/static/band.css, die raster_css() schreibt.
+
 Drei Dinge, die das Band von einer simplen Liste unterscheiden:
 
 * **Offene Enden bleiben offen.** "ab 13.30 Uhr" bekommt keinen Balken mit
@@ -36,6 +41,10 @@ MINDESTBREITE_SERIE = 14.0
 
 # Wenn der Tag sonst zu schmal wäre, mindestens so viele Stunden zeigen.
 MINDESTSPANNE = 4 * 60
+
+# Rasterschritte je Prozent der Achse: Viertelprozent, auf einem breiten
+# Monitor gut vier Pixel. Feiner hieße mehr Klassen in band.css.
+RASTER = 4
 
 
 def minuten(zeitstempel: str | None, basis: str) -> int | None:
@@ -159,6 +168,9 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
     def prozent(minute: int) -> float:
         return round((minute - von) / spanne * 100, 3)
 
+    def raster(wert: float) -> int:
+        return round(wert * RASTER)
+
     def zeichnen(eintrag: dict) -> dict:
         links = prozent(eintrag["von"])
         rechts = 100.0 if eintrag["offen"] else prozent(eintrag["bis"])
@@ -168,6 +180,10 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
         # sonst steht die Ansicht mit einem Rollbalken für zwei Pixel da.
         if links + breite > 100:
             links = max(0.0, 100 - breite)
+        rechts_buendig = links + breite >= 99.995
+        # Beide Kanten aufs Raster, nicht Anfang und Breite: so schließt ein
+        # Balken, der um 12:00 beginnt, bündig an den an, der um 12:00 endet.
+        ende = 100 * RASTER if rechts_buendig else raster(links + breite)
         beschriftung = ""
         if breite >= MINDESTBREITE_SERIE and eintrag["art"] == "programm":
             beschriftung = eintrag["titel"]
@@ -181,7 +197,11 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
                 # entscheidet die Rundung von Prozent auf Pixel darüber, ob
                 # ein Bruchteil hinausragt - und schon zeigt der Browser einen
                 # waagerechten Rollbalken fuer nichts.
-                "rechts_buendig": links + breite >= 99.995,
+                "rechts_buendig": rechts_buendig,
+                # Die Klassen band-links-N und band-rechts-N: Abstand vom
+                # linken und vom rechten Rand in Rasterschritten.
+                "raster_links": raster(links),
+                "raster_rechts": 100 * RASTER - ende,
                 "beschriftung": beschriftung,
                 "farbe": farben.get(eintrag.get("serie", ""), ""),
                 "von_uhr": _uhr(eintrag["von"]),
@@ -207,6 +227,7 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
         stunde = (minute // 60) % 24
         stunden.append({
             "prozent": prozent(minute),
+            "raster": raster(prozent(minute)),
             "text": "%02d" % stunde,
             # Mitternacht bekommt einen eigenen Strich: sonst läse sich die
             # "08" einer Nachtschicht wie der Morgen desselben Tages.
@@ -240,6 +261,7 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
         "bis_uhr": _uhr(bis),
         "stunden": stunden,
         "jetzt_prozent": jetzt_prozent,
+        "jetzt_raster": None if jetzt_prozent is None else raster(jetzt_prozent),
         "jetzt_rand": jetzt_rand,
         "programm_spuren": programm_spuren,
         "schicht_spuren": schicht_spuren,
@@ -251,3 +273,28 @@ def bauen(datum: str, programm: list[dict], schichten: list[dict],
 
 def _uhr(minute: int) -> str:
     return "%02d:%02d" % ((minute // 60) % 24, minute % 60)
+
+
+def raster_css() -> str:
+    """Der Inhalt von kern/static/band.css: eine Klasse je Rasterschritt,
+    für den Abstand vom linken und vom rechten Rand.
+
+    Ändert sich RASTER, die Datei neu schreiben (im Verzeichnis helfer):
+        python -m app.band
+    test_band.py prüft, dass sie zu RASTER passt.
+    """
+    zeilen = ["/* Positionen im Programm-Band (helfer/app/band.py, RASTER = %d)." % RASTER,
+              "   Erzeugt mit `python -m app.band` - nicht von Hand aendern. Klassen statt",
+              "   style-Attribut, weil die Content-Security-Policy Inline-Stile verwirft. */"]
+    schritte = range(100 * RASTER + 1)
+    zeilen += [".band-links-%d{left:%s%%}" % (n, format(n / RASTER, "g")) for n in schritte]
+    zeilen += [".band-rechts-%d{right:%s%%}" % (n, format(n / RASTER, "g")) for n in schritte]
+    return "\n".join(zeilen) + "\n"
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    ziel = Path(__file__).resolve().parents[2] / "kern" / "static" / "band.css"
+    ziel.write_text(raster_css(), encoding="utf-8", newline="\n")
+    print("geschrieben:", ziel)

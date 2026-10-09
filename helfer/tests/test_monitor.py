@@ -298,6 +298,8 @@ try:
     pruefe('data-quelle="/monitor/' + TOKEN + '/inhalt"' in seite,
            "das Skript kennt seine Quelle")
     pruefe("monitor.js" in seite, "das Skript ist eingebunden")
+    pruefe('href="/gemeinsam/band.css"' in seite,
+           "und die Rasterklassen fuer das Band im Tagesblick")
     pruefe("http-equiv=\"refresh\"" in seite and "<noscript>" in seite,
            "ohne JavaScript laedt die Seite selbst neu")
 
@@ -368,6 +370,9 @@ try:
            "zweimal antippbar: als Balken im Band und als Kachel in der Liste")
     pruefe("band-jetzt" not in tagseite,
            "an einem kuenftigen Tag steht keine Jetzt-Linie im Band")
+    pruefe("style=" not in tagseite and "band-links-" in tagseite
+           and "band-rechts-" in tagseite,
+           "Positionen als Rasterklassen, kein style-Attribut (CSP)")
     pruefe("Sonntagsprogramm" in tagseite, "das Programm des Tages steht dabei")
     pruefe("Pflichttraining" not in tagseite, "das von heute nicht")
 

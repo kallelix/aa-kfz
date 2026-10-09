@@ -73,6 +73,9 @@ pruefe(len(b["stunden"]) == 7, "sieben Stundenmarken (07 bis 13)")
 pruefe(b["stunden"][0]["prozent"] == 0.0
        and b["stunden"][-1]["prozent"] == 100.0,
        "die erste sitzt links, die letzte rechts")
+pruefe(b["stunden"][0]["raster"] == 0
+       and b["stunden"][-1]["raster"] == 100 * band.RASTER,
+       "auch auf dem Raster")
 pruefe([s["text"] for s in b["stunden"]] ==
        ["07", "08", "09", "10", "11", "12", "13"], "mit den richtigen Zahlen")
 
@@ -135,6 +138,7 @@ b = band.bauen(TAG, [], [schicht(1, "Dienst", "08:00", "18:00", 1, 1)],
                jetzt=datetime(2026, 8, 29, 13, 0))
 pruefe(b["jetzt_prozent"] == 50.0, "13:00 liegt mittig zwischen 08 und 18: "
        + str(b["jetzt_prozent"]))
+pruefe(b["jetzt_raster"] == 50 * band.RASTER, "auch auf dem Raster")
 b = band.bauen(TAG, [], [schicht(1, "Dienst", "08:00", "18:00", 1, 1)],
                jetzt=datetime(2026, 8, 31, 13, 0))
 pruefe(b["jetzt_prozent"] is None,
@@ -210,6 +214,7 @@ b = band.bauen(TAG, [programmpunkt("Rennlauf", "11:30", None)], [])
 rennlauf = b["programm_spuren"][0][0]
 pruefe(rennlauf["rechts_buendig"],
        "der offene Balken reicht bis zur Achse und wird rechts verankert")
+pruefe(rennlauf["raster_rechts"] == 0, "mit Abstand null zum rechten Rand")
 
 # Ohne offenen Balken endet die Achse am letzten Ende - die Schicht dort ist
 # dann buendig, die davor nicht.
@@ -220,6 +225,10 @@ pruefe(alle["Spaet"]["rechts_buendig"],
        "die letzte Schicht endet buendig und wird ebenso verankert")
 pruefe(not alle["Frueh"]["rechts_buendig"],
        "was mittendrin endet, wird weiter ueber die Breite bemessen")
+pruefe(alle["Spaet"]["raster_rechts"] == 0 and alle["Frueh"]["raster_rechts"] > 0,
+       "auf dem Raster: die letzte ohne Abstand nach rechts, die davor mit")
+pruefe(100 * band.RASTER - alle["Frueh"]["raster_rechts"] == alle["Spaet"]["raster_links"],
+       "und wo die eine endet, beginnt die andere - keine Luecke, kein Ueberlapp")
 
 print("Balken bleiben innerhalb der Achse")
 b = band.bauen(TAG, [programmpunkt("A", "08:00", "09:00"),
@@ -239,6 +248,22 @@ pruefe(all(x["links"] + x["breite"] <= 100.0 for x in alle),
        "auch der Winzling am Ende bleibt innerhalb: "
        + str([(x["titel"], round(x["links"] + x["breite"], 3)) for x in alle]))
 pruefe(all(x["breite"] > 0 for x in alle), "jeder ist sichtbar breit")
+pruefe(all(0 <= x["raster_links"] and 0 <= x["raster_rechts"]
+           and x["raster_links"] + x["raster_rechts"] < 100 * band.RASTER for x in alle),
+       "auch auf dem Raster: innerhalb und mindestens einen Schritt breit: "
+       + str([(x["raster_links"], x["raster_rechts"]) for x in alle]))
+
+print("Rasterklassen statt style-Attribut")
+# Die Content-Security-Policy auf dem Server verwirft Inline-Stile. Die
+# Klassen liegen deshalb in einer Datei, und die muss zum Raster passen.
+datei = WURZEL.parent / "kern" / "static" / "band.css"
+pruefe(datei.exists() and datei.read_text(encoding="utf-8").replace("\r\n", "\n")
+       == band.raster_css(), "kern/static/band.css passt zu RASTER (sonst: python -m app.band)")
+pruefe(".band-links-%d{left:100%%}" % (100 * band.RASTER) in band.raster_css()
+       and ".band-rechts-1{right:%s%%}" % format(1 / band.RASTER, "g") in band.raster_css(),
+       "von null bis ganz rechts, in Schritten von 1/RASTER Prozent")
+vorlage = (WURZEL / "app" / "templates" / "band.html").read_text(encoding="utf-8")
+pruefe("style=" not in vorlage, "das Band setzt kein style-Attribut")
 
 print()
 if fehler:
