@@ -2,7 +2,7 @@
 
 Einer der drei Bereiche im gemeinsamen Dienst – wie das Ganze zusammenhängt,
 steht in der [Übersicht](../README.md). Schichten, Helfer und ihre Einteilung,
-der Aufgabenplan, die Ausgabe von T-Shirts, Funkgeräten und KFZ-Schlüsseln –
+der Aufgabenplan, die Ausgabe von T-Shirts, Funkgeräten, Schlüsseln und anderem Material –
 und ein Monitor, auf den alle schauen. Grundlage ist
 [docs/plan-helfer-dashboard.md](../docs/plan-helfer-dashboard.md).
 
@@ -366,10 +366,16 @@ Reiter.
     Goodies mit Shirt ausgibt
   - **Monitor** – der Link für den Bildschirm
 
-**Ausgabe** – Funkgeräte und KFZ-Schlüssel ausgeben und zurücknehmen. Der
-Fahrzeugstamm baut sich bei der Schlüsselausgabe nebenbei auf. Bei der Ausgabe
-unterschreibt der Helfer auf dem Tablet, bei der Rücknahme nicht – wer etwas
-hinlegt, ist meist schon wieder weg.
+**Ausgabe** – ein Tisch für alles, was die Veranstaltung ausgibt (Lastenheft
+3.8, V-09): Funkgeräte, Fahrzeugschlüssel und was sonst unter Material steht.
+Ein Vorgang ist eine Person – ein Helfer aus der Auswahl oder jemand anderes,
+von dem nur der Name bekannt ist –, je Material eine Menge und, wo verlangt,
+Nummer oder Kennzeichen. Der Fahrzeugstamm baut sich bei Kennzeichen nebenbei
+auf. Zurück geht alles oder nur ein Teil; ein Material ohne Rückgabe ist mit
+der Übergabe erledigt. Bei der Ausgabe unterschreibt die Person auf dem
+Tablet, sofern ein Material es verlangt, bei der Rücknahme nicht – wer etwas
+hinlegt, ist meist schon wieder weg. Die alten Adressen `/helfer/funk` und
+`/helfer/schluessel` führen hierher.
 
 **Verwaltung**, bei der gewählten Veranstaltung – was man für sie einmal
 einrichtet:
@@ -383,11 +389,16 @@ einrichtet:
   Lauf übernimmt nichts, was nach einem Ausfall aussieht.
 - **Zeitplan-Abruf** – holt die Zeitpläne der Rennserien täglich von deren
   Websites und bildet die Wochentage auf die Renntage ab.
-- **Material** und **Tablet** – was bei einer Ausgabe vorgeschlagen wird, und
-  der Link fürs Tablet, auf dem unterschrieben wird.
+- **Material** – was die Ausgabe ausgibt: je Material mit oder ohne Rückgabe,
+  mit oder ohne Unterschrift, mit Nummer, Kennzeichen oder nichts, und womit
+  das Formular vorbelegt ist. Funkgerät, Headset, Ersatzakku und
+  Fahrzeugschlüssel lassen sich mit einem Klick anlegen; die Vorlage aus
+  einer früheren Veranstaltung nimmt die Materialien mit. Was schon
+  herausging, lässt sich nicht löschen.
+- **Tablet** – der Link fürs Tablet, auf dem unterschrieben wird.
 
-Die Adressen sind dieselben geblieben (`/helfer/funk`, `/helfer/goodies` …);
-nur die Navigation ordnet sie anders ein.
+Die Adressen sind dieselben geblieben (`/helfer/goodies` …); nur die
+Navigation ordnet sie anders ein.
 
 Ein Konto mit der Rolle *Bereichsleitung* sieht nur den Reiter Helfer und
 darin *Meine Bereiche* – beschränkt auf die Bereiche, die es leitet. Dort
@@ -430,7 +441,8 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_abruf.py        # Abruf der Helferliste, ohne Netz
 .venv/Scripts/python.exe helfer/tests/test_import.py       # CSV-Import und Backoffice
 .venv/Scripts/python.exe helfer/tests/test_aufgaben.py     # Aufgabenplan, Konfliktschutz
-.venv/Scripts/python.exe helfer/tests/test_material.py     # T-Shirts, Funkgeräte, Schlüssel
+.venv/Scripts/python.exe helfer/tests/test_material.py     # T-Shirts, Material, Ausgabe, Fahrzeugstamm
+.venv/Scripts/python.exe helfer/tests/test_material_migration.py  # Funk und Schlüssel ins Material übernommen
 .venv/Scripts/python.exe helfer/tests/test_unterschrift.py # Unterschriften am Tablet
 .venv/Scripts/python.exe helfer/tests/test_monitor.py      # Monitor mit gestellter Uhr
 .venv/Scripts/python.exe helfer/tests/test_bereiche.py     # Bereiche, Schichten, Goodies, Vorlage

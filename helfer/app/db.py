@@ -703,8 +703,8 @@ def vorlagen(vid: int) -> list[Zeile]:
 
 
 def vorlage_uebernehmen(vid: int, quelle_id: int, wer: str = "") -> dict | None:
-    """Bereiche, Schichten, Goodies und das Angebot einer früheren
-    Veranstaltung in diese kopieren. Die Schichten wandern um so viele Tage,
+    """Bereiche, Schichten, Goodies, das Angebot und die Materialien der
+    Ausgabe einer früheren Veranstaltung in diese kopieren. Die Schichten wandern um so viele Tage,
     wie die beiden Veranstaltungen auseinanderliegen – gemessen am ersten
     Tag. Einteilungen bleiben, wo sie sind: die Leute haben sich für damals
     gemeldet, nicht für jetzt. Einsatzgrenzen auf ganze Bereiche kommen mit
@@ -777,8 +777,13 @@ def vorlage_uebernehmen(vid: int, quelle_id: int, wer: str = "") -> dict | None:
                 " SELECT ?, goodies, shirt, schnitte, verpflegung, party, ? FROM angebot"
                 " WHERE veranstaltung_id = ? ON CONFLICT (veranstaltung_id) DO NOTHING",
                 (vid, jetzt(), quelle_id))
+            # Die Materialien der Ausgabe (V-09), soweit es sie hier noch
+            # nicht gibt.
+            material = sum(1 for m in con.execute(
+                "SELECT * FROM material WHERE veranstaltung_id = ? ORDER BY reihenfolge, id",
+                (quelle_id,)).fetchall() if _material_einfuegen(con, vid, dict(m)) is not None)
         return {"bereiche": len(neu), "schichten": len(schichten),
-                "goodies": len(goodies), "tage": tage}
+                "goodies": len(goodies), "material": material, "tage": tage}
     finally:
         con.close()
 
@@ -1451,7 +1456,7 @@ def verfallen_lassen(helfer_id: int) -> list[int]:
                     " AND h.tshirt_ausgegeben_am IS NULL"
                     " AND NOT EXISTS (SELECT 1 FROM einteilung WHERE helfer_id = h.id)"
                     " AND NOT EXISTS (SELECT 1 FROM teilnahme WHERE helfer_id = h.id)"
-                    " AND NOT EXISTS (SELECT 1 FROM ausleihe WHERE helfer_id = h.id)",
+                    " AND NOT EXISTS (SELECT 1 FROM ausgabe WHERE helfer_id = h.id)",
                     (nummer,))
             if con.execute("SELECT 1 FROM helfer WHERE id = ?", (helfer_id,)).fetchone():
                 _protokollieren(con, helfer_id, "", "Nicht bestätigt – Plätze freigegeben")
@@ -1789,7 +1794,7 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                         "  AND x.bereich_id IS NOT DISTINCT FROM g.bereich_id"
                         "  AND x.schicht_id IS NOT DISTINCT FROM g.schicht_id)", (weg, behalten))
             for tabelle in ("verfuegbarkeit", "einsatzgrenze", "einladung", "erinnerung",
-                            "ausleihe", "protokoll", "absage", "mail_out"):
+                            "ausgabe", "protokoll", "absage", "mail_out"):
                 con.execute("UPDATE " + tabelle + " SET helfer_id = ? WHERE helfer_id = ?",
                             (behalten, weg))
             # Die Unterschrift unter der Shirt-Ausgabe hängt an der Person.
@@ -1847,7 +1852,7 @@ def vergleich(helfer_id: int) -> dict | None:
                 "schichten": zahl("SELECT COUNT(*) FROM einteilung WHERE helfer_id = ?"),
                 "warteliste": zahl("SELECT COUNT(*) FROM warteliste WHERE helfer_id = ?"),
                 "springer": zahl("SELECT COUNT(*) FROM verfuegbarkeit WHERE helfer_id = ?"),
-                "ausleihen": zahl("SELECT COUNT(*) FROM ausleihe WHERE helfer_id = ?"),
+                "ausleihen": zahl("SELECT COUNT(*) FROM ausgabe WHERE helfer_id = ?"),
                 "mitgebracht": zahl("SELECT COUNT(*) FROM helfer WHERE angemeldet_von = ?")}
     finally:
         con.close()
@@ -2304,7 +2309,7 @@ def _nach_rueckgabe_loeschen(con: Verbindung) -> int:
     """Wer löschen wollte und nichts mehr ausgeliehen hat, ist jetzt weg."""
     zeilen = con.execute(
         "SELECT h.id FROM helfer h WHERE h.loeschen_beantragt_am IS NOT NULL"
-        " AND NOT EXISTS (SELECT 1 FROM ausleihe a WHERE a.helfer_id = h.id"
+        " AND NOT EXISTS (SELECT 1 FROM ausgabe a WHERE a.helfer_id = h.id"
         " AND a.zurueck_am IS NULL)").fetchall()
     for z in zeilen:
         _loeschen(con, z["id"])
@@ -2345,7 +2350,7 @@ def loeschen(anmelder_id: int, helfer_ids: list[int]) -> dict:
                         (helfer_id, marke(jetzt_lokal()))).fetchall():
                     ergebnis["abgaben"].append(_abgeben(con, e, "Daten gelöscht"))
                 con.execute("DELETE FROM warteliste WHERE helfer_id = ?", (helfer_id,))
-                offen = con.execute("SELECT 1 FROM ausleihe WHERE helfer_id = ?"
+                offen = con.execute("SELECT 1 FROM ausgabe WHERE helfer_id = ?"
                                     " AND zurueck_am IS NULL", (helfer_id,)).fetchone()
                 if offen:
                     con.execute("UPDATE helfer SET loeschen_beantragt_am = ? WHERE id = ?",
@@ -3552,225 +3557,146 @@ def helfer_umbenennen(helfer_id: int, name: str) -> bool:
         con.close()
 
 
-def ausleihe_mit_name(ausleihe_id: int) -> Zeile | None:
-    """Eine Ausleihe samt Name der Person – für den Wortlaut am Tablet."""
-    con = verbinden()
-    try:
-        return con.execute(
-            "SELECT a.*, h.name FROM ausleihe a JOIN helfer h ON h.id = a.helfer_id"
-            " WHERE a.id = ?", (ausleihe_id,)).fetchone()
-    finally:
-        con.close()
+# --- Materialausgabe (Lastenheft 3.8, V-09) ---------------------------------
+#
+# Je Veranstaltung eine Liste von Materialien. Ausgegeben wird in Vorgängen
+# (ausgabe): eine Person – Helfer oder jemand anderes –, ein Zeitpunkt, eine
+# Unterschrift, und je Material ein Posten mit Menge und, wo verlangt,
+# Nummer oder Kennzeichen. Funkgerät, Headset, Ersatzakku und
+# Fahrzeugschlüssel sind vier Materialien unter vielen; Migration 0014 hat
+# sie aus den alten Tabellen ausleihe und schluessel übernommen.
+#
+# Ein Vorgang ist offen, solange zurueck_am leer ist – bis alles zurück ist,
+# was zurückkommen muss. Ohne Rückgabe ist er mit der Übergabe erledigt.
 
-
-def schluessel_mit_fahrzeug(schluessel_id: int) -> Zeile | None:
-    """Ein Schlüsselvorgang samt Kennzeichen – für den Wortlaut am Tablet."""
-    con = verbinden()
-    try:
-        return con.execute(
-            "SELECT s.*, f.kennzeichen FROM schluessel s"
-            " JOIN fahrzeug f ON f.id = s.fahrzeug_id WHERE s.id = ?",
-            (schluessel_id,)).fetchone()
-    finally:
-        con.close()
-
-
-def ausleihe_laden(ausleihe_id: int) -> Zeile | None:
-    con = verbinden()
-    try:
-        return con.execute("SELECT * FROM ausleihe WHERE id = ?",
-                           (ausleihe_id,)).fetchone()
-    finally:
-        con.close()
-
-
-def schluessel_umbenennen(schluessel_id: int, name: str) -> bool:
-    """Der Name am Schlüsselvorgang – und im Fahrzeugstamm, falls dort noch
-    keiner steht."""
-    sauber = normalisieren.text(name)
-    if not sauber:
-        return False
-    con = verbinden()
-    try:
-        with con:
-            zeile = con.execute("SELECT * FROM schluessel WHERE id = ?",
-                                (schluessel_id,)).fetchone()
-            if zeile is None:
-                return False
-            con.execute("UPDATE schluessel SET name = ? WHERE id = ?",
-                        (sauber, schluessel_id))
-            con.execute(
-                "UPDATE fahrzeug SET name = ?, geaendert_am = ?"
-                " WHERE id = ? AND TRIM(name) = ''",
-                (sauber, jetzt(), zeile["fahrzeug_id"]))
-        return True
-    finally:
-        con.close()
-
-
-# --- Materialausleihe ------------------------------------------------------
-
-MATERIAL = ("funke", "headset", "ersatzakku")
-MATERIAL_TEXT = {"funke": "Funkgerät", "headset": "Headset",
-                 "ersatzakku": "Ersatzakku"}
-
-
-# Womit das Ausgabeformular vorbelegt ist, wenn nichts eingestellt wurde.
-# Ein Funkgerät ist der Normalfall, der Rest die Ausnahme.
-MATERIAL_VORGABE = {"funke": 1, "headset": 0, "ersatzakku": 0}
+ERFASSEN = {"": "nichts", "nummer": "Nummer", "kennzeichen": "Kennzeichen"}
 
 # Höher als das ist keine Vorbelegung mehr, sondern ein Tippfehler.
 MATERIAL_VORGABE_MAX = 20
 
+# Was eine Veranstaltung mit einem Klick bekommt: das, was es bisher gab.
+MATERIAL_STANDARD = (
+    {"name": "Funkgerät", "rueckgabe": 1, "unterschrift": 1, "erfassen": "", "vorgabe": 1},
+    {"name": "Headset", "rueckgabe": 1, "unterschrift": 1, "erfassen": "", "vorgabe": 0},
+    {"name": "Ersatzakku", "rueckgabe": 1, "unterschrift": 1, "erfassen": "", "vorgabe": 0},
+    {"name": "Fahrzeugschlüssel", "rueckgabe": 1, "unterschrift": 1, "erfassen": "kennzeichen",
+     "vorgabe": 0},
+)
 
-def material_vorgaben() -> dict[str, int]:
-    """Die Vorbelegung des Ausgabeformulars.
-
-    Steht in der Einstellungstabelle und nicht in der .env: das ist ein Wert,
-    den die Orga im laufenden Betrieb ändern will, wenn sich herausstellt,
-    dass jeder auch ein Headset bekommt. Ein Neustart des Dienstes dafür wäre
-    unverhältnismäßig.
-    """
-    ergebnis = {}
-    for stueck in MATERIAL:
-        roh = einstellung("vorgabe_" + stueck)
-        try:
-            wert = int(roh)
-        except (TypeError, ValueError):
-            wert = MATERIAL_VORGABE[stueck]
-        ergebnis[stueck] = min(max(0, wert), MATERIAL_VORGABE_MAX)
-    return ergebnis
+_MATERIAL_FELDER = ("name", "rueckgabe", "unterschrift", "erfassen", "vorgabe")
 
 
-def material_vorgaben_setzen(werte: dict) -> dict[str, int]:
-    """Speichert die Vorbelegung und gibt zurück, was tatsächlich gilt."""
-    for stueck in MATERIAL:
-        try:
-            wert = int(str(werte.get(stueck, "")).strip())
-        except (TypeError, ValueError):
-            continue
-        einstellung_setzen("vorgabe_" + stueck,
-                           str(min(max(0, wert), MATERIAL_VORGABE_MAX)))
-    return material_vorgaben()
+def materialien(vid: int) -> list[Zeile]:
+    """Was die Veranstaltung ausgibt, in der eingestellten Reihenfolge – je
+    Material mit der Zahl der Vorgänge, in denen es schon herausging."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT m.*, (SELECT COUNT(*) FROM ausgabe_posten p"
+            "  WHERE p.material_id = m.id) AS ausgegeben"
+            " FROM material m WHERE m.veranstaltung_id = ?"
+            " ORDER BY m.reihenfolge, lower(m.name)", (vid,)).fetchall()
+    finally:
+        con.close()
 
 
-def ausleihen(vid: int, helfer_id: int, mengen: dict, datum: str | None = None,
-              bemerkung: str = "", kuerzel: str = "") -> int | None:
-    def menge(stueck):
-        try:
-            return max(0, int(mengen.get(stueck, 0) or 0))
-        except (TypeError, ValueError):
-            return 0
+def material_laden(material_id: int) -> Zeile | None:
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM material WHERE id = ?", (material_id,)).fetchone()
+    finally:
+        con.close()
 
-    if sum(menge(s) for s in MATERIAL) <= 0:
+
+def _material_einfuegen(con: Verbindung, vid: int, werte: dict) -> int | None:
+    reihenfolge = con.execute("SELECT COALESCE(max(reihenfolge), 0) + 1 FROM material"
+                              " WHERE veranstaltung_id = ?", (vid,)).fetchone()[0]
+    zeile = con.execute(
+        "INSERT INTO material (veranstaltung_id, " + ", ".join(_MATERIAL_FELDER) +
+        ", reihenfolge, angelegt_am) VALUES (?, " + ", ".join("?" for _ in _MATERIAL_FELDER) +
+        ", ?, ?) ON CONFLICT (veranstaltung_id, name) DO NOTHING RETURNING id",
+        (vid, *(werte[f] for f in _MATERIAL_FELDER), reihenfolge, jetzt())).fetchone()
+    return int(zeile[0]) if zeile else None
+
+
+def material_anlegen(vid: int, werte: dict) -> int | None:
+    """None, wenn es ein Material dieses Namens schon gibt."""
+    con = verbinden()
+    try:
+        with con:
+            return _material_einfuegen(con, vid, werte)
+    finally:
+        con.close()
+
+
+def material_aendern(material_id: int, werte: dict) -> bool | None:
+    """False, wenn es das Material nicht mehr gibt; None, wenn der Name schon
+    vergeben ist."""
+    con = verbinden()
+    try:
+        with con:
+            return con.execute(
+                "UPDATE material SET " + ", ".join(f + " = ?" for f in _MATERIAL_FELDER) +
+                " WHERE id = ?", (*(werte[f] for f in _MATERIAL_FELDER), material_id)
+            ).rowcount > 0
+    except IntegrityError:
         return None
+    finally:
+        con.close()
 
+
+def material_loeschen(material_id: int) -> str:
+    """'weg', 'ausgegeben' (dann bleibt es – sonst verschwände, was jemand
+    unterschrieben hat) oder 'unbekannt'."""
     con = verbinden()
     try:
         with con:
-            zeiger = con.execute(
-                "INSERT INTO ausleihe (veranstaltung_id, helfer_id, datum, funke,"
-                " headset, ersatzakku, bemerkung, ausgegeben_am, ausgegeben_von)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
-                (vid, helfer_id, datum or None, *[menge(s) for s in MATERIAL],
-                 normalisieren.text(bemerkung), jetzt(), kuerzel))
-            nummer = int(zeiger.fetchone()[0])
-        return nummer
+            if con.execute("SELECT 1 FROM ausgabe_posten WHERE material_id = ?",
+                           (material_id,)).fetchone():
+                return "ausgegeben"
+            return "weg" if con.execute("DELETE FROM material WHERE id = ?",
+                                        (material_id,)).rowcount else "unbekannt"
     finally:
         con.close()
 
 
-def ausleihe_zurueck(ausleihe_id: int, mengen: dict | None = None,
-                     kuerzel: str = "") -> bool:
-    """Ohne `mengen` kommt alles zurück. Mit `mengen` nur ein Teil – wer das
-    Funkgerät bringt und den Ersatzakku behält, ist der Normalfall und kein
-    Sonderfall, für den man erst etwas erfinden müsste."""
+def material_standard(vid: int) -> int:
+    """Funkgerät, Headset, Ersatzakku und Fahrzeugschlüssel – was es davon
+    noch nicht gibt. Gibt zurück, wie viele dazukamen."""
     con = verbinden()
     try:
         with con:
-            zeile = con.execute(
-                "SELECT * FROM ausleihe WHERE id = ? FOR UPDATE",
-                (ausleihe_id,)).fetchone()
-            if zeile is None:
-                return False
-
-            neu = {}
-            for stueck in MATERIAL:
-                if mengen is None:
-                    neu[stueck] = zeile[stueck]
-                else:
-                    try:
-                        wert = int(mengen.get(stueck, 0) or 0)
-                    except (TypeError, ValueError):
-                        wert = 0
-                    neu[stueck] = min(max(0, wert), zeile[stueck])
-
-            vollstaendig = all(neu[s] >= zeile[s] for s in MATERIAL)
-            con.execute(
-                "UPDATE ausleihe SET funke_zurueck = ?, headset_zurueck = ?,"
-                " ersatzakku_zurueck = ?, zurueck_am = ?, zurueck_von = ?"
-                " WHERE id = ?",
-                (*[neu[s] for s in MATERIAL],
-                 jetzt() if vollstaendig else None,
-                 kuerzel if vollstaendig else zeile["zurueck_von"],
-                 ausleihe_id))
-            # Wer seine Daten löschen wollte, als noch etwas ausgeliehen war,
-            # ist jetzt dran (S-05) – samt der Unterschrift als Beleg.
-            if vollstaendig:
-                _nach_rueckgabe_loeschen(con)
-        return True
+            return sum(1 for werte in MATERIAL_STANDARD
+                       if _material_einfuegen(con, vid, werte) is not None)
     finally:
         con.close()
 
 
-def ausleihe_loeschen(ausleihe_id: int) -> bool:
-    con = verbinden()
-    try:
-        with con:
-            zeiger = con.execute("DELETE FROM ausleihe WHERE id = ?",
-                                 (ausleihe_id,))
-        return zeiger.rowcount > 0
-    finally:
-        con.close()
+def _fahrzeug_sichern(con: Verbindung, kennzeichen: str, name: str = "",
+                      bemerkung: str = "") -> tuple[int | None, bool]:
+    norm = normalisieren.kennzeichen(kennzeichen)
+    if not norm:
+        return None, False
+    vorhanden = con.execute("SELECT * FROM fahrzeug WHERE kennzeichen_norm = ?",
+                            (norm,)).fetchone()
+    if vorhanden is None:
+        zeiger = con.execute(
+            "INSERT INTO fahrzeug (kennzeichen, kennzeichen_norm, name, bemerkung, angelegt_am)"
+            " VALUES (?, ?, ?, ?, ?) RETURNING id",
+            (normalisieren.kennzeichen_anzeige(kennzeichen), norm,
+             normalisieren.text(name), normalisieren.text(bemerkung), jetzt()))
+        return int(zeiger.fetchone()[0]), True
+    aenderungen, werte = [], []
+    for spalte, wert in (("name", name), ("bemerkung", bemerkung)):
+        sauber = normalisieren.text(wert)
+        if sauber and not vorhanden[spalte]:
+            aenderungen.append(spalte + " = ?")
+            werte.append(sauber)
+    if aenderungen:
+        con.execute("UPDATE fahrzeug SET " + ", ".join(aenderungen) +
+                    ", geaendert_am = ? WHERE id = ?", (*werte, jetzt(), vorhanden["id"]))
+    return int(vorhanden["id"]), False
 
-
-def ausleihen_liste(vid: int, nur_offen: bool = False) -> list[Zeile]:
-    con = verbinden()
-    try:
-        return _mit_suche(con.execute(
-            "SELECT a.*, h.name, h.email, h.telefon,"
-            " (a.funke - a.funke_zurueck) AS funke_offen,"
-            " (a.headset - a.headset_zurueck) AS headset_offen,"
-            " (a.ersatzakku - a.ersatzakku_zurueck) AS ersatzakku_offen"
-            " FROM ausleihe a"
-            " JOIN helfer h ON h.id = a.helfer_id"
-            " WHERE a.veranstaltung_id = ?" +
-            (" AND a.zurueck_am IS NULL" if nur_offen else "") +
-            " ORDER BY a.zurueck_am IS NOT NULL, a.ausgegeben_am DESC", (vid,)
-        ).fetchall(), "name", "bemerkung")
-    finally:
-        con.close()
-
-
-def material_zaehler(vid: int) -> dict:
-    """Was insgesamt herausging und was davon noch draußen ist."""
-    con = verbinden()
-    try:
-        teile = []
-        for stueck in MATERIAL:
-            teile.append("COALESCE(SUM(" + stueck + "), 0) AS " + stueck + "_raus")
-            teile.append("COALESCE(SUM(" + stueck + " - " + stueck +
-                         "_zurueck), 0) AS " + stueck + "_offen")
-        zeile = con.execute("SELECT " + ", ".join(teile) +
-                            " FROM ausleihe WHERE veranstaltung_id = ?",
-                            (vid,)).fetchone()
-        return {s: {"raus": zeile[s + "_raus"], "offen": zeile[s + "_offen"]}
-                for s in MATERIAL}
-    finally:
-        con.close()
-
-
-# --- Fahrzeuge und Schlüssel -----------------------------------------------
 
 def fahrzeug_sichern(kennzeichen: str, name: str = "",
                      bemerkung: str = "") -> tuple[int | None, bool]:
@@ -3781,38 +3707,197 @@ def fahrzeug_sichern(kennzeichen: str, name: str = "",
     da. Leere Felder werden ergänzt, gefüllte bleiben stehen – eine spätere
     Ausgabe ohne Namen soll den vorhandenen nicht löschen.
     """
-    norm = normalisieren.kennzeichen(kennzeichen)
-    if not norm:
-        return None, False
-
     con = verbinden()
     try:
         with con:
-            vorhanden = con.execute(
-                "SELECT * FROM fahrzeug WHERE kennzeichen_norm = ?",
-                (norm,)).fetchone()
-            if vorhanden is None:
-                zeiger = con.execute(
-                    "INSERT INTO fahrzeug (kennzeichen, kennzeichen_norm,"
-                    " name, bemerkung, angelegt_am) VALUES (?, ?, ?, ?, ?)"
-                    " RETURNING id",
-                    (normalisieren.kennzeichen_anzeige(kennzeichen), norm,
-                     normalisieren.text(name), normalisieren.text(bemerkung),
-                     jetzt()))
-                return int(zeiger.fetchone()[0]), True
+            return _fahrzeug_sichern(con, kennzeichen, name, bemerkung)
+    finally:
+        con.close()
 
-            aenderungen, werte = [], []
-            for spalte, wert in (("name", name), ("bemerkung", bemerkung)):
-                sauber = normalisieren.text(wert)
-                if sauber and not vorhanden[spalte]:
-                    aenderungen.append(spalte + " = ?")
-                    werte.append(sauber)
-            if aenderungen:
-                con.execute(
-                    "UPDATE fahrzeug SET " + ", ".join(aenderungen) +
-                    ", geaendert_am = ? WHERE id = ?",
-                    (*werte, jetzt(), vorhanden["id"]))
-            return int(vorhanden["id"]), False
+
+def ausgeben(vid: int, helfer_id: int | None, name: str, posten: list[dict],
+             datum: str | None = None, bemerkung: str = "",
+             kuerzel: str = "") -> tuple[int | None, bool]:
+    """Ein Vorgang: an einen Helfer oder an jemanden, von dem nur der Name
+    bekannt ist. `posten`: je Material {material_id, menge, nummer}. Bei
+    Kennzeichen baut sich der Fahrzeugstamm mit auf.
+
+    Gibt (id, neues_fahrzeug) zurück; (None, False), wenn nichts herausgeht
+    oder niemand genannt ist."""
+    posten = [p for p in posten if p["menge"] > 0]
+    name = normalisieren.text(name)[:120]
+    if not posten or (helfer_id is None and not name):
+        return None, False
+    con = verbinden()
+    try:
+        with con:
+            material = {m["id"]: m for m in con.execute(
+                "SELECT * FROM material WHERE veranstaltung_id = ? AND id = ANY(?)",
+                (vid, [p["material_id"] for p in posten])).fetchall()}
+            if any(p["material_id"] not in material for p in posten):
+                return None, False
+            if helfer_id is not None:
+                person = con.execute("SELECT name FROM helfer WHERE id = ?",
+                                     (helfer_id,)).fetchone()
+                if person is None:
+                    return None, False
+                name = person["name"]
+            rueckgabe = any(material[p["material_id"]]["rueckgabe"] for p in posten)
+            ausgabe_id = int(con.execute(
+                "INSERT INTO ausgabe (veranstaltung_id, helfer_id, name, datum, bemerkung,"
+                " ausgegeben_am, ausgegeben_von, zurueck_am) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                " RETURNING id",
+                (vid, helfer_id, name, datum or None, normalisieren.text(bemerkung)[:200],
+                 jetzt(), kuerzel, None if rueckgabe else jetzt())).fetchone()[0])
+            fahrzeug_neu = False
+            for p in posten:
+                nummer = normalisieren.text(p.get("nummer"))[:60]
+                fahrzeug_id = None
+                if material[p["material_id"]]["erfassen"] == "kennzeichen" and nummer:
+                    fahrzeug_id, neu = _fahrzeug_sichern(con, nummer, name)
+                    fahrzeug_neu = fahrzeug_neu or neu
+                    # Die Schreibweise aus dem Stamm: „ILX999“ getippt ist
+                    # der Wagen, der dort als „IL-X 999“ steht.
+                    nummer = con.execute("SELECT kennzeichen FROM fahrzeug WHERE id = ?",
+                                         (fahrzeug_id,)).fetchone()[0]
+                con.execute("INSERT INTO ausgabe_posten (ausgabe_id, material_id, menge, nummer,"
+                            " fahrzeug_id) VALUES (?, ?, ?, ?, ?)",
+                            (ausgabe_id, p["material_id"], p["menge"], nummer, fahrzeug_id))
+            return ausgabe_id, fahrzeug_neu
+    finally:
+        con.close()
+
+
+def _posten(con: Verbindung, ausgabe_ids) -> dict[int, list[dict]]:
+    ergebnis: dict[int, list[dict]] = {}
+    for z in con.execute(
+            "SELECT p.*, m.name AS material, m.rueckgabe, m.erfassen, m.unterschrift"
+            " FROM ausgabe_posten p JOIN material m ON m.id = p.material_id"
+            " WHERE p.ausgabe_id = ANY(?) ORDER BY m.reihenfolge, lower(m.name), p.id",
+            (list(ausgabe_ids),)).fetchall():
+        ergebnis.setdefault(z["ausgabe_id"], []).append(dict(z))
+    return ergebnis
+
+
+def ausgabe_laden(ausgabe_id: int) -> dict | None:
+    """Ein Vorgang samt Posten und dem Namen, unter dem die Person jetzt
+    steht – für Wortlaut und Rücknahme."""
+    con = verbinden()
+    try:
+        zeile = con.execute(
+            "SELECT a.*, COALESCE(h.name, a.name) AS wer FROM ausgabe a"
+            " LEFT JOIN helfer h ON h.id = a.helfer_id WHERE a.id = ?",
+            (ausgabe_id,)).fetchone()
+        if zeile is None:
+            return None
+        return {**zeile, "posten": _posten(con, [ausgabe_id]).get(ausgabe_id, [])}
+    finally:
+        con.close()
+
+
+def ausgabe_zurueck(ausgabe_id: int, mengen: dict | None = None, kuerzel: str = "") -> bool:
+    """Ohne `mengen` kommt alles zurück. Mit `mengen` – je Posten, was
+    zurück ist – nur ein Teil: wer das Funkgerät bringt und den Ersatzakku
+    behält, ist der Normalfall und kein Sonderfall."""
+    con = verbinden()
+    try:
+        with con:
+            zeile = con.execute("SELECT * FROM ausgabe WHERE id = ? FOR UPDATE",
+                                (ausgabe_id,)).fetchone()
+            if zeile is None:
+                return False
+            vollstaendig = True
+            for p in _posten(con, [ausgabe_id]).get(ausgabe_id, []):
+                if not p["rueckgabe"]:
+                    continue
+                if mengen is None:
+                    neu = p["menge"]
+                else:
+                    try:
+                        neu = int(mengen.get(p["id"], 0) or 0)
+                    except (TypeError, ValueError):
+                        neu = 0
+                    neu = min(max(0, neu), p["menge"])
+                vollstaendig = vollstaendig and neu >= p["menge"]
+                con.execute("UPDATE ausgabe_posten SET zurueck = ? WHERE id = ?", (neu, p["id"]))
+            con.execute("UPDATE ausgabe SET zurueck_am = ?, zurueck_von = ? WHERE id = ?",
+                        (jetzt() if vollstaendig else None,
+                         kuerzel if vollstaendig else zeile["zurueck_von"], ausgabe_id))
+            # Wer seine Daten löschen wollte, als noch etwas ausgeliehen war,
+            # ist jetzt dran (S-05) – samt der Unterschrift als Beleg.
+            if vollstaendig:
+                _nach_rueckgabe_loeschen(con)
+        return True
+    finally:
+        con.close()
+
+
+def ausgabe_loeschen(ausgabe_id: int) -> bool:
+    con = verbinden()
+    try:
+        with con:
+            return con.execute("DELETE FROM ausgabe WHERE id = ?", (ausgabe_id,)).rowcount > 0
+    finally:
+        con.close()
+
+
+def ausgaben_liste(vid: int, nur_offen: bool = False) -> list[dict]:
+    """Die Vorgänge, die offenen zuerst, je mit ihren Posten und dem, wonach
+    die Liste sucht: Name, Bemerkung, Nummern und Kennzeichen."""
+    con = verbinden()
+    try:
+        zeilen = [dict(z) for z in con.execute(
+            "SELECT a.*, COALESCE(h.name, a.name) AS wer FROM ausgabe a"
+            " LEFT JOIN helfer h ON h.id = a.helfer_id WHERE a.veranstaltung_id = ?" +
+            (" AND a.zurueck_am IS NULL" if nur_offen else "") +
+            " ORDER BY a.zurueck_am IS NOT NULL, a.ausgegeben_am DESC, a.id DESC",
+            (vid,)).fetchall()]
+        posten = _posten(con, [z["id"] for z in zeilen])
+    finally:
+        con.close()
+    for z in zeilen:
+        z["posten"] = posten.get(z["id"], [])
+        z["rueckgabe"] = any(p["rueckgabe"] for p in z["posten"])
+        nummern = " ".join(p["nummer"] for p in z["posten"] if p["nummer"])
+        z["suche"] = normalisieren.suchtext(z["wer"], z["bemerkung"], nummern,
+                                            normalisieren.kennzeichen(nummern) or "")
+    return zeilen
+
+
+def ausgabe_zaehler(vid: int) -> list[dict]:
+    """Je Material, was insgesamt herausging und was davon noch draußen ist."""
+    con = verbinden()
+    try:
+        return [dict(z) for z in con.execute(
+            "SELECT m.id, m.name, m.rueckgabe,"
+            " COALESCE(SUM(p.menge), 0) AS raus,"
+            " COALESCE(SUM(CASE WHEN m.rueckgabe = 1 THEN p.menge - p.zurueck END), 0) AS offen"
+            " FROM material m LEFT JOIN ausgabe_posten p ON p.material_id = m.id"
+            " WHERE m.veranstaltung_id = ? GROUP BY m.id"
+            " ORDER BY m.reihenfolge, lower(m.name)", (vid,)).fetchall()]
+    finally:
+        con.close()
+
+
+def ausgabe_umbenennen(ausgabe_id: int, name: str) -> bool:
+    """Der am Tablet korrigierte Name: bei Helfern im Bestand, sonst am
+    Vorgang – und im Fahrzeugstamm, falls dort noch keiner steht."""
+    sauber = normalisieren.text(name)
+    if not sauber:
+        return False
+    zeile = ausgabe_laden(ausgabe_id)
+    if zeile is None:
+        return False
+    if zeile["helfer_id"]:
+        return helfer_umbenennen(zeile["helfer_id"], sauber)
+    con = verbinden()
+    try:
+        with con:
+            con.execute("UPDATE ausgabe SET name = ? WHERE id = ?", (sauber, ausgabe_id))
+            con.execute("UPDATE fahrzeug SET name = ?, geaendert_am = ? WHERE TRIM(name) = ''"
+                        " AND id IN (SELECT fahrzeug_id FROM ausgabe_posten WHERE ausgabe_id = ?)",
+                        (sauber, jetzt(), ausgabe_id))
+        return True
     finally:
         con.close()
 
@@ -3822,37 +3907,26 @@ def fahrzeuge() -> list[Zeile]:
     try:
         return con.execute(
             "SELECT f.*,"
-            " (SELECT COUNT(*) FROM schluessel s WHERE s.fahrzeug_id = f.id"
-            "  AND s.zurueck_am IS NULL) AS draussen,"
-            " (SELECT COUNT(*) FROM schluessel s WHERE s.fahrzeug_id = f.id)"
-            "  AS ausgaben"
+            " (SELECT COUNT(*) FROM ausgabe_posten p WHERE p.fahrzeug_id = f.id"
+            "  AND p.zurueck < p.menge) AS draussen,"
+            " (SELECT COUNT(*) FROM ausgabe_posten p WHERE p.fahrzeug_id = f.id) AS ausgaben"
             " FROM fahrzeug f ORDER BY lower(f.kennzeichen)").fetchall()
     finally:
         con.close()
 
 
 def fahrzeug_loeschen(fahrzeug_id: int) -> str:
-    """Nimmt ein Fahrzeug aus dem Stamm. Gibt zurueck, was daraus wurde.
+    """Nimmt ein Fahrzeug aus dem Stamm. Gibt zurück, was daraus wurde.
 
-    Nur, solange kein Vorgang daran haengt. schluessel.fahrzeug_id ist mit
-    ON DELETE CASCADE verknuepft und die Fremdschluessel sind eingeschaltet:
-    ein Loeschen risse also die ganze Ausgabehistorie des Wagens mit, und die
-    Unterschriften dazu blieben als Verweise ins Leere stehen - die haengen
-    ueber art und vorgang_id daran, ohne Fremdschluessel, der sie
-    mitraeumte.
-
-    Der Stamm baut sich von selbst auf; zu loeschen gibt es hier vor allem
-    Vertipper, und an denen haengt in aller Regel nichts. Wo doch, ist erst
-    der Vorgang zu loeschen - das ist eine bewusste Entscheidung mehr, aber
-    keine, die still Daten verliert.
-    """
+    Nur, solange kein Vorgang daran hängt – sonst risse das Löschen die
+    Ausgabehistorie des Wagens mit, samt Unterschriften. Zu löschen gibt es
+    hier vor allem Vertipper, und an denen hängt in aller Regel nichts."""
     con = verbinden()
     try:
         with con:
             zeile = con.execute(
-                "SELECT (SELECT COUNT(*) FROM schluessel s"
-                "  WHERE s.fahrzeug_id = f.id) AS vorgaenge"
-                " FROM fahrzeug f WHERE f.id = ?", (fahrzeug_id,)).fetchone()
+                "SELECT (SELECT COUNT(*) FROM ausgabe_posten p WHERE p.fahrzeug_id = f.id)"
+                " AS vorgaenge FROM fahrzeug f WHERE f.id = ?", (fahrzeug_id,)).fetchone()
             if zeile is None:
                 return "unbekannt"
             if zeile["vorgaenge"]:
@@ -3875,83 +3949,15 @@ def fahrzeug_suchen(kennzeichen: str) -> Zeile | None:
         con.close()
 
 
-def schluessel_ausgeben(vid: int, fahrzeug_id: int, name: str, bemerkung: str = "",
-                        kuerzel: str = "") -> int:
-    con = verbinden()
-    try:
-        with con:
-            zeiger = con.execute(
-                "INSERT INTO schluessel (veranstaltung_id, fahrzeug_id, name,"
-                " bemerkung, ausgegeben_am, ausgegeben_von)"
-                " VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-                (vid, fahrzeug_id, normalisieren.text(name),
-                 normalisieren.text(bemerkung), jetzt(), kuerzel))
-            nummer = int(zeiger.fetchone()[0])
-        return nummer
-    finally:
-        con.close()
-
-
-def schluessel_zurueck(schluessel_id: int, kuerzel: str = "") -> bool:
-    con = verbinden()
-    try:
-        with con:
-            zeiger = con.execute(
-                "UPDATE schluessel SET zurueck_am = ?, zurueck_von = ?"
-                " WHERE id = ? AND zurueck_am IS NULL",
-                (jetzt(), kuerzel, schluessel_id))
-        return zeiger.rowcount > 0
-    finally:
-        con.close()
-
-
-def schluessel_loeschen(schluessel_id: int) -> bool:
-    con = verbinden()
-    try:
-        with con:
-            zeiger = con.execute("DELETE FROM schluessel WHERE id = ?",
-                                 (schluessel_id,))
-        return zeiger.rowcount > 0
-    finally:
-        con.close()
-
-
-def schluessel_liste(vid: int, nur_offen: bool = False) -> list[Zeile]:
-    con = verbinden()
-    try:
-        return _mit_suche(con.execute(
-            "SELECT s.*, f.kennzeichen, f.kennzeichen_norm,"
-            " f.name AS halter"
-            " FROM schluessel s JOIN fahrzeug f ON f.id = s.fahrzeug_id"
-            " WHERE s.veranstaltung_id = ?" +
-            (" AND s.zurueck_am IS NULL" if nur_offen else "") +
-            " ORDER BY s.zurueck_am IS NOT NULL, s.ausgegeben_am DESC", (vid,)
-        ).fetchall(), "kennzeichen", "kennzeichen_norm", "name", "bemerkung")
-    finally:
-        con.close()
-
-
 def namen_vorschlaege(vid: int) -> list[str]:
-    """Helfernamen für die Vorschlagsliste bei der Schlüsselausgabe.
-
-    Die vom Shuttle zuerst: dort werden die meisten Schlüssel gebraucht. Alle
-    anderen danach – ein Schlüssel kann auch an jemand anderen gehen, und eine
-    Liste, die das ausschließt, wäre im entscheidenden Moment im Weg.
-    """
+    """Namen für „jemand anderes“: wer bei dieser Veranstaltung schon ohne
+    Helfereintrag etwas bekam, und die Halter aus dem Fahrzeugstamm."""
     con = verbinden()
     try:
-        shuttle = [z["name"] for z in con.execute(
-            "SELECT h.name FROM helfer h"
-            " JOIN einteilung e ON e.helfer_id = h.id"
-            " JOIN schicht s ON s.id = e.schicht_id"
-            " JOIN bereich b ON b.id = s.bereich_id"
-            " WHERE b.name ILIKE '%shuttle%' AND s.veranstaltung_id = ?"
-            " GROUP BY h.name ORDER BY lower(h.name)", (vid,))]
-        gesehen = set(shuttle)
-        rest = [z["name"] for z in con.execute(
-            "SELECT name FROM helfer ORDER BY lower(name)")
-            if z["name"] not in gesehen]
-        return shuttle + rest
+        return [z["name"] for z in con.execute(
+            "SELECT DISTINCT name FROM ("
+            " SELECT name FROM ausgabe WHERE veranstaltung_id = ? AND helfer_id IS NULL"
+            " UNION SELECT name FROM fahrzeug) x WHERE name <> '' ORDER BY name", (vid,))]
     finally:
         con.close()
 
@@ -4248,7 +4254,7 @@ def eltern_verfallen_lassen(helfer_id: int) -> list[int]:
                 "DELETE FROM helfer h WHERE h.id = ? AND h.tshirt_ausgegeben_am IS NULL"
                 " AND NOT EXISTS (SELECT 1 FROM einteilung WHERE helfer_id = h.id)"
                 " AND NOT EXISTS (SELECT 1 FROM teilnahme WHERE helfer_id = h.id)"
-                " AND NOT EXISTS (SELECT 1 FROM ausleihe WHERE helfer_id = h.id)"
+                " AND NOT EXISTS (SELECT 1 FROM ausgabe WHERE helfer_id = h.id)"
                 " AND NOT EXISTS (SELECT 1 FROM helfer m WHERE m.angemeldet_von = h.id)",
                 (helfer_id,)).rowcount
             if not weg:

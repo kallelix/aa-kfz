@@ -379,12 +379,14 @@ try:
     pruefe("hinweis=geloescht" in ort and zeilen("SELECT COUNT(*) FROM helfer WHERE id = ?", MIA)
            == [(0,)] and zeilen("SELECT name FROM absage WHERE schicht_id = ? AND helfer_id IS NULL",
                                 POSTEN_SO) == [("",)], "Mia ist weg – auch ihr Name an der Absage")
-    ausleihe = db.ausleihen(VA, BERT, {"funke": 1})
+    db.material_standard(VA)
+    funk = next(m["id"] for m in db.materialien(VA) if m["name"] == "Funkgerät")
+    ausleihe, _ = db.ausgeben(VA, BERT, "", [{"material_id": funk, "menge": 1}])
     status, _, seite = anfrage("POST", platz(BERT) + "/loeschen")
     pruefe(zeilen("SELECT loeschen_beantragt_am IS NOT NULL FROM helfer WHERE id = ?", BERT)
            == [(True,)] and "Funkgerät" in mails("geloescht", "bert@example.org")[0],
            "Bert hat noch ein Funkgerät: gelöscht wird nach der Rückgabe, und die Mail sagt warum")
-    db.ausleihe_zurueck(ausleihe)
+    db.ausgabe_zurueck(ausleihe)
     pruefe(zeilen("SELECT COUNT(*) FROM helfer WHERE id = ?", BERT) == [(0,)],
            "nach der Rückgabe ist Bert weg")
     _, _, seite = anfrage("GET", alt_platz + "/loeschen")

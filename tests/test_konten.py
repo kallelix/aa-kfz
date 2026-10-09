@@ -344,7 +344,7 @@ try:
     gruppen = re.findall(r'>([^<]+)</a>', seite[seite.index('class="gruppen-nav"'):].split("</nav>")[0])
     pruefe(gruppen == ["AA 2027", "Alle Veranstaltungen", "Konten"],
            "unter Verwaltung die gewählte, alle und die Konten: " + ", ".join(gruppen))
-    pruefe('href="/helfer/goodies"' in seite and 'href="/helfer/einstellungen"' in seite,
+    pruefe('href="/helfer/goodies"' in seite and 'href="/helfer/material"' in seite,
            "bei der Veranstaltung, was man für sie einrichtet")
     pruefe(ruf("/veranstaltungen", keks=pia)[0] == 403,
            "wer den Helferbereich nicht sieht, pflegt auch keine Veranstaltungen")

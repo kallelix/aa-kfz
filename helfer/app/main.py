@@ -379,12 +379,14 @@ MELDUNGEN = {
     'tshirt': 'T-Shirt als ausgegeben vermerkt.',
     'tshirt-zurueck': 'Die Ausgabe wurde zurückgenommen.',
     'groesse': 'Diese Größe gibt es nicht.',
-    'ausgegeben': 'Material ausgegeben.',
-    'neu-angelegt': 'Material ausgegeben – die Person war noch nicht erfasst und wurde angelegt.',
-    'nichts': 'Es war nichts zum Ausgeben angekreuzt.',
+    'ausgegeben': 'Ausgegeben.',
+    'nichts': 'Es war nichts zum Ausgeben eingetragen.',
     'zurueck': 'Als zurück vermerkt.',
-    'schluessel-raus': 'Schlüssel ausgegeben.',
-    'fahrzeug-neu': 'Schlüssel ausgegeben – das Fahrzeug war neu und steht jetzt im Stamm.',
+    'fahrzeug-neu': 'Ausgegeben – das Fahrzeug war neu und steht jetzt im Stamm.',
+    'material-neu': 'Material angelegt.',
+    'material-standard': 'Funkgerät, Headset, Ersatzakku und Fahrzeugschlüssel sind angelegt.',
+    'material-weg': 'Material gelöscht.',
+    'material-ausgegeben': 'Dieses Material ging schon heraus und bleibt – sonst verschwände, was jemand unterschrieben hat.',
     'kein-kennzeichen': 'Ohne Kennzeichen geht es nicht.',
     'angefordert': 'Steht auf dem Tablet.',
     'abgebrochen': 'Die Anforderung ist zurückgenommen.',
@@ -449,11 +451,11 @@ GRUPPEN_BEREICHSLEITUNG = [
                         ("/helfer/druck", "Drucken", ())]),
 ]
 
-# Der Reiter Ausgabe. Bis die Materialausgabe verallgemeinert ist (3.8),
-# sind es die beiden Tische von heute.
+# Der Reiter Ausgabe: seit 3.8 ein Tisch für alles, was die Veranstaltung
+# ausgibt. Was das ist, steht unter Verwaltung → Material.
 GRUPPEN_AUSGABE = [
-    ("Ausgabe", [("/helfer/funk", "Funk", ("/helfer/ausleihe",)),
-                 ("/helfer/schluessel", "Schlüssel", ("/helfer/fahrzeug",))]),
+    ("Ausgabe", [("/helfer/ausgabe", "Ausgabe",
+                  ("/helfer/funk", "/helfer/schluessel", "/helfer/fahrzeug"))]),
 ]
 
 
@@ -737,8 +739,9 @@ async def bereiche_aus_vorlage(request: Request,
         return _zurueck("/helfer/bereiche", "vorlage-nicht")
     tage = ergebnis["tage"]
     return _zurueck("/helfer/bereiche", (
-        "Übernommen: %d Bereiche, %d Schichten, %d Goodies. " % (
-            ergebnis["bereiche"], ergebnis["schichten"], ergebnis["goodies"]) +
+        "Übernommen: %d Bereiche, %d Schichten, %d Goodies, %d Materialien. " % (
+            ergebnis["bereiche"], ergebnis["schichten"], ergebnis["goodies"],
+            ergebnis["material"]) +
         ("Die Schichten liegen %d Tage %s." % (abs(tage), "später" if tage > 0 else "früher")
          if tage else "Die Tage sind dieselben.")))
 
@@ -2109,76 +2112,100 @@ async def helfer_sichern(request: Request, helfer_id: int,
     return _zurueck("/helfer/helfer/" + str(helfer_id), "gespeichert")
 
 
-# --- Funkgeräte und Material -----------------------------------------------
+# --- Materialausgabe (Lastenheft 3.8, V-09) ---------------------------------
 
-def _person_aus_formular(daten, sitzung) -> tuple[int | None, str]:
-    """Ermittelt die Person: entweder eine vorhandene aus der Auswahl oder
-    eine neue aus dem Textfeld daneben.
+def _person_aus_formular(daten) -> tuple[int | None, str]:
+    """An wen: jemand aus der Auswahl – oder jemand anderes, von dem nur der
+    Name bekannt ist (V-09: ausgegeben wird an Helfer und an jeden anderen).
 
     Zwei Wege statt eines Namensfeldes mit Vorschlägen, weil Namen hier nicht
     eindeutig sind – "Thomas" gibt es mehrfach. Getippt heißt deshalb immer
-    neu, ausgewählt immer die eine gemeinte Person.
+    jemand anderes, ausgewählt immer die eine gemeinte Person.
     """
-    neuer_name = normalisieren.text(daten.get("neuer_name"))
-    if neuer_name:
-        nummer, _ = db.helfer_von_hand({"name": neuer_name})
-        return nummer, "neu"
+    name = normalisieren.text(daten.get("name"))[:120]
+    if name:
+        return None, name
     try:
         nummer = int(str(daten.get("helfer_id") or ""))
     except ValueError:
-        return None, "keiner"
-    return (nummer, "vorhanden") if db.helfer_laden(nummer) else (None, "keiner")
+        return None, ""
+    return (nummer, "") if db.helfer_laden(nummer) else (None, "")
 
 
-@app.get("/helfer/funk")
-async def funk(request: Request, hinweis: str = "", offen: str = "",
-               sitzung: auth.Sitzung = Depends(_sitzung),
-               v=Depends(_veranstaltung)):
+def _posten_aus_formular(daten, materialien) -> tuple[list[dict], str]:
+    """Je Material die Menge und, wo verlangt, die Nummer. Ein Kennzeichen
+    ist ein Schlüssel – und eins, das sich nicht lesen lässt, keiner."""
+    posten = []
+    for m in materialien:
+        nummer = normalisieren.text(daten.get(f"n-{m['id']}"))
+        if m["erfassen"] == "kennzeichen":
+            if not nummer:
+                continue
+            if not normalisieren.kennzeichen(nummer):
+                return [], "kein-kennzeichen"
+            posten.append({"material_id": m["id"], "menge": 1, "nummer": nummer})
+            continue
+        try:
+            menge = min(max(0, int(str(daten.get(f"m-{m['id']}") or 0))), 99)
+        except ValueError:
+            menge = 0
+        if menge:
+            posten.append({"material_id": m["id"], "menge": menge, "nummer": nummer})
+    return posten, ""
+
+
+@app.get("/helfer/ausgabe")
+async def ausgabe_seite(request: Request, hinweis: str = "", offen: str = "",
+                        sitzung: auth.Sitzung = Depends(_sitzung),
+                        v=Depends(_veranstaltung)):
     # Einmal alles holen und in Python trennen: der Umschalter zeigt beide
     # Zahlen, und zwei Abfragen fuer ein paar Dutzend Zeilen waeren Aufwand
     # ohne Gegenwert.
-    alle = db.ausleihen_liste(v["id"])
+    materialien = db.materialien(v["id"])
+    alle = db.ausgaben_liste(v["id"])
     noch_draussen = [z for z in alle if not z["zurueck_am"]]
+    mit_kennzeichen = any(m["erfassen"] == "kennzeichen" for m in materialien)
     return templates.TemplateResponse(
-        "admin_funk.html",
+        "admin_ausgabe.html",
         _admin(request, sitzung, hinweis=hinweis,
-               ausleihen=noch_draussen if offen else alle,
+               ausgaben=noch_draussen if offen else alle,
                anzahl_alle=len(alle), anzahl_offen=len(noch_draussen),
-               nur_offen=bool(offen), zaehler=db.material_zaehler(v["id"]),
-               material=db.MATERIAL, material_text=db.MATERIAL_TEXT,
-               helfer=db.helfer_liste(v["id"]), tage=db.monitor_tage(v["id"]),
+               nur_offen=bool(offen), zaehler=db.ausgabe_zaehler(v["id"]),
+               materialien=materialien, helfer=db.helfer_liste(v["id"]),
+               namen=db.namen_vorschlaege(v["id"]), tage=db.monitor_tage(v["id"]),
                heute=db.jetzt_lokal().strftime("%Y-%m-%d"),
-               vorgaben=db.material_vorgaben(),
+               fahrzeuge=db.fahrzeuge() if mit_kennzeichen else [],
                unterschrieben=unterschriften.je_vorgang("material"),
                tablet=bool(db.tablet_token())))
 
 
-@app.post("/helfer/funk/ausgeben")
-async def funk_ausgeben(request: Request,
-                        sitzung: auth.Sitzung = Depends(_sitzung),
-                        v=Depends(_veranstaltung)):
+@app.post("/helfer/ausgabe")
+async def ausgeben(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
+                   v=Depends(_veranstaltung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
-
-    helfer_id, woher = _person_aus_formular(daten, sitzung)
-    if helfer_id is None:
-        return _zurueck("/helfer/funk", "keiner")
-
-    datum = _tag_pruefen(str(daten.get("datum") or ""))
-
-    mengen = {stueck: daten.get(stueck) for stueck in db.MATERIAL}
-    nummer = db.ausleihen(v["id"], helfer_id, mengen, datum,
-                          str(daten.get("bemerkung") or ""), sitzung.kuerzel)
+    helfer_id, name = _person_aus_formular(daten)
+    if helfer_id is None and not name:
+        return _zurueck("/helfer/ausgabe", "keiner")
+    materialien = db.materialien(v["id"])
+    posten, fehler = _posten_aus_formular(daten, materialien)
+    if fehler:
+        return _zurueck("/helfer/ausgabe", fehler)
+    nummer, fahrzeug_neu = db.ausgeben(v["id"], helfer_id, name, posten,
+                                       _tag_pruefen(str(daten.get("datum") or "")),
+                                       str(daten.get("bemerkung") or ""), sitzung.kuerzel)
     if nummer is None:
-        return _zurueck("/helfer/funk", "nichts")
-    _unterschrift_dazu("material", nummer, "ausgabe", sitzung.kuerzel)
-    return _zurueck("/helfer/funk", "neu-angelegt" if woher == "neu" else "ausgegeben")
+        return _zurueck("/helfer/ausgabe", "nichts")
+    gewaehlt = {p["material_id"] for p in posten}
+    if any(m["unterschrift"] for m in materialien if m["id"] in gewaehlt):
+        _unterschrift_dazu("material", nummer, "ausgabe", sitzung.kuerzel)
+    return _zurueck("/helfer/ausgabe", "fahrzeug-neu" if fahrzeug_neu else "ausgegeben")
 
 
-@app.post("/helfer/ausleihe/{ausleihe_id}/zurueck")
-async def ausleihe_zurueck(request: Request, ausleihe_id: int,
-                           sitzung: auth.Sitzung = Depends(_sitzung)):
+@app.post("/helfer/ausgabe/{ausgabe_id}/zurueck")
+async def ausgabe_zurueck(request: Request, ausgabe_id: int,
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -2186,91 +2213,25 @@ async def ausleihe_zurueck(request: Request, ausleihe_id: int,
     # einen Klick, der seltene ein Formular.
     mengen = None
     if str(daten.get("teilweise") or ""):
-        mengen = {stueck: daten.get(stueck) for stueck in db.MATERIAL}
-    db.ausleihe_zurueck(ausleihe_id, mengen, sitzung.kuerzel)
+        mengen = {int(k[2:]): w for k, w in daten.items()
+                  if k.startswith("z-") and k[2:].isdigit()}
+    db.ausgabe_zurueck(ausgabe_id, mengen, sitzung.kuerzel)
     # Keine Unterschrift bei der Ruecknahme - in der Praxis war das nicht zu
     # machen: bei der Ausgabe steht die Person ohnehin da und wartet, bei der
     # Rueckgabe legt sie das Geraet hin und ist weg. Wer unterschreibt, geht
     # eine Verpflichtung ein; die entsteht beim Empfangen, nicht beim
     # Zurueckgeben.
-    return _zurueck("/helfer/funk", "zurueck",
-                    offen=str(daten.get("offen") or ""))
+    return _zurueck("/helfer/ausgabe", "zurueck", offen=str(daten.get("offen") or ""))
 
 
-@app.post("/helfer/ausleihe/{ausleihe_id}/loeschen")
-async def ausleihe_weg(request: Request, ausleihe_id: int,
-                       sitzung: auth.Sitzung = Depends(_sitzung)):
+@app.post("/helfer/ausgabe/{ausgabe_id}/loeschen")
+async def ausgabe_weg(request: Request, ausgabe_id: int,
+                      sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
-    db.ausleihe_loeschen(ausleihe_id)
-    return _zurueck("/helfer/funk", "geloescht")
-
-
-# --- KFZ-Schlüssel ---------------------------------------------------------
-
-@app.get("/helfer/schluessel")
-async def schluessel(request: Request, hinweis: str = "", offen: str = "",
-                     sitzung: auth.Sitzung = Depends(_sitzung),
-                     v=Depends(_veranstaltung)):
-    alle = db.schluessel_liste(v["id"])
-    noch_draussen = [z for z in alle if not z["zurueck_am"]]
-    return templates.TemplateResponse(
-        "admin_schluessel.html",
-        _admin(request, sitzung, hinweis=hinweis,
-               schluessel=noch_draussen if offen else alle,
-               anzahl_alle=len(alle), anzahl_offen=len(noch_draussen),
-               nur_offen=bool(offen), fahrzeuge=db.fahrzeuge(),
-               namen=db.namen_vorschlaege(v["id"]),
-               unterschrieben=unterschriften.je_vorgang("schluessel"),
-               tablet=bool(db.tablet_token())))
-
-
-@app.post("/helfer/schluessel/ausgeben")
-async def schluessel_ausgeben(request: Request,
-                              sitzung: auth.Sitzung = Depends(_sitzung),
-                              v=Depends(_veranstaltung)):
-    daten = await _csrf_pflicht(request, sitzung)
-    if daten is None:
-        return Response("Ungültiger CSRF-Token", status_code=400)
-
-    kennzeichen = str(daten.get("kennzeichen") or "")
-    if not normalisieren.kennzeichen(kennzeichen):
-        return _zurueck("/helfer/schluessel", "kein-kennzeichen")
-
-    name = str(daten.get("name") or "")
-    fahrzeug_id, neu = db.fahrzeug_sichern(kennzeichen, name)
-    if fahrzeug_id is None:
-        return _zurueck("/helfer/schluessel", "kein-kennzeichen")
-
-    nummer = db.schluessel_ausgeben(v["id"], fahrzeug_id, name,
-                                    str(daten.get("bemerkung") or ""),
-                                    sitzung.kuerzel)
-    _unterschrift_dazu("schluessel", nummer, "ausgabe", sitzung.kuerzel)
-    return _zurueck("/helfer/schluessel",
-                    "fahrzeug-neu" if neu else "schluessel-raus")
-
-
-@app.post("/helfer/schluessel/{schluessel_id}/zurueck")
-async def schluessel_zurueck(request: Request, schluessel_id: int,
-                             sitzung: auth.Sitzung = Depends(_sitzung)):
-    daten = await _csrf_pflicht(request, sitzung)
-    if daten is None:
-        return Response("Ungültiger CSRF-Token", status_code=400)
-    # Wie beim Material: keine Unterschrift bei der Ruecknahme.
-    db.schluessel_zurueck(schluessel_id, sitzung.kuerzel)
-    return _zurueck("/helfer/schluessel", "zurueck",
-                    offen=str(daten.get("offen") or ""))
-
-
-@app.post("/helfer/schluessel/{schluessel_id}/loeschen")
-async def schluessel_weg(request: Request, schluessel_id: int,
-                         sitzung: auth.Sitzung = Depends(_sitzung)):
-    daten = await _csrf_pflicht(request, sitzung)
-    if daten is None:
-        return Response("Ungültiger CSRF-Token", status_code=400)
-    db.schluessel_loeschen(schluessel_id)
-    return _zurueck("/helfer/schluessel", "geloescht")
+    db.ausgabe_loeschen(ausgabe_id)
+    return _zurueck("/helfer/ausgabe", "geloescht")
 
 
 @app.post("/helfer/fahrzeug/{fahrzeug_id}/loeschen")
@@ -2280,10 +2241,118 @@ async def fahrzeug_weg(request: Request, fahrzeug_id: int,
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     ausgang = db.fahrzeug_loeschen(fahrzeug_id)
-    return _zurueck("/helfer/schluessel",
+    return _zurueck("/helfer/ausgabe",
                     {"weg": "fahrzeug-weg",
-                     "hat-vorgaenge": "fahrzeug-hat-vorgaenge"}.get(
-                         ausgang, "unbekannt"))
+                     "hat-vorgaenge": "fahrzeug-hat-vorgaenge"}.get(ausgang, "unbekannt"))
+
+
+# Funk und Schlüssel hatten bis 3.8 eigene Seiten. Wer sie als Lesezeichen
+# hat, landet bei der Ausgabe.
+@app.get("/helfer/funk")
+@app.get("/helfer/schluessel")
+async def alte_ausgabe(sitzung: auth.Sitzung = Depends(_sitzung)):
+    return RedirectResponse("/helfer/ausgabe", status_code=303)
+
+
+# --- Material einrichten (Lastenheft 3.8, V-09) -----------------------------
+
+def _material_werte(daten) -> tuple[dict, dict]:
+    name = normalisieren.text(daten.get("name"))[:60]
+    fehler = {} if name else {"name": "Ohne Namen findet es am Tisch niemand wieder."}
+    erfassen = str(daten.get("erfassen") or "")
+    if erfassen not in db.ERFASSEN:
+        erfassen = ""
+    try:
+        vorgabe = min(max(0, int(str(daten.get("vorgabe") or 0))), db.MATERIAL_VORGABE_MAX)
+    except ValueError:
+        vorgabe = 0
+    return {"name": name, "erfassen": erfassen,
+            # Ein Kennzeichen ist ein Schlüssel – vorbelegen lässt sich das nicht.
+            "vorgabe": 0 if erfassen == "kennzeichen" else vorgabe,
+            "rueckgabe": 1 if daten.get("rueckgabe") else 0,
+            "unterschrift": 1 if daten.get("unterschrift") else 0}, fehler
+
+
+_MATERIAL_NEU = {"name": "", "erfassen": "", "vorgabe": 0, "rueckgabe": 1, "unterschrift": 1}
+
+
+def _material_seite(request, sitzung, v, hinweis="", neu=None, fehler=None, offen=None,
+                    status_code=200):
+    return templates.TemplateResponse(
+        "admin_material.html",
+        _admin(request, sitzung, hinweis=hinweis, materialien=db.materialien(v["id"]),
+               neu=neu or _MATERIAL_NEU, fehler=fehler or {}, offen=offen,
+               erfassen=db.ERFASSEN, hoechstwert=db.MATERIAL_VORGABE_MAX,
+               darf=sitzung.darf_aendern),
+        status_code=status_code)
+
+
+def _eigenes_material(material_id: int, v):
+    m = db.material_laden(material_id)
+    return m if m is not None and m["veranstaltung_id"] == v["id"] else None
+
+
+@app.get("/helfer/material")
+async def material_seite(request: Request, hinweis: str = "",
+                         sitzung: auth.Sitzung = Depends(_sitzung),
+                         v=Depends(_veranstaltung)):
+    return _material_seite(request, sitzung, v, hinweis)
+
+
+@app.post("/helfer/material")
+async def material_anlegen(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
+                           v=Depends(_veranstaltung)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    werte, fehler = _material_werte(daten)
+    nummer = None if fehler else db.material_anlegen(v["id"], werte)
+    if nummer is None:
+        fehler = fehler or {"name": "Ein Material mit diesem Namen gibt es schon."}
+        return _material_seite(request, sitzung, v, neu=werte, fehler=fehler, offen="neu",
+                               status_code=400)
+    return _zurueck("/helfer/material", "material-neu", sprung=f"material-{nummer}")
+
+
+@app.post("/helfer/material/standard")
+async def material_standard(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
+                            v=Depends(_veranstaltung)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.material_standard(v["id"])
+    return _zurueck("/helfer/material", "material-standard")
+
+
+@app.post("/helfer/material/{material_id}")
+async def material_aendern(request: Request, material_id: int,
+                           sitzung: auth.Sitzung = Depends(_sitzung),
+                           v=Depends(_veranstaltung)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    if _eigenes_material(material_id, v) is None:
+        return _fehlt(request)
+    werte, fehler = _material_werte(daten)
+    ergebnis = None if fehler else db.material_aendern(material_id, werte)
+    if ergebnis is None:
+        fehler = fehler or {"name": "Ein Material mit diesem Namen gibt es schon."}
+        return _material_seite(request, sitzung, v, fehler=fehler, offen=material_id,
+                               status_code=400)
+    return _zurueck("/helfer/material", "gespeichert", sprung=f"material-{material_id}")
+
+
+@app.post("/helfer/material/{material_id}/loeschen")
+async def material_loeschen(request: Request, material_id: int,
+                            sitzung: auth.Sitzung = Depends(_sitzung),
+                            v=Depends(_veranstaltung)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    if _eigenes_material(material_id, v) is None:
+        return _fehlt(request)
+    return _zurueck("/helfer/material", {"weg": "material-weg"}.get(
+        db.material_loeschen(material_id), "material-ausgegeben"))
 
 
 # --- Einstellungen ---------------------------------------------------------
@@ -2324,9 +2393,6 @@ def _einstellungsseite(request: Request, sitzung, hinweis: str = ""):
     return templates.TemplateResponse(
         "admin_einstellungen.html",
         _admin(request, sitzung, hinweis=hinweis,
-               vorgaben=db.material_vorgaben(),
-               material=db.MATERIAL, material_text=db.MATERIAL_TEXT,
-               hoechstwert=db.MATERIAL_VORGABE_MAX,
                aus_der_env=aus_der_env,
                jetzt_fest=bool(config.JETZT_FEST)))
 
@@ -2335,17 +2401,6 @@ def _einstellungsseite(request: Request, sitzung, hinweis: str = ""):
 async def einstellungen(request: Request, hinweis: str = "",
                         sitzung: auth.Sitzung = Depends(_sitzung)):
     return _einstellungsseite(request, sitzung, hinweis)
-
-
-@app.post("/helfer/einstellungen")
-async def einstellungen_speichern(
-        request: Request,
-        sitzung: auth.Sitzung = Depends(_sitzung)):
-    daten = await _csrf_pflicht(request, sitzung)
-    if daten is None:
-        return Response("Ungültiger CSRF-Token", status_code=400)
-    db.material_vorgaben_setzen({s: daten.get(s) for s in db.MATERIAL})
-    return _zurueck("/helfer/einstellungen", "gespeichert")
 
 
 # --- Nachfragen aus dem Backoffice -----------------------------------------

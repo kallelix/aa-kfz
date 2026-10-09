@@ -619,11 +619,12 @@ Datei enthält **eine Zeile je Helfer** mit Name, Kontakt, Verpflegung, den
 T-Shirt-Größen (angekündigt, Rohwert, tatsächlich ausgegeben samt Zeitpunkt
 und Kürzel), der Zahl der Schichten und der Bemerkung.
 
-**Funkgeräte und Schlüssel stehen nicht darin**, die T-Shirt-Ausgabe schon.
-Der Unterschied liegt an der Form der Daten: das T-Shirt hängt als *ein* Feld
-an der Person, es gibt höchstens eine Ausgabe je Helfer. Funk und Schlüssel
-sind eigene Vorgänge, davon beliebig viele je Person – sie hier anzuhängen
-hieße, die Zeile zu vervielfachen. Dafür bräuchte es eigene Ausfuhren.
+**Die Materialausgabe steht nicht darin** (Funk, Schlüssel und anderes), die
+T-Shirt-Ausgabe schon. Der Unterschied liegt an der Form der Daten: das
+T-Shirt hängt als *ein* Feld an der Person, es gibt höchstens eine Ausgabe je
+Helfer. Material sind eigene Vorgänge, davon beliebig viele je Person – sie
+hier anzuhängen hieße, die Zeile zu vervielfachen. Dafür bräuchte es eigene
+Ausfuhren.
 
 Trennzeichen ist `CSV_TRENNER` (Vorgabe `;`, was deutsches Excel erwartet),
 und der Datei geht ein BOM voran – ohne das zeigt Excel unter Windows

@@ -95,10 +95,16 @@ with con:
                                       "tshirt": "M"})
 con.close()
 db.tshirt_ausgeben(anna, "L", "KK")
-ausleihe = db.ausleihen(VA, anna, {"funke": 1, "ersatzakku": 2}, "2026-08-29",
-                        kuerzel="KK")
-fahrzeug, _ = db.fahrzeug_sichern("IL-A 1", "Anna Berg")
-schluessel = db.schluessel_ausgeben(VA, fahrzeug, "Anna Berg", kuerzel="KK")
+# Seit 3.8 sind Funk und Schlüssel Material unter vielen (V-09).
+db.material_standard(VA)
+MAT = {m["name"]: m["id"] for m in db.materialien(VA)}
+ausleihe, _ = db.ausgeben(VA, anna, "", [{"material_id": MAT["Funkgerät"], "menge": 1},
+                                          {"material_id": MAT["Ersatzakku"], "menge": 2}],
+                          "2026-08-29", kuerzel="KK")
+POSTEN = {p["material"]: p["id"] for p in db.ausgabe_laden(ausleihe)["posten"]}
+schluessel, _ = db.ausgeben(VA, None, "Anna Berg",
+                            [{"material_id": MAT["Fahrzeugschlüssel"], "menge": 1,
+                              "nummer": "IL-A 1"}], kuerzel="KK")
 
 print("Wortlaut")
 titel, text, person = unterschriften.wortlaut("material", ausleihe, "ausgabe")
@@ -107,7 +113,7 @@ pruefe("Funkgerät" in text and "2× Ersatzakku" in text,
 pruefe(person == "Anna Berg", "mit der Person")
 titel, text, _ = unterschriften.wortlaut("tshirt", anna, "ausgabe")
 pruefe("Größe L" in text, "beim T-Shirt die AUSGEGEBENE Größe: " + text)
-titel, text, _ = unterschriften.wortlaut("schluessel", schluessel, "rueckgabe")
+titel, text, _ = unterschriften.wortlaut("material", schluessel, "rueckgabe")
 pruefe("IL-A 1" in text and "Rückgabe" in titel, "beim Schlüssel das Kennzeichen")
 titel, _, _ = unterschriften.wortlaut("material", 999999, "ausgabe")
 pruefe(titel == "", "ein unbekannter Vorgang ergibt nichts")
@@ -183,9 +189,9 @@ try:
 
     status, ort, _ = anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/helfer/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/ausgabe"})
     pruefe("hinweis=angefordert" in ort, "meldet Erfolg")
-    pruefe(ort.startswith("/helfer/funk"), "und kehrt dorthin zurück, wo man war")
+    pruefe(ort.startswith("/helfer/ausgabe"), "und kehrt dorthin zurück, wo man war")
 
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     pruefe("Material Ausgabe" in stand, "das Tablet zeigt den Vorgang")
@@ -206,11 +212,11 @@ try:
 
     print("Bei jeder Ausgabe wird sofort angefordert")
     unterschriften.abbrechen()
-    status, ort, _ = anfrage("POST", "/helfer/schluessel/ausgeben", {
-        "csrf": CSRF, "kennzeichen": "IL-Z 9", "name": "Sofort Sofortski"})
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe", {
+        "csrf": CSRF, "n-%d" % MAT["Fahrzeugschlüssel"]: "IL-Z 9", "name": "Sofort Sofortski"})
     pruefe("hinweis=" in ort, "Ausgabe laeuft")
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
-    pruefe("Schlüssel Ausgabe" in stand,
+    pruefe("Material Ausgabe" in stand and "Fahrzeugschlüssel IL-Z 9" in stand,
            "die Unterschrift steht ohne zweiten Klick auf dem Tablet")
     pruefe("Sofort Sofortski" in stand, "mit dem Namen im Feld")
 
@@ -227,15 +233,16 @@ try:
     # Wer unterschreibt, geht eine Verpflichtung ein - die entsteht beim
     # Empfangen, nicht beim Zurueckgeben.
     unterschriften.abbrechen()
-    anfrage("POST", "/helfer/ausleihe/%d/zurueck" % ausleihe,
-            {"csrf": CSRF, "teilweise": "1", "funke": "1", "ersatzakku": "0"})
+    anfrage("POST", "/helfer/ausgabe/%d/zurueck" % ausleihe,
+            {"csrf": CSRF, "teilweise": "1", "z-%d" % POSTEN["Funkgerät"]: "1",
+             "z-%d" % POSTEN["Ersatzakku"]: "0"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     pruefe("bereit-zeichen" in stand,
            "das Tablet bleibt im Wartezustand")
     pruefe("Material Rückgabe" not in stand,
            "und nichts steht darauf")
 
-    status, ort, _ = anfrage("POST", "/helfer/schluessel/%d/zurueck" % schluessel,
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe/%d/zurueck" % schluessel,
                              {"csrf": CSRF})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     pruefe("bereit-zeichen" in stand,
@@ -258,10 +265,10 @@ try:
 
     print("Nur eine Warteschlange")
     anfrage("POST", "/helfer/unterschrift/anfordern", {
-        "csrf": CSRF, "art": "schluessel", "vorgang_id": str(schluessel),
-        "richtung": "ausgabe", "weiter": "/helfer/schluessel"})
+        "csrf": CSRF, "art": "material", "vorgang_id": str(schluessel),
+        "richtung": "ausgabe", "weiter": "/helfer/ausgabe"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
-    pruefe("Schlüssel Ausgabe" in stand, "die neue Anforderung löst die alte ab")
+    pruefe("Fahrzeugschlüssel IL-A 1" in stand, "die neue Anforderung löst die alte ab")
     pruefe(zeilen("SELECT abgebrochen_am FROM unterschrift WHERE id = ?",
                   nummer)[0][0] is not None,
            "die alte gilt als abgebrochen – ein Stapel wäre nur eine Falle "
@@ -336,7 +343,7 @@ try:
     # Lange abgelaufen: auch nicht mehr annehmen.
     anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/helfer/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/ausgabe"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     vierte = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
     ablauf_setzen(vierte, 60)
@@ -347,7 +354,7 @@ try:
     print("Eine Unterschrift zum Material")
     anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/helfer/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/ausgabe"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     fuenfte = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
     status, ort, _ = anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
@@ -358,7 +365,7 @@ try:
     unterschriften.abbrechen()
     anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/helfer/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/ausgabe"})
     _, _, stand = anfrage("GET", "/unterschrift/" + TOKEN + "/stand")
     sechste = int(re.search(r'name="id" value="(\d+)"', stand).group(1))
     anfrage("POST", "/unterschrift/" + TOKEN + "/zeichnen",
@@ -376,7 +383,7 @@ try:
     print("Abbrechen vom Tablet")
     anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/helfer/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/ausgabe"})
     status, ort, _ = anfrage("POST", "/unterschrift/" + TOKEN + "/abbrechen", {})
     pruefe("hinweis=abgebrochen" in ort, "geht ohne Anmeldung – wer abbricht, "
            "steht am Tablet und nicht am Rechner")
@@ -426,7 +433,7 @@ try:
     status, ort, _ = anfrage("GET", "/helfer/stand")
     pruefe(status == 200, "der Zustand laedt fuer Angemeldete")
 
-    _, _, funk = anfrage("GET", "/helfer/funk")
+    _, _, funk = anfrage("GET", "/helfer/ausgabe")
     pruefe("admin_stand.js" in funk, "das Skript haengt an der Seite")
     marke_jetzt = int(re.search(r'data-marke="(\d+)"', funk).group(1))
     pruefe("data-unterschrift=" in funk,
@@ -438,8 +445,8 @@ try:
     pruefe(zustand["neu"] == [], "seit der eigenen Marke ist nichts Neues da")
 
     # Etwas ausgeben, unterschreiben, und nachsehen, ob es ankommt.
-    anfrage("POST", "/helfer/funk/ausgeben",
-            {"csrf": CSRF, "helfer_id": str(anna), "funke": "1"})
+    anfrage("POST", "/helfer/ausgabe",
+            {"csrf": CSRF, "helfer_id": str(anna), "m-%d" % MAT["Funkgerät"]: "1"})
     _, _, roh = anfrage("GET", "/helfer/stand?seit=%d&art=material" % marke_jetzt)
     zustand = _json.loads(roh)
     pruefe(zustand["offen"] is not None,
@@ -466,8 +473,8 @@ try:
     pruefe(_json.loads(roh)["neu"] == [],
            "beim naechsten Mal ist dieselbe Aenderung nicht noch einmal dabei")
 
-    _, _, roh = anfrage("GET", "/helfer/stand?seit=0&art=schluessel")
-    pruefe(all(e["art"] == "schluessel" for e in _json.loads(roh)["neu"]),
+    _, _, roh = anfrage("GET", "/helfer/stand?seit=0&art=tshirt")
+    pruefe(all(e["art"] == "tshirt" for e in _json.loads(roh)["neu"]),
            "nach Art gefiltert kommt nur, was die Seite auch anzeigen kann")
 
     print("Backoffice")
@@ -486,7 +493,7 @@ try:
     pruefe('viewBox="0 0 600 200"' not in seite,
            "keine feste viewBox mehr")
 
-    _, _, funk = anfrage("GET", "/helfer/funk")
+    _, _, funk = anfrage("GET", "/helfer/ausgabe")
     pruefe("unterschrieben" in funk,
            "in der Liste ist zu sehen, wo eine Unterschrift vorliegt")
 
@@ -495,7 +502,7 @@ try:
     # Seite schon benutzt, waere dort keine stille Ueberdeckung, sondern ein
     # Fehler - deshalb einmal alle durchklicken.
     for pfad in ("/helfer", "/helfer/schichten", "/helfer/band", "/helfer/helfer",
-                 "/helfer/aufgaben", "/helfer/funk", "/helfer/schluessel",
+                 "/helfer/aufgaben", "/helfer/ausgabe", "/helfer/material",
                  "/helfer/zeitplan", "/helfer/monitor", "/helfer/import",
                  "/helfer/unterschriften", "/helfer/einstellungen",
                  "/helfer/helfer/neu", "/helfer/aufgabe/neu"):
@@ -536,8 +543,8 @@ try:
             # Seit 2.8 steht unter Vor Ort auch Drucken, also eine dritte Ebene.
             ("/helfer/monitor", ("Helfer", "Vor Ort", "Monitor")),
             ("/helfer/druck", ("Helfer", "Vor Ort", "Drucken")),
-            ("/helfer/funk", ("Ausgabe", None, "Funk")),
-            ("/helfer/schluessel", ("Ausgabe", None, "Schlüssel")),
+            # Seit 3.8 ein Tisch für alles – keine dritte Ebene mehr.
+            ("/helfer/ausgabe", ("Ausgabe", None, None)),
             ("/helfer/goodie/neu", ("Verwaltung", None, "Goodies & Verpflegung")),
             ("/helfer/zeitplan", ("Verwaltung", None, "Zeitplan-Abruf")),
             ("/helfer/unterschriften", ("Verwaltung", None, "Tablet"))):
@@ -579,10 +586,10 @@ try:
     pruefe(status == 404, "der alte Link gilt nicht mehr")
     status, ort, _ = anfrage("POST", "/helfer/unterschrift/anfordern", {
         "csrf": CSRF, "art": "material", "vorgang_id": str(ausleihe),
-        "richtung": "ausgabe", "weiter": "/helfer/funk"})
+        "richtung": "ausgabe", "weiter": "/helfer/ausgabe"})
     pruefe("hinweis=kein-tablet" in ort,
            "und ohne Link wird gar nicht erst angefordert")
-    _, _, funk = anfrage("GET", "/helfer/funk")
+    _, _, funk = anfrage("GET", "/helfer/ausgabe")
     pruefe("unterschrift/anfordern" not in funk,
            "die Knöpfe verschwinden dann auch aus den Zeilen")
 

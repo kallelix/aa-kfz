@@ -34,7 +34,9 @@ from datetime import datetime, timedelta
 
 from . import config, db, normalisieren
 
-ARTEN = ("tshirt", "material", "schluessel")
+# Seit Lastenheft 3.8 ist jede Materialausgabe „material“ – auch der
+# Fahrzeugschlüssel, der früher eine eigene Art hatte (Migration 0014).
+ARTEN = ("tshirt", "material")
 # Beide Richtungen bleiben lesbar - in aelteren Bestaenden stehen noch
 # Ruecknahme-Unterschriften, und die Uebersicht soll sie zeigen koennen.
 RICHTUNGEN = ("ausgabe", "rueckgabe")
@@ -69,44 +71,37 @@ def wortlaut(art: str, vorgang_id: int, richtung: str) -> tuple[str, str, str]:
                 "T-Shirt in Größe " + groesse, person["name"])
 
     if art == "material":
-        zeile = db.ausleihe_mit_name(vorgang_id)
-        if zeile is not None:
-            # Bei der Rücknahme zählt, was zurückkam, nicht was einmal
-            # rausging: wer das Funkgerät bringt und den Akku behält, soll
-            # nicht quittieren, alles abgegeben zu haben.
-            spalte = (lambda s: s + "_zurueck") if richtung == "rueckgabe" \
-                else (lambda s: s)
-            teile = []
-            for stueck in db.MATERIAL:
-                menge = zeile[spalte(stueck)]
-                if menge:
-                    teile.append(str(menge) + "× " + db.MATERIAL_TEXT[stueck])
-            text = ", ".join(teile) or "nichts"
-            if richtung == "ausgabe" and zeile["datum"]:
-                text += " – für " + zeile["datum"]
-            if richtung == "rueckgabe":
-                offen_teile = []
-                for stueck in db.MATERIAL:
-                    rest = zeile[stueck] - zeile[stueck + "_zurueck"]
-                    if rest:
-                        offen_teile.append(str(rest) + "× "
-                                           + db.MATERIAL_TEXT[stueck])
-                if offen_teile:
-                    text += " (noch draußen: " + ", ".join(offen_teile) + ")"
-            return ("Material " + RICHTUNG_TEXT[richtung], text, zeile["name"])
-        return "", "", ""
-
-    if art == "schluessel":
-        zeile = db.schluessel_mit_fahrzeug(vorgang_id)
-        if zeile is not None:
-            text = "Fahrzeugschlüssel " + zeile["kennzeichen"]
-            if zeile["bemerkung"]:
-                text += " – " + zeile["bemerkung"]
-            return ("Schlüssel " + RICHTUNG_TEXT[richtung], text,
-                    zeile["name"] or "")
-        return "", "", ""
+        zeile = db.ausgabe_laden(vorgang_id)
+        if zeile is None:
+            return "", "", ""
+        # Bei der Rücknahme zählt, was zurückkam, nicht was einmal
+        # rausging: wer das Funkgerät bringt und den Akku behält, soll nicht
+        # quittieren, alles abgegeben zu haben.
+        teile, offen = [], []
+        for p in zeile["posten"]:
+            menge = p["zurueck"] if richtung == "rueckgabe" else p["menge"]
+            if menge:
+                teile.append(_posten_text(p, menge))
+            if p["rueckgabe"] and p["menge"] > p["zurueck"]:
+                offen.append(_posten_text(p, p["menge"] - p["zurueck"]))
+        text = ", ".join(teile) or "nichts"
+        if richtung == "ausgabe" and zeile["datum"]:
+            text += " – für " + zeile["datum"]
+        if richtung == "ausgabe" and zeile["bemerkung"]:
+            text += " – " + zeile["bemerkung"]
+        if richtung == "rueckgabe" and offen:
+            text += " (noch draußen: " + ", ".join(offen) + ")"
+        return ("Material " + RICHTUNG_TEXT[richtung], text, zeile["wer"])
 
     return "", "", ""
+
+
+def _posten_text(p, menge: int) -> str:
+    """'2× Ersatzakku', '1× Funkgerät (Nr. 12)', 'Fahrzeugschlüssel IL-A 1'."""
+    if p["erfassen"] == "kennzeichen" and p["nummer"]:
+        return p["material"] + " " + p["nummer"]
+    text = f"{menge}× {p['material']}"
+    return text + (f" (Nr. {p['nummer']})" if p["nummer"] else "")
 
 
 def anfordern(art: str, vorgang_id: int, richtung: str,
@@ -207,10 +202,7 @@ def namen_uebernehmen(art: str, vorgang_id: int, name: str) -> bool:
     if art == "tshirt":
         return db.helfer_umbenennen(vorgang_id, name)
     if art == "material":
-        zeile = db.ausleihe_laden(vorgang_id)
-        return db.helfer_umbenennen(zeile["helfer_id"], name) if zeile else False
-    if art == "schluessel":
-        return db.schluessel_umbenennen(vorgang_id, name)
+        return db.ausgabe_umbenennen(vorgang_id, name)
     return False
 
 

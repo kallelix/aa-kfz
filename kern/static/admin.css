@@ -1449,6 +1449,9 @@ main > p:not(.trefferzahl):not(.knopfreihe):not(.balken),
 
 /* Die Mengenfelder bleiben schmal - drei nebeneinander. */
 .mengen .menge input { width: 4.5rem; }
+/* Ein Kennzeichen oder eine Nummer braucht mehr Platz als eine Menge (3.8). */
+.mengen .menge input.kennzeichen-feld { width: 9rem; }
+.mengen .menge input.nummer-feld { width: 6rem; }
 
 /* An einem Ausgabetisch soll der Knopf zu sehen sein, ohne zu scrollen: das
    Formular steht fest, die Liste daneben rollt. Deshalb hier enger als in

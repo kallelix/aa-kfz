@@ -1,4 +1,4 @@
-"""T-Shirt-Ausgabe, Funkgeräte und KFZ-Schlüssel.
+"""T-Shirt-Ausgabe und die Materialausgabe (Funk, Schlüssel und mehr).
 
     python helfer/tests/test_material.py
 
@@ -125,7 +125,7 @@ try:
         return ergebnis
 
     print("Ohne Anmeldung")
-    for pfad in ("/helfer/funk", "/helfer/schluessel", "/helfer/helfer/neu"):
+    for pfad in ("/helfer/ausgabe", "/helfer/material", "/helfer/helfer/neu"):
         status, ort, _ = anfrage("GET", pfad)
         pruefe(status == 303 and ort.startswith("/helfer/login"),
                pfad + " führt zur Anmeldung")
@@ -287,49 +287,47 @@ try:
     pruefe(annas[kopf.index("ausgegeben von")] == "KK",
            "mit dem Kuerzel dessen, der es ausgegeben hat")
 
-    # --- 2. Funkgeräte -----------------------------------------------------
-    print("Einstellungen: Vorbelegung der Materialausgabe")
-    status, _, seite = anfrage("GET", "/helfer/einstellungen")
-    pruefe(status == 200, "die Seite laedt")
-    vorgaben = dict(re.findall(r'id="v-(\w+)"[^>]*value="(\d+)"', seite))
-    pruefe(vorgaben == {"funke": "1", "headset": "0", "ersatzakku": "0"},
-           "ohne Einstellung gilt: ein Funkgeraet, sonst nichts: " + str(vorgaben))
+    # --- 2. Material einrichten (Lastenheft 3.8, V-09) --------------------
+    print("Material: noch nichts")
+    status, _, seite = anfrage("GET", "/helfer/ausgabe")
+    pruefe(status == 200 and "Noch kein Material" in seite and 'href="/helfer/material"' in seite,
+           "ohne Material sagt die Ausgabe, wo man es einrichtet")
+    status, _, seite = anfrage("GET", "/helfer/material")
+    pruefe(status == 200 and "Funk und Schlüssel anlegen" in seite,
+           "die Materialseite bietet die bisherigen vier mit einem Klick an")
+    status, ort, _ = anfrage("POST", "/helfer/material/standard", {"csrf": CSRF})
+    pruefe("hinweis=material-standard" in ort, "angelegt")
+    mat = {z["name"]: z for z in zeilen("SELECT * FROM material WHERE veranstaltung_id = ?", VA)}
+    pruefe(sorted(mat) == ["Ersatzakku", "Fahrzeugschlüssel", "Funkgerät", "Headset"],
+           "Funkgerät, Headset, Ersatzakku, Fahrzeugschlüssel")
+    pruefe(mat["Funkgerät"]["vorgabe"] == 1 and mat["Headset"]["vorgabe"] == 0
+           and mat["Fahrzeugschlüssel"]["erfassen"] == "kennzeichen",
+           "ein Funkgerät vorbelegt, der Schlüssel mit Kennzeichen")
+    anfrage("POST", "/helfer/material/standard", {"csrf": CSRF})
+    pruefe(len(zeilen("SELECT id FROM material")) == 4, "ein zweiter Klick legt nichts doppelt an")
+    FUNK, HEADSET, AKKU, SCHLUESSEL = (mat[n]["id"] for n in
+                                       ("Funkgerät", "Headset", "Ersatzakku", "Fahrzeugschlüssel"))
 
-    _, _, funk = anfrage("GET", "/helfer/funk")
-    im_formular = dict(re.findall(
-        r'id="m-(\w+)"[\s\S]{0,140}?value="(\d+)"', funk))
-    pruefe(im_formular == vorgaben,
-           "und genau das steht im Ausgabeformular: " + str(im_formular))
-
-    status, ort, _ = anfrage("POST", "/helfer/einstellungen",
-                             {"csrf": CSRF, "funke": "1", "headset": "1",
-                              "ersatzakku": "2"})
-    pruefe("hinweis=gespeichert" in ort, "speichern meldet Erfolg")
-    _, _, funk = anfrage("GET", "/helfer/funk")
-    im_formular = dict(re.findall(
-        r'id="m-(\w+)"[\s\S]{0,140}?value="(\d+)"', funk))
-    pruefe(im_formular == {"funke": "1", "headset": "1", "ersatzakku": "2"},
-           "das Ausgabeformular folgt: " + str(im_formular))
-
-    print("Einstellungen: was nicht durchgeht")
-    anfrage("POST", "/helfer/einstellungen",
-            {"csrf": CSRF, "funke": "-5", "headset": "999",
-             "ersatzakku": "quatsch"})
-    _, _, seite = anfrage("GET", "/helfer/einstellungen")
-    vorgaben = dict(re.findall(r'id="v-(\w+)"[^>]*value="(\d+)"', seite))
-    pruefe(vorgaben["funke"] == "0", "eine negative Zahl wird auf 0 geklemmt")
-    pruefe(vorgaben["headset"] == "20",
-           "eine unsinnig grosse auf den Hoechstwert: " + vorgaben["headset"])
-    pruefe(vorgaben["ersatzakku"] == "2",
-           "und was keine Zahl ist, laesst den alten Wert stehen")
-
-    status, _, _ = anfrage("POST", "/helfer/einstellungen",
-                           {"csrf": "falsch", "funke": "9"})
+    print("Material: anlegen, ändern, was nicht geht")
+    status, ort, _ = anfrage("POST", "/helfer/material", {
+        "csrf": CSRF, "name": "Parkausweis", "erfassen": "nummer", "vorgabe": "0"})
+    pruefe("hinweis=material-neu" in ort, "ein neues Material")
+    park = zeilen("SELECT * FROM material WHERE name = 'Parkausweis'")[0]
+    pruefe(park["rueckgabe"] == 0 and park["unterschrift"] == 0 and park["erfassen"] == "nummer",
+           "ohne Häkchen: ohne Rückgabe und ohne Unterschrift, mit Nummer")
+    status, _, seite = anfrage("POST", "/helfer/material", {"csrf": CSRF, "name": "Funkgerät"})
+    pruefe(status == 400 and "gibt es schon" in seite, "denselben Namen zweimal gibt es nicht")
+    status, _, seite = anfrage("POST", "/helfer/material", {"csrf": CSRF, "name": ""})
+    pruefe(status == 400 and "Ohne Namen" in seite, "ohne Namen auch nicht")
+    status, ort, _ = anfrage("POST", "/helfer/material/%d" % HEADSET, {
+        "csrf": CSRF, "name": "Headset", "vorgabe": "999", "rueckgabe": "1", "unterschrift": "1"})
+    pruefe("hinweis=gespeichert" in ort
+           and zeilen("SELECT vorgabe FROM material WHERE id = ?", HEADSET)[0][0] == 20,
+           "eine unsinnig große Vorbelegung wird auf den Höchstwert geklemmt")
+    anfrage("POST", "/helfer/material/%d" % HEADSET, {
+        "csrf": CSRF, "name": "Headset", "vorgabe": "0", "rueckgabe": "1", "unterschrift": "1"})
+    status, _, _ = anfrage("POST", "/helfer/material/%d" % HEADSET, {"csrf": "falsch", "name": "X"})
     pruefe(status == 400, "ohne CSRF-Token wird nichts gespeichert")
-
-    # Fuer den Rest der Pruefungen wieder auf die Vorgabe zurueck.
-    anfrage("POST", "/helfer/einstellungen",
-            {"csrf": CSRF, "funke": "1", "headset": "0", "ersatzakku": "0"})
 
     print("Einstellungen: was aus der .env kommt")
     _, _, seite = anfrage("GET", "/helfer/einstellungen")
@@ -339,118 +337,132 @@ try:
            "die Tage nicht mehr - die kommen aus der Veranstaltung")
     pruefe("nach einem Neustart" in seite,
            "mit dem Hinweis, dass eine Aenderung dort erst dann wirkt")
+    pruefe('href="/helfer/material"' in seite, "und dem Weg zur Vorbelegung, die jetzt beim Material steht")
 
     print("Ausgabe und Ruecknahme nebeneinander")
-    for pfad, name in (("/helfer/funk", "funk-ausgabe"),
-                       ("/helfer/schluessel", "schluessel-ausgabe")):
-        _, _, seite = anfrage("GET", pfad)
-        pruefe('class="arbeitsflaeche"' in seite,
-               pfad + ": Formular und Liste stehen in einer Flaeche")
-        pruefe('data-merken="' + name + '"' in seite,
-               "das Formular laesst sich zuklappen und wird gemerkt")
-        pruefe('class="arbeit-liste"' in seite, "die Liste hat ihre eigene Spalte")
-        pruefe(seite.index("arbeit-formular") < seite.index("arbeit-liste"),
-               "Formular zuerst, Liste daneben")
-        pruefe("admin_merken.js" in seite, "das Merkskript haengt an der Seite")
+    _, _, seite = anfrage("GET", "/helfer/ausgabe")
+    pruefe('class="arbeitsflaeche"' in seite, "Formular und Liste stehen in einer Flaeche")
+    pruefe('data-merken="ausgabe"' in seite, "das Formular laesst sich zuklappen und wird gemerkt")
+    pruefe('class="arbeit-liste"' in seite, "die Liste hat ihre eigene Spalte")
+    pruefe(seite.index("arbeit-formular") < seite.index("arbeit-liste"),
+           "Formular zuerst, Liste daneben")
+    pruefe("admin_merken.js" in seite, "das Merkskript haengt an der Seite")
+    im_formular = dict(re.findall(r'id="m-(\d+)"[\s\S]{0,140}?value="(\d+)"', seite))
+    pruefe(im_formular == {str(FUNK): "1", str(HEADSET): "0", str(AKKU): "0", str(park["id"]): "0"},
+           "das Formular ist wie eingestellt vorbelegt: " + str(im_formular))
+    pruefe('id="n-%d"' % SCHLUESSEL in seite and 'id="n-%d"' % park["id"] in seite,
+           "Kennzeichen und Nummer haben ihr Feld")
 
+    for alt in ("/helfer/funk", "/helfer/schluessel"):
+        status, ort, _ = anfrage("GET", alt)
+        pruefe(status == 303 and ort == "/helfer/ausgabe", alt + " führt zur Ausgabe")
+
+    # --- 3. Ausgeben -----------------------------------------------------------
     print("Funk: ausgeben")
-    status, _, seite = anfrage("GET", "/helfer/funk")
-    pruefe(status == 200 and "Noch nichts ausgegeben" in seite,
-           "die leere Seite sagt das auch")
-
-    status, ort, _ = anfrage("POST", "/helfer/funk/ausgeben", {
+    pruefe("Noch nichts ausgegeben" in seite, "die leere Liste sagt das auch")
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe", {
         "csrf": CSRF, "helfer_id": str(anna), "datum": "2026-08-29",
-        "funke": "1", "headset": "1", "ersatzakku": "2",
+        "m-%d" % FUNK: "1", "m-%d" % HEADSET: "1", "m-%d" % AKKU: "2",
         "bemerkung": "Shuttle Nord"})
     pruefe("hinweis=ausgegeben" in ort, "meldet Erfolg")
-    vorgang = zeilen("SELECT * FROM ausleihe")[0]
-    pruefe((vorgang["funke"], vorgang["headset"], vorgang["ersatzakku"])
-           == (1, 1, 2), "die Mengen stimmen")
-    pruefe(vorgang["datum"] == "2026-08-29",
+    vorgang = zeilen("SELECT * FROM ausgabe")[0]
+    posten = {z["material_id"]: z["menge"] for z in
+              zeilen("SELECT * FROM ausgabe_posten WHERE ausgabe_id = ?", vorgang["id"])}
+    pruefe(posten == {FUNK: 1, HEADSET: 1, AKKU: 2}, "die Mengen stimmen: " + str(posten))
+    pruefe(vorgang["datum"] == "2026-08-29" and vorgang["helfer_id"] == anna
+           and vorgang["name"] == "Anna Berg",
            "mit Tagesbezug – ein Funkgerät wird für einen Tag geholt, nicht "
            "für eine einzelne Schicht")
     pruefe(vorgang["ausgegeben_von"] == "KK", "und mit Kürzel")
 
-    status, ort, _ = anfrage("POST", "/helfer/funk/ausgeben", {
-        "csrf": CSRF, "helfer_id": str(bert), "datum": "morgen", "funke": "1"})
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe", {
+        "csrf": CSRF, "helfer_id": str(bert), "datum": "morgen", "m-%d" % FUNK: "1"})
     pruefe("hinweis=ausgegeben" in ort, "ein unlesbarer Tag hält nichts auf")
-    pruefe(zeilen("SELECT datum FROM ausleihe ORDER BY id")[1][0] is None,
+    pruefe(zeilen("SELECT datum FROM ausgabe ORDER BY id")[1][0] is None,
            "er wird verworfen statt in die Datenbank gereicht")
-    anfrage("POST", "/helfer/ausleihe/%d/loeschen"
-            % zeilen("SELECT id FROM ausleihe ORDER BY id")[1][0],
-            {"csrf": CSRF})
+    anfrage("POST", "/helfer/ausgabe/%d/loeschen"
+            % zeilen("SELECT id FROM ausgabe ORDER BY id")[1][0], {"csrf": CSRF})
 
-    print("Funk: ohne Schicht und für jemand Neues")
-    status, ort, _ = anfrage("POST", "/helfer/funk/ausgeben",
-                             {"csrf": CSRF, "neuer_name": "Ganz Neu",
-                              "funke": "1"})
-    pruefe("hinweis=neu-angelegt" in ort,
-           "eine getippte Person wird angelegt und die Ausgabe gemeldet")
-    neu = zeilen("SELECT * FROM helfer WHERE name = 'Ganz Neu'")
-    pruefe(len(neu) == 1, "die Person steht jetzt in der Helferliste")
-    ohne = zeilen("SELECT * FROM ausleihe WHERE helfer_id = ?", neu[0]["id"])[0]
-    pruefe(ohne["datum"] is None,
-           "ein Tagesbezug ist ausdrücklich nicht nötig")
+    print("An jemand anderes (V-09)")
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe",
+                             {"csrf": CSRF, "name": "Ganz Neu", "m-%d" % FUNK: "1"})
+    pruefe("hinweis=ausgegeben" in ort, "an einen Namen, der kein Helfer ist")
+    pruefe(not zeilen("SELECT * FROM helfer WHERE name = 'Ganz Neu'"),
+           "er landet nicht in der Helferliste")
+    ohne = zeilen("SELECT * FROM ausgabe WHERE name = 'Ganz Neu'")[0]
+    pruefe(ohne["helfer_id"] is None and ohne["datum"] is None,
+           "der Vorgang steht nur auf dem Namen, ein Tagesbezug ist nicht nötig")
 
-    status, ort, _ = anfrage("POST", "/helfer/funk/ausgeben",
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe",
                              {"csrf": CSRF, "helfer_id": str(anna),
-                              "funke": "0", "headset": "0", "ersatzakku": "0"})
+                              "m-%d" % FUNK: "0", "m-%d" % HEADSET: "0"})
     pruefe("hinweis=nichts" in ort, "gar nichts auszugeben ist kein Vorgang")
-    pruefe(len(zeilen("SELECT id FROM ausleihe")) == 2, "und legt nichts an")
-
-    status, ort, _ = anfrage("POST", "/helfer/funk/ausgeben",
-                             {"csrf": CSRF, "funke": "1"})
+    pruefe(len(zeilen("SELECT id FROM ausgabe")) == 2, "und legt nichts an")
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe", {"csrf": CSRF, "m-%d" % FUNK: "1"})
     pruefe("hinweis=keiner" in ort, "ohne Person geht es nicht")
 
+    print("Ohne Rückgabe, mit Nummer")
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe", {
+        "csrf": CSRF, "helfer_id": str(bert), "m-%d" % park["id"]: "1",
+        "n-%d" % park["id"]: "P 17", "m-%d" % FUNK: "0"})
+    park_vorgang = zeilen("SELECT * FROM ausgabe WHERE helfer_id = ?", bert)[0]
+    pruefe(park_vorgang["zurueck_am"] is not None,
+           "ein Parkausweis ist mit der Übergabe erledigt")
+    pruefe(zeilen("SELECT nummer FROM ausgabe_posten WHERE ausgabe_id = ?",
+                  park_vorgang["id"])[0][0] == "P 17", "seine Nummer steht dabei")
+    _, _, seite = anfrage("GET", "/helfer/ausgabe")
+    pruefe("ohne Rückgabe" in seite and "1× Parkausweis (Nr. P 17)" in seite,
+           "die Liste zeigt es so")
+
     print("Funk: Zähler")
-    _, _, seite = anfrage("GET", "/helfer/funk")
     zahlen = dict(re.findall(
         r'zaehler-titel">([^<]+)</p>\s*<p class="zaehler-zahl">(\d+)', seite))
-    pruefe(zahlen.get("Funkgerät") == "2", "zwei Funkgeräte draußen")
-    pruefe(zahlen.get("Ersatzakku") == "2", "zwei Ersatzakkus draußen")
+    pruefe(zahlen.get("Funkgerät") == "2" and zahlen.get("Ersatzakku") == "2"
+           and zahlen.get("Parkausweis") == "1",
+           "zwei Funkgeräte und zwei Ersatzakkus draußen, ein Parkausweis ausgegeben: "
+           + str(zahlen))
 
     print("Funk: teilweise zurück")
-    status, ort, _ = anfrage("POST", "/helfer/ausleihe/%d/zurueck" % vorgang["id"],
-                             {"csrf": CSRF, "teilweise": "1", "funke": "1",
-                              "headset": "0", "ersatzakku": "1"})
+    p = {z["material_id"]: z["id"] for z in
+         zeilen("SELECT * FROM ausgabe_posten WHERE ausgabe_id = ?", vorgang["id"])}
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe/%d/zurueck" % vorgang["id"],
+                             {"csrf": CSRF, "teilweise": "1", "z-%d" % p[FUNK]: "1",
+                              "z-%d" % p[HEADSET]: "0", "z-%d" % p[AKKU]: "1"})
     pruefe("hinweis=zurueck" in ort, "meldet Erfolg")
-    jetzt = zeilen("SELECT * FROM ausleihe WHERE id = ?", vorgang["id"])[0]
-    pruefe((jetzt["funke_zurueck"], jetzt["ersatzakku_zurueck"]) == (1, 1),
-           "die Teilmengen stehen drin")
-    pruefe(jetzt["zurueck_am"] is None,
+    zurueck = {z["material_id"]: z["zurueck"] for z in
+               zeilen("SELECT * FROM ausgabe_posten WHERE ausgabe_id = ?", vorgang["id"])}
+    pruefe(zurueck == {FUNK: 1, HEADSET: 0, AKKU: 1}, "die Teilmengen stehen drin")
+    pruefe(zeilen("SELECT zurueck_am FROM ausgabe WHERE id = ?", vorgang["id"])[0][0] is None,
            "solange etwas fehlt, gilt der Vorgang nicht als erledigt")
-    _, _, seite = anfrage("GET", "/helfer/funk?offen=1")
-    pruefe(seite.count('class="ist-draussen"') == 2,
-           "und steht weiter unter den offenen")
+    _, _, seite = anfrage("GET", "/helfer/ausgabe?offen=1")
+    pruefe(seite.count('class="ist-draussen"') == 2, "und steht weiter unter den offenen")
 
     print("Funk: mehr zurück als raus geht nicht")
-    anfrage("POST", "/helfer/ausleihe/%d/zurueck" % vorgang["id"],
-            {"csrf": CSRF, "teilweise": "1", "funke": "99", "headset": "0",
-             "ersatzakku": "0"})
-    pruefe(zeilen("SELECT funke_zurueck FROM ausleihe WHERE id = ?",
-                  vorgang["id"])[0][0] == 1,
+    anfrage("POST", "/helfer/ausgabe/%d/zurueck" % vorgang["id"],
+            {"csrf": CSRF, "teilweise": "1", "z-%d" % p[FUNK]: "99",
+             "z-%d" % p[HEADSET]: "0", "z-%d" % p[AKKU]: "1"})
+    pruefe(zeilen("SELECT zurueck FROM ausgabe_posten WHERE id = ?", p[FUNK])[0][0] == 1,
            "die Menge wird auf das Ausgegebene begrenzt")
 
     print("Funk: alles zurück")
-    status, ort, _ = anfrage("POST", "/helfer/ausleihe/%d/zurueck" % vorgang["id"],
-                             {"csrf": CSRF})
-    jetzt = zeilen("SELECT * FROM ausleihe WHERE id = ?", vorgang["id"])[0]
-    pruefe(jetzt["zurueck_am"] is not None, "jetzt ist der Vorgang erledigt")
-    pruefe(jetzt["headset_zurueck"] == 1, "auch das Headset ist zurück")
-    _, _, seite = anfrage("GET", "/helfer/funk?offen=1")
+    anfrage("POST", "/helfer/ausgabe/%d/zurueck" % vorgang["id"], {"csrf": CSRF})
+    jetzt = zeilen("SELECT * FROM ausgabe WHERE id = ?", vorgang["id"])[0]
+    pruefe(jetzt["zurueck_am"] is not None and jetzt["zurueck_von"] == "KK",
+           "jetzt ist der Vorgang erledigt, mit Kürzel")
+    pruefe(zeilen("SELECT zurueck FROM ausgabe_posten WHERE id = ?", p[HEADSET])[0][0] == 1,
+           "auch das Headset ist zurück")
+    _, _, seite = anfrage("GET", "/helfer/ausgabe?offen=1")
     pruefe(seite.count('class="ist-draussen"') == 1, "einer bleibt offen")
-
-    status, _, _ = anfrage("POST", "/helfer/ausleihe/%d/zurueck" % vorgang["id"],
+    status, _, _ = anfrage("POST", "/helfer/ausgabe/%d/zurueck" % vorgang["id"],
                            {"csrf": "falsch"})
     pruefe(status == 400, "ohne CSRF-Token geht keine Rückgabe")
 
-    # --- 3. KFZ-Schlüssel --------------------------------------------------
+    # --- 4. Schlüssel ----------------------------------------------------------
     print("Schlüssel: Stamm baut sich auf")
-    status, ort, _ = anfrage("POST", "/helfer/schluessel/ausgeben", {
-        "csrf": CSRF, "kennzeichen": "il-x 999", "name": "Maik Tibbe",
-        "bemerkung": "Shuttle 1"})
-    pruefe("hinweis=fahrzeug-neu" in ort,
-           "das erste Mal legt das Fahrzeug an und sagt es")
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe", {
+        "csrf": CSRF, "name": "Maik Tibbe", "n-%d" % SCHLUESSEL: "il-x 999",
+        "m-%d" % FUNK: "0", "bemerkung": "Shuttle 1"})
+    pruefe("hinweis=fahrzeug-neu" in ort, "das erste Mal legt das Fahrzeug an und sagt es")
     wagen = zeilen("SELECT * FROM fahrzeug")
     pruefe(len(wagen) == 1, "ein Fahrzeug im Stamm")
     pruefe(wagen[0]["kennzeichen_norm"] == "ILX999", "normalisiert gespeichert")
@@ -458,168 +470,123 @@ try:
            "die Schreibweise bleibt für die Anzeige erhalten")
     pruefe(wagen[0]["name"] == "Maik Tibbe", "der Halter ist gemerkt")
 
-    status, ort, _ = anfrage("POST", "/helfer/schluessel/ausgeben", {
-        "csrf": CSRF, "kennzeichen": "ILX999", "name": "Anna Berg"})
-    pruefe("hinweis=schluessel-raus" in ort,
-           "anders getippt ist derselbe Wagen, kein neuer")
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe", {
+        "csrf": CSRF, "helfer_id": str(anna), "n-%d" % SCHLUESSEL: "ILX999",
+        "m-%d" % FUNK: "0"})
+    pruefe("hinweis=ausgegeben" in ort, "anders getippt ist derselbe Wagen, kein neuer")
     pruefe(len(zeilen("SELECT id FROM fahrzeug")) == 1, "der Stamm bleibt bei einem")
     pruefe(zeilen("SELECT name FROM fahrzeug")[0][0] == "Maik Tibbe",
            "und der einmal gemerkte Halter wird nicht überschrieben")
-    pruefe(len(zeilen("SELECT id FROM schluessel")) == 2, "zwei Ausgaben")
-    pruefe(zeilen("SELECT name FROM schluessel ORDER BY id")[1][0] == "Anna Berg",
-           "die zweite Ausgabe steht auf Anna – wer den Schlüssel hat, kann "
-           "vom Halter abweichen")
+    schluessel = zeilen("SELECT a.id, a.name, p.nummer FROM ausgabe a JOIN ausgabe_posten p"
+                        " ON p.ausgabe_id = a.id WHERE p.material_id = ? ORDER BY a.id", SCHLUESSEL)
+    pruefe(len(schluessel) == 2 and schluessel[1]["name"] == "Anna Berg"
+           and schluessel[1]["nummer"] == "IL-X 999",
+           "die zweite Ausgabe steht auf Anna – wer den Schlüssel hat, kann vom Halter abweichen")
 
-    status, ort, _ = anfrage("POST", "/helfer/schluessel/ausgeben",
-                             {"csrf": CSRF, "kennzeichen": "---"})
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe",
+                             {"csrf": CSRF, "name": "Wer", "n-%d" % SCHLUESSEL: "---"})
     pruefe("hinweis=kein-kennzeichen" in ort,
            "ein Kennzeichen ohne Buchstaben und Ziffern wird abgewiesen")
     pruefe(len(zeilen("SELECT id FROM fahrzeug")) == 1, "und legt nichts an")
 
     print("Der Fahrzeugstamm steht unter der Flaeche")
-    _, _, seite = anfrage("GET", "/helfer/schluessel")
+    _, _, seite = anfrage("GET", "/helfer/ausgabe")
     pruefe(seite.index("arbeitsflaeche") < seite.index("fahrzeugstamm"),
            "nicht in der Spalte neben dem Formular")
-    pruefe('data-merken="fahrzeugstamm"' in seite,
-           "und laesst sich ebenfalls zuklappen")
+    pruefe('data-merken="fahrzeugstamm"' in seite, "und laesst sich ebenfalls zuklappen")
+    pruefe('<option value="IL-X 999">Maik Tibbe</option>' in seite,
+           "das Kennzeichenfeld schlägt den Stamm vor")
 
-    print("Schlüssel: Namensvorschläge")
-    _, _, seite = anfrage("GET", "/helfer/schluessel")
+    print("Namensvorschläge für jemand anderes")
     liste = seite.split('<datalist id="v-namen">')[1].split("</datalist>")[0]
-    pruefe(liste.index("Anna Berg") < liste.index("Bert"),
-           "die vom Shuttle stehen vorn: " + liste[:120].replace("\\n", " "))
-    pruefe("Ganz Neu" in liste,
-           "die von Hand angelegten stehen auch drin")
+    pruefe("Maik Tibbe" in liste and "Ganz Neu" in liste and "Anna Berg" not in liste,
+           "wer schon ohne Helfereintrag etwas bekam – Helfer stehen in der Auswahl darüber")
 
     print("Schlüssel: zurück")
-    sid = zeilen("SELECT id FROM schluessel ORDER BY id")[0][0]
-    status, ort, _ = anfrage("POST", "/helfer/schluessel/%d/zurueck" % sid,
-                             {"csrf": CSRF})
+    sid = schluessel[0]["id"]
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe/%d/zurueck" % sid, {"csrf": CSRF})
     pruefe("hinweis=zurueck" in ort, "meldet Erfolg")
-    zeile = zeilen("SELECT * FROM schluessel WHERE id = ?", sid)[0]
+    zeile = zeilen("SELECT * FROM ausgabe WHERE id = ?", sid)[0]
     pruefe(zeile["zurueck_am"] is not None and zeile["zurueck_von"] == "KK",
            "mit Zeitpunkt und Kürzel")
-
-    status, ort, _ = anfrage("POST", "/helfer/schluessel/%d/zurueck" % sid,
-                             {"csrf": CSRF})
-    pruefe(zeilen("SELECT zurueck_am FROM schluessel WHERE id = ?", sid)[0][0]
-           == zeile["zurueck_am"],
-           "ein zweites Mal ändert den Zeitpunkt nicht")
-
-    _, _, seite = anfrage("GET", "/helfer/schluessel?offen=1")
-    pruefe(seite.count('class="ist-draussen"') == 1, "einer ist noch draußen")
+    _, _, seite = anfrage("GET", "/helfer/ausgabe?offen=1")
+    pruefe(seite.count('class="ist-draussen"') == 2, "Annas Schlüssel und Ganz Neus Funkgerät sind noch draußen")
 
     print("Umschalter: alles oder nur was draußen ist")
-    for pfad, merkname, spalte in (
-            ("/helfer/funk", "funk-offen", "ausleihe"),
-            ("/helfer/schluessel", "schluessel-offen", "schluessel")):
-        gesamt = zeilen("SELECT COUNT(*) FROM " + spalte)[0][0]
-        draussen = zeilen("SELECT COUNT(*) FROM " + spalte
-                          + " WHERE zurueck_am IS NULL")[0][0]
+    gesamt = zeilen("SELECT COUNT(*) FROM ausgabe")[0][0]
+    draussen = zeilen("SELECT COUNT(*) FROM ausgabe WHERE zurueck_am IS NULL")[0][0]
+    for anhang, erwartet_aktiv, erwartete_zeilen in (
+            ("", "Alle", gesamt), ("?offen=1", "Noch draußen", draussen)):
+        _, _, seite = anfrage("GET", "/helfer/ausgabe" + anhang)
+        pruefe('data-merken-filter="ausgabe-offen"' in seite,
+               "/helfer/ausgabe" + anhang + ": der Umschalter wird gemerkt")
+        # Beide Zahlen stehen immer dran - auch auf der gefilterten Seite,
+        # sonst waere "Alle" so gross wie die gerade sichtbare Liste.
+        zahlen = re.findall(r'umschalter-zahl">(\d+)<', seite)
+        pruefe(zahlen == [str(gesamt), str(draussen)],
+               "beide Zahlen stimmen: %s statt %s" % (zahlen, [gesamt, draussen]))
+        aktiv = re.search(r'umschalter-teil ist-aktiv[^"]*"'
+                          r'[\s\S]{0,200}?>\s*([^<]+?)\s*<span', seite)
+        pruefe(aktiv is not None and aktiv.group(1) == erwartet_aktiv,
+               "die gewählte Seite ist hervorgehoben: " + (aktiv.group(1) if aktiv else "keine"))
+        # admin_merken.js vergleicht die gemerkte Wahl mit dem data-wert des
+        # hervorgehobenen Teils - stimmte der nicht, lüde es immer wieder neu.
+        teile = re.findall(r'<a class="umschalter-teil([^"]*)"\s*'
+                           r'href="[^"]*" data-wert="(\d)"', seite)
+        markiert = [wert for klassen, wert in teile if "ist-aktiv" in klassen]
+        pruefe(markiert == ["1" if anhang else "0"],
+               "genau ein data-wert ist markiert, und zwar der richtige: " + str(markiert))
+        pruefe(seite.count('<tr data-suche=') == erwartete_zeilen,
+               "und es stehen %d Zeilen da" % erwartete_zeilen)
 
-        for anhang, erwartet_aktiv, erwartete_zeilen in (
-                ("", "Alle", gesamt), ("?offen=1", "Noch draußen", draussen)):
-            _, _, seite = anfrage("GET", pfad + anhang)
-            pruefe('data-merken-filter="' + merkname + '"' in seite,
-                   pfad + anhang + ": der Umschalter wird gemerkt")
-            pruefe("f-offen" not in seite,
-                   "das alte Häkchen mit Anzeigen-Knopf ist weg")
+    print("Suche ist trennzeichentolerant")
+    _, _, seite = anfrage("GET", "/helfer/ausgabe")
+    pruefe(any("ilx999" in z for z in re.findall(r'<tr data-suche="([^"]*)"', seite)),
+           "der Suchtext enthält die normalisierte Form des Kennzeichens")
 
-            # Beide Zahlen stehen immer dran - auch auf der gefilterten Seite,
-            # sonst waere "Alle" so gross wie die gerade sichtbare Liste.
-            zahlen = re.findall(r'umschalter-zahl">(\d+)<', seite)
-            pruefe(zahlen == [str(gesamt), str(draussen)],
-                   "beide Zahlen stimmen: %s statt %s"
-                   % (zahlen, [gesamt, draussen]))
-
-            aktiv = re.search(r'umschalter-teil ist-aktiv[^"]*"'
-                              r'[\s\S]{0,200}?>\s*([^<]+?)\s*<span', seite)
-            pruefe(aktiv is not None and aktiv.group(1) == erwartet_aktiv,
-                   "die gewählte Seite ist hervorgehoben: "
-                   + (aktiv.group(1) if aktiv else "keine"))
-
-            # admin_merken.js vergleicht die gemerkte Wahl mit dem data-wert
-            # des hervorgehobenen Teils - das ist sein Halt. Stimmte der
-            # nicht, schickte es sich im Kreis: die Seite "Alle" hat keinen
-            # Filter in der Adresse, es fände dort also immer wieder nichts
-            # und lüde immer wieder neu.
-            teile = re.findall(
-                r'<a class="umschalter-teil([^"]*)"\s*'
-                r'href="[^"]*" data-wert="(\d)"', seite)
-            markiert = [wert for klassen, wert in teile
-                        if "ist-aktiv" in klassen]
-            pruefe(markiert == ["1" if anhang else "0"],
-                   "genau ein data-wert ist markiert, und zwar der richtige: "
-                   + str(markiert))
-            pruefe(seite.count('<tr data-suche=') == erwartete_zeilen,
-                   "und es stehen %d Zeilen da" % erwartete_zeilen)
-
-    # Die Kacheln zaehlen den Bestand, nicht die Anzeige.
-    _, _, seite = anfrage("GET", "/helfer/schluessel?offen=1")
-    kacheln = re.findall(r'zaehler-zahl">(\d+)<', seite)
-    gesamt = zeilen("SELECT COUNT(*) FROM schluessel")[0][0]
-    pruefe(kacheln[1] == str(gesamt),
-           "die Kachel 'Vorgänge' zeigt auch mit Filter den ganzen Bestand: "
-           + str(kacheln))
-
-    print("Schlüssel: Suche ist trennzeichentolerant")
-    _, _, seite = anfrage("GET", "/helfer/schluessel")
-    zeile = re.search(r'<tr data-suche="([^"]*)"', seite).group(1)
-    pruefe("ilx999" in zeile,
-           "der Suchtext enthält die normalisierte Form: " + zeile[:60])
+    print("Material löschen")
+    status, ort, _ = anfrage("POST", "/helfer/material/%d/loeschen" % FUNK, {"csrf": CSRF})
+    pruefe("hinweis=material-ausgegeben" in ort and zeilen("SELECT 1 FROM material WHERE id = ?", FUNK),
+           "was schon herausging, bleibt")
+    anfrage("POST", "/helfer/material", {"csrf": CSRF, "name": "Vertippt"})
+    tipp = zeilen("SELECT id FROM material WHERE name = 'Vertippt'")[0][0]
+    status, ort, _ = anfrage("POST", "/helfer/material/%d/loeschen" % tipp, {"csrf": CSRF})
+    pruefe("hinweis=material-weg" in ort and not zeilen("SELECT 1 FROM material WHERE id = ?", tipp),
+           "was nie herausging, lässt sich löschen")
 
     print("Löschen")
-    status, ort, _ = anfrage("POST", "/helfer/schluessel/%d/loeschen" % sid,
-                             {"csrf": CSRF})
-    pruefe("hinweis=geloescht" in ort and
-           len(zeilen("SELECT id FROM schluessel")) == 1, "Schlüsselvorgang weg")
-    status, ort, _ = anfrage("POST", "/helfer/ausleihe/%d/loeschen" % vorgang["id"],
-                             {"csrf": CSRF})
-    pruefe("hinweis=geloescht" in ort and
-           len(zeilen("SELECT id FROM ausleihe")) == 1, "Ausleihe weg")
+    status, ort, _ = anfrage("POST", "/helfer/ausgabe/%d/loeschen" % sid, {"csrf": CSRF})
+    pruefe("hinweis=geloescht" in ort and not zeilen("SELECT 1 FROM ausgabe WHERE id = ?", sid)
+           and not zeilen("SELECT 1 FROM ausgabe_posten WHERE ausgabe_id = ?", sid),
+           "Vorgang samt Posten weg")
 
     print("Fahrzeug aus dem Stamm nehmen")
-    # schluessel.fahrzeug_id haengt mit ON DELETE CASCADE daran. Loeschte man
-    # ein Fahrzeug mit Vorgaengen, waere die ganze Ausgabehistorie still weg -
-    # und die Unterschriften dazu zeigten ins Leere.
+    # Loeschte man ein Fahrzeug mit Vorgaengen, waere die Ausgabehistorie still
+    # weg - und die Unterschriften dazu zeigten ins Leere.
     mit = zeilen("SELECT f.id FROM fahrzeug f WHERE EXISTS"
-                 " (SELECT 1 FROM schluessel s WHERE s.fahrzeug_id = f.id)")[0][0]
-    vorher = len(zeilen("SELECT id FROM schluessel"))
-    status, ort, _ = anfrage("POST", "/helfer/fahrzeug/%d/loeschen" % mit,
-                             {"csrf": CSRF})
-    pruefe("hinweis=fahrzeug-hat-vorgaenge" in ort,
-           "mit Vorgaengen wird abgelehnt")
-    pruefe(len(zeilen("SELECT id FROM fahrzeug WHERE id = ?", mit)) == 1
-           and len(zeilen("SELECT id FROM schluessel")) == vorher,
-           "und nichts ist verschwunden – weder Fahrzeug noch Vorgang")
+                 " (SELECT 1 FROM ausgabe_posten p WHERE p.fahrzeug_id = f.id)")[0][0]
+    status, ort, _ = anfrage("POST", "/helfer/fahrzeug/%d/loeschen" % mit, {"csrf": CSRF})
+    pruefe("hinweis=fahrzeug-hat-vorgaenge" in ort, "mit Vorgaengen wird abgelehnt")
+    pruefe(len(zeilen("SELECT id FROM fahrzeug WHERE id = ?", mit)) == 1,
+           "und nichts ist verschwunden")
 
     # Der Fall, um den es geht: ein Vertipper. Er kommt beim Ausgeben in den
     # Stamm; wird der Vorgang geloescht, bleibt das Fahrzeug allein zurueck.
-    anfrage("POST", "/helfer/schluessel/ausgeben",
-            {"csrf": CSRF, "kennzeichen": "IL-ZZ 999", "name": "Vertippt",
-             "bemerkung": ""})
+    anfrage("POST", "/helfer/ausgabe",
+            {"csrf": CSRF, "name": "Vertippt", "n-%d" % SCHLUESSEL: "IL-ZZ 999"})
     tipp = zeilen("SELECT id FROM fahrzeug WHERE kennzeichen_norm = 'ILZZ999'")[0][0]
-    falsch = zeilen("SELECT id FROM schluessel WHERE fahrzeug_id = ?", tipp)[0][0]
-    anfrage("POST", "/helfer/schluessel/%d/loeschen" % falsch, {"csrf": CSRF})
-    pruefe(not zeilen("SELECT id FROM schluessel WHERE fahrzeug_id = ?", tipp),
-           "der falsche Vorgang ist weg, das Fahrzeug steht noch da")
-
-    status, ort, _ = anfrage("POST", "/helfer/fahrzeug/%d/loeschen" % tipp,
-                             {"csrf": CSRF})
+    falsch = zeilen("SELECT ausgabe_id FROM ausgabe_posten WHERE fahrzeug_id = ?", tipp)[0][0]
+    anfrage("POST", "/helfer/ausgabe/%d/loeschen" % falsch, {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/helfer/fahrzeug/%d/loeschen" % tipp, {"csrf": CSRF})
     pruefe("hinweis=fahrzeug-weg" in ort
            and not zeilen("SELECT id FROM fahrzeug WHERE id = ?", tipp),
            "ohne Vorgaenge geht es")
-
-    status, ort, _ = anfrage("POST", "/helfer/fahrzeug/999999/loeschen",
-                             {"csrf": CSRF})
+    status, ort, _ = anfrage("POST", "/helfer/fahrzeug/999999/loeschen", {"csrf": CSRF})
     pruefe("hinweis=unbekannt" in ort, "ein Fahrzeug, das es nicht gibt")
-    status, _, _ = anfrage("POST", "/helfer/fahrzeug/%d/loeschen" % mit,
-                           {"csrf": "falsch"})
+    status, _, _ = anfrage("POST", "/helfer/fahrzeug/%d/loeschen" % mit, {"csrf": "falsch"})
     pruefe(status == 400, "ohne Token geht gar nichts")
-
-    _, _, seite = anfrage("GET", "/helfer/schluessel")
-    pruefe("hat Vorgänge" in seite,
-           "in der Liste steht statt des Knopfes, warum es nicht geht")
+    _, _, seite = anfrage("GET", "/helfer/ausgabe")
+    pruefe("hat Vorgänge" in seite, "in der Liste steht statt des Knopfes, warum es nicht geht")
 
 finally:
     prozess.terminate()

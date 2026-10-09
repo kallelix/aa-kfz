@@ -119,8 +119,9 @@ for helfer_id, von in ((LENA, "06:00"), (LENA2, "06:00"), (LENA2, "17:00")):
 for helfer_id in (LENA, LENA2):
     sql("INSERT INTO einsatzgrenze (helfer_id, bereich_id, art, angelegt_am)"
         " VALUES (?, ?, 'nur_zu_zweit', '2027-05-01 10:00')", helfer_id, BEREICH)
-sql("INSERT INTO ausleihe (veranstaltung_id, helfer_id, funke, ausgegeben_am)"
-    " VALUES (?, ?, 1, '2027-05-20 18:00')", VA, LENA2)
+db.material_standard(VA)
+FUNK = next(m["id"] for m in db.materialien(VA) if m["name"] == "Funkgerät")
+db.ausgeben(VA, LENA2, "", [{"material_id": FUNK, "menge": 1}])
 sql("INSERT INTO unterschrift (art, vorgang_id, richtung, titel, wortlaut, angefordert_am,"
     " laeuft_ab_am) VALUES ('tshirt', ?, 'ausgabe', 'T-Shirt Ausgabe', 'T-Shirt in Größe M',"
     " '2027-05-20 18:00', '2027-05-20 18:05')", LENA2)
@@ -222,7 +223,7 @@ try:
            "Springer-Zeiten: die gleiche einmal, die andere dazu")
     pruefe(len(sql("SELECT 1 FROM einsatzgrenze WHERE helfer_id = ?", LENA)) == 1,
            "die Einsatzgrenze einmal")
-    pruefe(sql("SELECT helfer_id FROM ausleihe")[0][0] == LENA
+    pruefe(sql("SELECT helfer_id FROM ausgabe")[0][0] == LENA
            and sql("SELECT vorgang_id FROM unterschrift")[0][0] == LENA
            and sql("SELECT helfer_id FROM absage")[0][0] == LENA
            and sql("SELECT helfer_id FROM mail_out")[0][0] == LENA,

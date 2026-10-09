@@ -39,7 +39,8 @@ XCO = {"id": 8, "kurz": "XCO 2027", "nutzt": ["helfer"]}
 
 print("Unter welchem Reiter eine Seite steht")
 for pfad, reiter in (("/helfer", "helfer"), ("/helfer/bereich/3", "helfer"),
-                     ("/helfer/funk", "ausgabe"), ("/helfer/fahrzeug/2/loeschen", "ausgabe"),
+                     ("/helfer/ausgabe", "ausgabe"), ("/helfer/fahrzeug/2/loeschen", "ausgabe"),
+                     ("/helfer/funk", "ausgabe"), ("/helfer/material/3", "verwaltung"),
                      ("/helfer/goodies", "verwaltung"), ("/helfer/goodie/4", "verwaltung"),
                      ("/helfer/unterschriften", "verwaltung"), ("/veranstaltungen/7", "verwaltung"),
                      ("/konten", "verwaltung"), ("/kennzeichen/durchfahrt", "kennzeichen"),
@@ -97,7 +98,7 @@ pruefe([name for name, _ in ohne_dienst] == ["AA 2027"] and ohne_dienst[0][1][0]
 
 print("Wohin nach dem Wechsel der Veranstaltung")
 for pfad, ziel in (("/helfer/bereiche", "/helfer/bereiche"), ("/helfer/bereich/5", "/helfer"),
-                   ("/helfer/schicht/2/aendern", "/helfer"), ("/helfer/ausleihe/3", "/helfer/funk"),
+                   ("/helfer/schicht/2/aendern", "/helfer"), ("/helfer/ausgabe/3/zurueck", "/helfer/ausgabe"),
                    ("/veranstaltungen/7", "/veranstaltungen/{id}"), ("/konten/4", "/veranstaltungen")):
     pruefe(nav._weiter(pfad) == ziel, pfad + " → " + ziel)
 

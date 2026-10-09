@@ -208,10 +208,22 @@ nutzt; gewählt wird sie im Kopf, für alle Bereiche, und das Backoffice zeigt
 nur die Reiter dessen, was sie nutzt. Der Helferbereich gliedert sich in
 Übersicht, Planen, Leute und Vor Ort; Goodies und Verpflegung, Import,
 Zeitplan-Abruf, Material und Tablet stehen unter Verwaltung bei der
-Veranstaltung; Funk und Schlüssel unter dem eigenen Reiter Ausgabe. Goodies
+Veranstaltung; die Ausgabe unter dem eigenen Reiter (seit 3.8 eine für alles
+Material, V-09). Goodies
 haben einen Schalter, das Shirt einen Schnitt (V-07). Die Daten von
 Kennzeichen und Presse hängen weiter an keiner Veranstaltung. Der Import aus helferliste.online
 macht aus jeder Liste einen Bereich und aus ihrem Bedarf Soll und Minimum.
+
+**Stand 10.10.2026, Schritt 3.8:** V-09 ist umgesetzt. Jede Veranstaltung
+legt unter Verwaltung → Material fest, was sie ausgibt – je Material mit oder
+ohne Rückgabe, mit oder ohne Unterschrift am Tablet, mit Nummer, Kennzeichen
+oder nichts, und womit das Formular vorbelegt ist. Ausgegeben wird an einem
+Tisch, an Helfer und an jeden anderen; ein Vorgang trägt alle Materialien
+einer Übergabe und eine Unterschrift, zurück geht alles oder ein Teil.
+Funkgerät, Headset, Ersatzakku und Fahrzeugschlüssel sind vier Materialien
+unter vielen: die Migration hat die bisherigen Ausleihen, Schlüssel und
+Unterschriften übernommen, der Fahrzeugstamm bleibt. Die Vorlage aus dem
+Vorjahr nimmt die Materialien mit.
 
 ### 5.2 Anmeldung (A)
 
@@ -912,7 +924,7 @@ Phase Vorrang.
 | 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | **erledigt** |
 | 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | **erledigt** |
 | 3.6 | ~~Warteliste mit Nachrücken~~ – vorgezogen in 2.5 | – |
-| 3.8 | **Materialausgabe verallgemeinern** (V-09): Materialien je Veranstaltung, eine Ausgabe für alles mit Rückgabe, Unterschrift und Nummer; Funk und Schlüssel ziehen um | 8 h |
+| 3.8 | **Materialausgabe verallgemeinern** (V-09): Materialien je Veranstaltung, eine Ausgabe für alles mit Rückgabe, Unterschrift und Nummer; Funk und Schlüssel ziehen um | **erledigt** |
 | 3.7 | Persönliche Backoffice-Konten mit Rollen und Einladen – für alle drei Bereiche | **erledigt** |
 
 ### Phase 4 – Veranstaltungstag und Anerkennung (März bis Ende April 2027)
@@ -937,7 +949,7 @@ Fehler beheben, nichts Neues.
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
-| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~32 h erledigt |
+| 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, **erledigt** |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |
 

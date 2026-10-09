@@ -258,8 +258,10 @@ try:
     db.einteilen(UR_POSTEN, QUINN)
     testdb.abfrage(db_url, "helfer", "UPDATE helfer SET stamm_einwilligung_am = '2022-08-01 10:00:00'"
                    " WHERE id = %d" % QUINN)
-    db.ausleihen(ALT, PETRA, {"funke": 1})
-    db.ausleihen(VA, ANNA, {"funke": 1})
+    for vid, wer in ((ALT, PETRA), (VA, ANNA)):
+        db.material_standard(vid)
+        funk = next(m["id"] for m in db.materialien(vid) if m["name"] == "Funkgerät")
+        db.ausgeben(vid, wer, "", [{"material_id": funk, "menge": 1}])
     skript = [str(PYTHON), str(WURZEL.parent / "deploy" / "daten-loeschen.py"), "--art", "helfer",
               "--url", db_url]
     probe = subprocess.run(skript, capture_output=True, text=True, encoding="utf-8",
@@ -277,8 +279,8 @@ try:
     pruefe(QUINN not in da, "Quinn: Einwilligung, aber zuletzt 2022 dabei – nach drei Jahren gelöscht")
     pruefe(ANNA in da and MIA in da and BEN in da,
            "wer 2027 dabei ist, bleibt – auch ohne Einwilligung")
-    pruefe(zeilen("SELECT veranstaltung_id FROM ausleihe") == [(VA,)],
-           "Ausleihen nur der vergangenen Veranstaltung sind weg")
+    pruefe(zeilen("SELECT veranstaltung_id FROM ausgabe") == [(VA,)],
+           "Ausgaben nur der vergangenen Veranstaltung sind weg")
 finally:
     prozess.terminate()
     try:

@@ -69,19 +69,15 @@ PLAENE: dict[str, list[tuple[str, str]]] = {
     # (D-04).
     "helfer": [
         ("DELETE FROM unterschrift u WHERE NOT ("
-         " (u.art = 'material' AND u.vorgang_id IN (SELECT id FROM ausleihe"
-         "   WHERE veranstaltung_id IN " + "{LAUFEND}" + "))"
-         " OR (u.art = 'schluessel' AND u.vorgang_id IN (SELECT id FROM schluessel"
+         " (u.art = 'material' AND u.vorgang_id IN (SELECT id FROM ausgabe"
          "   WHERE veranstaltung_id IN " + "{LAUFEND}" + "))"
          " OR (u.art = 'tshirt' AND u.vorgang_id IN " + "{DABEI}" + "))",
          "Unterschriften samt Namenszug, außer für laufende Veranstaltungen"),
-        ("DELETE FROM schluessel WHERE veranstaltung_id IN {VORBEI}",
-         "Schlüsselvorgänge samt Namen"),
+        ("DELETE FROM ausgabe WHERE veranstaltung_id IN {VORBEI}",
+         "Ausgaben samt Namen (Funk, Schlüssel, Material)"),
         ("DELETE FROM fahrzeug f WHERE NOT EXISTS"
-         " (SELECT 1 FROM schluessel s WHERE s.fahrzeug_id = f.id)",
+         " (SELECT 1 FROM ausgabe_posten p WHERE p.fahrzeug_id = f.id)",
          "Fahrzeugstamm samt Haltern, soweit nicht mehr gebraucht"),
-        ("DELETE FROM ausleihe WHERE veranstaltung_id IN {VORBEI}",
-         "Ausleihen (Funk und Material)"),
         ("DELETE FROM absage WHERE veranstaltung_id IN {VORBEI}", "Absagen samt Namen"),
         ("DELETE FROM warteliste WHERE schicht_id IN"
          " (SELECT id FROM schicht WHERE veranstaltung_id IN {VORBEI})", "Wartelisten"),

@@ -1,0 +1,326 @@
+{% extends "admin_base.html" %}
+{% import "unterschrift_knopf.html" as unterschrift %}
+{% block titel %}Ausgabe{% endblock %}
+{% block ueberschrift %}Ausgabe{% endblock %}
+
+{# V-09: eine Ausgabe für alles, was die Veranstaltung ausgibt – Funkgeräte,
+   Schlüssel und was sonst unter Material steht. Ein Vorgang: eine Person,
+   eine Unterschrift, je Material eine Menge und, wo verlangt, Nummer oder
+   Kennzeichen. #}
+{% block inhalt %}
+  {% if not materialien %}
+    <section class="kasten">
+      <h2>Noch kein Material</h2>
+      <p>Was diese Veranstaltung ausgibt, steht unter
+        <a href="/helfer/material">Verwaltung → Material</a>. Dort lassen sich Funkgeräte und
+        Schlüssel mit einem Klick anlegen.</p>
+    </section>
+  {% else %}
+
+  <section class="zaehler zaehler-flach">
+    {% for z in zaehler %}
+      <div class="zaehler-kachel {% if z.offen %}zaehler-voll{% endif %}">
+        <p class="zaehler-titel">{{ z.name }}</p>
+        {% if z.rueckgabe %}
+          <p class="zaehler-zahl">{{ z.offen }}</p>
+          <p class="zaehler-detail">draußen von {{ z.raus }} ausgegeben</p>
+        {% else %}
+          <p class="zaehler-zahl">{{ z.raus }}</p>
+          <p class="zaehler-detail">ausgegeben, ohne Rückgabe</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+
+  {# Formular und Liste nebeneinander, sobald der Bildschirm es hergibt.
+     Untereinander muesste man fuer jede Ruecknahme am ganzen Ausgabeformular
+     vorbeiscrollen - und an einem Tisch, an dem abwechselnd ausgegeben und
+     zurueckgenommen wird, ist das der haeufigste Handgriff ueberhaupt. #}
+  <div class="arbeitsflaeche">
+  <details class="kasten arbeit-formular" data-merken="ausgabe" open>
+    <summary class="kasten-klapp">
+      <span class="kasten-titel">Ausgeben</span>
+      <span class="klapp-pfeil" aria-hidden="true"></span>
+    </summary>
+    <form method="post" action="/helfer/ausgabe">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+
+      <div class="feld">
+        <label for="helfer_id">An wen</label>
+        <select id="helfer_id" name="helfer_id">
+          <option value="">– bitte wählen –</option>
+          {% for h in helfer %}
+            <option value="{{ h.id }}">{{ h.name }}{% if h.email %} – {{ h.email }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="feld">
+        <label for="name">… oder jemand anderes</label>
+        <input type="text" id="name" name="name" maxlength="120" list="v-namen"
+               autocomplete="off" placeholder="Name eintippen">
+        <datalist id="v-namen">
+          {% for n in namen %}<option value="{{ n }}">{% endfor %}
+        </datalist>
+      </div>
+
+      <div class="feld">
+        <label for="datum">Für welchen Tag <span class="optional">optional</span></label>
+        <select id="datum" name="datum">
+          <option value="">– ohne Tagesbezug –</option>
+          {% for t in tage %}
+            <option value="{{ t.datum }}"
+                    {% if t.datum == heute %}selected{% endif %}>{{ t.lang }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="feld">
+        <label>Material</label>
+        <div class="mengen">
+          {% for m in materialien %}
+            {% if m.erfassen == 'kennzeichen' %}
+              {# Ein Kennzeichen ist ein Schlüssel. Leer heißt: keiner. #}
+              <span class="menge">
+                <label for="n-{{ m.id }}">{{ m.name }} – Kennzeichen</label>
+                <input type="text" id="n-{{ m.id }}" name="n-{{ m.id }}" maxlength="20"
+                       class="kennzeichen-feld" list="v-kennzeichen" autocomplete="off"
+                       placeholder="IL-A 123">
+              </span>
+            {% else %}
+              <span class="menge">
+                <label for="m-{{ m.id }}">{{ m.name }}</label>
+                <input type="number" id="m-{{ m.id }}" name="m-{{ m.id }}"
+                       min="0" max="99" step="1" value="{{ m.vorgabe }}">
+                {% if m.erfassen == 'nummer' %}
+                  <input type="text" id="n-{{ m.id }}" name="n-{{ m.id }}" maxlength="60"
+                         class="nummer-feld" autocomplete="off" placeholder="Nr."
+                         aria-label="{{ m.name }} – Nummer">
+                {% endif %}
+              </span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% if fahrzeuge %}
+          <datalist id="v-kennzeichen">
+            {% for f in fahrzeuge %}<option value="{{ f.kennzeichen }}">{{ f.name }}</option>{% endfor %}
+          </datalist>
+        {% endif %}
+      </div>
+
+      <div class="feld">
+        <label for="bemerkung">Bemerkung <span class="optional">optional</span></label>
+        <input type="text" id="bemerkung" name="bemerkung" maxlength="200">
+      </div>
+
+      <button type="submit" class="knopf">Ausgeben</button>
+    </form>
+  </details>
+
+  <div class="arbeit-liste">
+  {# Ein Umschalter statt Haekchen und Knopf. Die Wahl wird gemerkt (siehe
+     admin_merken.js) - wer den ganzen Tag Rueckgaben annimmt, soll das nicht
+     nach jedem Seitenwechsel neu einstellen. #}
+  <nav class="umschalter" data-merken-filter="ausgabe-offen" aria-label="Anzeige">
+    <a class="umschalter-teil {% if not nur_offen %}ist-aktiv{% endif %}"
+       href="/helfer/ausgabe" data-wert="0"
+       {% if not nur_offen %}aria-current="true"{% endif %}>
+      Alle <span class="umschalter-zahl">{{ anzahl_alle }}</span></a>
+    <a class="umschalter-teil {% if nur_offen %}ist-aktiv{% endif %}
+              {% if anzahl_offen %}hat-offene{% endif %}"
+       href="/helfer/ausgabe?offen=1" data-wert="1"
+       {% if nur_offen %}aria-current="true"{% endif %}>
+      Noch draußen <span class="umschalter-zahl">{{ anzahl_offen }}</span></a>
+  </nav>
+
+  {% if not ausgaben %}
+    <p class="leer">
+      {% if nur_offen %}Es ist nichts mehr draußen.
+      {% else %}Noch nichts ausgegeben.{% endif %}
+    </p>
+  {% else %}
+    <div class="sperre-suche">
+      <label for="suche">Name, Bemerkung, Nummer oder Kennzeichen</label>
+      <div class="sperre-suche-zeile">
+        <input type="search" id="suche" autocomplete="off" spellcheck="false"
+               placeholder="z. B. Tibbe oder IL-A 1">
+        <a class="knopf-schlicht weg" id="zuruecksetzen" href="#">zurücksetzen</a>
+      </div>
+    </div>
+
+    <p class="trefferzahl" id="trefferzahl">{{ ausgaben|length }} Vorgänge</p>
+
+    <div class="tabelle-huelle">
+      <table data-liste data-sortspalte="0" data-einheit="Vorgang"
+             data-einheit-mehrzahl="Vorgänge">
+        <thead>
+          <tr>
+            <th scope="col" aria-sort="ascending">
+              <button type="button" class="sortknopf" data-spalte="0">
+                Wer <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col">Material</th>
+            <th scope="col" aria-sort="none">
+              <button type="button" class="sortknopf" data-spalte="2">
+                Für <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col" aria-sort="none">
+              <button type="button" class="sortknopf" data-spalte="3">
+                Ausgegeben <span class="sortpfeil" aria-hidden="true"></span>
+              </button>
+            </th>
+            <th scope="col">Zurück</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in ausgaben %}
+            <tr data-suche="{{ a.suche }}"
+                {% if not a.zurueck_am %}class="ist-draussen"{% endif %}>
+              <td>
+                {% if a.helfer_id %}<a href="/helfer/helfer/{{ a.helfer_id }}">{{ a.wer }}</a>
+                {%- else %}{{ a.wer }}{% endif %}
+                {% if a.bemerkung %}<br><span class="gedaempft">{{ a.bemerkung }}</span>{% endif %}
+              </td>
+              <td>
+                {% for p in a.posten %}
+                  <span class="stueck {% if p.rueckgabe and p.zurueck < p.menge %}stueck-offen{% endif %}">
+                    {%- if p.erfassen == 'kennzeichen' and p.nummer %}{{ p.material }} <span class="kennzeichen-feld">{{ p.nummer }}</span>
+                    {%- else %}{{ p.menge }}× {{ p.material }}{% if p.nummer %} (Nr. {{ p.nummer }}){% endif %}{% endif %}
+                    {%- if p.rueckgabe and p.zurueck and p.menge > 1 %} ({{ p.zurueck }} zurück){% endif %}
+                  </span>
+                {% endfor %}
+              </td>
+              <td class="nowrap" data-wert="{{ a.datum or '' }}">
+                {% if a.datum %}{{ a.datum | tag }}
+                {% else %}<span class="gedaempft">ohne Tag</span>{% endif %}
+              </td>
+              <td class="gedaempft nowrap" data-wert="{{ a.ausgegeben_am }}">
+                {{ a.ausgegeben_am[:16] }}
+                {%- if a.ausgegeben_von %}<br>{{ a.ausgegeben_von }}{% endif %}
+              </td>
+              <td>
+                {% if not a.rueckgabe %}
+                  <span class="gedaempft">ohne Rückgabe</span>
+                {% elif a.zurueck_am %}
+                  <span class="marke marke-voll">vollständig</span><br>
+                  <span class="gedaempft">{{ a.zurueck_am[:16] }}</span>
+                {% else %}
+                  <span class="marke marke-luecke">draußen</span>
+                {% endif %}
+              </td>
+              <td class="rechts">
+                <div class="zeilenaktionen">
+                  {% if not a.zurueck_am %}
+                    <form method="post" action="/helfer/ausgabe/{{ a.id }}/zurueck">
+                      <input type="hidden" name="csrf" value="{{ csrf }}">
+                      <input type="hidden" name="offen" value="{{ '1' if nur_offen else '' }}">
+                      <button type="submit" class="knopf-winzig">alles zurück</button>
+                    </form>
+                    {% if a.posten | selectattr('rueckgabe') | list | length > 1
+                          or a.posten | selectattr('rueckgabe') | selectattr('menge', 'gt', 1) | list %}
+                      <details class="teilrueckgabe">
+                        <summary class="knopf-winzig">nur teilweise</summary>
+                        <form method="post" action="/helfer/ausgabe/{{ a.id }}/zurueck">
+                          <input type="hidden" name="csrf" value="{{ csrf }}">
+                          <input type="hidden" name="teilweise" value="1">
+                          <input type="hidden" name="offen" value="{{ '1' if nur_offen else '' }}">
+                          <div class="mengen">
+                            {% for p in a.posten if p.rueckgabe %}
+                              <span class="menge">
+                                <label for="z-{{ p.id }}">{{ p.material }} (von {{ p.menge }})</label>
+                                <input type="number" id="z-{{ p.id }}" name="z-{{ p.id }}"
+                                       min="0" max="{{ p.menge }}" value="{{ p.zurueck }}">
+                              </span>
+                            {% endfor %}
+                          </div>
+                          <button type="submit" class="knopf-winzig">übernehmen</button>
+                        </form>
+                      </details>
+                    {% endif %}
+                  {% endif %}
+                  {# Immer die Ausgabe, nie die Ruecknahme: unterschrieben
+                     wird, was jemand empfaengt. Ist der Vorgang zurueck, wird
+                     kein Tablet mehr angeboten - die Marke bleibt aber
+                     stehen, damit sichtbar ist, ob unterschrieben wurde. #}
+                  {{ unterschrift.knopf(
+                       'material', a.id, 'ausgabe', '/helfer/ausgabe', csrf,
+                       tablet if not a.zurueck_am else false,
+                       (unterschrieben.get(a.id) or {}).get('ausgabe')) }}
+                  <form method="post" action="/helfer/ausgabe/{{ a.id }}/loeschen">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <button type="submit" class="knopf-winzig">löschen</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="leer weg" id="nichts-gefunden">Kein Treffer.</p>
+  {% endif %}
+  </div>{# arbeit-liste #}
+  </div>{# arbeitsflaeche #}
+
+  {% if fahrzeuge %}
+    <details class="fahrzeugstamm" data-merken="fahrzeugstamm">
+      <summary class="kasten-klapp">
+        <span class="kasten-titel">Fahrzeugstamm ({{ fahrzeuge | length }})</span>
+        <span class="klapp-pfeil" aria-hidden="true"></span>
+      </summary>
+      <p class="hilfe">Baut sich beim Ausgeben von selbst auf. Ein Fahrzeug
+        landet hier, sobald sein Kennzeichen zum ersten Mal getippt wurde.</p>
+      <div class="tabelle-huelle">
+        <table>
+          <thead>
+            <tr><th scope="col">Kennzeichen</th><th scope="col">Halter</th>
+              <th scope="col" class="rechts">Ausgaben</th>
+              <th scope="col">Status</th>
+              <th scope="col"></th></tr>
+          </thead>
+          <tbody>
+            {% for f in fahrzeuge %}
+              <tr>
+                <td class="kennzeichen-feld">{{ f.kennzeichen }}</td>
+                <td>
+                  {%- if f.name %}{{ f.name }}
+                  {%- else %}<span class="gedaempft">–</span>{% endif %}
+                </td>
+                <td class="rechts">{{ f.ausgaben }}</td>
+                <td>
+                  {% if f.draussen %}
+                    <span class="marke marke-luecke">Schlüssel draußen</span>
+                  {% else %}
+                    <span class="gedaempft">–</span>
+                  {% endif %}
+                </td>
+                <td class="rechts">
+                  {# Nur, solange nichts daran haengt: ein Fahrzeug zu loeschen
+                     naehme seine Vorgaenge mit. #}
+                  {% if f.ausgaben %}
+                    <span class="gedaempft">hat Vorgänge</span>
+                  {% else %}
+                    <form method="post" action="/helfer/fahrzeug/{{ f.id }}/loeschen">
+                      <input type="hidden" name="csrf" value="{{ csrf }}">
+                      <button type="submit" class="knopf-winzig">löschen</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  {% endif %}
+  {% endif %}
+{% endblock %}
+
+{# bereichsskript, nicht skript: skript gehoert der Huelle und traegt die
+   gemeinsamen Skripte. Wer ihn ueberschreibt, wirft sie weg. #}
+{# suchtext.js zuerst: liste.js benutzt es. #}
+{% block bereichsskript %}<script src="{{ gemeinsam }}/suchtext.js"></script>
+<script src="/helfer/static/liste.js"></script>{% endblock %}

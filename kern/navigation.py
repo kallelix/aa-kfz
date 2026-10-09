@@ -28,14 +28,15 @@ REITER = (
     ("kennzeichen", "Kennzeichen", "/kennzeichen"),
     ("presse", "Presse", "/presse"),
     ("helfer", "Helfer", "/helfer"),
-    ("ausgabe", "Ausgabe", "/helfer/funk"),
+    ("ausgabe", "Ausgabe", "/helfer/ausgabe"),
     ("verwaltung", "Verwaltung", "/veranstaltungen"),
 )
 
 # Seiten, die unter einem anderen Reiter stehen als dem ihrer Anwendung.
 UMGEHAENGT = (
-    ("/helfer/funk", "ausgabe"), ("/helfer/ausleihe", "ausgabe"),
-    ("/helfer/schluessel", "ausgabe"), ("/helfer/fahrzeug", "ausgabe"),
+    ("/helfer/ausgabe", "ausgabe"), ("/helfer/fahrzeug", "ausgabe"),
+    ("/helfer/funk", "ausgabe"), ("/helfer/schluessel", "ausgabe"),
+    ("/helfer/material", "verwaltung"),
     ("/helfer/goodies", "verwaltung"), ("/helfer/goodie", "verwaltung"),
     ("/helfer/import", "verwaltung"), ("/helfer/zeitplan", "verwaltung"),
     ("/helfer/programm", "verwaltung"), ("/helfer/einstellungen", "verwaltung"),
@@ -137,7 +138,7 @@ def verwaltung(sitzung, aktuell) -> list:
                           ("/helfer/import", "Import", ()),
                           ("/helfer/zeitplan", "Zeitplan-Abruf", ("/helfer/programm",))]
         if "ausgabe" in nutzt and helfer:
-            eintraege += [("/helfer/einstellungen", "Material", ()),
+            eintraege += [("/helfer/material", "Material", ("/helfer/einstellungen",)),
                           ("/helfer/unterschriften", "Tablet", ())]
         if eintraege:
             gruppen.append((aktuell["kurz"], eintraege))

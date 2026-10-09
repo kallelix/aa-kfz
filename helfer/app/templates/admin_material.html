@@ -1,0 +1,101 @@
+{% extends "admin_base.html" %}
+{% block titel %}Material{% endblock %}
+{% block ueberschrift %}Material{% endblock %}
+
+{# V-09: was diese Veranstaltung ausgibt – je Material mit oder ohne
+   Rückgabe, Unterschrift am Tablet und erfasster Nummer oder Kennzeichen.
+   Ausgegeben wird unter dem Reiter Ausgabe. #}
+{% macro felder(w, praefix, fehler={}) %}
+  <div class="feld {% if fehler.name %}feld-fehler{% endif %}">
+    <label for="{{ praefix }}name">Name</label>
+    <input type="text" id="{{ praefix }}name" name="name" maxlength="60" required
+           value="{{ w.name }}" placeholder="Parkausweis">
+    {% if fehler.name %}<p class="fehler">{{ fehler.name }}</p>{% endif %}
+  </div>
+  <div class="feld">
+    <label for="{{ praefix }}erfassen">Je Stück notieren</label>
+    <select id="{{ praefix }}erfassen" name="erfassen">
+      {% for schluessel, text in erfassen.items() %}
+        <option value="{{ schluessel }}" {% if w.erfassen == schluessel %}selected{% endif %}>{{ text }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="feld">
+    <label for="{{ praefix }}vorgabe">Im Formular vorbelegt</label>
+    <input type="number" id="{{ praefix }}vorgabe" name="vorgabe" min="0" max="{{ hoechstwert }}"
+           value="{{ w.vorgabe }}">
+  </div>
+  <fieldset class="feld">
+    <legend>Bei der Ausgabe</legend>
+    <label class="auswahl"><input type="checkbox" name="rueckgabe" value="1"
+           {% if w.rueckgabe %}checked{% endif %}>
+      <span class="auswahl-text"><span class="auswahl-titel">Kommt zurück</span>
+        <span class="auswahl-hilfe">Ohne Häkchen ist die Ausgabe mit der Übergabe erledigt –
+          ein Parkausweis, ein Essensbon.</span></span></label>
+    <label class="auswahl"><input type="checkbox" name="unterschrift" value="1"
+           {% if w.unterschrift %}checked{% endif %}>
+      <span class="auswahl-text"><span class="auswahl-titel">Unterschrift am Tablet</span>
+        <span class="auswahl-hilfe">Gibt es ein Tablet, steht die Ausgabe gleich zum Unterschreiben
+          darauf.</span></span></label>
+  </fieldset>
+{% endmacro %}
+
+{% block inhalt %}
+  {% if not materialien %}
+    <section class="kasten">
+      <h2>Noch nichts</h2>
+      <p>Was bisher ausgegeben wurde – Funkgerät, Headset, Ersatzakku und Fahrzeugschlüssel –,
+        lässt sich mit einem Klick anlegen und danach anpassen.</p>
+      {% if darf %}
+        <form method="post" action="/helfer/material/standard">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="knopf">Funk und Schlüssel anlegen</button>
+        </form>
+      {% endif %}
+    </section>
+  {% else %}
+    {% for m in materialien %}
+      <details class="kasten" id="material-{{ m.id }}" {% if offen == m.id %}open{% endif %}>
+        <summary class="kasten-klapp">
+          <span class="kasten-titel">{{ m.name }}
+            <span class="gedaempft">
+              {{- ' · ' ~ erfassen[m.erfassen] if m.erfassen }}
+              {{- ' · ohne Rückgabe' if not m.rueckgabe }}
+              {{- ' · ohne Unterschrift' if not m.unterschrift }}
+              {{- ' · ' ~ m.ausgegeben ~ '× ausgegeben' if m.ausgegeben }}</span></span>
+          <span class="klapp-pfeil" aria-hidden="true"></span>
+        </summary>
+        <form method="post" action="/helfer/material/{{ m.id }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {{ felder(m, 'm' ~ m.id ~ '-', fehler if offen == m.id else {}) }}
+          {% if darf %}<button type="submit" class="knopf">Speichern</button>{% endif %}
+        </form>
+        {% if darf %}
+          {% if m.ausgegeben %}
+            <p class="hilfe">Ging schon heraus und bleibt deshalb – sonst verschwände, was jemand
+              unterschrieben hat.</p>
+          {% else %}
+            <form method="post" action="/helfer/material/{{ m.id }}/loeschen">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button type="submit" class="knopf-schlicht">Löschen</button>
+            </form>
+          {% endif %}
+        {% endif %}
+      </details>
+    {% endfor %}
+  {% endif %}
+
+  {% if darf %}
+    <section class="kasten">
+      <h2>Neues Material</h2>
+      <form method="post" action="/helfer/material">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {{ felder(neu, 'neu-', fehler if offen == 'neu' else {}) }}
+        <button type="submit" class="knopf">Anlegen</button>
+      </form>
+    </section>
+  {% endif %}
+
+  <p class="hilfe">Ausgegeben wird unter <a href="/helfer/ausgabe">Ausgabe</a>. Was in der
+    Konfiguration des Servers steht, zeigt <a href="/helfer/einstellungen">Einstellungen</a>.</p>
+{% endblock %}
