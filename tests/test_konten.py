@@ -335,6 +335,32 @@ try:
     pruefe(bool(anmelden("lea@example.org", "lea-passwort-2", "kennzeichen")),
            "und meldet sich damit an")
 
+    print("Eine Bereichsleitung")
+    konto_anlegen(ada, name="Kalle Beispiel", email="kalle@example.org", kuerzel="KB",
+                  rolle="bereichsleitung", bereiche=["presse"], telefon="0151 000000")
+    pruefe(sql("kern", "SELECT bereiche, telefon FROM konto WHERE kuerzel = 'KB'")[0]
+           == {"bereiche": ["helfer"], "telefon": "0151 000000"},
+           "das Formular legt sie mit Nummer an, nur für den Helferbereich")
+    pruefe("Bereichsleitung – sieht im Helferbereich nur die Bereiche"
+           in letzte_mail("kalle@example.org")["text"],
+           "die Einladung erklärt die Rolle")
+    ruf(link_aus(letzte_mail("kalle@example.org")), "POST",
+        {"neu": "kalle-passwort-1", "wiederholung": "kalle-passwort-1"})
+    kalle = anmelden("kalle@example.org", "kalle-passwort-1", "helfer")
+    pruefe(bool(kalle), "Kalle meldet sich im Helferbereich an")
+    pruefe(ruf("/veranstaltungen", keks=kalle)[0] == 403,
+           "Veranstaltungen pflegt eine Bereichsleitung nicht")
+    _, _, seite, _ = ruf("/", keks=kalle)
+    pruefe('href="/helfer"' in seite and 'href="/veranstaltungen"' not in seite,
+           "auf der Startseite nur der Helferbereich")
+    pruefe(ruf("/helfer/funk", keks=kalle)[0] == 403, "die Ausgabetische nicht")
+    _, _, seite, _ = ruf("/konto", keks=kalle)
+    status, ort, _, _ = ruf("/konto/telefon", "POST",
+                            {"csrf": csrf(seite), "telefon": "0151 111111"}, keks=kalle)
+    pruefe(status == 303 and "telefon" in ort
+           and sql("kern", "SELECT telefon FROM konto WHERE kuerzel = 'KB'")[0][0]
+           == "0151 111111", "seine Nummer pflegt Kalle selbst")
+
     print("Sperren wirkt sofort")
     _, _, seite, _ = ruf("/konten/2", keks=ada)
     status, _, _, _ = ruf("/konten/2", "POST", {

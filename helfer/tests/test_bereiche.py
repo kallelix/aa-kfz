@@ -1,4 +1,5 @@
-"""Bereiche, Schichten und Goodies pflegen (Lastenheft 2.1, V-03 bis V-07).
+"""Bereiche, Schichten und Goodies pflegen (Lastenheft 2.1, V-03 bis V-07),
+dazu die Bereichsleitung als Konto (2.1a, B-02).
 
     python helfer/tests/test_bereiche.py
 
@@ -25,6 +26,7 @@ sys.path.insert(0, str(WURZEL.parent))
 from kern import db as kern_db  # noqa: E402
 from kern import testdb  # noqa: E402
 from kern import veranstaltungen as va  # noqa: E402
+from kern.konten import Konten  # noqa: E402
 
 PYTHON = WURZEL.parent / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
@@ -164,6 +166,11 @@ VA = db.VERANSTALTUNGEN.anlegen({"name": "Die absolute Abfahrt 2026", "kurz": "A
 NEU = db.VERANSTALTUNGEN.anlegen({"name": "Die absolute Abfahrt 2027", "kurz": "AA 2027",
                                   "beginn": "2027-07-02", "ende": "2027-07-04",
                                   "ort": "Ilmenau"})
+# Kalle leitet den Shuttle. Sein Konto hat noch kein Passwort: solange es
+# keinen Admin mit Passwort gibt, gilt das gemeinsame, mit dem der Test beginnt.
+KONTEN = Konten(lambda: db_url)
+KALLE = KONTEN.anlegen(email="kalle@example.org", name="Kalle Beispiel", kuerzel="KB",
+                       rolle="bereichsleitung", telefon="0151 000000")
 hafen = freier_hafen()
 
 prozess = subprocess.Popen(
@@ -193,22 +200,24 @@ try:
     else:
         raise RuntimeError("Server ist nicht hochgekommen")
 
-    # Zwei Kekse: die Sitzung und die gewählte Veranstaltung.
+    # Zwei Kekse: die Sitzung und die gewählte Veranstaltung. Ein zweites
+    # Glas für einen zweiten Browser – die Bereichsleitung.
     kekse = {}
 
-    def anfrage(methode, pfad, daten=None):
+    def anfrage(methode, pfad, daten=None, glas=None):
+        glas = kekse if glas is None else glas
         verbindung = http.client.HTTPConnection("127.0.0.1", hafen, timeout=10)
         koerper = urllib.parse.urlencode(daten, doseq=True).encode() if daten else None
         kopf = {}
         if koerper is not None:
             kopf["Content-Type"] = "application/x-www-form-urlencoded"
-        if kekse:
-            kopf["Cookie"] = "; ".join(k + "=" + w for k, w in kekse.items())
+        if glas:
+            kopf["Cookie"] = "; ".join(k + "=" + w for k, w in glas.items())
         verbindung.request(methode, pfad, body=koerper, headers=kopf)
         antwort = verbindung.getresponse()
         for gesetzt in antwort.headers.get_all("Set-Cookie") or []:
             name, _, wert = gesetzt.split(";")[0].partition("=")
-            kekse[name] = wert
+            glas[name] = wert
         ergebnis = (antwort.status, antwort.getheader("Location", ""),
                     antwort.read().decode("utf-8"))
         verbindung.close()
@@ -234,7 +243,7 @@ try:
     print("Bereich anlegen")
     status, ort, _ = anfrage("POST", "/helfer/bereich/neu", {
         "csrf": CSRF, "name": "Shuttle", "treffpunkt": "Parkplatz Talstation",
-        "leitung": "Kalle", "leitung_telefon": "0151 000000", "mindestalter": "18",
+        "leitung": str(KALLE), "mindestalter": "18",
         "voraussetzungen": "Führerschein Klasse B",
         "beschreibung": "Ihr fahrt die Rennfahrer auf den Berg."})
     pruefe(status == 303 and "hinweis=angelegt" in ort, "Shuttle angelegt")
@@ -293,8 +302,9 @@ try:
     _, _, seite = anfrage("GET", "/helfer/schichten?bereich=%d" % SHUTTLE)
     pruefe(seite.count("<tr data-suche=") == 3, "Filter nach Bereich")
     _, _, seite = anfrage("GET", "/helfer/bereiche")
-    pruefe("Parkplatz Talstation" in seite and "0151 000000" in seite and "ab 18" in seite,
-           "die Übersicht zeigt Treffpunkt, Leitung und Alter")
+    pruefe("Parkplatz Talstation" in seite and "Kalle Beispiel" in seite
+           and "0151 000000" in seite and "ab 18" in seite,
+           "die Übersicht zeigt Treffpunkt, Leitung samt Nummer aus dem Konto und Alter")
     _, _, seite = anfrage("GET", "/helfer/bereich/%d" % SHUTTLE)
     pruefe(seite.count("/aendern") == 3 and "kopieren" in seite,
            "der Bereich zeigt seine Schichten zum Ändern und Kopieren")
@@ -391,10 +401,95 @@ try:
            "die Angaben zum Bereich kommen mit")
     pruefe(db.angebot(NEU) == {"shirt": 1, "verpflegung": 0, "party": 1},
            "das Angebot kommt mit")
+    pruefe(zeilen("SELECT bl.konto_id FROM bereich_leitung bl"
+                  " JOIN bereich b ON b.id = bl.bereich_id"
+                  " WHERE b.veranstaltung_id = ? AND b.name = 'Shuttle'", NEU) == [(KALLE,)],
+           "die Bereichsleitung kommt mit")
     status, ort, _ = anfrage("POST", "/helfer/bereiche/vorlage", {"csrf": CSRF, "von": str(VA)})
     pruefe("hinweis=vorlage-nicht" in ort and zeilen(
         "SELECT COUNT(*) FROM bereich WHERE veranstaltung_id = ?", NEU) == [(2,)],
         "ein zweites Übernehmen geht nicht")
+
+    print("Bereichsleitung")
+    # Ab jetzt mit Konten: ein Admin mit Passwort schließt das gemeinsame.
+    KONTEN.anlegen(email="ada@example.org", name="Ada Admin", kuerzel="AD",
+                   rolle="admin", passwort="ein-langes-passwort")
+    KONTEN.passwort_setzen(KALLE, "kalles-langes-passwort")
+    status, ort, _ = anfrage("GET", "/helfer/bereiche")
+    pruefe(status == 303 and "login" in ort, "das gemeinsame Passwort gilt nicht mehr")
+    kalle = {}
+    anfrage("POST", "/helfer/login", {"email": "kalle@example.org",
+                                      "passwort": "kalles-langes-passwort",
+                                      "weiter": "/helfer"}, glas=kalle)
+    anfrage("GET", "/helfer/veranstaltung?id=" + str(VA), glas=kalle)
+    status, ort, _ = anfrage("GET", "/helfer", glas=kalle)
+    pruefe(status == 303 and ort.endswith("/helfer/bereiche"),
+           "die Übersicht führt eine Bereichsleitung zu ihren Bereichen")
+    status, _, seite = anfrage("GET", "/helfer/bereiche", glas=kalle)
+    pruefe(status == 200 and 'href="/helfer/bereich/%d"' % SHUTTLE in seite
+           and 'href="/helfer/bereich/%d"' % ORGA not in seite,
+           "sie sieht nur den Bereich, den sie leitet")
+    pruefe("/helfer/bereich/neu" not in seite and "/helfer/goodies" not in seite,
+           "und legt keine neuen an")
+    pruefe("Meine Bereiche" in seite and "/helfer/funk" not in seite
+           and "Einstellungen" not in seite
+           and "/veranstaltungen" not in seite and "data-takt" not in seite,
+           "Navigation nur mit ihren Punkten, ohne Tablet-Nachfragen")
+    kcsrf = re.search(r'name="csrf" value="([^"]+)"',
+                      anfrage("GET", "/helfer/bereich/%d" % SHUTTLE, glas=kalle)[2]).group(1)
+    _, _, seite = anfrage("GET", "/helfer/schichten", glas=kalle)
+    pruefe(seite.count("<tr data-suche=") == 2, "in der Schichtliste nur die des Shuttles")
+    for pfad in ("/helfer/bereich/%d" % ORGA, "/helfer/schicht/%d" % schicht_frueh,
+                 "/helfer/bereich/neu", "/helfer/helfer", "/helfer/funk",
+                 "/helfer/goodies", "/helfer/import", "/helfer/stand", "/helfer/band",
+                 "/helfer/helfer/export.csv"):
+        status, _, seite = anfrage("GET", pfad, glas=kalle)
+        pruefe(status == 403 and "Als Bereichsleitung" in seite, pfad + " bleibt zu")
+
+    shuttle_mittag = zeilen("SELECT id FROM schicht WHERE bereich_id = ?"
+                            " AND beginn = '2026-08-29 12:00'", SHUTTLE)[0][0]
+    _, _, seite = anfrage("GET", "/helfer/schicht/%d" % shuttle_mittag, glas=kalle)
+    pruefe("Anna Berg" in seite and "anna@example.org" not in seite,
+           "beim Einteilen nur Namen, keine Adressen fremder Leute")
+    status, ort, _ = anfrage("POST", "/helfer/schicht/%d/einteilen" % shuttle_mittag,
+                             {"csrf": kcsrf, "helfer_id": str(anna)}, glas=kalle)
+    pruefe("hinweis=eingeteilt" in ort, "sie teilt jemanden in ihre Schicht ein")
+    status, _, seite = anfrage("GET", "/helfer/helfer/%d" % anna, glas=kalle)
+    pruefe(status == 200 and "Shuttle" in seite and "Orgabüro" not in seite,
+           "die Person sieht sie – mit den Schichten ihres Bereichs, nicht den anderen")
+    fremd = zeilen("SELECT id FROM einteilung WHERE schicht_id = ?", schicht_frueh)[0][0]
+    status, _, _ = anfrage("POST", "/helfer/einteilung/%d/austragen" % fremd,
+                           {"csrf": kcsrf}, glas=kalle)
+    pruefe(status == 403 and zeilen("SELECT id FROM einteilung WHERE id = ?", fremd),
+           "aus fremden Schichten trägt sie niemanden aus")
+    status, _, _ = anfrage("POST", "/helfer/bereich/%d/loeschen" % SHUTTLE,
+                           {"csrf": kcsrf}, glas=kalle)
+    pruefe(status == 403, "ihren Bereich löscht sie nicht")
+    status, ort, _ = anfrage("POST", "/helfer/bereich/%d" % SHUTTLE, {
+        "csrf": kcsrf, "name": "Shuttle", "treffpunkt": "Parkplatz Talstation, Tor 2",
+        "mindestalter": "18", "voraussetzungen": "Führerschein Klasse B"}, glas=kalle)
+    pruefe("hinweis=gespeichert" in ort
+           and zeilen("SELECT treffpunkt FROM bereich WHERE id = ?", SHUTTLE)
+           == [("Parkplatz Talstation, Tor 2",)], "die Angaben ändert sie selbst")
+    pruefe(zeilen("SELECT konto_id FROM bereich_leitung WHERE bereich_id = ?", SHUTTLE)
+           == [(KALLE,)], "wer leitet, bleibt dabei stehen")
+    anfrage("POST", "/helfer/schicht/%d/aendern" % shuttle_mittag, {
+        "csrf": kcsrf, "bereich_id": str(ORGA), "datum": "2026-08-29", "beginn": "12:00",
+        "ende": "16:00", "soll": "2"}, glas=kalle)
+    pruefe(zeilen("SELECT bereich_id FROM schicht WHERE id = ?", shuttle_mittag)
+           == [(SHUTTLE,)], "in einen fremden Bereich schiebt sie keine Schicht")
+
+    ada = {}
+    anfrage("POST", "/helfer/login", {"email": "ada@example.org",
+                                      "passwort": "ein-langes-passwort",
+                                      "weiter": "/helfer"}, glas=ada)
+    anfrage("GET", "/helfer/veranstaltung?id=" + str(VA), glas=ada)
+    _, _, seite = anfrage("GET", "/helfer/bereiche", glas=ada)
+    pruefe("Orgabüro" in seite and "/helfer/bereich/neu" in seite,
+           "der Admin sieht weiter alles")
+    _, _, seite = anfrage("GET", "/helfer/bereich/%d" % ORGA, glas=ada)
+    pruefe('name="leitung" value="%d"' % KALLE in seite and "Ada Admin" in seite,
+           "zur Wahl stehen alle Konten mit Zugang zum Helferbereich")
 
     print("Veranstaltung löschen")
     meldung = ""

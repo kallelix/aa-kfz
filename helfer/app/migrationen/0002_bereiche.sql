@@ -19,12 +19,6 @@ CREATE TABLE bereich (
     beschreibung  TEXT NOT NULL DEFAULT '',
     treffpunkt    TEXT NOT NULL DEFAULT '',
 
-    -- Wer vor Ort Bescheid weiß, mit Nummer – für Erinnerungsmail und
-    -- Ausdruck (C-02, L-02). Ein Konto wird daraus erst mit der Rolle
-    -- Bereichsleitung (B-02).
-    leitung       TEXT NOT NULL DEFAULT '',
-    leitung_telefon TEXT NOT NULL DEFAULT '',
-
     -- NULL heißt: keine Altersgrenze.
     mindestalter  INTEGER CHECK (mindestalter IS NULL OR mindestalter BETWEEN 1 AND 99),
 
@@ -43,6 +37,18 @@ CREATE TABLE bereich (
     -- einem Bereich einer anderen Veranstaltung hängen.
     UNIQUE (id, veranstaltung_id)
 );
+
+-- Wer einen Bereich leitet: ein oder mehrere Konten (kern.konto). Name und
+-- Nummer kommen von dort – für Erinnerungsmail und Ausdruck (C-02, L-02).
+-- Hat das Konto die Rolle Bereichsleitung, sieht es im Helferbereich nur
+-- diese Bereiche (B-02).
+CREATE TABLE bereich_leitung (
+    bereich_id    INTEGER NOT NULL REFERENCES bereich (id) ON DELETE CASCADE,
+    konto_id      INTEGER NOT NULL REFERENCES kern.konto (id) ON DELETE CASCADE,
+    PRIMARY KEY (bereich_id, konto_id)
+);
+
+CREATE INDEX idx_bereich_leitung_konto ON bereich_leitung (konto_id);
 
 INSERT INTO bereich (veranstaltung_id, name, angelegt_am)
 SELECT DISTINCT veranstaltung_id, liste, to_char(now(), 'YYYY-MM-DD HH24:MI:SS')

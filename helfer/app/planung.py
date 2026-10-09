@@ -51,8 +51,6 @@ def bereich_pruefen(daten: dict) -> tuple[dict, dict]:
         "name": name,
         "beschreibung": (daten.get("beschreibung") or "").strip()[:2000],
         "treffpunkt": normalisieren.text(daten.get("treffpunkt"))[:200],
-        "leitung": normalisieren.text(daten.get("leitung"))[:120],
-        "leitung_telefon": normalisieren.text(daten.get("leitung_telefon"))[:40],
         "mindestalter": _zahl(daten.get("mindestalter"), "mindestalter", fehler, 1, 99),
         "voraussetzungen": "\n".join(z[:200] for z in voraussetzungen(
             str(daten.get("voraussetzungen") or "")))[:2000],

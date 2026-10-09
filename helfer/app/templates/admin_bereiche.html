@@ -6,12 +6,17 @@
   <p class="unterzeile">Wo geholfen wird – Streckenposten, Shuttle, Orgabüro … –
     und darin die Schichten.</p>
 
-  <p class="knopfreihe">
-    <a class="knopf" href="/helfer/bereich/neu">Neuer Bereich</a>
-    <a class="knopf-schlicht" href="/helfer/goodies">Shirt, Verpflegung, Goodies</a>
-  </p>
+  {% if not nur_eigene %}
+    <p class="knopfreihe">
+      <a class="knopf" href="/helfer/bereich/neu">Neuer Bereich</a>
+      <a class="knopf-schlicht" href="/helfer/goodies">Shirt, Verpflegung, Goodies</a>
+    </p>
+  {% endif %}
 
-  {% if not bereichsliste %}
+  {% if not bereichsliste and nur_eigene %}
+    <p class="leer">In {{ va_aktuell.kurz }} leitest du keinen Bereich. Stimmt das
+      nicht, sag der Orga Bescheid – sie trägt dich am Bereich ein.</p>
+  {% elif not bereichsliste %}
     <p class="leer">In dieser Veranstaltung gibt es noch keinen Bereich.</p>
 
     {% if vorlagen %}
@@ -56,9 +61,10 @@
               </td>
               <td>{{ b.treffpunkt or '–' }}</td>
               <td>
-                {%- if b.leitung %}{{ b.leitung }}
-                  {%- if b.leitung_telefon %}<br><span class="gedaempft">{{ b.leitung_telefon }}</span>{% endif %}
-                {%- else %}<span class="gedaempft">–</span>{% endif %}
+                {%- for k in leitungen[b.id] %}
+                  {{- k.name }}{% if k.telefon %} <span class="gedaempft nowrap">{{ k.telefon }}</span>{% endif %}
+                  {%- if not loop.last %}<br>{% endif %}
+                {%- else %}<span class="gedaempft">–</span>{% endfor %}
               </td>
               <td class="rechts">{{ b.schichten }}</td>
               <td class="rechts nowrap">{{ b.besetzt }} / {{ b.soll }}</td>

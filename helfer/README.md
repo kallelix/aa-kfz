@@ -45,12 +45,19 @@ Das Backoffice hat sieben Punkte, in denen gearbeitet wird:
   KFZ-Schlüsseln. Der Fahrzeugstamm baut sich bei der Schlüsselausgabe
   nebenbei auf.
 
+Ein Konto mit der Rolle *Bereichsleitung* sieht nur zwei Punkte: *Meine
+Bereiche* und *Schichten* – beides beschränkt auf die Bereiche, die es
+leitet. Dort ändert es Angaben und Schichten, teilt ein und trägt aus und
+sieht die Leute auf seinen Schichten. Neue Bereiche, die Ausgabetische, die
+ganze Helferliste, Monitor und Import bleiben der Orga.
+
 Dahinter, was man einmal einrichtet: Bereiche, Goodies, Einstellungen,
 Monitor-Link, Import, Unterschriften und Zeitplan-Abruf.
 
 - **Bereiche**: wo geholfen wird – Shuttle, Streckenposten, Orgabüro – mit
   Beschreibung, Treffpunkt, Bereichsleitung, Mindestalter, Voraussetzungen
-  und dem Haken *intern*. Darin die Schichten, jede mit drei Zahlen:
+  und dem Haken *intern*. Die Bereichsleitung sind ein oder mehrere Konten;
+  Name und Nummer kommen von dort. Darin die Schichten, jede mit drei Zahlen:
   **Minimum** (darunter geht es nicht), **Soll** (so ist es geplant) und
   **Reserve** (zusätzlich willkommen, fehlt nie). Eine Schicht kann ein
   eigenes Mindestalter haben und eigens intern sein. Hat eine Veranstaltung

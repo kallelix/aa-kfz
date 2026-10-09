@@ -34,10 +34,18 @@
       </div>
     </div>
 
-    <div class="feld">
-      <label for="email">Mailadresse</label>
-      <input type="email" id="email" name="email" required value="{{ werte.email }}">
-      {% if not konto %}<p class="hilfe">Dorthin geht die Einladung; damit meldet sich die Person an.</p>{% endif %}
+    <div class="spalten">
+      <div class="feld">
+        <label for="email">Mailadresse</label>
+        <input type="email" id="email" name="email" required value="{{ werte.email }}">
+        {% if not konto %}<p class="hilfe">Dorthin geht die Einladung; damit meldet sich die Person an.</p>{% endif %}
+      </div>
+      <div class="feld">
+        <label for="telefon">Telefon <span class="optional">optional</span></label>
+        <input type="tel" id="telefon" name="telefon" maxlength="40" value="{{ werte.telefon }}">
+        <p class="hilfe">Für eine Bereichsleitung wichtig: die Nummer steht in
+          Erinnerungsmail und Ausdruck.</p>
+      </div>
     </div>
 
     <fieldset class="feld">
@@ -56,7 +64,8 @@
 
     <fieldset class="feld">
       <legend>Bereiche</legend>
-      <p class="hilfe">Ein Admin sieht ohnehin alle.</p>
+      <p class="hilfe">Ein Admin sieht ohnehin alle, eine Bereichsleitung nur
+        den Helferbereich – welche Bereiche darin, legt der Bereich selbst fest.</p>
       {% for schluessel, name in alle_bereiche.items() %}
         <label class="auswahl">
           <input type="checkbox" name="bereich_{{ schluessel }}" value="1"

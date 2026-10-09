@@ -15,6 +15,7 @@ import csv
 import hmac
 import io
 import logging
+import re
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from pathlib import Path
@@ -265,6 +266,41 @@ def _veranstaltung(request: Request):
     return zeile
 
 
+# --- Bereichsleitung (B-02) -------------------------------------------------
+
+# Was eine Bereichsleitung im Helferbereich öffnen darf: ihre Bereiche mit
+# Schichten und Leuten. Alles andere – Ausgaben, Monitor, Import, die ganze
+# Helferliste, neue Bereiche – gehört der Orga. Ob es auch IHR Bereich ist,
+# prüft die Route selbst (_eigen); hier geht es nur um die Art der Seite.
+_BEREICHSLEITUNG_PFADE = re.compile(
+    r"^/helfer(/veranstaltung|/bereiche|/bereich/\d+(/schicht/neu)?"
+    r"|/schichten|/schicht/\d+(/aendern|/loeschen|/einteilen)?"
+    r"|/einteilung/\d+/austragen|/helfer/\d+)?$")
+
+
+def _sitzung(request: Request) -> kern_auth.Sitzung:
+    """Wie auth.sitzung_erforderlich, dazu die Grenzen der Bereichsleitung.
+    Jede Route im Backoffice hängt daran."""
+    sitzung = auth.sitzung_erforderlich(request)
+    if (sitzung.ist_bereichsleitung
+            and not _BEREICHSLEITUNG_PFADE.match(request.url.path)):
+        raise kern_auth.KeinZugang("bereichsleitung")
+    return sitzung
+
+
+def _leitung(sitzung) -> int | None:
+    """Das Konto, auf dessen Bereiche eine Ansicht beschränkt ist – nur bei
+    einer Bereichsleitung, sonst None."""
+    return sitzung.konto_id if sitzung.ist_bereichsleitung else None
+
+
+def _eigen(sitzung, pruefung, nummer: int) -> None:
+    """Bricht ab, wenn eine Bereichsleitung etwas außerhalb ihrer Bereiche
+    anfasst. `pruefung` ist eine der db.leitet_*-Funktionen."""
+    if sitzung.ist_bereichsleitung and not pruefung(sitzung.konto_id, nummer):
+        raise kern_auth.KeinZugang("bereichsleitung")
+
+
 # Die Meldungen standen bis zur Zusammenfuehrung in der eigenen Huelle des
 # Helferbereichs. Die gibt es nicht mehr - die gemeinsame zeigt nur noch, was
 # ihr gereicht wird.
@@ -327,6 +363,12 @@ HAUPTNAV = (
     ("/helfer/schluessel", "Schlüssel", ()),
 )
 
+# Was eine Bereichsleitung sieht: ihre Bereiche und deren Schichten.
+HAUPTNAV_BEREICHSLEITUNG = (
+    ("/helfer/bereiche", "Meine Bereiche", ("/helfer/bereich",)),
+    ("/helfer/schichten", "Schichten", ("/helfer/schicht", "/helfer/helfer")),
+)
+
 # Was man einmal einrichtet und danach selten anfasst - zusammengefasst hinter
 # einem Punkt, damit die Zeile darueber die sieben zeigt, in denen man
 # tatsaechlich arbeitet.
@@ -341,7 +383,7 @@ UNTERNAV = (
 )
 
 
-def _navigation(pfad: str) -> dict:
+def _navigation(pfad: str, bereichsleitung: bool = False) -> dict:
     """Die Navigation mit dem Punkt der gerade offenen Seite markiert.
 
     Es gewinnt der laengste passende Pfadanfang. Ein blosses „faengt damit an“
@@ -357,7 +399,9 @@ def _navigation(pfad: str) -> dict:
                 laenge = max(laenge, len(anfang))
         return laenge
 
-    laengster = max(treffer(eintrag) for eintrag in HAUPTNAV + UNTERNAV)
+    haupt = HAUPTNAV_BEREICHSLEITUNG if bereichsleitung else HAUPTNAV
+    unter = () if bereichsleitung else UNTERNAV
+    laengster = max(treffer(eintrag) for eintrag in haupt + unter)
 
     def punkte(eintraege) -> list:
         gemacht = []
@@ -367,10 +411,10 @@ def _navigation(pfad: str) -> dict:
                             "hier": eigen > 0 and eigen == laengster})
         return gemacht
 
-    unten = punkte(UNTERNAV)
+    unten = punkte(unter)
     # bereichsnav heisst, was frueher hauptnav hiess: die gemeinsame Huelle
     # rendert unter dieser Bezeichnung die Punkte des offenen Bereichs.
-    return {"bereichsnav": punkte(HAUPTNAV), "unternav": unten,
+    return {"bereichsnav": punkte(haupt), "unternav": unten,
             "unternav_hier": any(punkt["hier"] for punkt in unten)}
 
 
@@ -383,6 +427,9 @@ def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
     # keine stille Ueberdeckung, sondern ein Fehler auf jeder solchen Seite.
     roh = str(extra.pop("hinweis", "") or "")
     aktuell = _gewaehlt(request)
+    # Die Bereichsleitung hat mit den Ausgabetischen nichts zu tun: kein
+    # Tablet-Stand, kein Nachfragen alle paar Sekunden.
+    leitung = sitzung.ist_bereichsleitung
     return _kontext(request, sitzung=sitzung,
                     # Oben im Kopf und in der Auswahl: die Veranstaltung,
                     # mit der dieser Browser gerade arbeitet.
@@ -390,10 +437,12 @@ def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
                     ort=aktuell["ort"] if aktuell else config.ORT,
                     va_aktuell=aktuell,
                     va_auswahl=db.VERANSTALTUNGEN.liste(),
-                    va_verwaltung=kern_auth.VERWALTUNG,
+                    va_verwaltung=kern_auth.VERWALTUNG and not leitung,
+                    nur_eigene=leitung,
                     csrf=auth.csrf_token(sitzung.token),
-                    tabletstand=unterschriften.stand(),
-                    admin_takt=config.ADMIN_TAKT,
+                    tabletstand=({"offen": None, "marke": 0} if leitung
+                                 else unterschriften.stand()),
+                    admin_takt=0 if leitung else config.ADMIN_TAKT,
                                             bereiche=navigation.bereiche(request.url.path, sitzung),
                     gemeinsam="/helfer/gemeinsam",
                     # Die Meldung wird hier aufgeloest, nicht in der Vorlage:
@@ -401,7 +450,7 @@ def _admin(request: Request, sitzung: auth.Sitzung, **extra) -> dict:
                     hinweis=MELDUNGEN.get(roh, roh),
                     hinweis_art=("hinweis-warnung" if roh in WARNUNGEN
                                  else "hinweis-ok"),
-                    **_navigation(request.url.path), **extra)
+                    **_navigation(request.url.path, leitung), **extra)
 
 
 # --- Anmeldung -------------------------------------------------------------
@@ -436,7 +485,7 @@ async def _keine_veranstaltung(request: Request, ausnahme):
 
 @app.get("/helfer/veranstaltung")
 async def veranstaltung_waehlen(request: Request, id: str = "", weiter: str = "/helfer",
-                                sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                                sitzung: auth.Sitzung = Depends(_sitzung)):
     """Merkt sich im Browser, mit welcher Veranstaltung gearbeitet wird.
 
     Ein Link statt eines Formulars: die Auswahl oben ist eine Klappliste wie
@@ -475,8 +524,10 @@ def _zurueck(ziel: str, hinweis: str = "", **parameter) -> RedirectResponse:
 
 @app.get("/helfer")
 async def uebersicht(request: Request, hinweis: str = "",
-                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                     sitzung: auth.Sitzung = Depends(_sitzung),
                      v=Depends(_veranstaltung)):
+    if sitzung.ist_bereichsleitung:
+        return RedirectResponse("/helfer/bereiche", status_code=303)
     zaehler = db.zaehler(v["id"])
     luecken = [z for z in db.schichten(v["id"], nur_luecken=True)]
     return templates.TemplateResponse(
@@ -493,27 +544,29 @@ async def uebersicht(request: Request, hinweis: str = "",
 @app.get("/helfer/schichten")
 async def schichten(request: Request, bereich: str = "", tag: str = "",
                     luecken: str = "", hinweis: str = "",
-                    sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                    sitzung: auth.Sitzung = Depends(_sitzung),
                     v=Depends(_veranstaltung)):
     f_bereich = int(bereich) if bereich.isdigit() else None
     reihen = db.schichten(v["id"], bereich_id=f_bereich, tag=tag,
-                          nur_luecken=bool(luecken))
+                          nur_luecken=bool(luecken), leitung=_leitung(sitzung))
     return templates.TemplateResponse(
         "admin_schichten.html",
         _admin(request, sitzung, hinweis=hinweis, schichten=reihen,
-               bereichsliste=db.bereiche(v["id"]), tage=db.tage(v["id"]),
+               bereichsliste=db.bereiche(v["id"], _leitung(sitzung)),
+               tage=db.tage(v["id"]),
                f_bereich=f_bereich, f_tag=tag, f_luecken=bool(luecken)))
 
 
 @app.get("/helfer/schicht/{schicht_id}")
 async def schicht(request: Request, schicht_id: int, hinweis: str = "",
                   suche: str = "",
-                  sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                  sitzung: auth.Sitzung = Depends(_sitzung),
                   v=Depends(_veranstaltung)):
     eintrag = db.schicht_laden(schicht_id)
     if eintrag is None:
         return templates.TemplateResponse("admin_fehlt.html",
                                           _kontext(request), status_code=404)
+    _eigen(sitzung, db.leitet_schicht, schicht_id)
     besetzt = db.besetzung(schicht_id)
     drin = {z["id"] for z in besetzt}
     return templates.TemplateResponse(
@@ -525,7 +578,7 @@ async def schicht(request: Request, schicht_id: int, hinweis: str = "",
 
 @app.post("/helfer/schicht/{schicht_id}/einteilen")
 async def einteilen(request: Request, schicht_id: int,
-                    sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                    sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -533,6 +586,7 @@ async def einteilen(request: Request, schicht_id: int,
     ziel = "/helfer/schicht/" + str(schicht_id)
     if db.schicht_laden(schicht_id) is None:
         return _zurueck("/helfer/schichten", "unbekannt")
+    _eigen(sitzung, db.leitet_schicht, schicht_id)
 
     try:
         helfer_id = int(str(daten.get("helfer_id") or ""))
@@ -552,11 +606,12 @@ async def einteilen(request: Request, schicht_id: int,
 
 @app.post("/helfer/einteilung/{einteilung_id}/austragen")
 async def austragen(request: Request, einteilung_id: int,
-                    sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                    sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     ziel = _weiter_pfad(str(daten.get("weiter") or "/helfer/schichten"))
+    _eigen(sitzung, db.leitet_einteilung, einteilung_id)
     db.austragen(einteilung_id)
     return _zurueck(ziel, "ausgetragen")
 
@@ -570,18 +625,20 @@ def _fehlt(request: Request):
 
 @app.get("/helfer/bereiche")
 async def bereiche(request: Request, hinweis: str = "",
-                   sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                   sitzung: auth.Sitzung = Depends(_sitzung),
                    v=Depends(_veranstaltung)):
-    liste = db.bereiche(v["id"])
+    liste = db.bereiche(v["id"], _leitung(sitzung))
     return templates.TemplateResponse(
         "admin_bereiche.html",
         _admin(request, sitzung, hinweis=hinweis, bereichsliste=liste,
-               vorlagen=[] if liste else db.vorlagen(v["id"])))
+               leitungen=db.leitungen([b["id"] for b in liste]),
+               vorlagen=[] if liste or sitzung.ist_bereichsleitung
+               else db.vorlagen(v["id"])))
 
 
 @app.post("/helfer/bereiche/vorlage")
 async def bereiche_aus_vorlage(request: Request,
-                               sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                               sitzung: auth.Sitzung = Depends(_sitzung),
                                v=Depends(_veranstaltung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
@@ -602,17 +659,27 @@ async def bereiche_aus_vorlage(request: Request,
 
 
 def _bereich_werte(zeile) -> dict:
-    return {f: zeile[f] for f in ("name", "beschreibung", "treffpunkt", "leitung",
-                                  "leitung_telefon", "mindestalter",
+    return {f: zeile[f] for f in ("name", "beschreibung", "treffpunkt", "mindestalter",
                                   "voraussetzungen", "intern")}
+
+
+def _leitung_aus(daten) -> list[int]:
+    """Die angekreuzten Konten – nur solche, die leiten können."""
+    moeglich = {k["id"] for k in db.leitung_moeglich()}
+    gewaehlt = {int(w) for w in daten.getlist("leitung") if str(w).isdigit()}
+    return sorted(gewaehlt & moeglich)
 
 
 def _bereich_seite(request, sitzung, bereich, werte, fehler, status_code=200,
                    hinweis=""):
+    if "leitung" not in werte:
+        werte = {**werte, "leitung": [k["id"] for k in
+                                      db.leitungen([bereich["id"]])[bereich["id"]]]
+                 if bereich else []}
     return templates.TemplateResponse(
         "admin_bereich.html",
         _admin(request, sitzung, hinweis=hinweis, bereich=bereich, werte=werte,
-               fehler=fehler,
+               fehler=fehler, leitung_moeglich=db.leitung_moeglich(),
                schichten=db.schichten(bereich["veranstaltung_id"],
                                       bereich_id=bereich["id"]) if bereich else []),
         status_code=status_code)
@@ -620,7 +687,7 @@ def _bereich_seite(request, sitzung, bereich, werte, fehler, status_code=200,
 
 @app.get("/helfer/bereich/neu")
 async def bereich_neu(request: Request,
-                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                      sitzung: auth.Sitzung = Depends(_sitzung),
                       v=Depends(_veranstaltung)):
     leer, _ = planung.bereich_pruefen({})
     return _bereich_seite(request, sitzung, None, leer, {})
@@ -628,51 +695,60 @@ async def bereich_neu(request: Request,
 
 @app.post("/helfer/bereich/neu")
 async def bereich_anlegen(request: Request,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                          sitzung: auth.Sitzung = Depends(_sitzung),
                           v=Depends(_veranstaltung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     werte, fehler = planung.bereich_pruefen(dict(daten))
+    werte["leitung"] = _leitung_aus(daten)
     nummer = None if fehler else db.bereich_anlegen(v["id"], werte)
     if nummer is None:
         fehler = fehler or {"name": "Diesen Bereich gibt es in " + v["kurz"] + " schon."}
         return _bereich_seite(request, sitzung, None, werte, fehler, 400)
+    db.leitung_setzen(nummer, werte["leitung"])
     return _zurueck("/helfer/bereich/" + str(nummer), "angelegt")
 
 
 @app.get("/helfer/bereich/{bereich_id}")
 async def bereich_formular(request: Request, bereich_id: int, hinweis: str = "",
-                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                           sitzung: auth.Sitzung = Depends(_sitzung)):
     zeile = db.bereich_laden(bereich_id)
     if zeile is None:
         return _fehlt(request)
+    _eigen(sitzung, db.leitet_bereich, bereich_id)
     return _bereich_seite(request, sitzung, zeile, _bereich_werte(zeile), {},
                           hinweis=hinweis)
 
 
 @app.post("/helfer/bereich/{bereich_id}")
 async def bereich_sichern(request: Request, bereich_id: int,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     zeile = db.bereich_laden(bereich_id)
     if zeile is None:
         return _fehlt(request)
+    _eigen(sitzung, db.leitet_bereich, bereich_id)
     werte, fehler = planung.bereich_pruefen(dict(daten))
+    # Wer leitet, bestimmt die Orga – eine Bereichsleitung ändert es nicht.
+    if not sitzung.ist_bereichsleitung:
+        werte["leitung"] = _leitung_aus(daten)
     ergebnis = None if fehler else db.bereich_aendern(bereich_id, werte)
     if ergebnis is False:
         return _fehlt(request)
     if ergebnis is None:
         fehler = fehler or {"name": "Einen Bereich mit diesem Namen gibt es schon."}
         return _bereich_seite(request, sitzung, zeile, werte, fehler, 400)
+    if "leitung" in werte:
+        db.leitung_setzen(bereich_id, werte["leitung"])
     return _zurueck("/helfer/bereich/" + str(bereich_id), "gespeichert")
 
 
 @app.post("/helfer/bereich/{bereich_id}/loeschen")
 async def bereich_weg(request: Request, bereich_id: int,
-                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                      sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -703,7 +779,8 @@ def _schicht_seite(request, sitzung, bereich, schicht, werte, fehler,
         "admin_schicht_form.html",
         _admin(request, sitzung, bereich=bereich, schicht=schicht, werte=werte,
                fehler=fehler, tage=_tage_auswahl(bereich["veranstaltung_id"]),
-               bereichsliste=db.bereiche(bereich["veranstaltung_id"])),
+               bereichsliste=db.bereiche(bereich["veranstaltung_id"],
+                                         _leitung(sitzung))),
         status_code=status_code)
 
 
@@ -722,10 +799,11 @@ def _alter_gesenkt(werte: dict, bereich) -> bool:
 
 @app.get("/helfer/bereich/{bereich_id}/schicht/neu")
 async def schicht_neu(request: Request, bereich_id: int, von: str = "",
-                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                      sitzung: auth.Sitzung = Depends(_sitzung)):
     bereich = db.bereich_laden(bereich_id)
     if bereich is None:
         return _fehlt(request)
+    _eigen(sitzung, db.leitet_bereich, bereich_id)
     vorlage = db.schicht_laden(int(von)) if von.isdigit() else None
     if vorlage is not None:
         werte = _schicht_werte(vorlage)
@@ -739,13 +817,14 @@ async def schicht_neu(request: Request, bereich_id: int, von: str = "",
 
 @app.post("/helfer/bereich/{bereich_id}/schicht/neu")
 async def schicht_anlegen(request: Request, bereich_id: int,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     bereich = db.bereich_laden(bereich_id)
     if bereich is None:
         return _fehlt(request)
+    _eigen(sitzung, db.leitet_bereich, bereich_id)
     werte, fehler = planung.schicht_pruefen(dict(daten))
     nummer = None if fehler else db.schicht_anlegen(
         bereich["veranstaltung_id"], bereich_id, werte)
@@ -759,27 +838,32 @@ async def schicht_anlegen(request: Request, bereich_id: int,
 
 @app.get("/helfer/schicht/{schicht_id}/aendern")
 async def schicht_formular(request: Request, schicht_id: int,
-                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                           sitzung: auth.Sitzung = Depends(_sitzung)):
     zeile = db.schicht_laden(schicht_id)
     if zeile is None:
         return _fehlt(request)
+    _eigen(sitzung, db.leitet_schicht, schicht_id)
     return _schicht_seite(request, sitzung, db.bereich_laden(zeile["bereich_id"]),
                           zeile, _schicht_werte(zeile), {})
 
 
 @app.post("/helfer/schicht/{schicht_id}/aendern")
 async def schicht_sichern(request: Request, schicht_id: int,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     zeile = db.schicht_laden(schicht_id)
     if zeile is None:
         return _fehlt(request)
-    # Der Bereich darf wechseln, aber nur innerhalb der Veranstaltung.
+    _eigen(sitzung, db.leitet_schicht, schicht_id)
+    # Der Bereich darf wechseln, aber nur innerhalb der Veranstaltung – und
+    # für eine Bereichsleitung nur in einen ihrer eigenen.
     roh = str(daten.get("bereich_id") or "")
     bereich = db.bereich_laden(int(roh)) if roh.isdigit() else None
-    if bereich is None or bereich["veranstaltung_id"] != zeile["veranstaltung_id"]:
+    if (bereich is None or bereich["veranstaltung_id"] != zeile["veranstaltung_id"]
+            or (sitzung.ist_bereichsleitung
+                and not db.leitet_bereich(sitzung.konto_id, bereich["id"]))):
         bereich = db.bereich_laden(zeile["bereich_id"])
     werte, fehler = planung.schicht_pruefen(dict(daten))
     ergebnis = None if fehler else db.schicht_aendern(schicht_id, bereich["id"], werte)
@@ -795,13 +879,14 @@ async def schicht_sichern(request: Request, schicht_id: int,
 
 @app.post("/helfer/schicht/{schicht_id}/loeschen")
 async def schicht_weg(request: Request, schicht_id: int,
-                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                      sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
     zeile = db.schicht_laden(schicht_id)
     if zeile is None:
         return _zurueck("/helfer/bereiche", "unbekannt")
+    _eigen(sitzung, db.leitet_schicht, schicht_id)
     if db.schicht_loeschen(schicht_id):
         return _zurueck("/helfer/schicht/" + str(schicht_id) + "/aendern", "schicht-besetzt")
     return _zurueck("/helfer/bereich/" + str(zeile["bereich_id"]), "geloescht")
@@ -811,7 +896,7 @@ async def schicht_weg(request: Request, schicht_id: int,
 
 @app.get("/helfer/goodies")
 async def goodies(request: Request, hinweis: str = "",
-                  sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                  sitzung: auth.Sitzung = Depends(_sitzung),
                   v=Depends(_veranstaltung)):
     return templates.TemplateResponse(
         "admin_goodies.html",
@@ -821,7 +906,7 @@ async def goodies(request: Request, hinweis: str = "",
 
 @app.post("/helfer/goodies/angebot")
 async def angebot_sichern(request: Request,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                          sitzung: auth.Sitzung = Depends(_sitzung),
                           v=Depends(_veranstaltung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
@@ -854,7 +939,7 @@ def _goodie_eingabe(daten) -> dict:
 
 @app.get("/helfer/goodie/neu")
 async def goodie_neu(request: Request,
-                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                     sitzung: auth.Sitzung = Depends(_sitzung),
                      v=Depends(_veranstaltung)):
     return _goodie_seite(request, sitzung, None,
                          {"name": "", "schwelle": "", "schwelle_art": "schichten",
@@ -863,7 +948,7 @@ async def goodie_neu(request: Request,
 
 @app.post("/helfer/goodie/neu")
 async def goodie_anlegen(request: Request,
-                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                         sitzung: auth.Sitzung = Depends(_sitzung),
                          v=Depends(_veranstaltung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
@@ -877,7 +962,7 @@ async def goodie_anlegen(request: Request,
 
 @app.get("/helfer/goodie/{goodie_id}")
 async def goodie_formular(request: Request, goodie_id: int,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
     zeile = db.goodie_laden(goodie_id)
     if zeile is None:
         return _fehlt(request)
@@ -886,7 +971,7 @@ async def goodie_formular(request: Request, goodie_id: int,
 
 @app.post("/helfer/goodie/{goodie_id}")
 async def goodie_sichern(request: Request, goodie_id: int,
-                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                         sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -902,7 +987,7 @@ async def goodie_sichern(request: Request, goodie_id: int,
 
 @app.post("/helfer/goodie/{goodie_id}/loeschen")
 async def goodie_weg(request: Request, goodie_id: int,
-                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                     sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -914,7 +999,7 @@ async def goodie_weg(request: Request, goodie_id: int,
 
 @app.get("/helfer/helfer")
 async def helfer_liste(request: Request, hinweis: str = "", suche: str = "",
-                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                       sitzung: auth.Sitzung = Depends(_sitzung),
                        v=Depends(_veranstaltung)):
     return templates.TemplateResponse(
         "admin_helfer.html",
@@ -968,7 +1053,7 @@ def _helfer_zeile(person) -> list:
 @app.get("/helfer/helfer/export.csv")
 async def helfer_ausfuhr(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+        sitzung: auth.Sitzung = Depends(_sitzung),
         v=Depends(_veranstaltung)):
     """Alle Helfer als Datei - fuer die T-Shirt-Bestellung, eine Kontaktliste
     oder das Archiv nach der Veranstaltung.
@@ -1002,7 +1087,7 @@ async def helfer_ausfuhr(
 # helfer_id und die Anfrage scheitert an der Zahlenprüfung.
 @app.get("/helfer/helfer/neu")
 async def helfer_neu(request: Request,
-                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                     sitzung: auth.Sitzung = Depends(_sitzung)):
     leer = {"name": "", "email": "", "telefon": "", "veggie": "",
             "tshirt": "", "bemerkung": ""}
     return _helferformular(request, sitzung, leer, {})
@@ -1011,7 +1096,7 @@ async def helfer_neu(request: Request,
 @app.post("/helfer/helfer/neu")
 async def helfer_anlegen_von_hand(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1032,16 +1117,21 @@ async def helfer_anlegen_von_hand(
 
 @app.get("/helfer/helfer/{helfer_id}")
 async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
-                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                        sitzung: auth.Sitzung = Depends(_sitzung),
                         v=Depends(_veranstaltung)):
     person = db.helfer_laden(helfer_id)
     if person is None:
         return templates.TemplateResponse("admin_fehlt.html",
                                           _kontext(request), status_code=404)
+    _eigen(sitzung, db.leitet_helfer, helfer_id)
+    schichten = db.helfer_schichten(v["id"], helfer_id)
+    if sitzung.ist_bereichsleitung:
+        eigene = {b["id"] for b in db.bereiche(v["id"], sitzung.konto_id)}
+        schichten = [s for s in schichten if s["bereich_id"] in eigene]
     return templates.TemplateResponse(
         "admin_helfer_detail.html",
         _admin(request, sitzung, hinweis=hinweis, person=person,
-               schichten=db.helfer_schichten(v["id"], helfer_id)))
+               schichten=schichten))
 
 
 # --- Monitor ---------------------------------------------------------------
@@ -1138,7 +1228,7 @@ async def monitor_inhalt(request: Request, token: str, tag: str = ""):
 @app.get("/helfer/monitor")
 async def monitor_verwalten(
         request: Request, hinweis: str = "",
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(_sitzung)):
     token = db.monitor_token()
     basis = config.BASIS_URL or str(request.base_url).rstrip("/")
     return templates.TemplateResponse(
@@ -1152,7 +1242,7 @@ async def monitor_verwalten(
 @app.post("/helfer/monitor")
 async def monitor_link(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1185,7 +1275,7 @@ def _zeitplan_seite(request: Request, sitzung, v, berichte=None, code: int = 200
 @app.get("/helfer/zeitplan")
 async def zeitplan_ansicht(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+        sitzung: auth.Sitzung = Depends(_sitzung),
         v=Depends(_veranstaltung)):
     return _zeitplan_seite(request, sitzung, v)
 
@@ -1193,7 +1283,7 @@ async def zeitplan_ansicht(
 @app.post("/helfer/zeitplan/abrufen")
 async def zeitplan_abrufen(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+        sitzung: auth.Sitzung = Depends(_sitzung),
         v=Depends(_veranstaltung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
@@ -1234,7 +1324,7 @@ def _aus_zeile(zeile) -> dict:
 @app.get("/helfer/aufgaben")
 async def aufgaben(request: Request, phase: str = "", status: str = "",
                    hinweis: str = "",
-                   sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                   sitzung: auth.Sitzung = Depends(_sitzung),
                    v=Depends(_veranstaltung)):
     liste = db.aufgaben(v["id"], phase=phase if phase in eintraege.PHASEN else "",
                         status=status if status in eintraege.STATUS else "")
@@ -1247,7 +1337,7 @@ async def aufgaben(request: Request, phase: str = "", status: str = "",
 
 @app.get("/helfer/aufgabe/neu")
 async def aufgabe_neu(request: Request, tag: str = "",
-                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                      sitzung: auth.Sitzung = Depends(_sitzung)):
     leer = {"titel": "", "phase": "event", "status": "offen",
             "datum": _tag_pruefen(tag), "beginn": "", "ende": "", "ort": "",
             "verantwortlich": "", "kontakt": "", "notiz": "", "version": 0}
@@ -1258,7 +1348,7 @@ async def aufgabe_neu(request: Request, tag: str = "",
 
 @app.post("/helfer/aufgabe/neu")
 async def aufgabe_anlegen(request: Request,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                          sitzung: auth.Sitzung = Depends(_sitzung),
                           v=Depends(_veranstaltung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
@@ -1279,7 +1369,7 @@ async def aufgabe_anlegen(request: Request,
 
 @app.get("/helfer/aufgabe/{aufgabe_id}")
 async def aufgabe_formular(request: Request, aufgabe_id: int,
-                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                           sitzung: auth.Sitzung = Depends(_sitzung)):
     zeile = db.aufgabe_laden(aufgabe_id)
     if zeile is None:
         return templates.TemplateResponse("admin_fehlt.html",
@@ -1291,7 +1381,7 @@ async def aufgabe_formular(request: Request, aufgabe_id: int,
 
 @app.post("/helfer/aufgabe/{aufgabe_id}")
 async def aufgabe_sichern(request: Request, aufgabe_id: int,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1333,7 +1423,7 @@ async def aufgabe_sichern(request: Request, aufgabe_id: int,
 
 @app.post("/helfer/aufgabe/{aufgabe_id}/status")
 async def aufgabe_status(request: Request, aufgabe_id: int,
-                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                         sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1349,7 +1439,7 @@ async def aufgabe_status(request: Request, aufgabe_id: int,
 
 @app.post("/helfer/aufgabe/{aufgabe_id}/loeschen")
 async def aufgabe_weg(request: Request, aufgabe_id: int,
-                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                      sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1361,7 +1451,7 @@ async def aufgabe_weg(request: Request, aufgabe_id: int,
 
 @app.get("/helfer/programm/{programm_id}")
 async def programm_formular(request: Request, programm_id: int,
-                            sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                            sitzung: auth.Sitzung = Depends(_sitzung)):
     zeile = db.programm_eintrag(programm_id)
     if zeile is None:
         return templates.TemplateResponse("admin_fehlt.html",
@@ -1378,7 +1468,7 @@ async def programm_formular(request: Request, programm_id: int,
 
 @app.post("/helfer/programm/{programm_id}")
 async def programm_sichern(request: Request, programm_id: int,
-                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                           sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1421,7 +1511,7 @@ async def programm_sichern(request: Request, programm_id: int,
 
 @app.post("/helfer/programm/{programm_id}/freigeben")
 async def programm_freigeben(request: Request, programm_id: int,
-                             sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                             sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1433,7 +1523,7 @@ async def programm_freigeben(request: Request, programm_id: int,
 
 @app.get("/helfer/band")
 async def band_ansicht(request: Request, tag: str = "",
-                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                       sitzung: auth.Sitzung = Depends(_sitzung),
                        v=Depends(_veranstaltung)):
     jetzt = db.jetzt_lokal()
     tage = db.monitor_tage(v["id"])
@@ -1466,7 +1556,7 @@ def _helfer_zurueck(request: Request, helfer_id: int, hinweis: str):
 
 @app.post("/helfer/helfer/{helfer_id}/tshirt")
 async def tshirt_ausgeben(request: Request, helfer_id: int,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1488,7 +1578,7 @@ async def tshirt_ausgeben(request: Request, helfer_id: int,
 
 @app.post("/helfer/helfer/{helfer_id}/tshirt/zurueck")
 async def tshirt_zurueck(request: Request, helfer_id: int,
-                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                         sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1530,7 +1620,7 @@ def _helfer_daten(werte: dict) -> dict:
 
 @app.get("/helfer/helfer/{helfer_id}/aendern")
 async def helfer_formular(request: Request, helfer_id: int,
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
     person = db.helfer_laden(helfer_id)
     if person is None:
         return templates.TemplateResponse("admin_fehlt.html",
@@ -1545,7 +1635,7 @@ async def helfer_formular(request: Request, helfer_id: int,
 
 @app.post("/helfer/helfer/{helfer_id}/aendern")
 async def helfer_sichern(request: Request, helfer_id: int,
-                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                         sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1590,7 +1680,7 @@ def _person_aus_formular(daten, sitzung) -> tuple[int | None, str]:
 
 @app.get("/helfer/funk")
 async def funk(request: Request, hinweis: str = "", offen: str = "",
-               sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+               sitzung: auth.Sitzung = Depends(_sitzung),
                v=Depends(_veranstaltung)):
     # Einmal alles holen und in Python trennen: der Umschalter zeigt beide
     # Zahlen, und zwei Abfragen fuer ein paar Dutzend Zeilen waeren Aufwand
@@ -1613,7 +1703,7 @@ async def funk(request: Request, hinweis: str = "", offen: str = "",
 
 @app.post("/helfer/funk/ausgeben")
 async def funk_ausgeben(request: Request,
-                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                        sitzung: auth.Sitzung = Depends(_sitzung),
                         v=Depends(_veranstaltung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
@@ -1636,7 +1726,7 @@ async def funk_ausgeben(request: Request,
 
 @app.post("/helfer/ausleihe/{ausleihe_id}/zurueck")
 async def ausleihe_zurueck(request: Request, ausleihe_id: int,
-                           sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                           sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1657,7 +1747,7 @@ async def ausleihe_zurueck(request: Request, ausleihe_id: int,
 
 @app.post("/helfer/ausleihe/{ausleihe_id}/loeschen")
 async def ausleihe_weg(request: Request, ausleihe_id: int,
-                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                       sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1669,7 +1759,7 @@ async def ausleihe_weg(request: Request, ausleihe_id: int,
 
 @app.get("/helfer/schluessel")
 async def schluessel(request: Request, hinweis: str = "", offen: str = "",
-                     sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                     sitzung: auth.Sitzung = Depends(_sitzung),
                      v=Depends(_veranstaltung)):
     alle = db.schluessel_liste(v["id"])
     noch_draussen = [z for z in alle if not z["zurueck_am"]]
@@ -1686,7 +1776,7 @@ async def schluessel(request: Request, hinweis: str = "", offen: str = "",
 
 @app.post("/helfer/schluessel/ausgeben")
 async def schluessel_ausgeben(request: Request,
-                              sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                              sitzung: auth.Sitzung = Depends(_sitzung),
                               v=Depends(_veranstaltung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
@@ -1711,7 +1801,7 @@ async def schluessel_ausgeben(request: Request,
 
 @app.post("/helfer/schluessel/{schluessel_id}/zurueck")
 async def schluessel_zurueck(request: Request, schluessel_id: int,
-                             sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                             sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1723,7 +1813,7 @@ async def schluessel_zurueck(request: Request, schluessel_id: int,
 
 @app.post("/helfer/schluessel/{schluessel_id}/loeschen")
 async def schluessel_weg(request: Request, schluessel_id: int,
-                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                         sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1733,7 +1823,7 @@ async def schluessel_weg(request: Request, schluessel_id: int,
 
 @app.post("/helfer/fahrzeug/{fahrzeug_id}/loeschen")
 async def fahrzeug_weg(request: Request, fahrzeug_id: int,
-                       sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                       sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1791,14 +1881,14 @@ def _einstellungsseite(request: Request, sitzung, hinweis: str = ""):
 
 @app.get("/helfer/einstellungen")
 async def einstellungen(request: Request, hinweis: str = "",
-                        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                        sitzung: auth.Sitzung = Depends(_sitzung)):
     return _einstellungsseite(request, sitzung, hinweis)
 
 
 @app.post("/helfer/einstellungen")
 async def einstellungen_speichern(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1810,7 +1900,7 @@ async def einstellungen_speichern(
 
 @app.get("/helfer/stand")
 async def admin_stand(request: Request, seit: int = 0, art: str = "",
-                      sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                      sitzung: auth.Sitzung = Depends(_sitzung)):
     """Was sich seit `seit` getan hat. Klein gehalten – die Antwort geht alle
     paar Sekunden über die Leitung."""
     antwort = JSONResponse(unterschriften.stand(seit, art))
@@ -1906,7 +1996,7 @@ async def tablet_abbrechen(request: Request, token: str):
 @app.get("/helfer/unterschriften")
 async def unterschriften_verwalten(
         request: Request, hinweis: str = "",
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(_sitzung)):
     token = db.tablet_token()
     basis = config.BASIS_URL or str(request.base_url).rstrip("/")
     return templates.TemplateResponse(
@@ -1921,7 +2011,7 @@ async def unterschriften_verwalten(
 @app.post("/helfer/unterschriften/link")
 async def unterschriften_link(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1935,7 +2025,7 @@ async def unterschriften_link(
 @app.post("/helfer/unterschrift/anfordern")
 async def unterschrift_anfordern(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1958,7 +2048,7 @@ async def unterschrift_anfordern(
 @app.post("/helfer/unterschrift/abbrechen")
 async def unterschrift_abbrechen(
         request: Request,
-        sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+        sitzung: auth.Sitzung = Depends(_sitzung)):
     daten = await _csrf_pflicht(request, sitzung)
     if daten is None:
         return Response("Ungültiger CSRF-Token", status_code=400)
@@ -1977,7 +2067,7 @@ def _abruf_takt() -> int:
 
 @app.get("/helfer/import")
 async def import_formular(request: Request, hinweis: str = "",
-                          sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich)):
+                          sitzung: auth.Sitzung = Depends(_sitzung)):
     return templates.TemplateResponse(
         "admin_import.html",
         _admin(request, sitzung, hinweis=hinweis, bericht=None, fehler="",
@@ -1989,7 +2079,7 @@ async def import_formular(request: Request, hinweis: str = "",
 
 @app.post("/helfer/import")
 async def import_ausfuehren(request: Request,
-                            sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                            sitzung: auth.Sitzung = Depends(_sitzung),
                             v=Depends(_veranstaltung)):
     daten = await request.form()
     if not auth.csrf_pruefen(sitzung, str(daten.get("csrf") or "")):
@@ -2027,7 +2117,7 @@ async def import_ausfuehren(request: Request,
 
 @app.post("/helfer/import/abrufen")
 async def import_abrufen(request: Request,
-                         sitzung: auth.Sitzung = Depends(auth.sitzung_erforderlich),
+                         sitzung: auth.Sitzung = Depends(_sitzung),
                          v=Depends(_veranstaltung)):
     """Holt beide Listen beim Dienst, statt sie hochladen zu lassen.
 

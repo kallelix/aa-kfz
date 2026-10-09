@@ -64,6 +64,13 @@ pruefe(wirft(lambda: konten.anlegen(email="x@example.org", name="X", kuerzel="X 
 pia = konten.anlegen(email="pia@example.org", name="Pia Presse", kuerzel="PP",
                      rolle="orga", bereiche=["presse", "unbekannt"], von="EA")
 pruefe(konten.laden(pia)["bereiche"] == ["presse"], "unbekannte Bereiche fallen weg")
+bea = konten.anlegen(email="bea@example.org", name="Bea Bereich", kuerzel="BB",
+                     rolle="bereichsleitung", bereiche=["presse"], telefon="  0151   123 ")
+pruefe(konten.laden(bea)["bereiche"] == ["helfer"],
+       "eine Bereichsleitung sieht nur den Helferbereich, was auch angekreuzt war")
+pruefe(konten.laden(bea)["telefon"] == "0151 123", "die Nummer wird geglättet")
+konten.telefon_setzen(bea, "0160 9")
+pruefe(konten.laden(bea)["telefon"] == "0160 9", "die eigene Nummer lässt sich setzen")
 
 print("Einladung")
 link = konten.link_anlegen(eva, "einladung")

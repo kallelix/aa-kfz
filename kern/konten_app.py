@@ -44,6 +44,7 @@ MELDUNGEN = {
     "link": "Der Link ist per Mail unterwegs.",
     "abgemeldet": "Das Konto ist auf allen Geräten abgemeldet.",
     "passwort": "Dein neues Passwort gilt. Andere Geräte sind abgemeldet.",
+    "telefon": "Deine Nummer ist gespeichert.",
     "willkommen": "Dein Passwort ist gesetzt – du bist angemeldet.",
     "va-angelegt": "Veranstaltung angelegt.",
     "va-geloescht": "Veranstaltung gelöscht.",
@@ -52,8 +53,9 @@ MELDUNGEN = {
 
 def darf_veranstaltungen(sitzung) -> bool:
     """Veranstaltungen pflegt, wer den Helferbereich sieht – an ihnen hängen
-    bis jetzt nur dessen Daten. Admins sowieso."""
-    return sitzung.ist_admin or sitzung.darf("helfer")
+    bis jetzt nur dessen Daten. Admins sowieso; eine Bereichsleitung nicht,
+    sie sieht nur ihre Bereiche."""
+    return sitzung.ist_admin or (sitzung.darf("helfer") and not sitzung.ist_bereichsleitung)
 
 
 def _zeit(wert) -> str:
@@ -274,6 +276,7 @@ def bauen(config, mail_config=None) -> FastAPI:
             "kuerzel": str(daten.get("kuerzel") or "").strip(),
             "rolle": str(daten.get("rolle") or ""),
             "bereiche": [b for b in BEREICHE if daten.get("bereich_" + b)],
+            "telefon": str(daten.get("telefon") or "").strip(),
         }
 
     def kontoformular(request, sitzung, *, werte, konto=None, fehler="", status_code=200):
@@ -292,7 +295,8 @@ def bauen(config, mail_config=None) -> FastAPI:
 
     @app.get("/konten/neu", response_class=HTMLResponse)
     async def konto_neu(request: Request, sitzung=Depends(auth.admin_erforderlich)):
-        werte = {"name": "", "email": "", "kuerzel": "", "rolle": "orga", "bereiche": []}
+        werte = {"name": "", "email": "", "kuerzel": "", "rolle": "orga", "bereiche": [],
+                 "telefon": ""}
         return kontoformular(request, sitzung, werte=werte)
 
     @app.post("/konten/neu", response_class=HTMLResponse)
@@ -369,6 +373,15 @@ def bauen(config, mail_config=None) -> FastAPI:
             admin_kontext(request, sitzung, konto=konten.laden(sitzung.konto_id),
                           rollen=ROLLEN, rollen_text=ROLLEN_TEXT, alle_bereiche=BEREICHE,
                           fehler=""))
+
+    @app.post("/konto/telefon")
+    async def telefon_aendern(request: Request, sitzung=Depends(auth.angemeldet)):
+        await csrf_formular(request, sitzung)
+        if sitzung.konto_id is None:
+            return RedirectResponse("/konten", status_code=303)
+        daten = await request.form()
+        konten.telefon_setzen(sitzung.konto_id, str(daten.get("telefon") or ""))
+        return RedirectResponse("/konto?hinweis=telefon", status_code=303)
 
     @app.post("/konto/passwort", response_class=HTMLResponse)
     async def passwort_aendern(request: Request, sitzung=Depends(auth.angemeldet)):

@@ -220,13 +220,17 @@ def helfer_schichten(vid: int, helfer_id: int) -> list[Zeile]:
 
 # --- Bereiche --------------------------------------------------------------
 
-_BEREICH_FELDER = ("name", "beschreibung", "treffpunkt", "leitung",
-                   "leitung_telefon", "mindestalter", "voraussetzungen", "intern")
+_BEREICH_FELDER = ("name", "beschreibung", "treffpunkt", "mindestalter",
+                   "voraussetzungen", "intern")
+
+# Nur die Bereiche, die dieses Konto leitet - für die Rolle Bereichsleitung.
+_GELEITET = ("EXISTS (SELECT 1 FROM bereich_leitung bl"
+             " WHERE bl.bereich_id = b.id AND bl.konto_id = ?)")
 
 
-def bereiche(vid: int) -> list[Zeile]:
+def bereiche(vid: int, leitung: int | None = None) -> list[Zeile]:
     """Die Bereiche der Veranstaltung mit ihren Zahlen: Schichten, Plätze
-    nach Soll, davon besetzt."""
+    nach Soll, davon besetzt. Mit `leitung` nur die, die dieses Konto leitet."""
     con = verbinden()
     try:
         return con.execute(
@@ -236,8 +240,10 @@ def bereiche(vid: int) -> list[Zeile]:
             "  WHERE s.bereich_id = b.id) AS soll,"
             " (SELECT COUNT(*) FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
             "  WHERE s.bereich_id = b.id) AS besetzt"
-            " FROM bereich b WHERE b.veranstaltung_id = ?"
-            " ORDER BY lower(b.name)", (vid,)).fetchall()
+            " FROM bereich b WHERE b.veranstaltung_id = ?" +
+            (" AND " + _GELEITET if leitung else "") +
+            " ORDER BY lower(b.name)",
+            (vid, leitung) if leitung else (vid,)).fetchall()
     finally:
         con.close()
 
@@ -307,6 +313,87 @@ def bereich_sichern(con: Verbindung, vid: int, name: str) -> int:
     return int(con.execute(
         "INSERT INTO bereich (veranstaltung_id, name, angelegt_am)"
         " VALUES (?, ?, ?) RETURNING id", (vid, name, jetzt())).fetchone()[0])
+
+
+# --- Bereichsleitung (B-02) -------------------------------------------------
+
+def leitung_moeglich() -> list[Zeile]:
+    """Wer einen Bereich leiten kann: jedes aktive Konto, das den
+    Helferbereich sieht. Die Rolle Bereichsleitung schränkt nur ein, was das
+    Konto sonst noch sieht - leiten kann auch jemand von der Orga."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT id, name, kuerzel, telefon, rolle FROM kern.konto"
+            " WHERE aktiv = 1 AND (rolle = 'admin' OR 'helfer' = ANY(bereiche))"
+            " ORDER BY lower(name)").fetchall()
+    finally:
+        con.close()
+
+
+def leitungen(bereich_ids) -> dict[int, list[Zeile]]:
+    """Je Bereich die Konten, die ihn leiten, mit Name und Nummer."""
+    ergebnis: dict[int, list[Zeile]] = {nummer: [] for nummer in bereich_ids}
+    if not ergebnis:
+        return ergebnis
+    con = verbinden()
+    try:
+        for zeile in con.execute(
+                "SELECT bl.bereich_id, k.id, k.name, k.kuerzel, k.telefon"
+                " FROM bereich_leitung bl JOIN kern.konto k ON k.id = bl.konto_id"
+                " WHERE bl.bereich_id = ANY(?) ORDER BY lower(k.name)",
+                (list(ergebnis),)):
+            ergebnis[zeile["bereich_id"]].append(zeile)
+    finally:
+        con.close()
+    return ergebnis
+
+
+def leitung_setzen(bereich_id: int, konto_ids) -> None:
+    con = verbinden()
+    try:
+        with con:
+            con.execute("DELETE FROM bereich_leitung WHERE bereich_id = ?", (bereich_id,))
+            for konto_id in sorted(set(konto_ids)):
+                con.execute("INSERT INTO bereich_leitung (bereich_id, konto_id)"
+                            " VALUES (?, ?)", (bereich_id, konto_id))
+    finally:
+        con.close()
+
+
+def _gibt_es(sql: str, werte: tuple) -> bool:
+    con = verbinden()
+    try:
+        return bool(con.execute("SELECT EXISTS (" + sql + ")", werte).fetchone()[0])
+    finally:
+        con.close()
+
+
+def leitet_bereich(konto_id: int, bereich_id: int) -> bool:
+    return _gibt_es("SELECT 1 FROM bereich_leitung WHERE konto_id = ? AND bereich_id = ?",
+                    (konto_id, bereich_id))
+
+
+def leitet_schicht(konto_id: int, schicht_id: int) -> bool:
+    return _gibt_es(
+        "SELECT 1 FROM schicht s JOIN bereich_leitung bl ON bl.bereich_id = s.bereich_id"
+        " WHERE s.id = ? AND bl.konto_id = ?", (schicht_id, konto_id))
+
+
+def leitet_einteilung(konto_id: int, einteilung_id: int) -> bool:
+    return _gibt_es(
+        "SELECT 1 FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+        " JOIN bereich_leitung bl ON bl.bereich_id = s.bereich_id"
+        " WHERE e.id = ? AND bl.konto_id = ?", (einteilung_id, konto_id))
+
+
+def leitet_helfer(konto_id: int, helfer_id: int) -> bool:
+    """Ob die Person auf einer Schicht steht, die dieses Konto leitet - nur
+    dann sieht eine Bereichsleitung sie."""
+    return _gibt_es(
+        "SELECT 1 FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+        " JOIN bereich_leitung bl ON bl.bereich_id = s.bereich_id"
+        " WHERE e.helfer_id = ? AND bl.konto_id = ?", (helfer_id, konto_id))
 
 
 # --- Schichten -------------------------------------------------------------
@@ -422,8 +509,12 @@ _SCHICHT_SUCHE = ("bereich", "ort")
 
 
 def schichten(vid: int, bereich_id: int | None = None, tag: str = "",
-              nur_luecken: bool = False) -> list[Zeile]:
+              nur_luecken: bool = False, leitung: int | None = None) -> list[Zeile]:
+    """Mit `leitung` nur die Schichten der Bereiche, die dieses Konto leitet."""
     bedingungen, werte = ["s.veranstaltung_id = ?"], [vid]
+    if leitung:
+        bedingungen.append(_GELEITET)
+        werte.append(leitung)
     if bereich_id:
         bedingungen.append("s.bereich_id = ?")
         werte.append(bereich_id)
@@ -616,6 +707,11 @@ def vorlage_uebernehmen(vid: int, quelle_id: int) -> dict | None:
                     ", ".join(_BEREICH_FELDER) + ", angelegt_am) VALUES (?, " +
                     ", ".join("?" for _ in _BEREICH_FELDER) + ", ?) RETURNING id",
                     (vid, *(b[f] for f in _BEREICH_FELDER), jetzt())).fetchone()[0])
+                # Meist leiten dieselben Leute im nächsten Jahr wieder.
+                con.execute(
+                    "INSERT INTO bereich_leitung (bereich_id, konto_id)"
+                    " SELECT ?, konto_id FROM bereich_leitung WHERE bereich_id = ?",
+                    (neu[b["id"]], b["id"]))
             schichten = con.execute(
                 "SELECT * FROM schicht WHERE veranstaltung_id = ? ORDER BY beginn",
                 (quelle_id,)).fetchall()

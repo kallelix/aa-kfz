@@ -12,12 +12,19 @@
       Dein Konto darf hier nur lesen, nicht ändern.
     {% elif grund == "admin" %}
       Die Konten verwaltet nur ein Admin.
+    {% elif grund == "bereichsleitung" %}
+      Als Bereichsleitung siehst du deine Bereiche mit ihren Schichten und
+      Leuten – das hier gehört der Orga.
     {% else %}
       Dieser Bereich ist für dein Konto nicht freigegeben.
     {% endif %}
   </p>
-  <p>Wenn du das brauchst, sag einem Admin Bescheid – er kann es unter
-    <strong>Konten</strong> freigeben.</p>
+  {% if grund == "bereichsleitung" %}
+    <p><a href="/helfer/bereiche">Zu deinen Bereichen</a></p>
+  {% else %}
+    <p>Wenn du das brauchst, sag einem Admin Bescheid – er kann es unter
+      <strong>Konten</strong> freigeben.</p>
+  {% endif %}
   {% if bereiche %}
     <p>Für dich offen:
       {% for b in bereiche %}<a href="{{ b.ziel }}">{{ b.name }}</a>{% if not loop.last %} · {% endif %}{% endfor %}

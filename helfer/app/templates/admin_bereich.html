@@ -77,18 +77,34 @@
       <p class="hilfe">Gilt für alle Schichten, die keinen eigenen Ort haben.</p>
     </div>
 
-    <div class="paar">
-      <div class="feld">
-        <label for="leitung">Bereichsleitung <span class="optional">optional</span></label>
-        <input type="text" id="leitung" name="leitung" maxlength="120"
-               value="{{ werte.leitung }}">
-      </div>
-      <div class="feld">
-        <label for="leitung_telefon">Ihre Nummer <span class="optional">optional</span></label>
-        <input type="tel" id="leitung_telefon" name="leitung_telefon" maxlength="40"
-               value="{{ werte.leitung_telefon }}">
-      </div>
-    </div>
+    <fieldset class="feld">
+      <legend>Bereichsleitung</legend>
+      {% if nur_eigene %}
+        <p>
+          {%- for k in leitung_moeglich if k.id in werte.leitung %}
+            {{- k.name }}{% if k.telefon %} ({{ k.telefon }}){% endif %}
+            {%- if not loop.last %}, {% endif %}
+          {%- endfor %}</p>
+        <p class="hilfe">Wer einen Bereich leitet, trägt die Orga ein.</p>
+      {% else %}
+        <p class="hilfe">Name und Nummer kommen aus dem Konto. Eine Bereichsleitung
+          sieht im Backoffice nur ihre Bereiche; leiten kann auch jemand von der Orga.
+          Fehlt jemand, legt ein Admin unter <strong>Konten</strong> ein Konto an.</p>
+        {% for k in leitung_moeglich %}
+          <label class="auswahl">
+            <input type="checkbox" name="leitung" value="{{ k.id }}"
+                   {% if k.id in werte.leitung %}checked{% endif %}>
+            <span class="auswahl-text">
+              <span class="auswahl-titel">{{ k.name }}</span>
+              <span class="auswahl-hilfe">{{ k.telefon or 'ohne Nummer' }}
+                {%- if k.rolle != 'bereichsleitung' %} · {{ 'Admin' if k.rolle == 'admin' else 'Orga' if k.rolle == 'orga' else 'Lesend' }}{% endif %}</span>
+            </span>
+          </label>
+        {% else %}
+          <p class="leer">Noch kein Konto mit Zugang zum Helferbereich.</p>
+        {% endfor %}
+      {% endif %}
+    </fieldset>
 
     <div class="feld {% if fehler.mindestalter %}feld-fehler{% endif %}">
       <label for="mindestalter">Mindestalter <span class="optional">optional</span></label>
@@ -124,7 +140,7 @@
     </div>
   </form>
 
-  {% if bereich %}
+  {% if bereich and not nur_eigene %}
     <section class="loeschen">
       <h2>Löschen</h2>
       {% if schichten %}
@@ -139,5 +155,5 @@
     </section>
   {% endif %}
 
-  <p class="zurueck-zeile"><a href="/helfer/bereiche">Zurück zu den Bereichen</a></p>
+  <p class="zurueck-zeile"><a href="/helfer/bereiche">Zurück zu {{ 'deinen' if nur_eigene else 'den' }} Bereichen</a></p>
 {% endblock %}

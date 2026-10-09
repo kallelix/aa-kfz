@@ -179,8 +179,8 @@ der Dienst beim ersten Start selbst an; dann steht je Bereich
 Ins Backoffice meldet sich jeder mit seinem **eigenen Konto** an:
 Mailadresse und Passwort. Ein Admin lädt die anderen unter
 `admin.example.de/konten` ein; sie bekommen eine Mail mit einem Link, über
-den sie ihr Passwort festlegen. Jedes Konto hat eine Rolle – *Admin*, *Orga*
-oder *Lesend* – und die Bereiche, die es sehen darf. Sein Kürzel landet als
+den sie ihr Passwort festlegen. Jedes Konto hat eine Rolle – *Admin*, *Orga*,
+*Bereichsleitung* oder *Lesend* – und die Bereiche, die es sehen darf. Sein Kürzel landet als
 „bearbeitet von“ in den Daten.
 
 Den ersten Admin legt man auf dem Server an:

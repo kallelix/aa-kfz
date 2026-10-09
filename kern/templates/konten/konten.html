@@ -33,7 +33,7 @@
             <tr{% if not k.aktiv %} class="gedaempft"{% endif %}>
               <td><a href="/konten/{{ k.id }}">{{ k.name }}</a></td>
               <td>{{ k.kuerzel }}</td>
-              <td>{{ k.email }}</td>
+              <td>{{ k.email }}{% if k.telefon %}<br><span class="gedaempft">{{ k.telefon }}</span>{% endif %}</td>
               <td>{{ rollen[k.rolle] }}</td>
               <td>
                 {% if k.rolle == 'admin' %}alle{% else %}

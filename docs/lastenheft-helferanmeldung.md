@@ -198,8 +198,8 @@ Beschreibung, Treffpunkt, Bereichsleitung samt Nummer, Mindestalter,
 Voraussetzungen (eine je Zeile) und *intern*; Schichten mit Minimum, Soll,
 Reserve, eigenem Mindestalter und *intern*; je Veranstaltung Shirt,
 Verpflegung, Helferparty und Goodies mit Schwelle und Altersgrenze; die
-Vorlage aus einer früheren Veranstaltung. Die Bereichsleitung ist vorerst ein
-Name mit Nummer, noch kein Konto (B-02). Der Import aus helferliste.online
+Vorlage aus einer früheren Veranstaltung. Die Bereichsleitung sind Konten
+(B-02, Schritt 2.1a). Der Import aus helferliste.online
 macht aus jeder Liste einen Bereich und aus ihrem Bedarf Soll und Minimum.
 
 ### 5.2 Anmeldung (A)
@@ -380,9 +380,10 @@ Ankündigungsgruppe niemanden mit @ erwähnen: das zeigt dessen Nummer allen.
 
 **Stand 09.10.2026:** B-01, B-03 und B-04 sind umgesetzt, vorgezogen vor die
 Öffnung. B-02 mit *Admin*, *Orga* und *Lesend*, jeweils für einzelne der drei
-Backoffice-Bereiche. Die *Bereichsleitung* für einzelne Helferbereiche
-kommt direkt nach den Bereichen (2.1a), vorgezogen aus Phase 3. Offen:
-Passkeys (B-03), das Protokoll (B-05).
+Backoffice-Bereiche. Dazu seit Schritt 2.1a die *Bereichsleitung*: ein
+Konto, das am Bereich eingetragen ist und im Helferbereich nur diese Bereiche
+sieht – mit ihren Schichten und den Leuten darauf. Die Nummer steht am Konto
+und wird selbst gepflegt. Offen: Passkeys (B-03), das Protokoll (B-05).
 
 ### 5.12 Datenschutz und Recht (D)
 
@@ -581,15 +582,16 @@ veranstaltung (id, name, kurz, beginn, ende, ort, status,
 person        (id, vorname, nachname, email, email_bestaetigt_am, telefon,
                geburtsdatum, eltern_name, eltern_email, eltern_bestaetigt_am,
                angemeldet_von_person_id, stamm_einwilligung_am, angelegt_am)
-benutzer      (id, email, name, kuerzel, passwort_hash, rolle, aktiv)
-benutzer_bereich (benutzer_id, bereich_id)     -- für Bereichsleitungen
+konto         (id, email, name, kuerzel, telefon, passwort_hash, rolle,
+               bereiche, aktiv)                -- umgesetzt (B-01 bis B-04)
 zugangslink   (token_hash, person_id, zweck, gueltig_bis, benutzt_am)
 mail_out      (…)                                -- aus Kennzeichen/Presse
 protokoll     (id, benutzer_id, was, objekt, vorher, nachher, am)
 
 -- helfer
 bereich       (id, veranstaltung_id, name, beschreibung, treffpunkt,
-               leitung, leitung_telefon, mindestalter, voraussetzungen, intern)
+               mindestalter, voraussetzungen, intern)
+bereich_leitung (bereich_id, konto_id)         -- wer leitet (B-02)
 schicht       (id, bereich_id, beginn, ende, ort, hinweis,
                minimum, soll, reserve, mindestalter, intern)
 angebot       (veranstaltung_id, shirt, verpflegung, party)
@@ -679,7 +681,7 @@ Selbstbedienung.
 | # | Schritt | Aufwand |
 | --- | --- | --- |
 | 2.1 | Bereiche und Schichten pflegen: Minimum/Soll/Reserve, Mindestalter, Voraussetzungen, intern, Goodies je Veranstaltung, Vorlage aus dem Vorjahr | **erledigt** |
-| 2.1a | **Bereichsleitung als Konto** (B-02, aus Phase 3): sieht und pflegt nur ihre Bereiche, Schichten und Leute; Empfänger für Meldungen und Ausdrucke | 3 h |
+| 2.1a | **Bereichsleitung als Konto** (B-02, aus Phase 3): sieht und pflegt nur ihre Bereiche, Schichten und Leute; Empfänger für Meldungen und Ausdrucke | **erledigt** |
 | 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten; **Interesse vormerken** bei angekündigten Veranstaltungen (aus 3.3); Verfügbarkeit und Vorlieben schon im Datenmodell, für den Assistenten | 11 h |
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | 3 h |
 | 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 9 h |
@@ -702,10 +704,10 @@ Bestehendes umgebaut.
 
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen rund 84 Stunden. Davon sind
-der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 schon erledigt; es bleiben
-rund 56 Stunden, die 8 Stunden pro Woche haben also Luft.
+der Prototyp (0.2), Phase 1 bis auf DKIM, 2.1 und 2.1a schon erledigt; es
+bleiben rund 53 Stunden, die 8 Stunden pro Woche haben also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~56 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~53 h, ab 12. Oktober |
 | --- | --- |
 | Anfang Dezember 2026 | ~8 h |
 | **Mitte Dezember 2026** | **~6 h** |
@@ -755,7 +757,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~60 h, davon ~6 h erledigt |
+| 2 Öffnung | ~60 h, davon ~9 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten | ~32 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~135 h** |

@@ -86,6 +86,12 @@ class Sitzung:
     def ist_admin(self) -> bool:
         return self.rolle == "admin"
 
+    @property
+    def ist_bereichsleitung(self) -> bool:
+        """Sieht im Helferbereich nur die Bereiche, die sie leitet. Was das
+        heißt, entscheidet der Helferbereich; kern kennt dessen Bereiche nicht."""
+        return self.rolle == "bereichsleitung"
+
 
 def hash_erzeugen(klartext: str) -> str:
     """Ohne Konfiguration und deshalb hier: ``python -m kern.passwort`` ruft es."""

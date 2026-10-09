@@ -29,11 +29,14 @@ BEREICHE = {"kennzeichen": "Kennzeichen", "presse": "Presse", "helfer": "Helfer"
 ROLLEN = {
     "admin": "Admin",
     "orga": "Orga",
+    "bereichsleitung": "Bereichsleitung",
     "lesend": "Lesend",
 }
 ROLLEN_TEXT = {
     "admin": "alle Bereiche, dazu die Konten",
     "orga": "darf in seinen Bereichen alles bearbeiten",
+    "bereichsleitung": "sieht im Helferbereich nur die Bereiche, die es leitet, "
+                       "mit ihren Schichten und Leuten",
     "lesend": "sieht seine Bereiche, ändert nichts",
 }
 
@@ -124,13 +127,16 @@ class Konten:
 
     # --- Anlegen und ändern ---------------------------------------------------
 
-    def _werte(self, email, name, kuerzel, rolle, bereiche) -> dict:
+    def _werte(self, email, name, kuerzel, rolle, bereiche, telefon="") -> dict:
         werte = {
             "email": email_normal(email),
             "name": " ".join((name or "").split()),
             "kuerzel": (kuerzel or "").strip().upper(),
             "rolle": rolle,
-            "bereiche": [b for b in BEREICHE if b in (bereiche or ())],
+            # Eine Bereichsleitung gibt es nur im Helferbereich.
+            "bereiche": (["helfer"] if rolle == "bereichsleitung"
+                         else [b for b in BEREICHE if b in (bereiche or ())]),
+            "telefon": " ".join((telefon or "").split())[:40],
         }
         if not _EMAIL.match(werte["email"]):
             raise Fehler("Bitte eine gültige Mailadresse angeben.")
@@ -154,8 +160,9 @@ class Konten:
                 raise Fehler(f"{text} hat schon ein anderes Konto.")
 
     def anlegen(self, *, email: str, name: str, kuerzel: str, rolle: str,
-                bereiche=(), von: str = "", passwort: str | None = None) -> int:
-        werte = self._werte(email, name, kuerzel, rolle, bereiche)
+                bereiche=(), telefon: str = "", von: str = "",
+                passwort: str | None = None) -> int:
+        werte = self._werte(email, name, kuerzel, rolle, bereiche, telefon)
         passwort_hash = None
         if passwort is not None:
             grund = passwort_regeln(passwort)
@@ -166,11 +173,12 @@ class Konten:
             with self._db.transaktion() as con:
                 self._doppelt(con, werte, None)
                 return int(con.execute(
-                    "INSERT INTO konto (email, name, kuerzel, rolle, bereiche,"
-                    " passwort_hash, angelegt_von) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    "INSERT INTO konto (email, name, kuerzel, rolle, bereiche, telefon,"
+                    " passwort_hash, angelegt_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
                     " RETURNING id",
                     (werte["email"], werte["name"], werte["kuerzel"], werte["rolle"],
-                     werte["bereiche"], passwort_hash, von)).fetchone()[0])
+                     werte["bereiche"], werte["telefon"], passwort_hash,
+                     von)).fetchone()[0])
         except IntegrityError:
             # Zwei gleichzeitig angelegt - die Prüfung oben sah beide nicht.
             raise Fehler("Mailadresse oder Kürzel hat schon ein anderes Konto.")
@@ -182,8 +190,8 @@ class Konten:
             " AND passwort_hash IS NOT NULL AND id <> ?)", (konto_id,)).fetchone()[0]
 
     def aendern(self, konto_id: int, *, email: str, name: str, kuerzel: str,
-                rolle: str, bereiche=(), aktiv: bool = True) -> None:
-        werte = self._werte(email, name, kuerzel, rolle, bereiche)
+                rolle: str, bereiche=(), telefon: str = "", aktiv: bool = True) -> None:
+        werte = self._werte(email, name, kuerzel, rolle, bereiche, telefon)
         try:
             with self._db.transaktion() as con:
                 alt = con.execute("SELECT * FROM konto WHERE id = ? FOR UPDATE",
@@ -199,9 +207,10 @@ class Konten:
                                  "zum Admin machen – sonst kommt niemand mehr an die Konten.")
                 con.execute(
                     "UPDATE konto SET email = ?, name = ?, kuerzel = ?, rolle = ?,"
-                    " bereiche = ?, aktiv = ?, geaendert_am = now() WHERE id = ?",
+                    " bereiche = ?, telefon = ?, aktiv = ?, geaendert_am = now()"
+                    " WHERE id = ?",
                     (werte["email"], werte["name"], werte["kuerzel"], werte["rolle"],
-                     werte["bereiche"], 1 if aktiv else 0, konto_id))
+                     werte["bereiche"], werte["telefon"], 1 if aktiv else 0, konto_id))
                 if not aktiv:
                     # Gesperrt heißt: sofort draußen, nicht erst, wenn der
                     # Keks abläuft.
@@ -230,6 +239,12 @@ class Konten:
             con.execute("UPDATE konto SET zuletzt_angemeldet_am = now() WHERE id = ?",
                         (konto["id"],))
         return konto
+
+    def telefon_setzen(self, konto_id: int, telefon: str) -> None:
+        """Die eigene Nummer – jeder pflegt sie selbst unter Mein Konto."""
+        with self._db.transaktion() as con:
+            con.execute("UPDATE konto SET telefon = ?, geaendert_am = now() WHERE id = ?",
+                        (" ".join((telefon or "").split())[:40], konto_id))
 
     def passwort_setzen(self, konto_id: int, passwort: str,
                         ausser_sitzung: str | None = None) -> None:

@@ -8,6 +8,7 @@
     <dt>Name</dt><dd>{{ konto.name }}</dd>
     <dt>Kürzel</dt><dd>{{ konto.kuerzel }}</dd>
     <dt>Mailadresse</dt><dd>{{ konto.email }}</dd>
+    <dt>Telefon</dt><dd>{{ konto.telefon or '–' }}</dd>
     <dt>Rolle</dt><dd>{{ rollen[konto.rolle] }} – {{ rollen_text[konto.rolle] }}</dd>
     <dt>Bereiche</dt>
     <dd>{% if konto.rolle == 'admin' %}alle{% else %}
@@ -15,6 +16,21 @@
     {% endif %}</dd>
   </dl>
   <p class="hilfe">Name, Kürzel oder Rechte ändert ein Admin.</p>
+
+  <h2>Telefon</h2>
+  <form method="post" action="/konto/telefon">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="feld">
+      <label for="telefon">Deine Nummer <span class="optional">optional</span></label>
+      <input type="tel" id="telefon" name="telefon" maxlength="40" autocomplete="tel"
+             value="{{ konto.telefon }}">
+      <p class="hilfe">Leitest du einen Bereich, steht sie in der Erinnerungsmail an
+        deine Helfer und auf dem Ausdruck am Treffpunkt.</p>
+    </div>
+    <div class="knopfreihe">
+      <button type="submit">Nummer speichern</button>
+    </div>
+  </form>
 
   <h2>Passwort ändern</h2>
   {% if fehler %}

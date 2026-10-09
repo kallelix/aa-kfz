@@ -167,9 +167,16 @@ Mailadresse und Passwort, eine Anmeldung für alle Bereiche, die das Konto
 sehen darf. Ein Konto hat
 
 - eine **Rolle**: *Admin* (alles, dazu die Konten), *Orga* (darf in seinen
-  Bereichen alles bearbeiten) oder *Lesend* (sieht, ändert nichts);
+  Bereichen alles bearbeiten), *Bereichsleitung* (sieht im Helferbereich nur
+  die Bereiche, die sie leitet, mit deren Schichten und Leuten) oder *Lesend*
+  (sieht, ändert nichts);
 - seine **Bereiche**: Kennzeichen, Presse, Helfer – einzeln freizugeben;
-- ein **Kürzel**, das als „bearbeitet von“ in den Daten landet.
+- ein **Kürzel**, das als „bearbeitet von“ in den Daten landet;
+- eine **Nummer**, die jeder unter *Mein Konto* selbst pflegt – für eine
+  Bereichsleitung steht sie in Erinnerungsmail und Ausdruck.
+
+Wer einen Helferbereich leitet, wird am Bereich eingetragen (Einstellungen ›
+Bereiche); leiten kann auch jemand von der Orga.
 
 Admins laden unter `admin.example.de/konten` ein: die Person bekommt eine
 Mail mit einem Link und legt damit ihr Passwort fest. Vergessene Passwörter

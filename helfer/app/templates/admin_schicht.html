@@ -94,7 +94,7 @@
           <option value="">bitte wählen …</option>
           {% for h in helfer %}
             <option value="{{ h.id }}">
-              {{- h.name }}{% if h.email %} – {{ h.email }}{% endif %}
+              {{- h.name }}{% if h.email and not nur_eigene %} – {{ h.email }}{% endif %}
               ({{ h.schichten }} Schichten)</option>
           {% endfor %}
         </select>
