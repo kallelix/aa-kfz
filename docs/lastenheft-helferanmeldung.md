@@ -247,7 +247,7 @@ sofort bei der richtigen Person ankommt.
 | I-02 | T-Shirt-Größe als **Auswahl** (XS bis 5XL, Damen-/Herrenschnitt, „kein Shirt"), Verpflegung als Auswahl – beides nur, wenn die Veranstaltung es anbietet (V-07). Freitext nur unter *Bemerkung*. | M | 2 |
 | I-03 | Die Mailadresse wird per Link **bestätigt**. Unbestätigte Anmeldungen halten ihren Platz eine begrenzte Zeit und verfallen dann, mit Erinnerung. | M | 2 |
 | I-04 | Handynummer wird beim Speichern in eine einheitliche Form gebracht (+49 …). | S | 2 |
-| I-05 | **Dublettenprüfung beim Anmelden**: gleiche Adresse oder gleiche Nummer mit gleichem Namen (Umlaute in beiden Schreibweisen, `kern/suchen.py`) → „Bist du das?" statt einer zweiten Person. Mitangemeldete Personen derselben anmeldenden Person sind ausgenommen – das sind Familien und Vereinskollegen, keine Dubletten. | M | 3 |
+| I-05 | **Dublettenprüfung beim Anmelden**: gleiche Adresse oder gleiche Nummer mit gleichem Namen (Umlaute in beiden Schreibweisen, `kern/suchen.py`) → „Bist du das?" statt einer zweiten Person. Mitangemeldete Personen derselben anmeldenden Person sind ausgenommen – das sind Familien und Vereinskollegen, keine Dubletten. | M | 2 |
 | I-06 | **Zusammenführen im Backoffice**: zwei Personen zu einer machen, Schichten und Ausgaben wandern mit. | S | 3 |
 | I-07 | Social Login (Google, Apple …) – geprüft und **nicht empfohlen**, siehe Abschnitt 7.4. | – | – |
 
@@ -282,7 +282,7 @@ Backoffice vor vielen Augen, und gemeint ist Teilhabe, nicht Ausschluss.
 | R-01 | Je Schicht **Minimum** (darunter geht es nicht), **Soll** (so ist es geplant) und **Reserve** (zusätzlich willkommen). | M | 2 |
 | R-02 | Das Dashboard färbt nach diesen Stufen: rot unter Minimum, gelb unter Soll, grün ab Soll. **Reserveplätze zählen nie als fehlend.** | M | 2 |
 | R-03 | Ist das Soll erreicht, wird eine Anmeldung als Reserve angenommen und so angezeigt („Du bist Reserve – danke, das hilft uns sehr"). | M | 2 |
-| R-04 | Ist auch die Reserve voll: Warteliste. Wird ein Platz frei, bekommt die erste Person der Warteliste eine Mail mit Link zum Bestätigen. | K | 3 |
+| R-04 | Ist auch die Reserve voll: Warteliste. Wird ein Platz frei, bekommt die erste Person der Warteliste eine Mail mit Link zum Bestätigen. | K | 2 |
 | R-05 | **Springer**: Person mit Zeitfenstern statt Schicht („Sa 12–18, mache alles"), optional mit Vorlieben. | M | 2 |
 | R-06 | Dashboard und Monitor zeigen die Springer, die **jetzt** verfügbar sind, und wie viele es in den nächsten Stunden werden. | M | 2 |
 | R-07 | Die Orga setzt einen Springer mit zwei Tipps in eine Schicht; er bekommt die Zuweisung als Mail bzw. per Anruf. Auch vorab möglich: wer bis zu einer Frist nur Zeiten angegeben hat, wird von der Orga eingeteilt und bekommt Bescheid. | S | 4 |
@@ -372,7 +372,7 @@ Ankündigungsgruppe niemanden mit @ erwähnen: das zeigt dessen Nummer allen.
 | Nr. | Anforderung | Prio | Phase |
 | --- | --- | --- | --- |
 | B-01 | **Persönliche Konten** statt eines gemeinsamen Passworts – für alle drei Bereiche, also in `kern`. | M | 3 |
-| B-02 | Rollen: *Admin*, *Orga*, *Bereichsleitung* (nur ihre Bereiche), *Lesend*. | M | 3 |
+| B-02 | Rollen: *Admin*, *Orga*, *Bereichsleitung* (nur ihre Bereiche), *Lesend*. | M | 2 |
 | B-03 | Einladen per Mail; der Eingeladene setzt sein Passwort selbst. Optional Passkey. | M | 3 |
 | B-04 | Das Kürzel ergibt sich aus dem Konto – die Abfrage bei der Anmeldung entfällt. | M | 3 |
 | B-05 | **Protokoll**: wer hat wann wen eingeteilt, ausgetragen, zusammengeführt, gelöscht. | S | 2 |
@@ -380,9 +380,9 @@ Ankündigungsgruppe niemanden mit @ erwähnen: das zeigt dessen Nummer allen.
 
 **Stand 09.10.2026:** B-01, B-03 und B-04 sind umgesetzt, vorgezogen vor die
 Öffnung. B-02 mit *Admin*, *Orga* und *Lesend*, jeweils für einzelne der drei
-Backoffice-Bereiche; die *Bereichsleitung* für einzelne Helferbereiche folgt,
-sobald es die Bereiche im Datenmodell gibt (1.2). Offen: Passkeys (B-03),
-das Protokoll (B-05).
+Backoffice-Bereiche. Die *Bereichsleitung* für einzelne Helferbereiche
+kommt direkt nach den Bereichen (2.1a), vorgezogen aus Phase 3. Offen:
+Passkeys (B-03), das Protokoll (B-05).
 
 ### 5.12 Datenschutz und Recht (D)
 
@@ -679,32 +679,40 @@ Selbstbedienung.
 | # | Schritt | Aufwand |
 | --- | --- | --- |
 | 2.1 | Bereiche und Schichten pflegen: Minimum/Soll/Reserve, Mindestalter, Voraussetzungen, intern, Goodies je Veranstaltung, Vorlage aus dem Vorjahr | **erledigt** |
-| 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten | 9 h |
+| 2.1a | **Bereichsleitung als Konto** (B-02, aus Phase 3): sieht und pflegt nur ihre Bereiche, Schichten und Leute; Empfänger für Meldungen und Ausdrucke | 3 h |
+| 2.2 | Öffentliche Schichtliste mit Konfliktsperre, Pflichtfeldern, Mitanmeldung weiterer Personen, Springer-Zeiten; **Interesse vormerken** bei angekündigten Veranstaltungen (aus 3.3); Verfügbarkeit und Vorlieben schon im Datenmodell, für den Assistenten | 11 h |
 | 2.3 | **Einsatzgrenzen**: pflegen, still anwenden, Hinweis „nur zu zweit" für die Bereichsleitung | 3 h |
-| 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 7 h |
-| 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; Meldung kurzfristiger Absagen; Protokoll | 8 h |
+| 2.4 | Bestätigungslink mit Code, Wiedererkennen per Adresse, **Dubletten erkennen** über Name und Nummer (I-05, aus 3.2), Mein Helferplatz (ansehen, dazunehmen), Kalender-Abo | 9 h |
+| 2.5 | **Selbstbedienung**: stornieren, umbuchen, ganz abmelden, Angaben ändern, Daten löschen, Mitangemeldete; **Warteliste mit Nachrücken** (R-04, aus 3.6); Meldung kurzfristiger Absagen; Protokoll | 11 h |
 | 2.6 | „Noch eine Schicht?" nach dem Eintragen, Tagesbalken auf der Startseite | 3 h |
 | 2.7 | Dashboard und Monitor: Stufen statt Bedarf, Reserve, Springer, kurzfristige Absagen | 4 h |
 | 2.8 | Druckansichten und Notfallmappe | 3 h |
 | 2.9 | Datenschutzhinweise, Einwilligungen, Altersprüfung, Elternbestätigung, Löschwerkzeug angepasst | 5 h |
 | 2.10 | Lasttest: 200 gleichzeitige Anmeldungen auf dieselben zehn Plätze, Umbuchen gegeneinander | 2 h |
 
+**Vorgezogen am 09.10.2026** aus Phase 3, weil es dieselben Stellen anfasst:
+die Bereichsleitung als Konto, die Warteliste (sie gehört in dieselbe
+Transaktion wie Stornieren und Umbuchen), das Vormerken von Interesse (die
+öffentliche Startseite) und das Erkennen von Dubletten (derselbe Abgleich wie
+das Wiedererkennen per Adresse). Später gebaut, hätte jedes davon Phase 2 ein
+zweites Mal aufgemacht. Der Assistent bleibt in Phase 3.
+
 **Meilenstein:** Anmeldung öffnet. Ab hier wird nur noch ergänzt, nichts
 Bestehendes umgebaut.
 
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
-für Prototyp, Phase 1 und 2 – rund 74 Stunden. Davon sind der Prototyp (0.2),
-Phase 1 bis auf DKIM und 2.1 schon erledigt; es bleiben rund 44 Stunden, die
-8 Stunden pro Woche haben also Luft.
+für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen rund 84 Stunden. Davon sind
+der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 schon erledigt; es bleiben
+rund 56 Stunden, die 8 Stunden pro Woche haben also Luft.
 
-| Öffnung | Bauzeit pro Woche ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~56 h, ab 12. Oktober |
 | --- | --- |
-| Anfang Dezember 2026 | ~10 h |
-| **Mitte Dezember 2026** | **~8 h** |
-| Rückfallebene: Anfang März 2027 | ~4 h |
+| Anfang Dezember 2026 | ~8 h |
+| **Mitte Dezember 2026** | **~6 h** |
+| Rückfallebene: Anfang März 2027 | ~3 h |
 
-Danach entspannt es sich: Phase 3 und 4 sind rund 60 Stunden, von Januar bis
-Ende April etwa 3,5 Stunden pro Woche – mit sechs Wochen Puffer bis zum
+Danach entspannt es sich: Phase 3 und 4 sind noch rund 46 Stunden, von Januar
+bis Ende April knapp 3 Stunden pro Woche – mit sechs Wochen Puffer bis zum
 Stillstand Mitte Juni. Und die Helfer haben über sechs Monate Zeit, sich bis
 zur AA am 1.–4. Juli anzumelden.
 
@@ -719,11 +727,11 @@ Phase Vorrang.
 | # | Schritt | Aufwand |
 | --- | --- | --- |
 | 3.1 | **Assistent**: Verfügbarkeit, Vorlieben, Vorschläge nach Dringlichkeit, Springer | 10 h |
-| 3.2 | Dubletten über Name und Nummer erkennen, zusammenführen | 5 h |
-| 3.3 | Ankündigungen und Interesse vormerken, Mail bei Anmeldestart | 4 h |
+| 3.2 | Dubletten zusammenführen (I-06); das Erkennen kommt mit 2.4 | 3 h |
+| 3.3 | Mail bei Anmeldestart an die Vorgemerkten (C-08); das Vormerken kommt mit 2.2 | 2 h |
 | 3.4 | Hilferuf: knappe Schichten, Mail an passende Stamm-Helfer, WhatsApp-Text | 5 h |
 | 3.5 | Erinnerung vor der Schicht, Danke-Mail mit Rückblick | 3 h |
-| 3.6 | Warteliste mit Nachrücken | 3 h |
+| 3.6 | ~~Warteliste mit Nachrücken~~ – vorgezogen in 2.5 | – |
 | 3.7 | Persönliche Backoffice-Konten mit Rollen und Einladen – für alle drei Bereiche | **erledigt** |
 
 ### Phase 4 – Veranstaltungstag und Anerkennung (März bis Ende April 2027)
@@ -747,10 +755,10 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~50 h, davon ~6 h erledigt |
-| 3 Assistent, Helferstamm, Backoffice-Konten | ~39 h, davon ~9 h erledigt |
+| 2 Öffnung | ~60 h, davon ~6 h erledigt |
+| 3 Assistent, Helferstamm, Backoffice-Konten | ~32 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
-| **gesamt** | **~132 h** |
+| **gesamt** | **~135 h** |
 
 Phase 1 und 2 sind die Öffnung. Fällt die Zeit knapp aus, wird Phase 4
 verschoben, nicht Phase 2 gekürzt – bis auf den Check-in (4.1), der zur AA
@@ -822,6 +830,10 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
   wählt jeder im Browser; ohne Wahl gilt die nächste, die noch nicht vorbei
   ist. Kennzeichen und Presse kommen dazu, wenn eine zweite Veranstaltung
   sie braucht (V-01, V-02).
+- **Reihenfolge** (09.10.2026): Bereichsleitung als Konto, Warteliste,
+  Interesse vormerken und das Erkennen von Dubletten sind aus Phase 3 in
+  Phase 2 vorgezogen – sie fassen dieselben Stellen an. Der Assistent bleibt
+  in Phase 3 (Abschnitt 9).
 
 ### Offen
 
