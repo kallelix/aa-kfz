@@ -306,3 +306,50 @@ def leitung_absage(empfaenger: str, abgabe: dict) -> tuple:
     zeilen += ["", "Die Helferplanung"]
     betreff = ("Kurzfristige Absage: " if abgabe["kurzfristig"] else "Absage: ") + s["text"]
     return ("leitung", empfaenger, betreff, "\n".join(zeilen))
+
+
+# --- Einverständnis der Eltern (Lastenheft 2.9, D-06) ----------------------
+
+def _eltern_gruss(kind) -> str:
+    return f"Hallo {kind['eltern_name']}," if kind["eltern_name"] else "Hallo,"
+
+
+def eltern(kind, va_text: str, eintraege, link: str, angemeldet_von: str = "") -> tuple:
+    """An die erziehungsberechtigte Person – erst mit ihrem Klick gilt die
+    Anmeldung."""
+    wer = _vorname(kind)
+    text = "\n".join([
+        _eltern_gruss(kind),
+        "",
+        f"{kind['name']} möchte bei {va_text} mithelfen"
+        + (f" – angemeldet von {angemeldet_von}" if angemeldet_von else "")
+        + " – und hat dich als erziehungsberechtigte Person angegeben.",
+        "",
+        "Eingetragen ist:",
+        schichten_text(eintraege),
+        "",
+        f"Bist du einverstanden, dass {wer} mithilft? Dann bestätige es bitte hier:",
+        "",
+        f"  {link}",
+        "",
+        f"Ohne dein Einverständnis geben wir die Plätze nach {config.BESTAETIGEN_FRIST_STUNDEN}"
+        " Stunden wieder frei und löschen die Angaben.",
+        "Fragen zum Einsatz beantworten wir gern – die Kontaktdaten stehen unten.",
+        _fuss(),
+    ])
+    return ("eltern", kind["eltern_email"], f"Einverständnis: {wer} hilft mit", text)
+
+
+def eltern_verfallen(empfaenger, kind_name: str, va_text: str, anmeldung: str) -> tuple:
+    """An die Person, die angemeldet hat: ohne Einverständnis keine Plätze."""
+    text = "\n".join([
+        f"Hallo {_vorname(empfaenger)},",
+        "",
+        f"für {kind_name} ist das Einverständnis der Eltern zu {va_text} nicht",
+        "gekommen. Die Plätze sind deshalb wieder frei.",
+        "",
+        "Klappt es doch? Dann einfach neu anmelden:",
+        f"  {anmeldung}",
+        _fuss(),
+    ])
+    return ("eltern_verfallen", empfaenger["email"], "Ohne Einverständnis keine Anmeldung", text)

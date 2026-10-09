@@ -132,7 +132,7 @@
     </div>
   </section>
 
-  {% if konflikte or doppelt or allein or dubletten %}
+  {% if konflikte or doppelt or allein or dubletten or jugendschutz %}
     <section>
       <h2>Bitte prüfen</h2>
 
@@ -154,6 +154,27 @@
                     <span class="gedaempft nowrap">{{ k.beginn_a | zeitpunkt }}</span></td>
                   <td><a href="/helfer/schicht/{{ k.schicht_b }}">{{ k.bereich_b }}</a>
                     <span class="gedaempft nowrap">{{ k.beginn_b | zeitpunkt }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
+      {% if jugendschutz %}
+        {# D-07 als Richtschnur, keine Sperre. #}
+        <h3>Jugendliche: mehr als 8 Stunden oder vor 6 / nach 20 Uhr ({{ jugendschutz | length }})</h3>
+        <p class="hilfe">Als Richtschnur für unter 18: höchstens 8 Stunden am Tag, nur zwischen
+          6 und 20 Uhr. Keine Sperre – bitte anschauen.</p>
+        <div class="tabelle-huelle">
+          <table>
+            <tbody>
+              {% for j in jugendschutz %}
+                <tr>
+                  <td><a href="/helfer/helfer/{{ j.helfer_id }}">{{ j.name }}</a>
+                    <span class="gedaempft">{{ j.alter }} Jahre</span></td>
+                  <td class="nowrap">{{ j.datum | tag }}</td>
+                  <td>{{ j.stunden | round(1) }} Stunden{% if j.randzeit %} · vor 6 oder nach 20 Uhr{% endif %}</td>
                 </tr>
               {% endfor %}
             </tbody>

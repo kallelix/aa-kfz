@@ -150,6 +150,7 @@ try:
         daten += [("ich-vorname", vorname), ("ich-nachname", "Berg"),
                   ("ich-email", vorname.lower() + "@example.org"), ("ich-telefon", telefon),
                   ("ich-volljaehrig", volljaehrig), ("ich-geburtsdatum", geburtsdatum),
+                  ("ich-eltern_name", "Eva Berg"), ("ich-eltern_email", "eva@example.org"),
                   ("ich-tshirt", "M"), ("ich-schnitt", "damen"),
                   ("ich-verpflegung", "vegetarisch"), ("weitere", len(weitere)),
                   ("aktion", "anmelden"), ("voraussetzung", "Kassenschulung")]

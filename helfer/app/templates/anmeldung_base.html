@@ -23,6 +23,7 @@
       Fragen? {% if kontakt_name %}{{ kontakt_name }}{% endif %}
       {%- if kontakt_telefon %} · <a href="tel:{{ kontakt_telefon|replace(' ', '') }}">{{ kontakt_telefon }}</a>{% endif %}
       {%- if kontakt_mail %} · <a href="mailto:{{ kontakt_mail }}">{{ kontakt_mail }}</a>{% endif %}
+      · <a href="/datenschutz">Datenschutz</a>
     </p>
   </div>
   {% block skript %}{% endblock %}

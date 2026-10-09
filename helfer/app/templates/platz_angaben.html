@@ -85,6 +85,11 @@
       </div>
     {% endfor %}
 
+    {# D-03, D-05: so einfach heraus wie hinein. #}
+    <label class="haken"><input type="checkbox" name="stamm" value="1"
+           {% if eingabe.get('stamm') %}checked{% endif %}>
+      <span>Ihr dürft mich für künftige Veranstaltungen ansprechen. <span class="leise">Ohne
+        Häkchen löschen wir die Angaben nach der Veranstaltung.</span></span></label>
     <button type="submit" class="knopf">Speichern</button>
   </form>
 {% endblock %}

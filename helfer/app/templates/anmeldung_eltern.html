@@ -1,0 +1,43 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Einverständnis{% endblock %}
+{% block ueberschrift %}{{ kind.vorname or kind.name }} möchte mithelfen{% endblock %}
+
+{# D-06: die erziehungsberechtigte Person sieht, wofür ihr Kind eingetragen
+   ist, und stimmt mit einem Klick zu. Der Link aus der Mail zeigt nur diese
+   Seite – erst der Knopf löst etwas aus (7.4). #}
+{% block inhalt %}
+  {% if bestaetigt %}
+    <div class="hinweis gut">Danke! {{ kind.vorname or kind.name }} ist dabei.</div>
+  {% else %}
+    <p>{{ kind.name }} hat dich als erziehungsberechtigte Person angegeben. Erst mit deinem
+      Einverständnis gilt die Anmeldung.</p>
+  {% endif %}
+
+  {% for e in eintraege %}
+    <h2>{{ e.va.name }}</h2>
+    {% for s in e.schichten %}
+      <div class="karte schicht">
+        <h3>{{ s.bereich }}</h3>
+        <div class="zeit">{{ s.datum|tag }} · {{ s|spanne }}</div>
+        <div class="ort">Treffpunkt: {{ s.ort or s.treffpunkt or 'kommt noch' }}</div>
+      </div>
+    {% endfor %}
+    {% for f in e.fenster %}
+      <div class="karte"><h3>Springer</h3><p>{{ f.beginn|zeitpunkt }} bis {{ f.ende|uhr }}</p></div>
+    {% endfor %}
+    {% for s in e.warteliste %}
+      <div class="karte schicht"><h3>{{ s.bereich }}</h3>
+        <div class="zeit">{{ s.datum|tag }} · {{ s|spanne }}</div>
+        <span class="marke voll">Warteliste</span></div>
+    {% endfor %}
+  {% endfor %}
+
+  {% if not bestaetigt %}
+    <form method="post" action="/eltern/{{ token }}">
+      <button type="submit" class="knopf">Ich bin einverstanden</button>
+    </form>
+    <p class="leise">Nicht einverstanden? Dann tu einfach nichts – ohne Bestätigung geben wir
+      die Plätze wieder frei und löschen die Angaben. Fragen zum Einsatz beantworten wir gern,
+      die Kontaktdaten stehen unten. <a href="/datenschutz">Datenschutz</a></p>
+  {% endif %}
+{% endblock %}

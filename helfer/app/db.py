@@ -561,7 +561,8 @@ def besetzung(schicht_id: int) -> list[Zeile]:
             " e.bemerkung AS notiz, e.eingeteilt_am, h.*,"
             # Selbst angemeldet und noch nicht bestätigt (I-03) – bei
             # Mitangemeldeten zählt die Adresse dessen, der angemeldet hat.
-            " (e.quelle = 'selbst' AND a.email_bestaetigt_am IS NULL) AS unbestaetigt"
+            " (e.quelle = 'selbst' AND a.email_bestaetigt_am IS NULL) AS unbestaetigt,"
+            " (h.eltern_email <> '' AND h.eltern_bestaetigt_am IS NULL) AS eltern_fehlt"
             " FROM einteilung e JOIN helfer h ON h.id = e.helfer_id"
             " JOIN helfer a ON a.id = COALESCE(h.angemeldet_von, h.id)"
             " WHERE e.schicht_id = ?"
@@ -827,7 +828,8 @@ def _person_sichern(con: Verbindung, werte: dict, schluessel_email: str,
     vorhanden = con.execute("SELECT id FROM helfer WHERE schluessel = ?",
                             (schluessel,)).fetchone()
     felder = ("name", "vorname", "nachname", "volljaehrig", "geburtsdatum",
-              "veggie", "tshirt", "tshirt_roh")
+              "veggie", "tshirt", "tshirt_roh", "eltern_name", "eltern_email")
+    werte = {"eltern_name": "", "eltern_email": "", **werte}
     if vorhanden is None:
         return int(con.execute(
             "INSERT INTO helfer (" + ", ".join(felder) + ", email, telefon, schluessel,"
@@ -835,6 +837,9 @@ def _person_sichern(con: Verbindung, werte: dict, schluessel_email: str,
             ", ?, ?, ?, ?, ?) RETURNING id",
             (*(werte[f] for f in felder), werte["email"], werte["telefon"], schluessel,
              angemeldet_von, jetzt())).fetchone()[0])
+    # Andere Eltern, neue Bestätigung (D-06).
+    con.execute("UPDATE helfer SET eltern_bestaetigt_am = NULL WHERE id = ?"
+                " AND eltern_email <> ?", (vorhanden["id"], werte["eltern_email"]))
     con.execute(
         "UPDATE helfer SET " + ", ".join(f + " = ?" for f in felder) +
         ", telefon = CASE WHEN ? <> '' THEN ? ELSE telefon END,"
@@ -1098,6 +1103,9 @@ def dazunehmen(vid: int, anmelder_id: int, helfer_ids: list[int], neue: list[dic
             if bestaetigt:
                 con.execute("UPDATE helfer SET email_bestaetigt_am = ? WHERE id = ?"
                             " AND email_bestaetigt_am IS NULL", (jetzt(), anmelder_id))
+            if con.execute("SELECT email_bestaetigt_am FROM helfer WHERE id = ?",
+                           (anmelder_id,)).fetchone()["email_bestaetigt_am"]:
+                _eltern_durch_anmelder(con, anmelder_id)
             for i, helfer_id in enumerate(ids):
                 for s in schichten:
                     art = verteilung[s["id"]][i]
@@ -1236,6 +1244,7 @@ def bestaetigen(helfer_id: int) -> bool:
                 " AND email_bestaetigt_am IS NULL", (jetzt(), helfer_id)).rowcount > 0
             if geaendert:
                 _protokollieren(con, helfer_id, "selbst", "Adresse bestätigt")
+            _eltern_durch_anmelder(con, helfer_id)
         return geaendert
     finally:
         con.close()
@@ -3557,7 +3566,8 @@ def druckliste(vid: int, bereich_id: int | None = None, datum: str = "",
                 "SELECT e.art, e.bestaetigen_bis, h.id, h.name, h.telefon, h.tshirt,"
                 " h.tshirt_roh, h.veggie, a.name AS ueber_name, a.telefon AS ueber_telefon,"
                 " (e.quelle = 'selbst' AND COALESCE(a.email_bestaetigt_am,"
-                "  h.email_bestaetigt_am) IS NULL) AS unbestaetigt"
+                "  h.email_bestaetigt_am) IS NULL) AS unbestaetigt,"
+                " (h.eltern_email <> '' AND h.eltern_bestaetigt_am IS NULL) AS eltern_fehlt"
                 " FROM einteilung e JOIN helfer h ON h.id = e.helfer_id"
                 " LEFT JOIN helfer a ON a.id = h.angemeldet_von"
                 " WHERE e.schicht_id = ?"
@@ -3616,3 +3626,151 @@ def springer_lage(vid: int, zeitpunkt: datetime | None = None, stunden: int = 3)
         con.close()
     return {"jetzt": sorted(frei, key=lambda z: z["name"].lower()), "bald": int(bald),
             "stunden": stunden}
+
+
+# --- Datenschutz und Jugendschutz (Lastenheft 2.9) --------------------------
+
+def _eltern_durch_anmelder(con: Verbindung, anmelder_id: int) -> None:
+    """D-06: Wer jemanden mitanmeldet und dabei selbst als erziehungs-
+    berechtigt eingetragen ist – gleiche Adresse –, bestätigt mit der
+    eigenen Adresse auch das Einverständnis."""
+    anmelder = con.execute("SELECT email FROM helfer WHERE id = ?", (anmelder_id,)).fetchone()
+    if anmelder is None or not anmelder["email"]:
+        return
+    for z in con.execute(
+            "UPDATE helfer SET eltern_bestaetigt_am = ? WHERE angemeldet_von = ?"
+            " AND eltern_bestaetigt_am IS NULL AND eltern_email <> ''"
+            " AND lower(eltern_email) = lower(?) RETURNING id",
+            (jetzt(), anmelder_id, anmelder["email"])).fetchall():
+        _protokollieren(con, z["id"], "selbst", "Einverständnis der Eltern bestätigt")
+
+
+def eltern_bestaetigen(helfer_id: int) -> bool:
+    """Die erziehungsberechtigte Person ist einverstanden (D-06)."""
+    con = verbinden()
+    try:
+        with con:
+            geaendert = con.execute(
+                "UPDATE helfer SET eltern_bestaetigt_am = ? WHERE id = ?"
+                " AND eltern_bestaetigt_am IS NULL AND eltern_email <> ''",
+                (jetzt(), helfer_id)).rowcount > 0
+            if geaendert:
+                _protokollieren(con, helfer_id, "eltern", "Einverständnis der Eltern bestätigt")
+        return geaendert
+    finally:
+        con.close()
+
+
+def stamm_einwilligung(anmelder_id: int, helfer_id: int, ja: bool) -> bool:
+    """D-03, D-05: in den Helferstamm – oder wieder heraus. Gibt zurück, ob
+    sich etwas geändert hat."""
+    con = verbinden()
+    try:
+        with con:
+            if not _gehoert(con, anmelder_id, helfer_id):
+                return False
+            if ja:
+                geaendert = con.execute(
+                    "UPDATE helfer SET stamm_einwilligung_am = ? WHERE id = ?"
+                    " AND stamm_einwilligung_am IS NULL", (jetzt(), helfer_id)).rowcount > 0
+            else:
+                geaendert = con.execute(
+                    "UPDATE helfer SET stamm_einwilligung_am = NULL WHERE id = ?"
+                    " AND stamm_einwilligung_am IS NOT NULL", (helfer_id,)).rowcount > 0
+            if geaendert:
+                _protokollieren(con, helfer_id, "selbst", "Einwilligung Helferstamm "
+                                + ("erteilt" if ja else "widerrufen"))
+        return geaendert
+    finally:
+        con.close()
+
+
+def eltern_offen(stunden: int, nur_unerinnert: bool = False) -> list[dict]:
+    """Minderjährige, deren Eltern nach `stunden` noch nicht eingewilligt
+    haben – mit der Veranstaltung ihrer Anmeldung und der Person, die
+    angemeldet hat."""
+    grenze = (jetzt_lokal() - timedelta(hours=stunden)).strftime("%Y-%m-%d %H:%M:%S")
+    con = verbinden()
+    try:
+        return [dict(z) for z in con.execute(
+            "SELECT DISTINCT ON (h.id) h.*, t.veranstaltung_id, t.angemeldet_am,"
+            " COALESCE(h.angemeldet_von, h.id) AS anmelder_id"
+            " FROM helfer h JOIN teilnahme t ON t.helfer_id = h.id AND t.quelle = 'selbst'"
+            " WHERE h.eltern_email <> '' AND h.eltern_bestaetigt_am IS NULL"
+            " AND t.angemeldet_am <= ?"
+            + (" AND h.eltern_erinnert_am IS NULL" if nur_unerinnert else "") +
+            " ORDER BY h.id, t.angemeldet_am", (grenze,)).fetchall()]
+    finally:
+        con.close()
+
+
+def eltern_erinnert(helfer_id: int) -> None:
+    con = verbinden()
+    try:
+        with con:
+            con.execute("UPDATE helfer SET eltern_erinnert_am = ? WHERE id = ?",
+                        (jetzt(), helfer_id))
+    finally:
+        con.close()
+
+
+def eltern_verfallen_lassen(helfer_id: int) -> list[int]:
+    """Ohne Einverständnis gilt die Anmeldung nicht (D-06): die selbst
+    gebuchten Plätze der minderjährigen Person werden frei, und wenn danach
+    nichts mehr an ihr hängt, ist sie gelöscht. Gibt die frei gewordenen
+    Schichten zurück."""
+    con = verbinden()
+    try:
+        with con:
+            frei = [int(z["schicht_id"]) for z in con.execute(
+                "DELETE FROM einteilung WHERE helfer_id = ? AND quelle = 'selbst'"
+                " RETURNING schicht_id", (helfer_id,)).fetchall()]
+            con.execute("DELETE FROM verfuegbarkeit WHERE helfer_id = ?", (helfer_id,))
+            con.execute("DELETE FROM warteliste WHERE helfer_id = ?", (helfer_id,))
+            con.execute("DELETE FROM teilnahme WHERE helfer_id = ? AND quelle = 'selbst'",
+                        (helfer_id,))
+            weg = con.execute(
+                "DELETE FROM helfer h WHERE h.id = ? AND h.tshirt_ausgegeben_am IS NULL"
+                " AND NOT EXISTS (SELECT 1 FROM einteilung WHERE helfer_id = h.id)"
+                " AND NOT EXISTS (SELECT 1 FROM teilnahme WHERE helfer_id = h.id)"
+                " AND NOT EXISTS (SELECT 1 FROM ausleihe WHERE helfer_id = h.id)"
+                " AND NOT EXISTS (SELECT 1 FROM helfer m WHERE m.angemeldet_von = h.id)",
+                (helfer_id,)).rowcount
+            if not weg:
+                _protokollieren(con, helfer_id, "", "Ohne Einverständnis der Eltern – Plätze freigegeben")
+        return sorted(set(frei))
+    finally:
+        con.close()
+
+
+def jugendschutz(vid: int) -> list[dict]:
+    """D-07 als Richtschnur, keine Sperre: wer unter 18 ist und an einem Tag
+    mehr als 8 Stunden eingeteilt ist oder vor 6 oder nach 20 Uhr – für
+    „Bitte prüfen“ in der Übersicht."""
+    v = VERANSTALTUNGEN.laden(vid)
+    con = verbinden()
+    try:
+        zeilen = con.execute(
+            "SELECT h.id, h.name, h.volljaehrig, h.geburtsdatum, s.datum, s.beginn, s.ende"
+            " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            " JOIN helfer h ON h.id = e.helfer_id"
+            " WHERE s.veranstaltung_id = ? AND h.volljaehrig = 0"
+            " ORDER BY h.id, s.beginn", (vid,)).fetchall()
+    finally:
+        con.close()
+    je_tag: dict[tuple[int, str], dict] = {}
+    for z in zeilen:
+        alter = _alter(z, v["beginn"])
+        if alter is None or alter >= 18:
+            continue
+        try:
+            von, bis = datetime.fromisoformat(z["beginn"]), datetime.fromisoformat(z["ende"])
+        except ValueError:
+            continue
+        eintrag = je_tag.setdefault((z["id"], z["datum"]), {
+            "helfer_id": z["id"], "name": z["name"], "alter": alter, "datum": z["datum"],
+            "stunden": 0.0, "randzeit": False})
+        eintrag["stunden"] += (bis - von).total_seconds() / 3600
+        if von.hour < 6 or bis.hour > 20 or (bis.hour == 20 and bis.minute) or bis.date() > von.date():
+            eintrag["randzeit"] = True
+    return [e for e in je_tag.values() if e["stunden"] > 8 or e["randzeit"]]

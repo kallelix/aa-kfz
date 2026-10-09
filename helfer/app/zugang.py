@@ -25,6 +25,8 @@ BESTAETIGEN = "bestaetigen"
 KALENDER = "kalender"
 # Eine neue Adresse bestätigen (S-04) – gebunden an genau diese.
 EMAIL = "email"
+# Das Einverständnis der Eltern (D-06) – gebunden an deren Adresse.
+ELTERN = "eltern"
 
 # Ab so vielen falschen Codes gilt nur noch der Link aus der Mail.
 CODE_VERSUCHE = 5
@@ -38,7 +40,8 @@ def _siegel(*teile) -> str:
 
 def _bindung(zweck: str, person) -> tuple:
     # Ein Bestätigungslink gilt nur für die Adresse, an die er ging.
-    extra = {BESTAETIGEN: person["email"], EMAIL: person.get("email_neu") or ""}.get(zweck, "")
+    extra = {BESTAETIGEN: person["email"], EMAIL: person.get("email_neu") or "",
+             ELTERN: person.get("eltern_email") or ""}.get(zweck, "")
     return (zweck, person["id"], person["zugang_version"], extra)
 
 

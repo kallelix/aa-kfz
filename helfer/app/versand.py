@@ -92,8 +92,36 @@ def absage_mails(abgaben) -> None:
             db.mail_einreihen(None, mail.leitung_absage(adresse, abgabe))
 
 
+def eltern_mail(kind, basis: str) -> bool:
+    """D-06: die Bitte um Einverständnis an die Eltern, mit den Schichten
+    des Kindes. Ist die anmeldende Person selbst als erziehungsberechtigt
+    eingetragen – gleiche Adresse –, zählt ihre eigene Bestätigung, und es
+    geht keine Mail."""
+    if not kind["eltern_email"] or kind["eltern_bestaetigt_am"]:
+        return False
+    anmelder_id = kind["angemeldet_von"] or kind["id"]
+    anmelder = db.helfer_laden(anmelder_id)
+    if (anmelder is not None and anmelder["id"] != kind["id"]
+            and anmelder["email"].lower() == kind["eltern_email"].lower()):
+        return False
+    heute = db.jetzt_lokal().date()
+    gesendet = False
+    for vid in db.teilnahmen([kind["id"]]):
+        v = db.VERANSTALTUNGEN.laden(vid)
+        if v is None or v["ende"] < heute:
+            continue
+        ergebnis = db.anmeldung_laden(vid, anmelder_id)
+        eintraege = [e for e in ergebnis["personen"] if e["person"]["id"] == kind["id"]]
+        db.mail_einreihen(kind["id"], mail.eltern(
+            kind, selbstanmeldung.va_text(v), eintraege,
+            basis + "/eltern/" + zugang.token(zugang.ELTERN, kind),
+            angemeldet_von=anmelder["name"] if anmelder and anmelder["id"] != kind["id"] else ""))
+        gesendet = True
+    return gesendet
+
+
 def fristen() -> tuple[int, int]:
-    """Erinnern und verfallen lassen (I-03), abgelaufene Angebote der
+    """Erinnern und verfallen lassen (I-03, D-06), abgelaufene Angebote der
     Warteliste weitergeben (R-04), nach der Rückgabe löschen (S-05).
     Liefert (erinnert, verfallen)."""
     erinnert = verfallen = 0
@@ -111,6 +139,21 @@ def fristen() -> tuple[int, int]:
                 link("/" + normalisieren.kurzadresse(v["kurz"]))))
         protokoll.info("Anmeldung %s nicht bestätigt, %d Plätze frei", person["id"], len(frei))
         verfallen += 1
+    # D-06: ohne Einverständnis der Eltern gilt die Anmeldung nicht.
+    for kind in db.eltern_offen(frist):
+        v = db.VERANSTALTUNGEN.laden(kind["veranstaltung_id"])
+        frei = db.eltern_verfallen_lassen(kind["id"])
+        angebote += db.nachruecken(frei)
+        empfaenger = kind if kind["anmelder_id"] == kind["id"] else db.helfer_laden(kind["anmelder_id"])
+        if v is not None and empfaenger is not None and empfaenger["email"]:
+            db.mail_einreihen(None, mail.eltern_verfallen(
+                empfaenger, kind["name"], selbstanmeldung.va_text(v),
+                link("/" + normalisieren.kurzadresse(v["kurz"]))))
+        verfallen += 1
+    for kind in db.eltern_offen(config.BESTAETIGEN_ERINNERN_STUNDEN, nur_unerinnert=True):
+        if eltern_mail(kind, config.BASIS_URL):
+            erinnert += 1
+        db.eltern_erinnert(kind["id"])
     for person in db.unbestaetigt(config.BESTAETIGEN_ERINNERN_STUNDEN, nur_unerinnert=True):
         v = db.VERANSTALTUNGEN.laden(person["veranstaltung_id"])
         if v is None:

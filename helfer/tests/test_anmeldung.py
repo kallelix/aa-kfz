@@ -84,7 +84,17 @@ _, f = anmeldung.person_pruefen({**GUT, "ich-volljaehrig": ""}, "ich-", ANGEBOT,
 pruefe("ich-volljaehrig" in f, "das Alter muss gefragt sein")
 werte, f = anmeldung.person_pruefen({**GUT, "ich-volljaehrig": "nein",
                                      "ich-geburtsdatum": "2011-03-01"}, "ich-", ANGEBOT, STICHTAG, True)
-pruefe(not f and werte["alter"] == 16 and werte["volljaehrig"] == 0, "16 Jahre am ersten Tag")
+pruefe(werte["alter"] == 16 and werte["volljaehrig"] == 0, "16 Jahre am ersten Tag")
+pruefe("ich-eltern_name" in f and "ich-eltern_email" in f,
+       "unter 18 fehlt dann noch die erziehungsberechtigte Person (D-06)")
+werte, f = anmeldung.person_pruefen({**GUT, "ich-volljaehrig": "nein", "ich-geburtsdatum": "2011-03-01",
+                                     "ich-eltern_name": "Eva Berg", "ich-eltern_email": "Eva@Example.org"},
+                                    "ich-", ANGEBOT, STICHTAG, True)
+pruefe(not f and werte["eltern_email"] == "eva@example.org", "mit ihr geht es")
+_, f = anmeldung.person_pruefen({**GUT, "ich-volljaehrig": "nein", "ich-geburtsdatum": "2011-03-01",
+                                 "ich-eltern_name": "Ich", "ich-eltern_email": "anna@example.org"},
+                                "ich-", ANGEBOT, STICHTAG, True)
+pruefe("ich-eltern_email" in f, "die eigene Adresse als die der Eltern geht nicht")
 _, f = anmeldung.person_pruefen({**GUT, "ich-volljaehrig": "nein",
                                  "ich-geburtsdatum": "2016-01-01"}, "ich-", ANGEBOT, STICHTAG, True)
 pruefe("ich-geburtsdatum" in f, "unter 12 geht es nicht (D-06)")
@@ -271,7 +281,8 @@ try:
 
     print("Alter und Mitanmeldung")
     jung = {"ich-vorname": "Emil", "ich-email": "emil@example.org", "ich-volljaehrig": "nein",
-            "ich-geburtsdatum": "2011-03-01"}
+            "ich-geburtsdatum": "2011-03-01", "ich-eltern_name": "Eva Berg",
+            "ich-eltern_email": "eva@example.org"}
     status, _, seite = angaben([MITTAG], jung, voraussetzung="Führerschein Klasse B")
     pruefe(status == 409 and "erst ab 18" in seite, "mit 16 nicht beim Shuttle (D-07)")
     status, _, seite = angaben([POSTEN], {**jung, "ich-geburtsdatum": "2018-01-01"})

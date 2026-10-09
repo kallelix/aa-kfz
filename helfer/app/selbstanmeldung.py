@@ -109,12 +109,29 @@ def person_pruefen(daten: dict, praefix: str, angebot: dict, stichtag: date,
             elif alter >= 18:
                 volljaehrig = 1
 
+    # D-06: unter 18 eine erziehungsberechtigte Person, die per Mail
+    # bestätigt. Wer selbst erziehungsberechtigt ist und mitanmeldet, trägt
+    # sich hier ein – dann zählt die eigene Bestätigung.
+    eltern_name = eltern_email = ""
+    if volljaehrig == 0 and alter is not None and MINDESTALTER <= alter < 18:
+        eltern_name = feld("eltern_name")[:120]
+        eltern_email = feld("eltern_email").lower()[:120]
+        if not eltern_name:
+            fehler[praefix + "eltern_name"] = "Unter 18 brauchen wir eine erziehungsberechtigte Person."
+        if not _EMAIL.match(eltern_email):
+            fehler[praefix + "eltern_email"] = (
+                "An diese Adresse geht die Bitte um Einverständnis." if not eltern_email
+                else "Diese Mailadresse sieht nicht vollständig aus.")
+        elif mit_kontakt and eltern_email == email:
+            fehler[praefix + "eltern_email"] = "Bitte die Adresse deiner Eltern – nicht deine eigene."
+
     shirt_essen = _shirt_essen(feld, praefix, angebot, fehler)
     werte = {
         "vorname": vorname, "nachname": nachname,
         "name": (vorname + " " + nachname).strip(),
         "email": email, "telefon": telefon,
         "volljaehrig": volljaehrig, "geburtsdatum": geburtsdatum, "alter": alter,
+        "eltern_name": eltern_name, "eltern_email": eltern_email,
         "tshirt": None, "tshirt_roh": "", "veggie": None, **shirt_essen,
     }
     return werte, fehler

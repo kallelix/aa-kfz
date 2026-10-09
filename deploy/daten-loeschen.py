@@ -63,24 +63,80 @@ PLAENE: dict[str, list[tuple[str, str]]] = {
         ("DELETE FROM mail_out",
          "verschickte und wartende Mails samt Empfänger und Text"),
     ],
+    # Seit Lastenheft 2.9 nur, was zu Veranstaltungen gehört, die vorbei sind
+    # – eine andere kann gerade laufen –, und Personen nur, wenn sie nicht im
+    # Helferstamm stehen (D-03) oder seit drei Jahren nicht mehr dabei waren
+    # (D-04).
     "helfer": [
-        ("DELETE FROM unterschrift",
-         "Unterschriften samt Namenszug und Person"),
-        ("DELETE FROM schluessel", "Schlüsselvorgänge samt Namen"),
-        ("DELETE FROM fahrzeug", "Fahrzeugstamm samt Haltern"),
-        # helfer zieht einteilung und ausleihe über ON DELETE CASCADE mit.
-        ("DELETE FROM helfer",
-         "Helfer samt Kontakt – und darüber Einteilungen und Ausleihen"),
+        ("DELETE FROM unterschrift u WHERE NOT ("
+         " (u.art = 'material' AND u.vorgang_id IN (SELECT id FROM ausleihe"
+         "   WHERE veranstaltung_id IN " + "{LAUFEND}" + "))"
+         " OR (u.art = 'schluessel' AND u.vorgang_id IN (SELECT id FROM schluessel"
+         "   WHERE veranstaltung_id IN " + "{LAUFEND}" + "))"
+         " OR (u.art = 'tshirt' AND u.vorgang_id IN " + "{DABEI}" + "))",
+         "Unterschriften samt Namenszug, außer für laufende Veranstaltungen"),
+        ("DELETE FROM schluessel WHERE veranstaltung_id IN {VORBEI}",
+         "Schlüsselvorgänge samt Namen"),
+        ("DELETE FROM fahrzeug f WHERE NOT EXISTS"
+         " (SELECT 1 FROM schluessel s WHERE s.fahrzeug_id = f.id)",
+         "Fahrzeugstamm samt Haltern, soweit nicht mehr gebraucht"),
+        ("DELETE FROM ausleihe WHERE veranstaltung_id IN {VORBEI}",
+         "Ausleihen (Funk und Material)"),
+        ("DELETE FROM absage WHERE veranstaltung_id IN {VORBEI}", "Absagen samt Namen"),
+        ("DELETE FROM warteliste WHERE schicht_id IN"
+         " (SELECT id FROM schicht WHERE veranstaltung_id IN {VORBEI})", "Wartelisten"),
+        ("DELETE FROM verfuegbarkeit WHERE veranstaltung_id IN {VORBEI}",
+         "Springer-Zeiten"),
+        ("DELETE FROM interesse WHERE veranstaltung_id IN {VORBEI}",
+         "vorgemerktes Interesse samt Adresse"),
+        ("DELETE FROM protokoll WHERE veranstaltung_id IN {VORBEI}",
+         "Protokoll zu vergangenen Veranstaltungen"),
+        ("DELETE FROM mail_out WHERE gesendet_am IS NOT NULL",
+         "verschickte Mails samt Empfänger und Text"),
+        # helfer zieht einteilung, teilnahme, einsatzgrenze und protokoll über
+        # ON DELETE CASCADE mit.
+        ("DELETE FROM helfer h WHERE NOT ({BLEIBT})",
+         "Helfer ohne Einwilligung in den Helferstamm – und darüber ihre Einteilungen"),
         # In den Berichten stehen Hinweise wie „Erika Mustermann: in der
         # Verpflegungsspalte stand 'L'".
         ("DELETE FROM import_lauf", "Importprotokolle samt Namen darin"),
-        ("UPDATE aufgabe SET verantwortlich = '', kontakt = '', kuerzel = ''",
-         "Namen an den Aufgaben (die Aufgaben selbst bleiben)"),
+        ("UPDATE aufgabe SET verantwortlich = '', kontakt = '', kuerzel = ''"
+         " WHERE veranstaltung_id IN {VORBEI}",
+         "Namen an den Aufgaben vergangener Veranstaltungen (die Aufgaben bleiben)"),
         ("DELETE FROM einstellung"
          " WHERE schluessel IN ('monitor_token', 'tablet_token')",
          "Monitor- und Tablet-Token"),
     ],
 }
+
+# Bausteine der Bedingungen im Helferbereich. Eine Veranstaltung ist vorbei,
+# wenn ihr letzter Tag vor heute liegt.
+_VORBEI = "(SELECT id FROM kern.veranstaltung WHERE ende < CURRENT_DATE)"
+_LAUFEND = "(SELECT id FROM kern.veranstaltung WHERE ende >= CURRENT_DATE)"
+# Wer in einer laufenden oder kommenden Veranstaltung dabei ist.
+_DABEI = ("(SELECT helfer_id FROM teilnahme WHERE veranstaltung_id IN " + _LAUFEND +
+          " UNION SELECT e.helfer_id FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+          " WHERE s.veranstaltung_id IN " + _LAUFEND +
+          " UNION SELECT w.helfer_id FROM warteliste w JOIN schicht s ON s.id = w.schicht_id"
+          " WHERE s.veranstaltung_id IN " + _LAUFEND + ")")
+# D-03, D-04: im Helferstamm – selbst eingewilligt oder von jemandem
+# mitgebracht, der eingewilligt hat –, und zuletzt dabei vor höchstens drei
+# Jahren (ohne Teilnahme zählt der Tag der Einwilligung).
+_STAMM = ("((h.stamm_einwilligung_am IS NOT NULL OR EXISTS (SELECT 1 FROM helfer a"
+          " WHERE a.id = h.angemeldet_von AND a.stamm_einwilligung_am IS NOT NULL))"
+          " AND COALESCE((SELECT MAX(v.ende) FROM kern.veranstaltung v WHERE v.id IN"
+          "  (SELECT veranstaltung_id FROM teilnahme WHERE helfer_id = h.id"
+          "   UNION SELECT s.veranstaltung_id FROM einteilung e JOIN schicht s"
+          "   ON s.id = e.schicht_id WHERE e.helfer_id = h.id)),"
+          "  CAST(LEFT(COALESCE(h.stamm_einwilligung_am, ''), 10) AS date))"
+          " >= CURRENT_DATE - INTERVAL '3 years')")
+_BAUSTEINE = {"{VORBEI}": _VORBEI, "{LAUFEND}": _LAUFEND, "{DABEI}": _DABEI,
+              "{BLEIBT}": "h.id IN " + _DABEI + " OR " + _STAMM}
+for _art, _plan in PLAENE.items():
+    for _i, (_sql, _worte) in enumerate(_plan):
+        for _platzhalter, _text in _BAUSTEINE.items():
+            _sql = _sql.replace(_platzhalter, _text)
+        _plan[_i] = (_sql, _worte)
 
 # Was ausdrücklich stehenbleibt. Steht hier, damit der Bericht es benennt und
 # niemand raten muss, ob etwas vergessen wurde.
@@ -88,7 +144,10 @@ BLEIBT: dict[str, str] = {
     "kennzeichen": "die Einstellungen (ohne den Token)",
     "presse": "die Einstellungen",
     "helfer": ("Schichten und Zeiten, der Zeitplan der Rennserien, die "
-               "Aufgabenliste ohne Namen, die Materialvorgaben"),
+               "Aufgabenliste ohne Namen, die Materialvorgaben – und wer in einer "
+               "laufenden oder kommenden Veranstaltung dabei ist oder in den "
+               "Helferstamm eingewilligt hat (samt Mitgebrachten), höchstens drei "
+               "Jahre nach der letzten Teilnahme"),
 }
 
 
@@ -196,7 +255,7 @@ def main() -> int:
     con.roh.autocommit = True
     tabellen = sorted({_tabelle_und_bedingung(sql).split()[0] for sql, _ in plan})
     if werte.art == "helfer":
-        tabellen += ["einteilung", "ausleihe"]
+        tabellen += ["einteilung", "teilnahme", "einsatzgrenze"]
     for tabelle in tabellen:
         con.execute("VACUUM FULL " + tabelle)
     con.close()

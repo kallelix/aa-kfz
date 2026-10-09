@@ -33,6 +33,15 @@
     {% endif %}
   {% endif %}
 
+  {% for eintrag in anmeldung.personen if eintrag.person.eltern_email and not eintrag.person.eltern_bestaetigt_am
+                                          and eintrag.person.eltern_email|lower != anmeldung.anmelder.email|lower %}
+    {% if loop.first %}
+      {# D-06: erst mit dem Einverständnis gilt die Anmeldung. #}
+      <div class="hinweis">Für {{ eintrag.person.vorname or eintrag.person.name }}{% if not loop.last %} und die anderen unter 18{% endif %}
+        brauchen wir noch das Einverständnis der Eltern – wir haben ihnen geschrieben.</div>
+    {% endif %}
+  {% endfor %}
+
   {% for eintrag in anmeldung.personen %}
     <h2>{{ 'Deine Schichten' if loop.first else 'Schichten von ' ~ eintrag.person.vorname }}</h2>
     {% for s in eintrag.schichten %}

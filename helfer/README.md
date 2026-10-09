@@ -92,6 +92,28 @@ Die erste Schicht ist leicht – es geht um die zweite und dritte (Lastenheft
 - Die Startseite zeigt je Tag, wie viele der geplanten Plätze besetzt sind –
   das Wir, keine Rangliste.
 
+## Datenschutz und Jugendschutz
+
+Seit Lastenheft 2.9 (D-01 bis D-07):
+
+- Jedes Formular sagt kurz, wofür die Angaben sind, und verweist auf
+  `/datenschutz` – Verantwortlicher (`VERANTWORTLICH`), Zwecke mit
+  Rechtsgrundlagen, Speicherdauer, Rechte. Der Text ist ein Entwurf und
+  gehört vor dem Start fachkundig geprüft (D-09).
+- **Helferstamm** nur mit eigener Einwilligung: ein freiwilliges, nicht
+  vorangekreuztes Häkchen bei der Anmeldung, in Mein Helferplatz unter
+  „Angaben ändern“ genauso leicht wieder weg. Ohne Einwilligung wird nach der
+  Veranstaltung gelöscht.
+- **Unter 18** fragt das Formular nach einer erziehungsberechtigten Person.
+  Sie bekommt eine Mail mit den Schichten und einem Knopf; erst dann gilt die
+  Anmeldung. Nach 24 Stunden geht eine Erinnerung, nach 72 sind die Plätze
+  frei. Wer jemanden mitanmeldet und sich selbst als erziehungsberechtigt
+  einträgt (gleiche Adresse), bestätigt das Einverständnis mit der eigenen
+  Adresse. Im Backoffice und auf den Listen steht „Eltern fehlen“.
+- **Richtschnur für Jugendliche**: wer unter 18 an einem Tag mehr als 8
+  Stunden eingeteilt ist oder vor 6 bzw. nach 20 Uhr, steht in der Übersicht
+  unter „Bitte prüfen“ – ein Hinweis, keine Sperre.
+
 ## Stufen, Springer und der Monitor
 
 Seit Lastenheft 2.7 (R-02, R-06, T-04) färben Übersicht, Schichtliste,
@@ -291,6 +313,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_selbstbedienung.py  # Absagen, Tauschen, Warteliste, Löschen
 .venv/Scripts/python.exe helfer/tests/test_druck.py        # Noch eine Schicht?, Tagesbalken, Drucken
 .venv/Scripts/python.exe helfer/tests/test_stufen.py       # Stufen, Springer, Absagen auf dem Monitor
+.venv/Scripts/python.exe helfer/tests/test_datenschutz.py  # Einwilligung, Eltern, Löschwerkzeug
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

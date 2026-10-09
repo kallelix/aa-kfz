@@ -738,6 +738,17 @@ Was bleibt: Schichtzeiten, der Zeitplan der Rennserien, die Aufgabenliste
 ohne die Namen dahinter, die Materialvorgaben. Das ist nächstes Jahr eine
 Vorlage und benennt niemanden.
 
+**Im Helferbereich seit Lastenheft 2.9** fasst der Lauf nur an, was zu
+Veranstaltungen gehört, die vorbei sind (letzter Tag vor heute) – eine andere
+kann gerade laufen. Personen bleiben, wenn sie in einer laufenden oder
+kommenden Veranstaltung dabei sind oder in den Helferstamm eingewilligt
+haben, samt denen, die sie mitgebracht haben – Letztere höchstens drei Jahre
+nach der letzten Teilnahme (D-04). Ihre Teilnahmen bleiben dafür stehen;
+Ausleihen, Schlüssel, Unterschriften, Absagen, Wartelisten, Springer-Zeiten,
+vorgemerktes Interesse und das Protokoll der vergangenen Veranstaltung gehen.
+Wer den Lauf einmal im Jahr nach der letzten Veranstaltung macht, löscht
+damit auch die, deren drei Jahre um sind.
+
 Nicht vergessen, weil außerhalb der Datenbank:
 
 - **Die Sicherungen** unter `/var/backups/…` aus der Zeit der Veranstaltung –

@@ -76,6 +76,7 @@
                 <td class="gedaempft">{{ {'import': 'Import', 'hand': 'von Hand', 'selbst': 'selbst angemeldet'}[h.quelle] }}
                   {%- if h.art == 'reserve' %} <span class="marke">Reserve</span>{% endif %}
                   {%- if h.unbestaetigt %} <span class="marke">unbestätigt</span>{% endif %}
+                  {%- if h.eltern_fehlt %} <span class="marke">Eltern fehlen</span>{% endif %}
                   {%- if h.bestaetigen_bis %} <span class="marke">von der Warteliste, angeboten bis {{ h.bestaetigen_bis | zeitpunkt }}</span>{% endif %}
                   {%- if h.vermerk and sieht_grenzen %} <span class="marke" title="{{ h.vermerk }}">mit Vermerk</span>{% endif %}</td>
                 <td class="rechts">

@@ -1,0 +1,64 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Datenschutz{% endblock %}
+{% block ueberschrift %}Datenschutz bei der Helferanmeldung{% endblock %}
+
+{# D-01, D-02: der ausführliche Hinweis nach Art. 13 DSGVO, auf den jedes
+   Formular kurz verweist. ENTWURF – vor dem Start fachkundig prüfen lassen
+   (D-09). Verantwortlicher und Kontakt kommen aus der Konfiguration
+   (VERANTWORTLICH, KONTAKT_*), nicht aus dem Repository. #}
+{% block inhalt %}
+  <div class="karte">
+    <h2>Wer verantwortlich ist</h2>
+    <p>{{ verantwortlich or kontakt_name }}{% if kontakt_mail %}<br>
+      <a href="mailto:{{ kontakt_mail }}">{{ kontakt_mail }}</a>{% endif %}</p>
+  </div>
+
+  <div class="karte">
+    <h2>Wofür wir deine Angaben nutzen</h2>
+    <p><strong>Dein Einsatz</strong> – Name, Mailadresse, Handynummer, Alter und deine
+      Schichten: damit wir dich einteilen, erreichen und am Treffpunkt erwarten können.
+      Rechtsgrundlage ist die Vereinbarung über deine Mithilfe (Art. 6 Abs. 1 lit. b DSGVO).</p>
+    <p><strong>Planung und Kommunikation rund um die Veranstaltung</strong> – Shirt-Größe,
+      Verpflegung, Erinnerungen und Hinweise zu deinen Schichten, Listen für die
+      Bereichsleitung: unser berechtigtes Interesse an einer geordneten Veranstaltung
+      (Art. 6 Abs. 1 lit. f DSGVO).</p>
+    <p><strong>Helferstamm</strong> – nur wenn du das Häkchen setzt: wir dürfen dich für
+      künftige Veranstaltungen ansprechen (Art. 6 Abs. 1 lit. a DSGVO). Das ist freiwillig
+      und jederzeit widerrufbar.</p>
+  </div>
+
+  <div class="karte">
+    <h2>Wie lange wir sie behalten</h2>
+    <p>Nach der Veranstaltung löschen wir deine Angaben – außer, du hast in den
+      Helferstamm eingewilligt. Dann behalten wir sie, bis du widerrufst, und löschen sie
+      spätestens drei Jahre nach deiner letzten Teilnahme.</p>
+    <p>Bestätigst du deine Anmeldung nicht, geben wir die Plätze nach {{ frist }} Stunden
+      wieder frei und löschen die Angaben.</p>
+  </div>
+
+  <div class="karte">
+    <h2>Unter 18</h2>
+    <p>Mithelfen geht ab 12 Jahren. Unter 18 fragen wir nach einer erziehungsberechtigten
+      Person; sie bekommt eine Mail und muss einverstanden sein, erst dann gilt die
+      Anmeldung.</p>
+  </div>
+
+  <div class="karte">
+    <h2>Wer sie sieht</h2>
+    <p>Die Orga und die Leitung des Bereichs, in dem du hilfst. Auf dem Monitor im Zelt
+      steht nur dein Name bei deiner Schicht. Wir geben nichts an Dritte weiter und
+      übermitteln nichts in Länder außerhalb der EU. Die Daten liegen auf unserem Server,
+      die Mails gehen über unseren Mailserver.</p>
+    <p>Messenger wie WhatsApp binden wir nicht an: deine Nummer landet dort nicht durch
+      uns.</p>
+  </div>
+
+  <div class="karte">
+    <h2>Deine Rechte</h2>
+    <p>Du kannst Auskunft verlangen, falsche Angaben berichtigen und deine Daten löschen
+      lassen. Vieles davon geht selbst in <strong>Mein Helferplatz</strong> – Angaben
+      ändern, absagen, löschen, die Einwilligung widerrufen. Für alles andere schreib uns.
+      Du hast außerdem das Recht, dich bei einer Datenschutzaufsichtsbehörde zu
+      beschweren.</p>
+  </div>
+{% endblock %}

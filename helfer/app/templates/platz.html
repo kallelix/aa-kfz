@@ -24,6 +24,15 @@
       {% if x.personen|length > 1 %}
         <h3>{{ 'Du' if loop.first else eintrag.person.vorname or eintrag.person.name }}</h3>
       {% endif %}
+      {% if eintrag.person.eltern_email and not eintrag.person.eltern_bestaetigt_am
+            and eintrag.person.eltern_email|lower != person.email|lower %}
+        {# D-06: ohne Einverständnis werden die Plätze nach der Frist frei. #}
+        <form method="post" action="/platz/{{ token }}/eltern/{{ eintrag.person.id }}" class="hinweis">
+          Das Einverständnis der Eltern fehlt noch – wir haben {{ eintrag.person.eltern_email }}
+          geschrieben.
+          <button type="submit" class="knopf klein zweit">Mail noch einmal schicken</button>
+        </form>
+      {% endif %}
       {% for s in eintrag.schichten %}
         <div class="karte schicht">
           <h3>{{ s.bereich }}</h3>

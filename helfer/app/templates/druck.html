@@ -82,6 +82,7 @@
                     'Reserve' if h.art == 'reserve' else '',
                     'von der Warteliste angefragt' if h.bestaetigen_bis
                       else ('noch nicht bestätigt' if h.unbestaetigt else ''),
+                    'Einverständnis der Eltern fehlt' if h.eltern_fehlt else '',
                     'vegetarisch' if h.veggie == 1 else ''] | select | join(', ') }}</td>
                 </tr>
               {% endfor %}

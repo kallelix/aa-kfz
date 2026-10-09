@@ -48,6 +48,25 @@
     <input type="date" id="{{ p }}geburtsdatum" name="{{ p }}geburtsdatum" value="{{ e.get(p ~ 'geburtsdatum', '') }}">
     {% if fehler[p ~ 'geburtsdatum'] %}<p class="fehler">{{ fehler[p ~ 'geburtsdatum'] }}</p>{% endif %}
   </div>
+  {# D-06: unter 18 eine erziehungsberechtigte Person – sie bekommt eine Mail
+     und bestätigt. Erst dann gilt die Anmeldung. #}
+  <div data-nur-juenger="{{ p }}">
+    <p class="leise">Unter 18 brauchen wir das Einverständnis einer erziehungsberechtigten
+      Person – sie bekommt von uns eine Mail.{% if not du %} Bist du es selbst, trag dich
+      hier ein.{% endif %}</p>
+    <div class="{% if fehler[p ~ 'eltern_name'] %}feld-fehler{% endif %}">
+      <label for="{{ p }}eltern_name">Name der erziehungsberechtigten Person</label>
+      <input type="text" id="{{ p }}eltern_name" name="{{ p }}eltern_name" maxlength="120"
+             value="{{ e.get(p ~ 'eltern_name', '') }}">
+      {% if fehler[p ~ 'eltern_name'] %}<p class="fehler">{{ fehler[p ~ 'eltern_name'] }}</p>{% endif %}
+    </div>
+    <div class="{% if fehler[p ~ 'eltern_email'] %}feld-fehler{% endif %}">
+      <label for="{{ p }}eltern_email">Deren Mailadresse</label>
+      <input type="email" id="{{ p }}eltern_email" name="{{ p }}eltern_email" maxlength="120"
+             inputmode="email" value="{{ e.get(p ~ 'eltern_email', '') }}">
+      {% if fehler[p ~ 'eltern_email'] %}<p class="fehler">{{ fehler[p ~ 'eltern_email'] }}</p>{% endif %}
+    </div>
+  </div>
 
   {% if angebot.shirt %}
     <label for="{{ p }}tshirt">T-Shirt</label>
@@ -181,7 +200,16 @@
     {% if platz %}
       <button type="submit" class="knopf" name="aktion" value="eintragen">Eintragen</button>
     {% else %}
-      <p class="leise">Deine Angaben nutzen wir nur, um die Schichten zu planen und dich zu erreichen.</p>
+      {# D-03: eine eigene Einwilligung, nicht vorangekreuzt – ohne sie wird
+         nach der Veranstaltung gelöscht. #}
+      <label class="haken"><input type="checkbox" name="stamm" value="1"
+             {% if eingabe.get('stamm') %}checked{% endif %}>
+        <span>Ihr dürft mich{% if weitere %} und die, die ich mitbringe,{% endif %} für künftige
+          Veranstaltungen ansprechen. <span class="leise">Freiwillig – ohne Häkchen löschen wir
+          die Angaben nach der Veranstaltung. Widerrufen geht jederzeit in Mein Helferplatz.</span></span></label>
+      {# D-01: kurz hier, ausführlich verlinkt. #}
+      <p class="leise">Deine Angaben nutzen wir, um die Schichten zu planen und dich zu
+        erreichen. Mehr dazu: <a href="/datenschutz">Datenschutz</a>.</p>
       <button type="submit" class="knopf" name="aktion" value="anmelden">Anmelden</button>
     {% endif %}
   </form>

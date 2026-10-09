@@ -577,6 +577,7 @@ async def uebersicht(request: Request, hinweis: str = "",
                konflikte=db.konflikte(v["id"]), doppelt=db.doppelt_besetzt(v["id"]),
                allein=db.allein(v["id"]) if _sieht_grenzen(sitzung) else [],
                dubletten=db.moegliche_dubletten(),
+               jugendschutz=db.jugendschutz(v["id"]),
                kurzfristig=db.kurzfristige_absagen(v["id"]),
                springer=db.springer_lage(v["id"]),
                importe=db.importe()[:1], jetzt=db.jetzt_lokal()))
@@ -2328,7 +2329,7 @@ class _Adresse(StringConvertor):
     Pfadteile. Sonst passte '/monitor/' ohne Schrägstrich auf '/{adresse}',
     und Starlette leitete dorthin um, statt 404 zu geben."""
     regex = (r"(?!(?:helfer|monitor|unterschrift|static|gemeinsam|platz|bestaetigen"
-             r"|kalender)(?![^/]))[^/]+")
+             r"|kalender|email|eltern|datenschutz)(?![^/]))[^/]+")
 
 
 register_url_convertor("adresse", _Adresse())
@@ -2590,6 +2591,10 @@ async def angaben_absenden(request: Request, adresse: str):
         return _angaben_seite(request, v, gewaehlte, fenster, werte, liste,
                               personen_roh, gruende=ausnahme.gruende, status_code=409)
     _bestaetigungsmail(request, v, ergebnis["anmelder"])
+    if daten.get("stamm"):
+        db.stamm_einwilligung(ergebnis["anmelder"], ergebnis["anmelder"], True)
+    for helfer_id in ergebnis["personen"]:
+        versand.eltern_mail(db.helfer_laden(helfer_id), _basis(request))
     zeichen = selbstanmeldung.zeichen(config.APP_SECRET_KEY, v["id"], ergebnis["anmelder"])
     return RedirectResponse(f"/{adresse}/danke?p={ergebnis['anmelder']}&t={zeichen}",
                             status_code=303)
@@ -2768,6 +2773,7 @@ _PLATZ_HINWEISE = {
     "adresse-bestaetigt": "Die neue Adresse ist bestätigt.",
     "geloescht": "Gelöscht.",
     "wartet": "Gelöscht wird, sobald alles Ausgeliehene zurück ist.",
+    "eltern": "Die Mail an die Eltern ist noch einmal unterwegs.",
 }
 
 
@@ -2946,10 +2952,12 @@ async def platz_angaben_absenden(request: Request, tok: str, adresse: str):
         return _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste,
                            personen_roh, wer, fehler=fehler, status_code=400)
     try:
-        db.dazunehmen(v["id"], person["id"], wer, neue, [s["id"] for s in gewaehlte],
-                      [(f["schluessel"], f["beginn"], f["ende"]) for f in fenster],
-                      bemerkung=str(daten.get("bemerkung") or "").strip()[:1000],
-                      warteliste=_warte(gewaehlte))
+        dazu = db.dazunehmen(v["id"], person["id"], wer, neue, [s["id"] for s in gewaehlte],
+                             [(f["schluessel"], f["beginn"], f["ende"]) for f in fenster],
+                             bemerkung=str(daten.get("bemerkung") or "").strip()[:1000],
+                             warteliste=_warte(gewaehlte))
+        for helfer_id in dazu["personen"]:
+            versand.eltern_mail(db.helfer_laden(helfer_id), _basis(request))
     except db.AnmeldeFehler as ausnahme:
         return _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste,
                            personen_roh, wer, gruende=ausnahme.gruende, status_code=409)
@@ -3221,6 +3229,8 @@ async def platz_angaben_aendern_seite(request: Request, tok: str):
         eingabe.update(selbstanmeldung.vorbelegen(m, f"m{m['id']}-"))
     for v in _kommende(db.teilnahmen([person["id"]])):
         eingabe[f"bemerkung-{v['id']}"] = db.bemerkung(v["id"], person["id"])
+    if person["stamm_einwilligung_am"]:
+        eingabe["stamm"] = "1"
     return _angaben_aendern_seite(request, tok, person, eingabe)
 
 
@@ -3262,6 +3272,8 @@ async def platz_angaben_aendern(request: Request, tok: str):
         if feld in daten:
             db.bemerkung_setzen(v["id"], person["id"], person["id"],
                                 str(daten.get(feld) or "").strip())
+    # D-03, D-05: in den Helferstamm – oder wieder heraus, so einfach wie hinein.
+    db.stamm_einwilligung(person["id"], person["id"], bool(daten.get("stamm")))
     hinweis = "angaben"
     for wer, praefix, email in neue_adressen:
         grund = db.email_vormerken(person["id"], wer["id"], email)
@@ -3466,3 +3478,62 @@ async def druck_person(request: Request, helfer_id: int,
         "druck_person.html",
         _kontext(request, va=v, person=person, schichten=schichten, leitungen=leitungen,
                  angebot=db.angebot(v["id"]), stand=db.jetzt_lokal().strftime("%d.%m.%Y %H:%M")))
+
+
+# --- Datenschutz und Einverständnis der Eltern (Lastenheft 2.9) --------------
+
+@app.get("/datenschutz")
+async def datenschutz(request: Request):
+    """D-01, D-02: der ausführliche Hinweis, auf den jedes Formular verweist.
+    Vor dem Start fachkundig prüfen lassen (D-09)."""
+    return templates.TemplateResponse(
+        "anmeldung_datenschutz.html",
+        _oeffentlich(request, None, verantwortlich=config.VERANTWORTLICH,
+                     frist=config.BESTAETIGEN_FRIST_STUNDEN))
+
+
+def _kind_mit(roh: str):
+    kind = _person_mit(zugang.ELTERN, roh)
+    return kind if kind is not None and kind["eltern_email"] else None
+
+
+def _eltern_seite(request: Request, tok: str, kind, bestaetigt: bool = False):
+    eintraege = []
+    anmelder_id = kind["angemeldet_von"] or kind["id"]
+    for v in _kommende(db.teilnahmen([kind["id"]])):
+        ergebnis = db.anmeldung_laden(v["id"], anmelder_id)
+        eintraege += [{"va": v, **e} for e in ergebnis["personen"] if e["person"]["id"] == kind["id"]]
+    return templates.TemplateResponse(
+        "anmeldung_eltern.html",
+        _oeffentlich(request, None, kind=kind, token=tok, eintraege=eintraege,
+                     bestaetigt=bestaetigt or bool(kind["eltern_bestaetigt_am"])))
+
+
+@app.get("/eltern/{tok}")
+async def eltern_seite(request: Request, tok: str):
+    """D-06: Was das Kind vorhat – und ein Knopf. Wie beim Bestätigen löst
+    erst der Klick etwas aus, nicht schon der Aufruf (7.4)."""
+    kind = _kind_mit(tok)
+    if kind is None:
+        return _nicht_da(request)
+    return _eltern_seite(request, tok, kind)
+
+
+@app.post("/eltern/{tok}")
+async def eltern_einverstanden(request: Request, tok: str):
+    kind = _kind_mit(tok)
+    if kind is None:
+        return _nicht_da(request)
+    db.eltern_bestaetigen(kind["id"])
+    return _eltern_seite(request, tok, db.helfer_laden(kind["id"]), bestaetigt=True)
+
+
+@app.post("/platz/{tok}/eltern/{helfer_id}")
+async def platz_eltern_erneut(request: Request, tok: str, helfer_id: int):
+    """Die Mail an die Eltern noch einmal – für eigene Minderjährige."""
+    person = _person_mit(zugang.PLATZ, tok)
+    kind = db.helfer_laden(helfer_id) if person else None
+    if kind is None or (kind["id"] != person["id"] and kind["angemeldet_von"] != person["id"]):
+        return _nicht_da(request)
+    versand.eltern_mail(kind, _basis(request))
+    return RedirectResponse(f"/platz/{tok}?hinweis=eltern", status_code=303)

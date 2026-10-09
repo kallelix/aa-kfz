@@ -283,6 +283,11 @@ KONTAKT_NAME = _env("KONTAKT_NAME", "Orga-Team Absolute Abfahrt")
 KONTAKT_MAIL = _env("KONTAKT_MAIL", "")
 KONTAKT_TELEFON = _env("KONTAKT_TELEFON", "")
 
+# Wer verantwortlich ist im Sinne der DSGVO (D-01) – für die Seite
+# /datenschutz. Eine Zeile, z. B. "Musterverein e. V., Musterstraße 1,
+# 12345 Musterstadt". Echte Angaben gehören in die .env, nicht ins Repository.
+VERANTWORTLICH = _env("VERANTWORTLICH", "")
+
 # --- Mails an Helfer (Lastenheft 2.4) --------------------------------------
 #
 # Wie in Kennzeichen und Presse. Ohne SMTP_HOST und MAIL_FROM sammeln sich die

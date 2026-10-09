@@ -475,6 +475,19 @@ Trennung macht (Anhang A).
 | D-09 | Datenschutzerklärung und Einwilligungstexte vor dem Start fachkundig prüfen lassen. | M | 2 |
 | D-10 | Unter 13 wird der Einladungslink zur WhatsApp-Community nicht angezeigt – das Mindestalter von WhatsApp in der EU. | M | 3 |
 
+**Stand 09.10.2026, Schritt 2.9:** D-01 bis D-03, D-05 bis D-07 sind
+umgesetzt. Jedes Formular verweist auf `/datenschutz`; der Text dort ist ein
+Entwurf und wartet auf die Prüfung (D-09). Die Einwilligung in den
+Helferstamm ist ein eigenes, nicht vorangekreuztes Häkchen und in Mein
+Helferplatz so leicht widerrufen wie erteilt. Unter 18 bestätigt eine
+erziehungsberechtigte Person per Link; ohne sie sind die Plätze nach 72
+Stunden frei – wer selbst erziehungsberechtigt ist und mitanmeldet,
+bestätigt mit der eigenen Adresse. D-07 steht als Richtschnur in der
+Übersicht (mehr als 8 Stunden am Tag, vor 6 oder nach 20 Uhr), nicht als
+Sperre. Das Löschwerkzeug (deploy/daten-loeschen.py) behält den Helferstamm
+und löscht ihn drei Jahre nach der letzten Teilnahme; die jährliche Frage
+„Bleibst du dabei?“ aus D-04 kommt mit Phase 3.
+
 Zu D-06 und D-07: Die Altersgrenze 16 aus Art. 8 DSGVO gilt nach Auffassung
 der Aufsichtsbehörden hier eher nicht – sie betrifft Online-Dienste, die sich
 direkt an Kinder richten. Die Zustimmung der Eltern ist trotzdem richtig,
@@ -785,7 +798,7 @@ Selbstbedienung.
 | 2.6 | „Noch eine Schicht?" nach dem Eintragen, Tagesbalken auf der Startseite | **erledigt** |
 | 2.7 | Dashboard und Monitor: Stufen statt Bedarf, Reserve, Springer, kurzfristige Absagen | **erledigt** |
 | 2.8 | Druckansichten und Notfallmappe | **erledigt** |
-| 2.9 | Datenschutzhinweise, Einwilligungen, Altersprüfung, Elternbestätigung, Löschwerkzeug angepasst | 5 h |
+| 2.9 | Datenschutzhinweise, Einwilligungen, Altersprüfung, Elternbestätigung, Löschwerkzeug angepasst | **erledigt** |
 | 2.10 | Lasttest: 200 gleichzeitige Anmeldungen auf dieselben zehn Plätze, Umbuchen gegeneinander | 2 h |
 
 **Vorgezogen am 09.10.2026** aus Phase 3, weil es dieselben Stellen anfasst:
@@ -807,13 +820,13 @@ Bestehendes umgebaut.
 **Ziel ist Mitte Dezember 2026.** Ab dem 12. Oktober sind das gut neun Wochen
 für Prototyp, Phase 1 und 2 – mit dem Vorgezogenen und der Navigation rund
 89 Stunden. Davon sind der Prototyp (0.2), Phase 1 bis auf DKIM und 2.1 bis
-2.8 schon erledigt; es bleiben rund 9 Stunden, die 8 Stunden pro Woche haben
+2.9 schon erledigt; es bleiben rund 4 Stunden, die 8 Stunden pro Woche haben
 also Luft.
 
-| Öffnung | Bauzeit pro Woche für die restlichen ~9 h, ab 12. Oktober |
+| Öffnung | Bauzeit pro Woche für die restlichen ~4 h, ab 12. Oktober |
 | --- | --- |
-| Anfang Dezember 2026 | ~1,5 h |
-| **Mitte Dezember 2026** | **~1 h** |
+| Anfang Dezember 2026 | ~0,5 h |
+| **Mitte Dezember 2026** | **~0,5 h** |
 | Rückfallebene: Anfang März 2027 | ~1 h |
 
 Danach entspannt es sich: Phase 3 und 4 sind noch rund 54 Stunden, von Januar
@@ -861,7 +874,7 @@ Fehler beheben, nichts Neues.
 | Phase | Aufwand |
 | --- | --- |
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
-| 2 Öffnung | ~65 h, davon ~58 h erledigt |
+| 2 Öffnung | ~65 h, davon ~63 h erledigt |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, davon ~9 h erledigt |
 | 4 Veranstaltungstag, Anerkennung | ~23 h |
 | **gesamt** | **~148 h** |
