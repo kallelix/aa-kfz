@@ -21,6 +21,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlencode
 
+import segno
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import (JSONResponse, RedirectResponse,
                                Response)
@@ -357,6 +358,10 @@ MELDUNGEN = {
     'eingeladen': 'Die Einladungen sind unterwegs.',
     'hilferuf': 'Der Hilferuf ist unterwegs.',
     'gedankt': 'Die Danke-Mails sind unterwegs.',
+    'eingecheckt': 'Eingecheckt.',
+    'nichts-heute': 'Für heute steht bei dieser Person nichts an – nichts eingecheckt.',
+    'ausgecheckt': 'Check-in zurückgenommen.',
+    'code-unbekannt': 'Diesen Code kennen wir nicht – am besten nach dem Namen suchen.',
     'danke-zu': 'Danke sagen geht ab dem letzten Tag der Veranstaltung.',
     'danke-fotos': 'Der Link zu den Fotos muss mit https:// beginnen.',
     'hilferuf-leer': 'Wähle mindestens eine Schicht, zu der jemand passt.',
@@ -421,8 +426,12 @@ WARNUNGEN = ("schon-drin", "keiner", "unbekannt", "widerrufen", "groesse",
 # der Veranstaltung (Reiter Verwaltung); Funk und Schlüssel unter Ausgabe.
 def _helfer_gruppen(aktuell) -> list:
     vor_ort = []
+    angebot = db.angebot(aktuell["id"]) if aktuell is not None else {}
+    # T-01: der Tisch, an dem alle ankommen, steht vorn – wenn es ihn gibt.
+    if angebot.get("checkin"):
+        vor_ort.append(("/helfer/checkin", "Check-in", ()))
     # Shirts gibt es nur, wenn die Veranstaltung welche ausgibt.
-    if aktuell is not None and db.angebot(aktuell["id"])["shirt"]:
+    if angebot.get("shirt"):
         vor_ort.append(("/helfer/shirts", "Shirts & Goodies", ()))
     vor_ort.append(("/helfer/monitor", "Monitor", ()))
     vor_ort.append(("/helfer/druck", "Drucken", ()))
@@ -596,6 +605,8 @@ async def uebersicht(request: Request, hinweis: str = "",
                fuehrt_zusammen=_pflegt_grenzen(sitzung),
                jugendschutz=db.jugendschutz(v["id"]),
                kurzfristig=db.kurzfristige_absagen(v["id"]),
+               noch_nicht_da=db.noch_nicht_da(v["id"])
+               if db.angebot(v["id"])["checkin"] else [],
                springer=db.springer_lage(v["id"]),
                importe=db.importe()[:1], jetzt=db.jetzt_lokal()))
 
@@ -719,6 +730,8 @@ async def bereiche(request: Request, hinweis: str = "",
                if sitzung.ist_bereichsleitung else [],
                kurzfristig=db.kurzfristige_absagen(v["id"], sitzung.konto_id)
                if sitzung.ist_bereichsleitung else [],
+               noch_nicht_da=db.noch_nicht_da(v["id"], sitzung.konto_id)
+               if sitzung.ist_bereichsleitung and db.angebot(v["id"])["checkin"] else [],
                vorlagen=[] if liste or sitzung.ist_bereichsleitung
                else db.vorlagen(v["id"])))
 
@@ -2156,6 +2169,7 @@ def _posten_aus_formular(daten, materialien) -> tuple[list[dict], str]:
 
 @app.get("/helfer/ausgabe")
 async def ausgabe_seite(request: Request, hinweis: str = "", offen: str = "",
+                        helfer: str = "",
                         sitzung: auth.Sitzung = Depends(_sitzung),
                         v=Depends(_veranstaltung)):
     # Einmal alles holen und in Python trennen: der Umschalter zeigt beide
@@ -2175,6 +2189,8 @@ async def ausgabe_seite(request: Request, hinweis: str = "", offen: str = "",
                namen=db.namen_vorschlaege(v["id"]), tage=db.monitor_tage(v["id"]),
                heute=db.jetzt_lokal().strftime("%Y-%m-%d"),
                fahrzeuge=db.fahrzeuge() if mit_kennzeichen else [],
+               # Vom Check-in-Tisch aus ist die Person schon gewählt (T-03).
+               vorwahl=int(helfer) if helfer.isdigit() else None,
                unterschrieben=unterschriften.je_vorgang("material"),
                tablet=bool(db.tablet_token())))
 
@@ -2252,6 +2268,104 @@ async def fahrzeug_weg(request: Request, fahrzeug_id: int,
 @app.get("/helfer/schluessel")
 async def alte_ausgabe(sitzung: auth.Sitzung = Depends(_sitzung)):
     return RedirectResponse("/helfer/ausgabe", status_code=303)
+
+
+# --- Check-in zentral bei der Orga (Lastenheft 4.1: T-01 bis T-03) ---------
+
+_CODE = re.compile(r"(\d+\.[0-9a-f]{32})")
+
+
+def _checkin_suche(v, q: str) -> list:
+    """Nach Namen, Adresse oder Größe wie in der Helferliste – wer heute
+    erwartet wird, zuerst."""
+    nadel = normalisieren.suchtext(q)
+    if not nadel:
+        return []
+    treffer = [h for h in db.helfer_liste(v["id"]) if nadel in h["suche"]]
+    return sorted(treffer, key=lambda h: (not h["schichten"], h["name"].lower()))[:25]
+
+
+@app.get("/helfer/checkin")
+async def checkin_seite(request: Request, q: str = "", p: str = "", hinweis: str = "",
+                        sitzung: auth.Sitzung = Depends(_sitzung),
+                        v=Depends(_veranstaltung)):
+    """T-01: der Tisch, an dem alle ankommen. Oben suchen – nach Namen oder
+    mit dem Code aus Mein Helferplatz, den ein Scanner wie getippt
+    hineinschreibt –, darunter die Person mit allen, die mit ihr angemeldet
+    sind; daneben, wer noch nicht da ist (T-02)."""
+    code = _CODE.search(q or "")
+    if code:
+        person = _person_mit(zugang.CHECKIN, code.group(1))
+        if person is None:
+            return _zurueck("/helfer/checkin", "code-unbekannt")
+        return RedirectResponse(f"/helfer/checkin?p={person['id']}", status_code=303)
+    gruppe = db.checkin_gruppe(v["id"], int(p)) if p.isdigit() else []
+    angebot = db.angebot(v["id"])
+    for eintrag in gruppe:
+        person = eintrag["person"]
+        eintrag["goodies"] = db.goodies_fuer(
+            v["id"], eintrag["schichten_gesamt"], eintrag["stunden"],
+            db._alter(person, v["beginn"]))
+        # T-03: das Shirt, sobald die erste Schicht angetreten ist.
+        eintrag["shirt"] = (bool(angebot["shirt"]) and not person["tshirt_ausgegeben_am"]
+                            and eintrag["da"])
+    return templates.TemplateResponse(
+        "admin_checkin.html",
+        _admin(request, sitzung, hinweis=hinweis, q=q, treffer=_checkin_suche(v, q) if q else [],
+               gruppe=gruppe, noch_nicht_da=db.noch_nicht_da(v["id"]),
+               gleich=db.gleich_dran(v["id"]), zaehler=db.checkin_zaehler(v["id"]),
+               springer=db.springer_lage(v["id"]), groessen=normalisieren.GROESSEN,
+               minuten=db.NOCH_NICHT_DA_MINUTEN, angebot=angebot,
+               unterschrieben=unterschriften.je_vorgang("tshirt"),
+               tablet=bool(db.tablet_token())))
+
+
+def _checkin_zurueck(daten, helfer_id: int, hinweis: str) -> RedirectResponse:
+    """Zurück zur Person – oder in die Liste, aus der heraus eingecheckt
+    wurde."""
+    if str(daten.get("liste") or ""):
+        return _zurueck("/helfer/checkin", hinweis)
+    return _zurueck("/helfer/checkin", hinweis, p=str(daten.get("p") or helfer_id))
+
+
+@app.post("/helfer/checkin/{helfer_id}")
+async def checkin(request: Request, helfer_id: int,
+                  sitzung: auth.Sitzung = Depends(_sitzung), v=Depends(_veranstaltung)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    ids = [helfer_id]
+    if str(daten.get("alle") or ""):
+        ids = [e["person"]["id"] for e in db.checkin_gruppe(v["id"], helfer_id)]
+    anzahl = sum(db.einchecken(v["id"], i, sitzung.kuerzel) for i in ids)
+    return _checkin_zurueck(daten, helfer_id, "eingecheckt" if anzahl else "nichts-heute")
+
+
+@app.post("/helfer/checkin/{helfer_id}/zurueck")
+async def checkin_zuruecknehmen(request: Request, helfer_id: int,
+                                sitzung: auth.Sitzung = Depends(_sitzung),
+                                v=Depends(_veranstaltung)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.auschecken(v["id"], helfer_id, sitzung.kuerzel)
+    return _checkin_zurueck(daten, helfer_id, "ausgecheckt")
+
+
+@app.post("/helfer/checkin/{helfer_id}/tshirt")
+async def checkin_tshirt(request: Request, helfer_id: int,
+                         sitzung: auth.Sitzung = Depends(_sitzung)):
+    """T-03: das Shirt am selben Tisch – wie in der Helferliste, nur zurück
+    zum Check-in."""
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    groesse = str(daten.get("groesse") or "").strip()
+    if db.helfer_laden(helfer_id) is None or (groesse and groesse not in normalisieren.GROESSEN):
+        return _checkin_zurueck(daten, helfer_id, "groesse")
+    db.tshirt_ausgeben(helfer_id, groesse, sitzung.kuerzel)
+    _unterschrift_dazu("tshirt", helfer_id, "ausgabe", sitzung.kuerzel)
+    return _checkin_zurueck(daten, helfer_id, "tshirt")
 
 
 # --- Material einrichten (Lastenheft 3.8, V-09) -----------------------------
@@ -3340,10 +3454,15 @@ def platz(request: Request, tok: str, hinweis: str = ""):
     dabei = {x["va"]["id"] for x in veranstaltungen}
     weitere = [{"va": v, "tage": _tage_text(v), "adresse": normalisieren.kurzadresse(v["kurz"])}
                for v in _oeffentliche() if _zustand(v) == "offen" and v["id"] not in dabei]
+    # T-01: der Code für den Check-in bei der Orga. Er sagt nur, wer hier
+    # steht – gescannt wird im Backoffice.
+    checkin_qr = segno.make(zugang.token(zugang.CHECKIN, person), error="m").svg_inline(
+        scale=4, dark="#000000", border=2) if any(
+            db.angebot(x["va"]["id"])["checkin"] for x in veranstaltungen) else ""
     return templates.TemplateResponse(
         "platz.html",
         _oeffentlich(request, None, person=person, token=tok, veranstaltungen=veranstaltungen,
-                     weitere=weitere, links=_links(request, person),
+                     weitere=weitere, links=_links(request, person), checkin_qr=checkin_qr,
                      mit=db.mitangemeldete(person["id"]),
                      hinweis=_PLATZ_HINWEISE.get(hinweis, "")))
 

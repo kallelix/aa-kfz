@@ -280,6 +280,10 @@ details.karte > summary { cursor: pointer; font-weight: 600; }
 .aktionen .knopf { width: auto; }
 .wahl-zeile { display: flex; gap: .75rem; align-items: flex-start; cursor: pointer; }
 
+/* Der Code für den Check-in (T-01): groß genug für einen Scanner. */
+.checkin-code .qr { text-align: center; margin: .5rem 0; }
+.checkin-code .qr svg { width: 12rem; height: auto; max-width: 100%; }
+
 /* Der Assistent (A-03): Vorlieben als breite Kacheln, eine je Zeile. */
 .vorlieben label.wahl {
   display: flex; gap: .7rem; align-items: center; margin: 0 0 .5rem;

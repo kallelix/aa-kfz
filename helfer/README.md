@@ -181,10 +181,37 @@ kommen.
 Zwei Tage vor der ersten Schicht – oder Springer-Zeit – kommt eine
 Erinnerung (Lastenheft 3.5, C-02): alle Schichten mit Treffpunkt, die
 Bereichsleitung mit Nummer, die Hinweise der Schichten, die Bitte, 15 Minuten
-vorher da zu sein, und der Link zu Mein Helferplatz, um abzusagen, falls
-etwas dazwischenkommt. Das erledigt der Mail-Worker (`versand.erinnern`);
-wie lange vorher, steht in `ERINNERN_STUNDEN`. Den QR-Code fürs Einchecken
-bringt der Check-in (Phase 4).
+vorher da zu sein – mit Check-in bei der Orga, sonst am Treffpunkt –, und der
+Link zu Mein Helferplatz, um abzusagen, falls etwas dazwischenkommt. Mit
+Check-in hängt der QR-Code als Bild an der Mail; der Text bleibt Text. Das
+erledigt der Mail-Worker (`versand.erinnern`); wie lange vorher, steht in
+`ERINNERN_STUNDEN`.
+
+## Check-in
+
+Ob eine Veranstaltung einen Check-in hat, stellt sie unter Goodies &
+Verpflegung → Vor Ort ein (Lastenheft 4.1, T-01 bis T-03). Dann melden sich
+alle 15 Minuten vor Beginn an einem Tisch bei der Orga, auch die von
+entfernten Posten:
+
+- **Vor Ort → Check-in**: oben suchen – nach Namen oder mit dem QR-Code aus der
+  Erinnerung oder aus Mein Helferplatz. Ein Scanner schreibt den Code wie
+  getippt ins Feld; wo der Browser QR-Codes selbst lesen kann, geht es auch
+  mit der Kamera (`checkin.js`). Darunter die Person mit allen, die mit ihr
+  angemeldet sind: ein Klick checkt alle Schichten des Tages ein, für einen
+  oder für alle.
+- **Am selben Tisch**: das Shirt, sobald jemand eingecheckt ist, in der
+  angemeldeten Größe vorgewählt; welche Goodies jemandem zustehen, bei
+  Altersgrenze die Alternative; und ein Klick zur Ausgabe, die Person schon
+  gewählt.
+- **Noch nicht da**: wer in 15 Minuten anfängt oder schon angefangen hat und
+  keinen Haken hat – am Tisch, in der Übersicht und für die Bereichsleitung
+  in ihren Bereichen, mit Nummer und dem Weg zur Schicht, um einen Springer
+  einzusetzen. Daneben, wer in den nächsten zwei Stunden kommt.
+
+Ein Check-in lässt sich zurücknehmen, falls die falsche Person erwischt
+wurde. Ohne Check-in bleibt alles wie vorher: kein Menüpunkt, kein Code,
+und die Erinnerung schickt gleich zum Treffpunkt.
 
 Nach der Veranstaltung dankt die Orga unter Leute → Danke (G-07): je Person
 die Stunden aus ihren Schichten, ob sie als Springer da war, auf Wunsch der
@@ -459,6 +486,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_einladen.py     # Anmeldestart, Helferstamm einladen
 .venv/Scripts/python.exe helfer/tests/test_hilferuf.py     # passende Stamm-Helfer, Text, 24 Stunden, abbestellen
 .venv/Scripts/python.exe helfer/tests/test_erinnerung.py   # Erinnerung vor der Schicht, Danke danach
+.venv/Scripts/python.exe helfer/tests/test_checkin.py      # Code, Gruppe, Shirt, noch nicht da, Schalter
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

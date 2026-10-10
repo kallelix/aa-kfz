@@ -1,0 +1,14 @@
+{# T-02: wer in 15 Minuten anfängt oder schon angefangen hat und nicht
+   eingecheckt ist – früh genug, um anzurufen oder einen Springer zu
+   schicken. Für die Orga in der Übersicht, für die Bereichsleitung in ihren
+   Bereichen. #}
+<section class="kasten kasten-warnung">
+  <h2>Noch nicht da ({{ noch_nicht_da | length }})</h2>
+  <ul class="strichliste">
+    {% for z in noch_nicht_da %}
+      <li><span><a href="/helfer/helfer/{{ z.id }}">{{ z.name }}</a>
+        {%- if z.telefon %} · {{ z.telefon }}{% endif %}</span>
+        <span class="gedaempft">{{ z.beginn[11:16] }} · <a href="/helfer/schicht/{{ z.schicht_id }}">{{ z.bereich }}</a></span></li>
+    {% endfor %}
+  </ul>
+</section>

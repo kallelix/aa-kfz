@@ -50,7 +50,7 @@
         <select id="helfer_id" name="helfer_id">
           <option value="">– bitte wählen –</option>
           {% for h in helfer %}
-            <option value="{{ h.id }}">{{ h.name }}{% if h.email %} – {{ h.email }}{% endif %}</option>
+            <option value="{{ h.id }}" {% if h.id == vorwahl %}selected{% endif %}>{{ h.name }}{% if h.email %} – {{ h.email }}{% endif %}</option>
           {% endfor %}
         </select>
       </div>

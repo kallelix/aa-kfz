@@ -1,0 +1,187 @@
+{% extends "admin_base.html" %}
+{% block titel %}Check-in{% endblock %}
+{% block ueberschrift %}Check-in{% endblock %}
+
+{# T-01 bis T-03: der Tisch bei der Orga, an dem alle ankommen. Links suchen
+   – nach Namen oder mit dem Code aus der Erinnerung, den ein Scanner wie
+   getippt hineinschreibt – und die Person mit allen, die mit ihr angemeldet
+   sind: einchecken, Shirt, Material. Rechts, wer noch fehlt. #}
+{% block inhalt %}
+  {% if not angebot.checkin %}
+    <section class="kasten">
+      <h2>Kein Check-in</h2>
+      <p>Für diese Veranstaltung ist kein Check-in eingestellt. Einschalten lässt er sich unter
+        <a href="/helfer/goodies">Goodies &amp; Verpflegung</a> → Vor Ort.</p>
+    </section>
+  {% else %}
+
+  <section class="zaehler zaehler-flach">
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Heute da</p>
+      <p class="zaehler-zahl">{{ zaehler.da }}</p>
+      <p class="zaehler-detail">von {{ zaehler.erwartet }} erwartet</p>
+    </div>
+    <div class="zaehler-kachel {% if noch_nicht_da %}zaehler-voll{% endif %}">
+      <p class="zaehler-titel">Noch nicht da</p>
+      <p class="zaehler-zahl">{{ noch_nicht_da | length }}</p>
+      <p class="zaehler-detail">ab {{ minuten }} Minuten vor Beginn</p>
+    </div>
+  </section>
+
+  <div class="arbeitsflaeche">
+  <div class="kasten arbeit-formular">
+    <form method="get" action="/helfer/checkin" data-checkin>
+      <div class="feld">
+        <label for="q">Name oder Code</label>
+        <input type="search" id="q" name="q" value="{{ q }}" autofocus autocomplete="off"
+               spellcheck="false" placeholder="Scannen oder Namen tippen">
+      </div>
+      <div class="knopfreihe">
+        <button type="submit" class="knopf">Suchen</button>
+        {# Nur, wo der Browser QR-Codes selbst lesen kann (checkin.js). #}
+        <button type="button" class="knopf-schlicht" data-kamera hidden>Mit der Kamera scannen</button>
+      </div>
+      <video class="checkin-kamera" data-bild hidden playsinline muted></video>
+    </form>
+
+    {% if q and not treffer %}<p class="leer">Niemand gefunden.</p>{% endif %}
+    {% if treffer %}
+      <ul class="strichliste">
+        {% for h in treffer %}
+          <li><span><a href="/helfer/checkin?p={{ h.id }}">{{ h.name }}</a>
+            {%- if h.email %} <span class="gedaempft">{{ h.email }}</span>{% endif %}</span>
+            <span class="gedaempft">{{ h.schichten }} {{ 'Schicht' if h.schichten == 1 else 'Schichten' }}</span></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% for e in gruppe %}
+      {% set p = e.person %}
+      <section class="checkin-person" id="person-{{ p.id }}">
+        <h2>{{ p.name }}
+          {%- if e.da %} <span class="marke marke-voll">da</span>{% endif %}</h2>
+        {% if p.telefon %}<p class="gedaempft">{{ p.telefon }}</p>{% endif %}
+        {% if e.schichten or e.fenster %}
+          <ul class="strichliste">
+            {% for s in e.schichten %}
+              <li><span>{{ s | spanne }} · {{ s.bereich }}
+                {%- if s.ort or s.treffpunkt %} – Treffpunkt {{ s.ort or s.treffpunkt }}{% endif %}
+                {%- if s.art == 'reserve' %} (Reserve){% endif %}
+                {%- if s.bestaetigen_bis %} <span class="gedaempft">(Angebot, noch nicht angenommen)</span>{% endif %}</span>
+                <span>{% if s.eingecheckt_am %}<span class="marke marke-voll">da {{ s.eingecheckt_am[11:16] }}</span>{% endif %}</span></li>
+            {% endfor %}
+            {% for f in e.fenster %}
+              <li><span>{{ f.beginn[11:16] }}–{{ f.ende[11:16] if f.ende[11:16] != '00:00' else '24:00' }} · Springer</span>
+                <span>{% if f.eingecheckt_am %}<span class="marke marke-voll">da</span>{% endif %}</span></li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="leer">Heute keine Schicht.</p>
+        {% endif %}
+
+        <div class="zeilenaktionen">
+          {% if e.erwartet and not e.da %}
+            <form method="post" action="/helfer/checkin/{{ p.id }}">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="hidden" name="p" value="{{ gruppe[0].person.id }}">
+              <button type="submit" class="knopf">Einchecken</button>
+            </form>
+          {% elif e.da %}
+            <form method="post" action="/helfer/checkin/{{ p.id }}/zurueck">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="hidden" name="p" value="{{ gruppe[0].person.id }}">
+              <button type="submit" class="knopf-winzig">zurücknehmen</button>
+            </form>
+          {% endif %}
+        </div>
+
+        {# T-03: was am selben Tisch dazugehört. #}
+        {% if angebot.shirt %}
+          {% if p.tshirt_ausgegeben_am %}
+            <p>Shirt: <strong>{{ p.tshirt_ausgegeben or p.tshirt }}</strong> ausgegeben
+              {%- if (unterschrieben.get(p.id) or {}).get('ausgabe') %} <span class="gedaempft">· unterschrieben</span>{% endif %}</p>
+          {% elif e.shirt %}
+            <form method="post" action="/helfer/checkin/{{ p.id }}/tshirt" class="checkin-shirt">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="hidden" name="p" value="{{ gruppe[0].person.id }}">
+              <label for="g-{{ p.id }}">Shirt</label>
+              <select id="g-{{ p.id }}" name="groesse">
+                {% for g in groessen %}<option value="{{ g }}" {% if g == p.tshirt %}selected{% endif %}>{{ g }}</option>{% endfor %}
+              </select>
+              <button type="submit" class="knopf-schlicht">Shirt ausgeben</button>
+            </form>
+          {% elif e.erwartet %}
+            <p class="gedaempft">Das Shirt gibt es nach dem Einchecken.</p>
+          {% endif %}
+        {% endif %}
+        {% if e.goodies %}<p>Steht zu: {{ e.goodies | join(', ') }}</p>{% endif %}
+        <p><a href="/helfer/ausgabe?helfer={{ p.id }}">Material ausgeben</a>
+          {%- if e.ausgaben_offen %} · <span class="gedaempft">{{ e.ausgaben_offen }} noch draußen</span>{% endif %}</p>
+      </section>
+    {% endfor %}
+
+    {% if gruppe | length > 1 and gruppe | selectattr('erwartet') | rejectattr('da') | list | length > 1 %}
+      <form method="post" action="/helfer/checkin/{{ gruppe[0].person.id }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="alle" value="1">
+        <button type="submit" class="knopf">Alle einchecken</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <div class="arbeit-liste">
+    <h2>Noch nicht da ({{ noch_nicht_da | length }})</h2>
+    {% if not noch_nicht_da %}
+      <p class="leer">Alle da, die in den nächsten {{ minuten }} Minuten anfangen.</p>
+    {% else %}
+      <div class="tabelle-huelle">
+        <table>
+          <tbody>
+            {% for z in noch_nicht_da %}
+              <tr class="ist-draussen">
+                <td><a href="/helfer/checkin?p={{ z.id }}">{{ z.name }}</a>
+                  {%- if z.telefon %}<br><span class="gedaempft">{{ z.telefon }}</span>{% endif %}</td>
+                <td>{{ z.beginn[11:16] }}–{{ z.ende[11:16] }} · <a href="/helfer/schicht/{{ z.schicht_id }}">{{ z.bereich }}</a></td>
+                <td class="rechts">
+                  <form method="post" action="/helfer/checkin/{{ z.id }}">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <input type="hidden" name="liste" value="1">
+                    <button type="submit" class="knopf-winzig">ist da</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {# R-06: wer einspringen kann – eingeteilt wird auf der Seite der Schicht. #}
+      {% if springer.jetzt %}
+        <p class="hilfe">Springer jetzt:
+          {% for f in springer.jetzt %}<a href="/helfer/checkin?p={{ f.id }}">{{ f.name }}</a>
+            {%- if f.telefon %} ({{ f.telefon }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
+          – einsetzen auf der Seite der Schicht.</p>
+      {% endif %}
+    {% endif %}
+
+    <h2>Gleich dran ({{ gleich | length }})</h2>
+    {% if not gleich %}
+      <p class="leer">In den nächsten zwei Stunden fängt niemand mehr an, der noch fehlt.</p>
+    {% else %}
+      <ul class="strichliste">
+        {% for z in gleich %}
+          <li><span>{{ z.beginn[11:16] }} · <a href="/helfer/checkin?p={{ z.id }}">{{ z.name }}</a>
+            <span class="gedaempft">{{ z.bereich }}</span></span>
+            <form method="post" action="/helfer/checkin/{{ z.id }}">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="hidden" name="liste" value="1">
+              <button type="submit" class="knopf-winzig">ist da</button>
+            </form></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+  </div>
+  {% endif %}
+{% endblock %}
+
+{% block bereichsskript %}<script src="/helfer/static/checkin.js"></script>{% endblock %}

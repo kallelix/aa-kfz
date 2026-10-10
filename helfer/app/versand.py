@@ -13,8 +13,11 @@ nach MAIL_MAX_VERSUCHE bleibt die Mail liegen.
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
 from datetime import datetime, timedelta
+
+import segno
 
 from . import config, db, mail, normalisieren, selbstanmeldung, zugang
 
@@ -32,7 +35,8 @@ def verschicken() -> tuple[int, int]:
     gesendet = fehlgeschlagen = 0
     for zeile in db.mails_faellig():
         try:
-            mail.senden(zeile["empfaenger"], zeile["betreff"], zeile["body"])
+            mail.senden(zeile["empfaenger"], zeile["betreff"], zeile["body"],
+                        _qr_anhang(zeile["qr"]))
         except Exception as ausnahme:  # noqa: BLE001 – jeder Fehler ist ein Fehlversuch
             versuche = zeile["versuche"] + 1
             aufgegeben = versuche >= config.MAIL_MAX_VERSUCHE
@@ -46,6 +50,16 @@ def verschicken() -> tuple[int, int]:
             db.mail_gesendet(zeile["id"])
             gesendet += 1
     return gesendet, fehlgeschlagen
+
+
+def _qr_anhang(inhalt: str) -> list:
+    """Der QR-Code für den Check-in als PNG – groß genug, dass ein Handy ihn
+    vom Bildschirm eines anderen Handys liest."""
+    if not inhalt:
+        return []
+    puffer = io.BytesIO()
+    segno.make(inhalt, error="m").save(puffer, kind="png", scale=10, border=4)
+    return [("check-in-code.png", "image/png", puffer.getvalue())]
 
 
 def link(pfad: str) -> str:
@@ -230,9 +244,12 @@ def erinnern() -> int:
             if s["hinweis"] and f"{s['bereich']}: {s['hinweis']}" not in hinweise:
                 hinweise.append(f"{s['bereich']}: {s['hinweis']}")
         platz = link("/platz/" + zugang.token(zugang.PLATZ, person))
+        # T-01: mit Check-in reist der Code als Bild mit.
+        checkin = bool(db.angebot(v["id"])["checkin"])
         db.erinnerung_vermerken(v["id"], person["id"], "vorher", mail.vorher(
             person, selbstanmeldung.va_text(v), _wann(zeile["erste"], jetzt.date()),
-            eintraege, leitung, hinweise, platz))
+            eintraege, leitung, hinweise, platz, checkin),
+            qr=zugang.token(zugang.CHECKIN, person) if checkin else "")
         erinnert += 1
     return erinnert
 

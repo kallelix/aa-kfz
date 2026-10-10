@@ -19,8 +19,8 @@ from . import config
 NichtEingerichtet = kern_mail.NichtEingerichtet
 
 
-def senden(empfaenger: str, betreff: str, text: str) -> None:
-    kern_mail.senden(config, empfaenger, betreff, text)
+def senden(empfaenger: str, betreff: str, text: str, anhaenge=()) -> None:
+    kern_mail.senden(config, empfaenger, betreff, text, anhaenge)
 
 
 def _vorname(person) -> str:
@@ -258,10 +258,11 @@ def hilferuf(person, va_text: str, eintraege: list[tuple[str, str]], abbestellen
 # --- Erinnerung und Danke (Lastenheft 3.5: C-02, G-07) ---------------------
 
 def vorher(person, va_text: str, wann: str, eintraege, leitung: list[str],
-           hinweise: list[str], platz: str) -> tuple:
+           hinweise: list[str], platz: str, checkin: bool = False) -> tuple:
     """C-02: kurz vor der ersten Schicht – Treffpunkt, Ansprechpartner,
-    Hinweise, und die Bitte um 15 Minuten Vorlauf. Den QR-Code fürs
-    Einchecken bringt der Check-in (T-01, Phase 4)."""
+    Hinweise. Mit Check-in (T-01) die Bitte, 15 Minuten vorher zur Orga zu
+    kommen; der QR-Code dafür hängt als Bild an der Mail, der Text bleibt
+    Text. Ohne Check-in geht es gleich zum Treffpunkt."""
     zeilen = [
         f"Hallo {_vorname(person)},",
         "",
@@ -269,10 +270,19 @@ def vorher(person, va_text: str, wann: str, eintraege, leitung: list[str],
         "",
         schichten_text(eintraege),
         "",
-        "Bitte sei 15 Minuten vor Beginn am Treffpunkt und melde dich bei der",
-        "Bereichsleitung." + (" Das sind:" if leitung else ""),
     ]
-    zeilen += [f"  {zeile}" for zeile in leitung]
+    if checkin:
+        zeilen += [
+            "Bitte komm 15 Minuten vor Beginn zum Check-in bei der Orga – dort",
+            "bekommst du, was du brauchst, und von dort geht es zu deinem Treffpunkt.",
+            "Zeig dort den Code im Anhang dieser Mail, auf dem Handy oder",
+            "ausgedruckt. Ohne Handy reicht auch dein Name.",
+        ]
+    else:
+        zeilen += ["Bitte sei 15 Minuten vor Beginn am Treffpunkt und melde dich bei der",
+                   "Bereichsleitung."]
+    if leitung:
+        zeilen += ["", "Deine Ansprechpartner vor Ort:"] + [f"  {zeile}" for zeile in leitung]
     if hinweise:
         zeilen += ["", "Denk dran:"] + [f"  {zeile}" for zeile in hinweise]
     zeilen += [

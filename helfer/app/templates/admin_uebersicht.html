@@ -4,6 +4,7 @@
 
 {% block inhalt %}
   {% if kurzfristig %}{% include "_kurzfristig.html" %}{% endif %}
+  {% if noch_nicht_da %}{% include "_noch_nicht_da.html" %}{% endif %}
 
   {% if springer.jetzt or springer.bald %}
     {# R-06: wer jetzt einspringen kann – und wie viele bald dazukommen. #}

@@ -587,8 +587,8 @@ def tage(vid: int) -> list[str]:
 
 # Die Häkchen im Formular. goodies und schnitte sind Schalter mit zwei
 # Stellungen und kommen dort als Auswahl.
-ANGEBOT_VORGABE = {"shirt": 0, "verpflegung": 1, "party": 0}
-_ANGEBOT_FELDER = ("goodies", "shirt", "schnitte", "verpflegung", "party")
+ANGEBOT_VORGABE = {"shirt": 0, "verpflegung": 1, "party": 0, "checkin": 0}
+_ANGEBOT_FELDER = ("goodies", "shirt", "schnitte", "verpflegung", "party", "checkin")
 
 
 def angebot_roh(vid: int) -> dict:
@@ -619,7 +619,8 @@ def angebot_setzen(vid: int, werte: dict) -> None:
         with con:
             con.execute(
                 "INSERT INTO angebot (veranstaltung_id, " + ", ".join(_ANGEBOT_FELDER) +
-                ", geaendert_am) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                ", geaendert_am) VALUES (?, " + ", ".join("?" for _ in _ANGEBOT_FELDER) +
+                ", ?)"
                 " ON CONFLICT (veranstaltung_id) DO UPDATE SET " +
                 ", ".join(f + " = excluded." + f for f in _ANGEBOT_FELDER) +
                 ", geaendert_am = excluded.geaendert_am",
@@ -773,8 +774,8 @@ def vorlage_uebernehmen(vid: int, quelle_id: int, wer: str = "") -> dict | None:
             # Das Angebot nur, wenn hier noch keins eingestellt ist.
             con.execute(
                 "INSERT INTO angebot (veranstaltung_id, goodies, shirt, schnitte,"
-                " verpflegung, party, geaendert_am)"
-                " SELECT ?, goodies, shirt, schnitte, verpflegung, party, ? FROM angebot"
+                " verpflegung, party, checkin, geaendert_am)"
+                " SELECT ?, goodies, shirt, schnitte, verpflegung, party, checkin, ? FROM angebot"
                 " WHERE veranstaltung_id = ? ON CONFLICT (veranstaltung_id) DO NOTHING",
                 (vid, jetzt(), quelle_id))
             # Die Materialien der Ausgabe (V-09), soweit es sie hier noch
@@ -1668,7 +1669,8 @@ def gedankt(vid: int) -> int:
         con.close()
 
 
-def erinnerung_vermerken(vid: int, helfer_id: int, art: str, mail: tuple | None) -> bool:
+def erinnerung_vermerken(vid: int, helfer_id: int, art: str, mail: tuple | None,
+                         qr: str = "") -> bool:
     """Vermerkt die Mail und reiht sie ein – beides oder keins, und nur
     einmal. Ohne Mail (nichts zu sagen) nur der Vermerk."""
     con = verbinden()
@@ -1678,7 +1680,7 @@ def erinnerung_vermerken(vid: int, helfer_id: int, art: str, mail: tuple | None)
                               " VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
                               (vid, helfer_id, art, jetzt())).rowcount > 0
             if neu and mail is not None:
-                mail_einreihen(helfer_id, mail, con)
+                mail_einreihen(helfer_id, mail, con, qr=qr)
             return neu
     finally:
         con.close()
@@ -2453,16 +2455,19 @@ def warteliste_von(schicht_id: int) -> list[Zeile]:
 
 # --- Mails (Lastenheft 2.4, C-01) ------------------------------------------
 
-def mail_einreihen(helfer_id: int | None, mail: tuple, con: Verbindung | None = None) -> None:
-    """mail = (typ, empfänger, betreff, text) aus mail.py."""
+def mail_einreihen(helfer_id: int | None, mail: tuple, con: Verbindung | None = None,
+                   qr: str = "") -> None:
+    """mail = (typ, empfänger, betreff, text) aus mail.py. `qr`: was der
+    QR-Code im Anhang enthalten soll – das Bild entsteht beim Verschicken."""
     typ, empfaenger, betreff, text = mail
     eigene = con is None
     con = con or verbinden()
     try:
         with (con if eigene else _offen()):
             con.execute(
-                "INSERT INTO mail_out (helfer_id, typ, empfaenger, betreff, body, angelegt_am)"
-                " VALUES (?, ?, ?, ?, ?, ?)", (helfer_id, typ, empfaenger, betreff, text, jetzt()))
+                "INSERT INTO mail_out (helfer_id, typ, empfaenger, betreff, body, qr, angelegt_am)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (helfer_id, typ, empfaenger, betreff, text, qr, jetzt()))
     finally:
         if eigene:
             con.close()
@@ -4147,6 +4152,203 @@ def springer_lage(vid: int, zeitpunkt: datetime | None = None, stunden: int = 3)
         con.close()
     return {"jetzt": sorted(frei, key=lambda z: z["name"].lower()), "bald": int(bald),
             "stunden": stunden}
+
+
+# --- Check-in zentral bei der Orga (Lastenheft 4.1: T-01 bis T-03) ---------
+#
+# Eingecheckt wird je Einteilung, und zwar alles vom selben Tag auf einmal:
+# wer morgens am Tisch steht, ist für die Schicht am Nachmittag auch da.
+# Ein Angebot der Warteliste, das noch nicht angenommen ist, zählt nicht.
+
+# T-02: so lange vor Beginn ist jemand „noch nicht da“.
+NOCH_NICHT_DA_MINUTEN = 15
+
+
+def _heute(zeitpunkt: datetime | None = None) -> tuple[str, str]:
+    zeitpunkt = zeitpunkt or jetzt_lokal()
+    return zeitpunkt.strftime("%Y-%m-%d"), marke(zeitpunkt)
+
+
+def einchecken(vid: int, helfer_id: int, wer: str) -> int:
+    """Checkt die Person für heute ein: alle Schichten, die heute beginnen
+    oder gerade laufen, und ihre Springer-Zeiten von heute. Gibt zurück, wie
+    viele Schichten es waren."""
+    tag, jetzt_ = _heute()
+    con = verbinden()
+    try:
+        with con:
+            schichten = con.execute(
+                "UPDATE einteilung e SET eingecheckt_am = ?, eingecheckt_von = ?"
+                " FROM schicht s WHERE s.id = e.schicht_id AND e.helfer_id = ?"
+                " AND s.veranstaltung_id = ? AND e.eingecheckt_am IS NULL"
+                " AND e.bestaetigen_bis IS NULL"
+                " AND (s.datum = ? OR (s.beginn <= ? AND s.ende > ?))",
+                (jetzt(), wer, helfer_id, vid, tag, jetzt_, jetzt_)).rowcount
+            fenster = con.execute(
+                "UPDATE verfuegbarkeit SET eingecheckt_am = ? WHERE helfer_id = ?"
+                " AND veranstaltung_id = ? AND eingecheckt_am IS NULL"
+                " AND (left(beginn, 10) = ? OR (beginn <= ? AND ende > ?))",
+                (jetzt(), helfer_id, vid, tag, jetzt_, jetzt_)).rowcount
+            if schichten or fenster:
+                _protokollieren(con, helfer_id, wer, "Eingecheckt", vid)
+            return schichten
+    finally:
+        con.close()
+
+
+def auschecken(vid: int, helfer_id: int, wer: str) -> bool:
+    """Nimmt den Check-in von heute zurück – für den Fall, dass die falsche
+    Person erwischt wurde."""
+    tag, jetzt_ = _heute()
+    con = verbinden()
+    try:
+        with con:
+            weg = con.execute(
+                "UPDATE einteilung e SET eingecheckt_am = NULL, eingecheckt_von = ''"
+                " FROM schicht s WHERE s.id = e.schicht_id AND e.helfer_id = ?"
+                " AND s.veranstaltung_id = ? AND e.eingecheckt_am IS NOT NULL"
+                " AND (s.datum = ? OR (s.beginn <= ? AND s.ende > ?))",
+                (helfer_id, vid, tag, jetzt_, jetzt_)).rowcount
+            weg += con.execute(
+                "UPDATE verfuegbarkeit SET eingecheckt_am = NULL WHERE helfer_id = ?"
+                " AND veranstaltung_id = ? AND eingecheckt_am IS NOT NULL"
+                " AND (left(beginn, 10) = ? OR (beginn <= ? AND ende > ?))",
+                (helfer_id, vid, tag, jetzt_, jetzt_)).rowcount
+            if weg:
+                _protokollieren(con, helfer_id, wer, "Check-in zurückgenommen", vid)
+            return weg > 0
+    finally:
+        con.close()
+
+
+_ERWARTET = (
+    "SELECT e.id AS einteilung_id, e.art, e.eingecheckt_am, s.id AS schicht_id,"
+    " s.beginn, s.ende, s.datum, s.bereich_id, b.name AS bereich, h.id, h.name,"
+    " COALESCE(NULLIF(h.telefon, ''), a.telefon, '') AS telefon"
+    " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+    " JOIN bereich b ON b.id = s.bereich_id JOIN helfer h ON h.id = e.helfer_id"
+    " LEFT JOIN helfer a ON a.id = h.angemeldet_von"
+    " WHERE s.veranstaltung_id = ? AND e.bestaetigen_bis IS NULL")
+
+
+def noch_nicht_da(vid: int, leitung: int | None = None,
+                  zeitpunkt: datetime | None = None) -> list[Zeile]:
+    """T-02: wer in 15 Minuten anfängt oder schon angefangen hat und keinen
+    Haken hat – früh genug, um anzurufen oder einen Springer zu schicken.
+    Mit `leitung` nur die Bereiche dieses Kontos."""
+    zeitpunkt = zeitpunkt or jetzt_lokal()
+    jetzt_ = marke(zeitpunkt)
+    gleich = marke(zeitpunkt + timedelta(minutes=NOCH_NICHT_DA_MINUTEN))
+    con = verbinden()
+    try:
+        return con.execute(
+            _ERWARTET + " AND e.eingecheckt_am IS NULL AND s.beginn <= ? AND s.ende > ?" +
+            (" AND " + _GELEITET if leitung else "") +
+            " ORDER BY s.beginn, lower(b.name), lower(h.name)",
+            (vid, gleich, jetzt_, *((leitung,) if leitung else ()))).fetchall()
+    finally:
+        con.close()
+
+
+def gleich_dran(vid: int, stunden: int = 2, zeitpunkt: datetime | None = None) -> list[Zeile]:
+    """Wer in den nächsten Stunden anfängt und noch nicht da ist – damit am
+    Tisch keiner gesucht werden muss."""
+    zeitpunkt = zeitpunkt or jetzt_lokal()
+    von = marke(zeitpunkt + timedelta(minutes=NOCH_NICHT_DA_MINUTEN))
+    bis = marke(zeitpunkt + timedelta(hours=stunden))
+    con = verbinden()
+    try:
+        return con.execute(
+            _ERWARTET + " AND e.eingecheckt_am IS NULL AND s.beginn > ? AND s.beginn <= ?"
+            " ORDER BY s.beginn, lower(h.name)", (vid, von, bis)).fetchall()
+    finally:
+        con.close()
+
+
+def checkin_zaehler(vid: int) -> dict:
+    """Heute: wie viele Leute erwartet werden und wie viele schon da sind."""
+    tag, _ = _heute()
+    con = verbinden()
+    try:
+        zeile = con.execute(
+            "SELECT COUNT(DISTINCT e.helfer_id) AS erwartet,"
+            " COUNT(DISTINCT e.helfer_id) FILTER (WHERE e.eingecheckt_am IS NOT NULL) AS da"
+            " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            " WHERE s.veranstaltung_id = ? AND s.datum = ? AND e.bestaetigen_bis IS NULL",
+            (vid, tag)).fetchone()
+        return {"erwartet": zeile["erwartet"], "da": zeile["da"]}
+    finally:
+        con.close()
+
+
+def checkin_gruppe(vid: int, helfer_id: int) -> list[dict]:
+    """Die Person und alle, die mit ihr angemeldet sind (A-08) – eine
+    Familie kommt zusammen an den Tisch. Je Person ihre Schichten von heute
+    und was gerade läuft, ihre Springer-Zeiten von heute und ihre offenen
+    Ausgaben."""
+    tag, jetzt_ = _heute()
+    con = verbinden()
+    try:
+        person = con.execute("SELECT * FROM helfer WHERE id = ?", (helfer_id,)).fetchone()
+        if person is None:
+            return []
+        kopf = person["angemeldet_von"] or person["id"]
+        leute = con.execute(
+            "SELECT * FROM helfer WHERE id = ? OR angemeldet_von = ?"
+            " ORDER BY id = ? DESC, id", (kopf, kopf, helfer_id)).fetchall()
+        ergebnis = []
+        for p in leute:
+            schichten = con.execute(
+                "SELECT e.id AS einteilung_id, e.art, e.eingecheckt_am, e.bestaetigen_bis,"
+                " s.*, b.name AS bereich, b.treffpunkt"
+                " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+                " JOIN bereich b ON b.id = s.bereich_id"
+                " WHERE e.helfer_id = ? AND s.veranstaltung_id = ?"
+                " AND (s.datum = ? OR (s.beginn <= ? AND s.ende > ?))"
+                " ORDER BY s.beginn", (p["id"], vid, tag, jetzt_, jetzt_)).fetchall()
+            fenster = con.execute(
+                "SELECT * FROM verfuegbarkeit WHERE helfer_id = ? AND veranstaltung_id = ?"
+                " AND springer = 1 AND (left(beginn, 10) = ? OR (beginn <= ? AND ende > ?))"
+                " ORDER BY beginn", (p["id"], vid, tag, jetzt_, jetzt_)).fetchall()
+            alle = con.execute(
+                "SELECT COUNT(*) AS anzahl, COUNT(e.eingecheckt_am) AS angetreten,"
+                " COALESCE(SUM(EXTRACT(EPOCH FROM (s.ende::timestamp - s.beginn::timestamp))"
+                "  / 3600), 0) AS stunden"
+                " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+                " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? AND e.bestaetigen_bis IS NULL",
+                (p["id"], vid)).fetchone()
+            offen = con.execute("SELECT COUNT(*) FROM ausgabe WHERE helfer_id = ?"
+                                " AND veranstaltung_id = ? AND zurueck_am IS NULL",
+                                (p["id"], vid)).fetchone()[0]
+            ergebnis.append({
+                "person": p, "schichten": schichten, "fenster": fenster,
+                "da": any(s["eingecheckt_am"] for s in schichten)
+                or any(f["eingecheckt_am"] for f in fenster),
+                "erwartet": bool([s for s in schichten if not s["bestaetigen_bis"]] or fenster),
+                "schichten_gesamt": int(alle["anzahl"]), "angetreten": int(alle["angetreten"]),
+                "stunden": float(alle["stunden"]), "ausgaben_offen": int(offen)})
+        return ergebnis
+    finally:
+        con.close()
+
+
+def goodies_fuer(vid: int, schichten: int, stunden: float, alter: int | None) -> list[str]:
+    """Was einer Person nach Schichten und Stunden zusteht (V-07) – bei
+    einer Altersgrenze, unter der sie liegt, die Alternative. Nur, wenn die
+    Veranstaltung Goodies ausgibt."""
+    if not angebot(vid)["goodies"]:
+        return []
+    ergebnis = []
+    for g in goodies(vid):
+        if (g["ab_schichten"] and schichten < g["ab_schichten"]) or \
+                (g["ab_stunden"] and stunden < g["ab_stunden"]):
+            continue
+        if g["mindestalter"] and (alter is None or alter < g["mindestalter"]):
+            if g["alternative"]:
+                ergebnis.append(g["alternative"])
+            continue
+        ergebnis.append(g["name"])
+    return ergebnis
 
 
 # --- Datenschutz und Jugendschutz (Lastenheft 2.9) --------------------------

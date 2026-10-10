@@ -114,6 +114,18 @@
     <p>Gerade gibt es keine Veranstaltung, für die du eingetragen bist.</p>
   {% endif %}
 
+  {% if checkin_qr %}
+    {# T-01: der Code für den Check-in bei der Orga – derselbe wie im Anhang
+       der Erinnerung. #}
+    <section class="karte checkin-code">
+      <h2>Dein Check-in</h2>
+      <p>Komm 15 Minuten vor Beginn zum Check-in bei der Orga und zeig diesen Code – auf dem
+        Handy oder ausgedruckt. Ohne Handy reicht dein Name.</p>
+      <div class="qr">{{ checkin_qr | safe }}</div>
+      {% if mit %}<p class="leise">Gilt auch für alle, die du angemeldet hast.</p>{% endif %}
+    </section>
+  {% endif %}
+
   {% if veranstaltungen %}
     <h2>Im Kalender</h2>
     <p>Abonniere deine Schichten – ändert sich etwas, ändert sich auch dein Kalender.</p>

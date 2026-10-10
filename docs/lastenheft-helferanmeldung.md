@@ -427,7 +427,7 @@ Orga pro Hilferuf zehn Sekunden und erspart jede Abhängigkeit.
 | Nr. | Anforderung | Prio | Phase |
 | --- | --- | --- | --- |
 | C-01 | **E-Mail ist der Pflichtkanal**: Bestätigung, Änderungen, Erinnerung, Hilferuf, Dank. Alles Wichtige kommt per Mail, auch wenn es zusätzlich in WhatsApp steht. | M | 2 |
-| C-02 | Erinnerung zwei Tage vor der ersten Schicht: Treffpunkt, Ansprechpartner mit Nummer, was mitzubringen ist, Link auf Mein Helferplatz – und die Bitte, **15 Minuten vor Beginn** am Treffpunkt zu sein und sich bei der Bereichsleitung einzuchecken; den QR-Code dafür enthält die Mail (T-01). | S | 3 |
+| C-02 | Erinnerung zwei Tage vor der ersten Schicht: Treffpunkt, Ansprechpartner mit Nummer, was mitzubringen ist, Link auf Mein Helferplatz – und die Bitte, **15 Minuten vor Beginn** zum Check-in bei der Orga zu kommen; den QR-Code dafür trägt die Mail als Bild im Anhang, und Mein Helferplatz zeigt ihn auch (T-01). | S | 3 |
 | C-03 | **Hilferuf**: das Backoffice zeigt Schichten unter Minimum bzw. Soll. Ein Klick erzeugt (a) eine Mail an Stamm-Helfer, deren Verfügbarkeit und Vorlieben passen und die zu der Zeit noch frei sind – mehrere knappe Schichten in einer Mail, **Zusagen direkt per Link aus der Mail** –, und (b) einen fertigen Text mit Direktlink (A-12) für die Ankündigungsgruppe der Community, zum Kopieren oder als `wa.me`-Link, der WhatsApp mit dem Text öffnet. | S | 3 |
 | C-04 | Je Schicht höchstens ein Hilferuf in 24 Stunden; wer Hilferufe abbestellt hat, bekommt keine. | M | 3 |
 | C-05 | Nach der Anmeldung – **nicht** auf öffentlichen Seiten – erscheint der Einladungslink zur Community und ggf. zur Gruppe des Bereichs. WhatsApp rät ausdrücklich davon ab, Einladungslinks öffentlich zu posten; Beitrittsanfragen bestätigt ein Admin. | S | 3 |
@@ -491,10 +491,21 @@ Bereiche; Einsatzgrenzen stehen auf keinem Ausdruck (K-07).
 
 | Nr. | Anforderung | Prio | Phase |
 | --- | --- | --- | --- |
-| T-01 | **Check-in bei der Bereichsleitung**: sie hat auf ihrem Handy die Liste derer, die an ihrem Treffpunkt in Kürze beginnen, und hakt ab – per Scan des QR-Codes, den jeder Helfer in der Mail und in Mein Helferplatz hat, auf dem Handy oder ausgedruckt, oder per Tipp auf den Namen, wenn jemand nichts dabeihat. Bei schlechtem Netz merkt sich das Gerät die Häkchen und reicht sie nach. Wo niemand von der Orga steht, etwa an einer Straßensperre, erscheint in Mein Helferplatz ab 30 Minuten vor Beginn ein Knopf *Ich bin da*. **Kein QR-Aushang**: nicht jeder hat ein Handy mit Netz dabei, ein abfotografierter Aushang ginge herum, und vergessenes Scannen löste bei T-02 Fehlalarme aus. Zur Not die Papierliste. | M | 4 |
-| T-02 | Wer **15 Minuten vor Schichtbeginn** noch nicht eingecheckt ist, erscheint im Dashboard als *noch nicht da* – früh genug, um anzurufen oder einen Springer zu schicken (R-06). Die Bereichsleitung sieht es zuerst. | M | 4 |
-| T-03 | Check-in und Ausgabe hängen zusammen: wer seine erste Schicht angetreten hat, ist für Shirt und Goodies freigegeben – sofern die Veranstaltung sie ausgibt (V-07), und bei Goodies mit Altersgrenze mit der passenden Alternative. Ausgegeben und abgehakt wird wie heute beim Shirt. | S | 4 |
+| T-01 | **Check-in zentral bei der Orga**: alle Helfer melden sich 15 Minuten vor Beginn an einem Tisch bei der Orga – auch die von entfernten Posten wie der Straßensperre. Ob es ihn gibt, stellt jede Veranstaltung ein. Die Orga scannt den QR-Code aus der Erinnerung oder aus Mein Helferplatz, auf dem Handy oder ausgedruckt, oder sucht den Namen, wenn jemand nichts dabeihat; ein Klick checkt alle Schichten des Tages ein. Kein *Ich bin da* und kein Selbst-Check-in. **Kein QR-Aushang**: nicht jeder hat ein Handy mit Netz dabei, ein abfotografierter Aushang ginge herum, und vergessenes Scannen löste bei T-02 Fehlalarme aus. Zur Not die Papierliste. | M | 4 |
+| T-02 | Wer **15 Minuten vor Schichtbeginn** noch nicht eingecheckt ist, erscheint am Check-in und im Dashboard als *noch nicht da* – früh genug, um anzurufen oder einen Springer zu schicken (R-06). Die Bereichsleitung sieht es für ihre Bereiche. | M | 4 |
+| T-03 | Check-in und Ausgabe an **einem Tisch**: nach dem Einchecken steht je Person, was ihr zusteht – das Shirt, sobald die erste Schicht angetreten ist, Goodies mit der passenden Alternative bei Altersgrenze, sofern die Veranstaltung sie ausgibt (V-07), und Material aus der Ausgabe (V-09). Ausgegeben und abgehakt wird im selben Zug. | S | 4 |
 | T-04 | Monitor zeigt neben den Schichten die verfügbaren Springer (R-06). | M | 2 |
+
+**Stand 10.10.2026, Schritt 4.1:** T-01 und T-02 sind umgesetzt, von T-03
+alles außer dem Abhaken der Goodies (4.2). Ob eine Veranstaltung einen
+Check-in hat, stellt sie beim Angebot ein. Dann hängt der QR-Code als Bild an
+der Erinnerung und steht in Mein Helferplatz; am Tisch scannt die Orga ihn –
+mit einem Scanner oder, wo der Browser es kann, mit der Kamera – oder sucht
+den Namen. Ein Klick checkt alle Schichten des Tages ein, auch für alle, die
+zusammen angemeldet sind. Am selben Tisch: das Shirt nach dem Einchecken, was
+an Goodies zusteht, und die Ausgabe mit der Person schon gewählt. *Noch nicht
+da* steht am Tisch, in der Übersicht und bei der Bereichsleitung für ihre
+Bereiche, mit Nummer und dem Weg zur Schicht für einen Springer.
 
 ### 5.11 Backoffice-Benutzer und Rechte (B)
 
@@ -931,8 +942,8 @@ Phase Vorrang.
 
 | # | Schritt | Aufwand |
 | --- | --- | --- |
-| 4.1 | **Check-in bei der Bereichsleitung**: Liste je Treffpunkt, QR-Scan, Häkchen bei schlechtem Netz nachreichen, *Ich bin da* für Posten ohne Orga; *noch nicht da* ab 15 Minuten vor Beginn, Springer einsetzen | 9 h |
-| 4.2 | Ausgabe von Shirt und Goodies an den Check-in koppeln, Altersgrenze je Goodie | 2 h |
+| 4.1 | **Check-in zentral bei der Orga**, je Veranstaltung einstellbar: QR-Code in der Erinnerung und in Mein Helferplatz, Scan oder Name, alle Schichten des Tages mit einem Klick; *noch nicht da* ab 15 Minuten vor Beginn, Springer einsetzen; am selben Tisch Shirt und Material | **erledigt** |
+| 4.2 | Goodies am Check-in-Tisch abhaken, mit Schwelle, Altersgrenze und Alternative | 2 h |
 | 4.3 | Stempelkarte, Belohnungsstufen, Abzeichen | 6 h |
 | 4.4 | Helferparty: Einladung, Zusagen, Begleitpersonen | 3 h |
 | 4.5 | Freunde mitbringen | 3 h |
@@ -950,8 +961,8 @@ Fehler beheben, nichts Neues.
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, **erledigt** |
-| 4 Veranstaltungstag, Anerkennung | ~23 h |
-| **gesamt** | **~148 h** |
+| 4 Veranstaltungstag, Anerkennung | ~21 h, davon ~7 h erledigt |
+| **gesamt** | **~146 h** |
 
 Phase 1 und 2 sind die Öffnung. Fällt die Zeit knapp aus, wird Phase 4
 verschoben, nicht Phase 2 gekürzt – bis auf den Check-in (4.1), der zur AA
@@ -1009,10 +1020,15 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
   Nachbereitung – zwei Monate früher als 2026 (Abschnitt 9).
 - **Weitere Veranstaltungen 2027 sind noch unklar.** Geplant wird auf die AA
   hin; kommt eine davor dazu, ist sie der Probelauf (Abschnitt 8).
-- **Check-in bei der Bereichsleitung**: sie scannt den QR-Code des Helfers
-  oder hakt ihn per Namen ab; *noch nicht da* ab 15 Minuten vor
-  Schichtbeginn (T-01, T-02). Am 09.10.2026 umgedreht – vorher war ein
-  Selbst-Check-in per QR-Aushang geplant.
+- **Check-in zentral bei der Orga** (10.10.2026): alle Helfer, auch die von
+  entfernten Posten, melden sich 15 Minuten vor Beginn an einem Tisch bei der
+  Orga; dort gibt es auch Shirt, Goodies und Material. *Noch nicht da* ab 15
+  Minuten vor Schichtbeginn (T-01 bis T-03). Je Veranstaltung einstellbar,
+  ob es den Check-in gibt; der QR-Code kommt mit der Erinnerung als Bild im
+  Anhang. Kein *Ich bin da*, kein
+  Abgleich bei schlechtem Netz. Davor war der Check-in bei der
+  Bereichsleitung geplant (09.10.2026), davor ein Selbst-Check-in per
+  QR-Aushang.
 - **Backoffice-Konten** (09.10.2026): Anmeldung mit Mailadresse und
   Passwort; Rollen *Admin*, *Orga*, *Lesend* und je Konto die freigegebenen
   Bereiche; Einladung per Mail über den vorhandenen Versand. Das gemeinsame

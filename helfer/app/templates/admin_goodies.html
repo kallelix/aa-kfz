@@ -77,6 +77,21 @@
       </label>
     </fieldset>
 
+    {# T-01: ob es den Check-in gibt. Ohne ihn schickt die Erinnerung gleich
+       zum Treffpunkt, und niemand ist „noch nicht da“. #}
+    <fieldset class="feld">
+      <legend>Vor Ort</legend>
+      <label class="auswahl">
+        <input type="checkbox" name="checkin" value="1" {% if angebot.checkin %}checked{% endif %}>
+        <span class="auswahl-text">
+          <span class="auswahl-titel">Check-in bei der Orga</span>
+          <span class="auswahl-hilfe">Alle melden sich 15 Minuten vor Beginn an einem Tisch bei der
+            Orga; die Erinnerung bringt den QR-Code dafür mit. Wer dann noch fehlt, steht als
+            „noch nicht da“ in der Übersicht.</span>
+        </span>
+      </label>
+    </fieldset>
+
     <div class="knopfreihe">
       <button type="submit" class="knopf">Speichern</button>
     </div>

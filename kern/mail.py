@@ -39,9 +39,12 @@ def _verbindung(config):
     return smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=config.SMTP_TIMEOUT)
 
 
-def senden(config, empfaenger: str, betreff: str, body: str) -> None:
+def senden(config, empfaenger: str, betreff: str, body: str, anhaenge=()) -> None:
     """Verschickt eine Mail. Wirft bei jedem Fehler – wer aufruft, entscheidet,
-    ob es noch einmal versucht wird."""
+    ob es noch einmal versucht wird.
+
+    `anhaenge`: (Dateiname, MIME-Typ, Inhalt) – etwa der QR-Code für den
+    Check-in als PNG. Der Text bleibt Text."""
     if not aktiv(config):
         raise NichtEingerichtet("SMTP_HOST oder MAIL_FROM fehlt")
 
@@ -58,6 +61,9 @@ def senden(config, empfaenger: str, betreff: str, body: str) -> None:
     # Automatische Antworten und Abwesenheitsnotizen unterbinden.
     nachricht["Auto-Submitted"] = "auto-generated"
     nachricht.set_content(body)
+    for dateiname, typ, inhalt in anhaenge:
+        haupt, _, unter = typ.partition("/")
+        nachricht.add_attachment(inhalt, maintype=haupt, subtype=unter, filename=dateiname)
 
     with _verbindung(config) as smtp:
         if config.SMTP_TLS == "starttls":

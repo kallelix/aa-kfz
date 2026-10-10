@@ -361,7 +361,7 @@ try:
     anfrage("POST", "/helfer/goodies/angebot", {"csrf": CSRF, "goodies": "1", "shirt": "1",
                                                  "schnitte": "1", "party": "1"})
     pruefe(db.angebot(VA) == {"goodies": 1, "shirt": 1, "schnitte": 1, "verpflegung": 0,
-                              "party": 1}, "Angebot gespeichert, mit Damen- und Herrenschnitt")
+                              "party": 1, "checkin": 0}, "Angebot gespeichert, mit Damen- und Herrenschnitt")
     _, _, seite = anfrage("GET", "/helfer")
     pruefe('href="/helfer/shirts"' in seite, "mit Shirt gibt es unter Vor Ort die Ausgabe")
     status, _, _ = anfrage("GET", "/helfer/shirts")
@@ -416,7 +416,7 @@ try:
            == [("Parkplatz Talstation", 18, "Führerschein Klasse B")],
            "die Angaben zum Bereich kommen mit")
     pruefe(db.angebot(NEU) == {"goodies": 1, "shirt": 1, "schnitte": 1, "verpflegung": 0,
-                               "party": 1}, "das Angebot kommt mit")
+                               "party": 1, "checkin": 0}, "das Angebot kommt mit")
     pruefe(zeilen("SELECT bl.konto_id FROM bereich_leitung bl"
                   " JOIN bereich b ON b.id = bl.bereich_id"
                   " WHERE b.veranstaltung_id = ? AND b.name = 'Shuttle'", NEU) == [(KALLE,)],

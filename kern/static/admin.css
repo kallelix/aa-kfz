@@ -1449,6 +1449,14 @@ main > p:not(.trefferzahl):not(.knopfreihe):not(.balken),
 
 /* Die Mengenfelder bleiben schmal - drei nebeneinander. */
 .mengen .menge input { width: 4.5rem; }
+/* Check-in (4.1): je Person ein Abschnitt, die Kamera nur, wenn sie läuft. */
+.checkin-person { border-top: 1px solid var(--rand); margin-top: 1rem; padding-top: .8rem; }
+.checkin-person h2 { margin-top: 0; }
+.checkin-kamera { display: block; width: 100%; max-height: 18rem; margin-top: .6rem;
+  border-radius: 8px; background: #000; }
+.checkin-kamera[hidden] { display: none; }
+.checkin-shirt { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+
 /* Ein Kennzeichen oder eine Nummer braucht mehr Platz als eine Menge (3.8). */
 .mengen .menge input.kennzeichen-feld { width: 9rem; }
 .mengen .menge input.nummer-feld { width: 6rem; }

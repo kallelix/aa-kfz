@@ -29,6 +29,8 @@ EMAIL = "email"
 ELTERN = "eltern"
 # Hilferufe und Einladungen abbestellen (C-09) – kann nur das.
 ABBESTELLEN = "abbestellen"
+# Der Code am Check-in (T-01): zeigt der Orga, wer da steht – mehr nicht.
+CHECKIN = "checkin"
 
 # Ab so vielen falschen Codes gilt nur noch der Link aus der Mail.
 CODE_VERSUCHE = 5
