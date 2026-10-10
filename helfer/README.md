@@ -202,6 +202,18 @@ Check-in hängt der QR-Code als Bild an der Mail; der Text bleibt Text. Das
 erledigt der Mail-Worker (`versand.erinnern`); wie lange vorher, steht in
 `ERINNERN_STUNDEN`.
 
+## Freunde mitbringen
+
+Auf der Bestätigungsseite und in Mein Helferplatz steht an jeder Schicht, die
+noch kommt, „Freunde mitbringen“ (Lastenheft 4.5, G-06): ein gewöhnlicher
+`wa.me`-Link mit fertigem Text und dem kurzen Link auf genau diese Schicht
+(`/s/<nummer>?f=<zeichen>`). Das Zeichen gehört der Person, die teilt; es reist
+über die Liste und die Angaben bis zur Anmeldung mit. Wer sich darüber
+anmeldet – samt allen, die er mitanmeldet –, zählt bei ihr: Mein Helferplatz
+sagt „Du hast 2 Freunde mitgebracht“, die Seite der Person im Backoffice zeigt
+„Kam über“ und „Hat mitgebracht“. Ein gefälschtes Zeichen zählt nirgends, die
+Anmeldung geht trotzdem durch.
+
 ## Helferparty
 
 Feiert eine Veranstaltung eine Helferparty (Goodies & Verpflegung →
@@ -519,6 +531,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_checkin.py      # Code, Gruppe, Shirt, noch nicht da, Schalter
 .venv/Scripts/python.exe helfer/tests/test_anerkennung.py  # Stempelkarte, Stufen, Abzeichen
 .venv/Scripts/python.exe helfer/tests/test_party.py        # Einladung, Zusage mit Begleitung, Erinnerung am Tag
+.venv/Scripts/python.exe helfer/tests/test_freunde.py      # Link teilen, über den Link anmelden, wer zählt
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

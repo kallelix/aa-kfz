@@ -418,6 +418,13 @@ der Begleitpersonen an; Mein Helferplatz zeigt die Antwort. Die Orga sieht,
 wie viele kommen, davon Helfer und Begleitung, und wer abgesagt hat. Am
 Party-Tag geht ab acht Uhr eine Erinnerung an alle, die zugesagt haben.
 
+**Stand 10.10.2026, Schritt 4.5:** G-06 ist umgesetzt. Auf der
+Bestätigungsseite und in Mein Helferplatz steht an jeder Schicht, die noch
+kommt, „Freunde mitbringen“: ein `wa.me`-Link mit fertigem Text und dem kurzen
+Link auf genau diese Schicht, der das Zeichen der teilenden Person trägt. Wer
+sich darüber anmeldet, samt Mitangemeldeten, zählt bei ihr – zu sehen in Mein
+Helferplatz und bei der Person im Backoffice.
+
 ### 5.8 Kommunikation und WhatsApp (C)
 
 Die Recherche (Stand Oktober 2026, Quellen in Anhang A) ergibt ein klares
@@ -972,7 +979,7 @@ Phase Vorrang.
 | 4.2 | Goodies am Check-in-Tisch abhaken, mit Schwelle, Altersgrenze und Alternative | **erledigt** |
 | 4.3 | Stempelkarte, Belohnungsstufen, Abzeichen | **erledigt** |
 | 4.4 | Helferparty: Einladung, Zusagen, Begleitpersonen | **erledigt** |
-| 4.5 | Freunde mitbringen | 3 h |
+| 4.5 | Freunde mitbringen | **erledigt** |
 
 Der Check-in steht vorn: erst mit ihm ist *noch nicht da* verlässlich, und
 am Veranstaltungstag ersetzt er die Papierliste.
@@ -987,7 +994,7 @@ Fehler beheben, nichts Neues.
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, **erledigt** |
-| 4 Veranstaltungstag, Anerkennung | ~21 h, davon ~18 h erledigt |
+| 4 Veranstaltungstag, Anerkennung | ~21 h, **erledigt** |
 | **gesamt** | **~146 h** |
 
 Phase 1 und 2 sind die Öffnung. Fällt die Zeit knapp aus, wird Phase 4

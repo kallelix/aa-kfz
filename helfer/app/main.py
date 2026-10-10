@@ -1271,6 +1271,9 @@ async def helfer_detail(request: Request, helfer_id: int, hinweis: str = "",
                if person["angemeldet_von"] else None,
                mitgebracht=db.mitangemeldete(helfer_id),
                vorlieben=[_VORLIEBE_NAMEN.get(k, k) for k in db.vorlieben(v["id"], helfer_id)],
+               freunde=db.mitgebracht(helfer_id),
+               eingeladen_von=db.helfer_laden(person["eingeladen_von"])
+               if person["eingeladen_von"] else None,
                fuehrt_zusammen=_pflegt_grenzen(sitzung),
                dubletten=db.moegliche_dubletten(helfer_id) if _pflegt_grenzen(sitzung) else [],
                grenzen=db.grenzen(v["id"], helfer_id, _leitung(sitzung))
@@ -3092,18 +3095,31 @@ def _auswahl(v, schicht_roh, fenster_roh, warte_roh=()):
     return gewaehlte, fenster
 
 
+_FREUND = re.compile(r"^\d+\.[0-9a-f]{32}$")
+
+
+def _freund_aus(quelle) -> str:
+    """G-06: das Zeichen der Person, deren Link jemanden hergebracht hat –
+    hier nur der Form nach geprüft, beim Anmelden auf echt."""
+    roh = str(quelle.get("f") or "")
+    return roh if _FREUND.match(roh) else ""
+
+
 def _assistent_aus(quelle) -> dict:
     """Was im Assistenten gewählt wurde – Zeiten und Vorlieben. Es reist mit
     bis zur Anmeldung: für den Weg zurück zu den Vorschlägen und damit die
-    Vorlieben an der Teilnahme stehen (A-03)."""
+    Vorlieben an der Teilnahme stehen (A-03). Dazu, über wessen Link jemand
+    kam (G-06)."""
+    freund = _freund_aus(quelle)
     return {"zeit": [str(z) for z in quelle.getlist("zeit")][:60],
-            "vorliebe": selbstanmeldung.vorlieben_aus(quelle.getlist("vorliebe"))}
+            "vorliebe": selbstanmeldung.vorlieben_aus(quelle.getlist("vorliebe")),
+            "f": [freund] if freund else []}
 
 
 def _auswahl_query(gewaehlte, fenster, assistent=None) -> str:
     return urlencode([("w" if s["warteliste"] else "s", s["id"]) for s in gewaehlte] +
                      [("z", f["schluessel"]) for f in fenster] +
-                     [(k, w) for k in ("zeit", "vorliebe")
+                     [(k, w) for k in ("zeit", "vorliebe", "f")
                       for w in (assistent or {}).get(k, [])])
 
 
@@ -3118,6 +3134,8 @@ def schicht_kurzlink(request: Request, code: str):
     zu haben – voll, vorbei, intern –, kommt dieselbe neutrale Antwort wie
     bei jeder anderen nicht buchbaren Schicht (K-06)."""
     nummer = hilferuf.nummer(code)
+    freund = _freund_aus(request.query_params)
+    mit = f"&f={freund}" if freund else ""
     vid = db.schicht_veranstaltung(nummer) if nummer is not None else None
     v = next((x for x in _oeffentliche() if x["id"] == vid), None) if vid else None
     if v is None:
@@ -3127,8 +3145,8 @@ def schicht_kurzlink(request: Request, code: str):
         return RedirectResponse(f"/{adresse}", status_code=303)
     s = next((x for x in db.oeffentliche_schichten(v["id"]) if x["id"] == nummer), None)
     if s is None or s["lage"] == "voll":
-        return RedirectResponse(f"/{adresse}/schichten?hinweis=nicht-frei", status_code=303)
-    return RedirectResponse(f"/{adresse}/schichten?s={nummer}#s{nummer}", status_code=303)
+        return RedirectResponse(f"/{adresse}/schichten?hinweis=nicht-frei{mit}", status_code=303)
+    return RedirectResponse(f"/{adresse}/schichten?s={nummer}{mit}#s{nummer}", status_code=303)
 
 
 @app.get("/abbestellen/{tok}")
@@ -3172,6 +3190,7 @@ def oeffentliche_schichten(request: Request, adresse: str, hinweis: str = ""):
                      fenster_gewaehlt=set(request.query_params.getlist("z")),
                      tage=_anmeldetage(v, schichten),
                      tageszeiten=selbstanmeldung.TAGESZEITEN,
+                     freund=_freund_aus(request.query_params),
                      hinweis={"leer": "Wähle mindestens eine Schicht – oder trag dich "
                               "unten als Springer ein.",
                               # K-06, A-12: dieselbe Antwort für alles, was nicht geht.
@@ -3309,7 +3328,7 @@ def _angaben_seite(request, v, gewaehlte, fenster, eingabe, liste, weitere,
                      zur_auswahl=("/vorschlaege?" if assistent and assistent["zeit"]
                                   else "/schichten?") + _auswahl_query(gewaehlte, fenster,
                                                                        assistent),
-                     assistent=assistent or {"zeit": [], "vorliebe": []},
+                     assistent=assistent or {"zeit": [], "vorliebe": [], "f": []},
                      eingabe=eingabe, eingabe_liste=liste, weitere=weitere,
                      max_weitere=MAX_WEITERE, angebot=db.angebot(v["id"]),
                      groessen=normalisieren.GROESSEN, schnitte=selbstanmeldung.SCHNITTE,
@@ -3407,6 +3426,10 @@ def _angaben_absenden(request: Request, adresse: str, daten):
                               personen_roh, gruende=ausnahme.gruende, status_code=409,
                               assistent=assistent)
     _bestaetigungsmail(request, v, ergebnis["anmelder"])
+    # G-06: kam die Anmeldung über den Link einer anderen Person, zählt sie dort.
+    werber = _person_mit(zugang.FREUND, assistent["f"][0]) if assistent["f"] else None
+    if werber is not None:
+        db.geworben(werber["id"], ergebnis["personen"])
     if daten.get("stamm"):
         db.stamm_einwilligung(ergebnis["anmelder"], ergebnis["anmelder"], True)
     for helfer_id in ergebnis["personen"]:
@@ -3424,11 +3447,31 @@ def _noch_eine(v, personen) -> dict:
             "goodie": db.naechstes_goodie(v["id"], eigene), "gruppe": len(ids) > 1}
 
 
+def _freunde_links(request: Request, v, person, schichten) -> dict:
+    """G-06: je Schicht ein WhatsApp-Link mit fertigem Text und dem kurzen
+    Link auf genau diese Schicht – mit dem Zeichen der Person, die ihn
+    teilt. Nur, solange die Anmeldung offen ist und die Schicht noch kommt."""
+    if _zustand(v) != "offen":
+        return {}
+    jetzt_ = db.marke(db.jetzt_lokal())
+    zeichen = zugang.token(zugang.FREUND, person)
+    links = {}
+    for s in schichten:
+        if s["beginn"] <= jetzt_ or s.get("intern") or s.get("bestaetigen_bis"):
+            continue
+        link = f"{_basis(request)}/s/{hilferuf.kurz(s['id'])}?f={zeichen}"
+        links[s["id"]] = hilferuf.whatsapp_link(hilferuf.freunde_text(v["name"], s, link))
+    return links
+
+
 def _danke_seite(request, v, ergebnis, p, t, fehler="", status_code=200, hinweis="",
                  gruende=()):
     return templates.TemplateResponse(
         "anmeldung_danke.html",
         _oeffentlich(request, v, anmeldung=ergebnis, p=p, t=t, fehler=fehler,
+                     freunde=_freunde_links(request, v, ergebnis["anmelder"],
+                                            [s for e in ergebnis["personen"]
+                                             for s in e["schichten"]]),
                      # G-01: die Stempelkarte gleich in der Bestätigung.
                      karte=db.stempelkarte(v["id"], ergebnis["anmelder"]["id"]),
                      abzeichen=db.abzeichen(v["id"], ergebnis["anmelder"]["id"]),
@@ -3623,6 +3666,9 @@ def platz(request: Request, tok: str, hinweis: str = ""):
         veranstaltungen.append({
             "va": v, "tage": _tage_text(v), "adresse": normalisieren.kurzadresse(v["kurz"]),
             "zustand": _zustand(v), "personen": ergebnis["personen"],
+            # G-06: je Schicht der Knopf „Freunde mitbringen“.
+            "freunde": _freunde_links(request, v, person,
+                                      [s for e in ergebnis["personen"] for s in e["schichten"]]),
             # G-09: die Party, wenn die Person eingeladen ist.
             "party": _platz_party(request, v, person),
             # G-01, G-05: je Person die Stempelkarte und ihre Abzeichen.
@@ -3645,6 +3691,7 @@ def platz(request: Request, tok: str, hinweis: str = ""):
         "platz.html",
         _oeffentlich(request, None, person=person, token=tok, veranstaltungen=veranstaltungen,
                      weitere=weitere, links=_links(request, person), checkin_qr=checkin_qr,
+                     mitgebracht=db.mitgebracht(person["id"]),
                      mit=db.mitangemeldete(person["id"]),
                      hinweis=_PLATZ_HINWEISE.get(hinweis, "")))
 

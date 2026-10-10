@@ -135,6 +135,7 @@
     {# Aus dem Assistenten: für den Weg zurück und die Vorlieben (A-03). #}
     {% for z in assistent.zeit %}<input type="hidden" name="zeit" value="{{ z }}">{% endfor %}
     {% for w in assistent.vorliebe %}<input type="hidden" name="vorliebe" value="{{ w }}">{% endfor %}
+    {% for w in assistent.f %}<input type="hidden" name="f" value="{{ w }}">{% endfor %}
     <input type="hidden" name="weitere" value="{{ weitere|length }}">
 
     {% if rueckfrage %}

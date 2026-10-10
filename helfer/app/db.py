@@ -1798,6 +1798,34 @@ def erinnerung_vermerken(vid: int, helfer_id: int, art: str, mail: tuple | None,
         con.close()
 
 
+# --- Freunde mitbringen (Lastenheft 4.5: G-06) ------------------------------
+
+def geworben(werber_id: int, helfer_ids) -> int:
+    """Wer über den Link von `werber_id` kam, zählt bei ihr mit – alle aus
+    dieser Anmeldung, nicht sie selbst und nicht die, die sie selbst
+    mitangemeldet hat, und niemand, der schon jemandem zählt."""
+    con = verbinden()
+    try:
+        with con:
+            return con.execute(
+                "UPDATE helfer SET eingeladen_von = ? WHERE id = ANY(?)"
+                " AND eingeladen_von IS NULL AND id <> ?"
+                " AND angemeldet_von IS DISTINCT FROM ?",
+                (werber_id, list(helfer_ids), werber_id, werber_id)).rowcount
+    finally:
+        con.close()
+
+
+def mitgebracht(werber_id: int) -> list[Zeile]:
+    """Wen jemand mitgebracht hat (G-06)."""
+    con = verbinden()
+    try:
+        return con.execute("SELECT id, name, vorname FROM helfer WHERE eingeladen_von = ?"
+                           " ORDER BY lower(name)", (werber_id,)).fetchall()
+    finally:
+        con.close()
+
+
 # --- Dubletten zusammenführen (Lastenheft 3.2: I-06) ------------------------
 
 # Was die bleibende Person von der anderen übernimmt, wenn es ihr fehlt.
@@ -1923,6 +1951,9 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                         " AND vorgang_id = ?", (behalten, weg))
             con.execute("UPDATE helfer SET angemeldet_von = ? WHERE angemeldet_von = ?"
                         " AND id <> ?", (behalten, weg, behalten))
+            # G-06: wen der andere Eintrag mitgebracht hat, hat jetzt dieser.
+            con.execute("UPDATE helfer SET eingeladen_von = ? WHERE eingeladen_von = ?"
+                        " AND id <> ?", (behalten, weg, behalten))
 
             # Die Angaben: was `behalten` fehlt, kommt von `weg`.
             werte = {f: alt[f] for f in _ERGAENZEN if _leer(neu[f]) and not _leer(alt[f])}
@@ -1937,6 +1968,10 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                 werte["bemerkung"] = (neu["bemerkung"] + "\n" + alt["bemerkung"]).strip()
             if neu["angemeldet_von"] == weg:
                 werte["angemeldet_von"] = None
+            if neu["eingeladen_von"] == weg:
+                werte["eingeladen_von"] = None
+            elif neu["eingeladen_von"] is None and alt["eingeladen_von"] not in (None, behalten):
+                werte["eingeladen_von"] = alt["eingeladen_von"]
             werte["aktiv"] = max(neu["aktiv"], alt["aktiv"])
 
             con.execute("DELETE FROM helfer WHERE id = ?", (weg,))

@@ -96,6 +96,13 @@ def whatsapp_text(va_name: str, schichten: list[dict], link) -> str:
     return "\n".join(zeilen)
 
 
+def freunde_text(va_name: str, s, link: str) -> str:
+    """G-06: was jemand seinen Freunden schickt – mit dem Link auf genau
+    diese Schicht."""
+    return (f"Ich helfe bei {va_name} mit: {zeit(s)}, {s['bereich']}. Kommst du mit? "
+            f"Hier kannst du dich gleich dazu eintragen: {link}")
+
+
 def whatsapp_link(text: str) -> str:
     """C-06: ein gewöhnlicher Link, der WhatsApp mit dem Text öffnet – kein
     Skript von WhatsApp oder Meta."""

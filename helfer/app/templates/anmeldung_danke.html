@@ -50,6 +50,8 @@
         <div class="zeit">{{ s.datum|tag }} · {{ s|spanne }}</div>
         <div class="ort">Treffpunkt: {{ s.ort or s.treffpunkt or 'kommt noch' }}</div>
         {% if s.art == 'reserve' %}<span class="marke reserve">Du bist Reserve – danke, das hilft uns sehr</span>{% endif %}
+        {# G-06: ein gewöhnlicher Link, kein Skript von WhatsApp (C-06). #}
+        {% if freunde.get(s.id) %}<p class="aktionen"><a href="{{ freunde[s.id] }}" rel="noopener noreferrer" target="_blank">Freunde mitbringen</a></p>{% endif %}
       </div>
     {% endfor %}
     {% for s in eintrag.warteliste %}

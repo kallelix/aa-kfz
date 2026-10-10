@@ -7,6 +7,10 @@
    Link ist der Zugang. Absagen geht jederzeit, ohne Frist. #}
 {% block inhalt %}
   {% if hinweis %}<div class="hinweis gut">{{ hinweis }}</div>{% endif %}
+  {% if mitgebracht %}
+    {# G-06: wer über deinen Link kam. #}
+    <p class="leise">Du hast {{ mitgebracht | length }} {{ 'Freund' if mitgebracht | length == 1 else 'Freunde' }} mitgebracht – {{ mitgebracht | map(attribute='vorname') | join(', ') }}. Danke!</p>
+  {% endif %}
 
   {% if not person.email_bestaetigt_am %}
     <form method="post" action="/platz/{{ token }}/bestaetigen" class="hinweis">
@@ -55,6 +59,8 @@
             <p class="aktionen">
               <a href="/platz/{{ token }}/tauschen/{{ s.einteilung_id }}">Tauschen</a> ·
               <a href="/platz/{{ token }}/absagen/{{ s.einteilung_id }}">Absagen</a>
+              {%- if x.freunde.get(s.id) %} ·
+              <a href="{{ x.freunde[s.id] }}" rel="noopener noreferrer" target="_blank">Freunde mitbringen</a>{% endif %}
             </p>
           {% endif %}
         </div>

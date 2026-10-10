@@ -48,6 +48,15 @@
         {%- else %}<span class="gedaempft">nicht angegeben</span>{% endif %}
       </dd>
 
+      {% if eingeladen_von %}
+        <dt>Kam über</dt><dd><a href="/helfer/helfer/{{ eingeladen_von.id }}">{{ eingeladen_von.name }}</a></dd>
+      {% endif %}
+      {% if freunde %}
+        {# G-06: wen diese Person mitgebracht hat. #}
+        <dt>Hat mitgebracht</dt>
+        <dd>{% for f in freunde %}<a href="/helfer/helfer/{{ f.id }}">{{ f.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+      {% endif %}
+
       {% if vorlieben %}
         {# Aus dem Assistenten (A-03) – hilft beim Einsetzen von Springern. #}
         <dt>Macht gern</dt><dd>{{ vorlieben | join(', ') }}</dd>

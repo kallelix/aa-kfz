@@ -12,6 +12,8 @@
      Leiste mit und graut aus, was sich überschneidet (K-01). Geprüft wird
      beim Absenden ohnehin noch einmal. #}
   <form method="get" action="{{ basis }}/angaben" data-auswahl>
+    {# G-06: über wessen Link jemand kam – reist bis zur Anmeldung mit. #}
+    {% if freund %}<input type="hidden" name="f" value="{{ freund }}">{% endif %}
 
     {# Die Filter braucht nur, wer Skript hat – ohne bleibt die Liste ganz. #}
     <div class="filter" data-filter="tag" hidden>

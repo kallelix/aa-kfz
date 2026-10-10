@@ -33,6 +33,9 @@ ABBESTELLEN = "abbestellen"
 CHECKIN = "checkin"
 # Zu- oder Absage zur Helferparty (G-09) – kann nur das.
 PARTY = "party"
+# Freunde mitbringen (G-06): wer über diesen Link kommt, zählt bei der
+# Person mit, die ihn geteilt hat. Er öffnet nichts.
+FREUND = "freund"
 
 # Ab so vielen falschen Codes gilt nur noch der Link aus der Mail.
 CODE_VERSUCHE = 5
