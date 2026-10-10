@@ -383,7 +383,7 @@ und dritte**.
 | Nr. | Anforderung | Prio | Phase |
 | --- | --- | --- | --- |
 | G-01 | **Stempelkarte** statt Punktestand: jede Schicht ein Stempel, sichtbar in Mein Helferplatz und in der Bestätigung. Ein Bild, das jeder kennt, auch ohne IT-Erfahrung. Gibt eine Veranstaltung keine Goodies aus (V-07), zeigt die Karte den Dank, aber keine Belohnungen. | S | 4 |
-| G-02 | **Belohnungsstufen je Veranstaltung** frei pflegbar, nach Schichten *oder* Stunden, z. B. 1 Schicht → Helfershirt, 2 Schichten → ein Bier am Bierwagen oder eine Eistüte. Die zweite Stufe zielt genau auf die zweite Schicht. **Ein Goodie kann eine Altersgrenze tragen** (Bier ab 16); wer jünger ist, bekommt die Alternative – bei Helfern ab 12 keine Nebensache. Wahlweise zählen Nacht- und Frühschichten doppelt – das sind die, die sonst liegen bleiben. | S | 4 |
+| G-02 | **Belohnungsstufen je Veranstaltung** frei pflegbar, nach Schichten *oder* Stunden, z. B. 1 Schicht → Helfershirt, 2 Schichten → ein Bier am Bierwagen oder eine Eistüte. Die zweite Stufe zielt genau auf die zweite Schicht. **Ein Goodie kann eine Altersgrenze tragen** (Bier ab 16); wer jünger ist, bekommt die Alternative – bei Helfern ab 12 keine Nebensache. Jede Schicht zählt gleich, auch Nacht- und Frühschichten. | S | 4 |
 | G-03 | Direkt nach dem Eintragen: **„Noch eine Schicht bis …"** mit 2–3 passenden Vorschlägen – am liebsten am selben Tag und Ort, direkt davor oder danach. | M | 2 |
 | G-04 | **Gemeinsames Ziel** auf der Startseite: „Samstag: 98 von 122 Plätzen besetzt", als Balken je Tag. Das Wir zählt, nicht die Rangliste. | S | 2 |
 | G-05 | **Abzeichen**, die etwas Echtes würdigen: *Schicht-Retter* (in eine Schicht unter Minimum eingetragen), *Frühaufsteher* (vor 7 Uhr), *Nachtwache*, *Stammhelfer* (drittes Jahr in Folge). | K | 4 |
@@ -512,8 +512,8 @@ steht je Person, welche Goodies ihr nach den angetretenen Schichten oder
 Stunden zustehen – die zweite Stufe zielt auf die zweite Schicht, nicht auf
 die zweite Anmeldung –, und wird abgehakt, einmal je Goodie. Unter der
 Altersgrenze gibt es die Alternative; ist das Alter unbekannt, entscheidet
-der Ausweis. Darunter, was als Nächstes kommt. Dass Nacht- und
-Frühschichten doppelt zählen (G-02, wahlweise), steht noch aus.
+der Ausweis. Darunter, was als Nächstes kommt. Jede Schicht zählt gleich –
+Nacht- und Frühschichten doppelt zu zählen ist verworfen (10.10.2026).
 
 ### 5.11 Backoffice-Benutzer und Rechte (B)
 
@@ -1041,6 +1041,8 @@ Reihenfolge nichts – sie wird dann einfach die erste auf dem neuen System
   Passwort; Rollen *Admin*, *Orga*, *Lesend* und je Konto die freigegebenen
   Bereiche; Einladung per Mail über den vorhandenen Versand. Das gemeinsame
   Passwort gilt nur, bis ein Admin sein eigenes Konto hat (B-01 bis B-04).
+- **Goodies** (10.10.2026): jede angetretene Schicht zählt gleich, auch
+  Nacht- und Frühschichten – keine doppelte Wertung (G-02).
 - **Datenstand 0** (09.10.2026): Aus der SQLite-Zeit wird nichts
   übernommen; PostgreSQL beginnt leer (Abschnitt 8).
 - **Veranstaltungen** (09.10.2026): Mit welcher das Backoffice arbeitet,
