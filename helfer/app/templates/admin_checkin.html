@@ -114,7 +114,40 @@
             <p class="gedaempft">Das Shirt gibt es nach dem Einchecken.</p>
           {% endif %}
         {% endif %}
-        {% if e.goodies %}<p>Steht zu: {{ e.goodies | join(', ') }}</p>{% endif %}
+        {# G-02, T-03: was nach den angetretenen Schichten zusteht – abhaken im
+           selben Zug. Unter der Altersgrenze die Alternative; ist das Alter
+           unbekannt, entscheidet der Ausweis. #}
+        {% for g in e.goodies.verdient %}
+          <div class="checkin-goodie">
+            {% if g.ausgabe %}
+              <span><span class="marke marke-voll">✓</span> {{ g.ausgabe.was }}
+                <span class="gedaempft">{{ g.ausgabe.ausgegeben_am[11:16] }}</span></span>
+              <form method="post" action="/helfer/checkin/{{ p.id }}/goodie/{{ g.id }}/zurueck">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input type="hidden" name="p" value="{{ gruppe[0].person.id }}">
+                <button type="submit" class="knopf-winzig">zurücknehmen</button>
+              </form>
+            {% else %}
+              {% if g.unbekannt %}
+                <form method="post" action="/helfer/checkin/{{ p.id }}/goodie/{{ g.id }}">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <input type="hidden" name="p" value="{{ gruppe[0].person.id }}">
+                  <input type="hidden" name="voll" value="1">
+                  <button type="submit" class="knopf-schlicht">{{ g.name }} – Ausweis ab {{ g.mindestalter }} gezeigt</button>
+                </form>
+              {% endif %}
+              {% if not g.unbekannt or g.was != g.name %}
+                <form method="post" action="/helfer/checkin/{{ p.id }}/goodie/{{ g.id }}">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <input type="hidden" name="p" value="{{ gruppe[0].person.id }}">
+                  <button type="submit" class="knopf-schlicht">{{ g.was }} ausgeben</button>
+                  {%- if g.alternative and not g.unbekannt %} <span class="gedaempft">statt {{ g.name }}, unter {{ g.mindestalter }}</span>{% endif %}
+                </form>
+              {% endif %}
+            {% endif %}
+          </div>
+        {% endfor %}
+        {% if e.goodies.naechstes %}<p class="gedaempft">Goodies: {{ e.goodies.naechstes }}.</p>{% endif %}
         <p><a href="/helfer/ausgabe?helfer={{ p.id }}">Material ausgeben</a>
           {%- if e.ausgaben_offen %} · <span class="gedaempft">{{ e.ausgaben_offen }} noch draußen</span>{% endif %}</p>
       </section>

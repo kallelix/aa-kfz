@@ -201,9 +201,11 @@ entfernten Posten:
   angemeldet sind: ein Klick checkt alle Schichten des Tages ein, für einen
   oder für alle.
 - **Am selben Tisch**: das Shirt, sobald jemand eingecheckt ist, in der
-  angemeldeten Größe vorgewählt; welche Goodies jemandem zustehen, bei
-  Altersgrenze die Alternative; und ein Klick zur Ausgabe, die Person schon
-  gewählt.
+  angemeldeten Größe vorgewählt; die Goodies, die jemandem nach seinen
+  angetretenen Schichten oder Stunden zustehen, zum Abhaken (4.2) – unter der
+  Altersgrenze die Alternative, bei unbekanntem Alter entscheidet der
+  Ausweis –, und was als Nächstes kommt („noch 1 Schicht bis …“); dazu ein
+  Klick zur Ausgabe, die Person schon gewählt.
 - **Noch nicht da**: wer in 15 Minuten anfängt oder schon angefangen hat und
   keinen Haken hat – am Tisch, in der Übersicht und für die Bereichsleitung
   in ihren Bereichen, mit Nummer und dem Weg zur Schicht, um einen Springer

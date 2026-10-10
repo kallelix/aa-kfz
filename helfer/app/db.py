@@ -1784,6 +1784,9 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                         " (SELECT 1 FROM verfuegbarkeit x WHERE x.helfer_id = ?"
                         "  AND x.veranstaltung_id = v.veranstaltung_id"
                         "  AND x.beginn = v.beginn AND x.ende = v.ende)", (weg, behalten))
+            con.execute("DELETE FROM goodie_ausgabe g WHERE helfer_id = ? AND EXISTS"
+                        " (SELECT 1 FROM goodie_ausgabe x WHERE x.helfer_id = ?"
+                        "  AND x.goodie_id = g.goodie_id)", (weg, behalten))
             con.execute("DELETE FROM erinnerung g WHERE helfer_id = ? AND EXISTS"
                         " (SELECT 1 FROM erinnerung x WHERE x.helfer_id = ?"
                         "  AND x.veranstaltung_id = g.veranstaltung_id AND x.art = g.art)",
@@ -1796,7 +1799,7 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                         "  AND x.bereich_id IS NOT DISTINCT FROM g.bereich_id"
                         "  AND x.schicht_id IS NOT DISTINCT FROM g.schicht_id)", (weg, behalten))
             for tabelle in ("verfuegbarkeit", "einsatzgrenze", "einladung", "erinnerung",
-                            "ausgabe", "protokoll", "absage", "mail_out"):
+                            "goodie_ausgabe", "ausgabe", "protokoll", "absage", "mail_out"):
                 con.execute("UPDATE " + tabelle + " SET helfer_id = ? WHERE helfer_id = ?",
                             (behalten, weg))
             # Die Unterschrift unter der Shirt-Ausgabe hängt an der Person.
@@ -4313,7 +4316,7 @@ def checkin_gruppe(vid: int, helfer_id: int) -> list[dict]:
             alle = con.execute(
                 "SELECT COUNT(*) AS anzahl, COUNT(e.eingecheckt_am) AS angetreten,"
                 " COALESCE(SUM(EXTRACT(EPOCH FROM (s.ende::timestamp - s.beginn::timestamp))"
-                "  / 3600), 0) AS stunden"
+                "  / 3600) FILTER (WHERE e.eingecheckt_am IS NOT NULL), 0) AS stunden"
                 " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
                 " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? AND e.bestaetigen_bis IS NULL",
                 (p["id"], vid)).fetchone()
@@ -4332,23 +4335,68 @@ def checkin_gruppe(vid: int, helfer_id: int) -> list[dict]:
         con.close()
 
 
-def goodies_fuer(vid: int, schichten: int, stunden: float, alter: int | None) -> list[str]:
-    """Was einer Person nach Schichten und Stunden zusteht (V-07) – bei
-    einer Altersgrenze, unter der sie liegt, die Alternative. Nur, wenn die
-    Veranstaltung Goodies ausgibt."""
+def goodies_fuer(vid: int, helfer_id: int, schichten: int, stunden: float,
+                 alter: int | None) -> dict:
+    """G-02, T-03: was einer Person nach ihren angetretenen Schichten oder
+    Stunden zusteht – bei einer Altersgrenze, unter der sie liegt oder bei
+    der wir ihr Alter nicht kennen, die Alternative –, ob es schon
+    ausgegeben ist, und was als Nächstes kommt. Nur, wenn die Veranstaltung
+    Goodies ausgibt (V-07)."""
+    ergebnis: dict = {"verdient": [], "naechstes": ""}
     if not angebot(vid)["goodies"]:
-        return []
-    ergebnis = []
+        return ergebnis
+    con = verbinden()
+    try:
+        schon = {z["goodie_id"]: z for z in con.execute(
+            "SELECT * FROM goodie_ausgabe WHERE helfer_id = ?", (helfer_id,)).fetchall()}
+    finally:
+        con.close()
     for g in goodies(vid):
-        if (g["ab_schichten"] and schichten < g["ab_schichten"]) or \
-                (g["ab_stunden"] and stunden < g["ab_stunden"]):
+        if g["ab_schichten"]:
+            fehlt, einheit = g["ab_schichten"] - schichten, ("Schicht", "Schichten")
+        else:
+            fehlt, einheit = g["ab_stunden"] - stunden, ("Stunde", "Stunden")
+        if fehlt > 0:
+            if not ergebnis["naechstes"]:
+                zahl = f"{fehlt:g}"
+                ergebnis["naechstes"] = (f"noch {zahl} {einheit[0] if zahl == '1' else einheit[1]}"
+                                         f" bis {g['name']}")
             continue
-        if g["mindestalter"] and (alter is None or alter < g["mindestalter"]):
-            if g["alternative"]:
-                ergebnis.append(g["alternative"])
+        # Unbekanntes Alter: der Tisch fragt nach dem Ausweis, sonst gibt es
+        # die Alternative.
+        unbekannt = bool(g["mindestalter"]) and alter is None
+        alternative = bool(g["mindestalter"]) and (unbekannt or alter < g["mindestalter"])
+        if alternative and not unbekannt and not g["alternative"]:
             continue
-        ergebnis.append(g["name"])
+        ergebnis["verdient"].append({
+            "id": g["id"], "name": g["name"], "alternative": alternative,
+            "unbekannt": unbekannt,
+            "was": g["alternative"] if alternative and g["alternative"] else g["name"],
+            "mindestalter": g["mindestalter"], "ausgabe": schon.get(g["id"])})
     return ergebnis
+
+
+def goodie_ausgeben(goodie_id: int, helfer_id: int, was: str, wer: str) -> bool:
+    """Abhaken (T-03) – einmal je Goodie und Person."""
+    con = verbinden()
+    try:
+        with con:
+            return con.execute(
+                "INSERT INTO goodie_ausgabe (goodie_id, helfer_id, was, ausgegeben_am,"
+                " ausgegeben_von) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                (goodie_id, helfer_id, was, jetzt(), wer)).rowcount > 0
+    finally:
+        con.close()
+
+
+def goodie_zuruecknehmen(goodie_id: int, helfer_id: int) -> bool:
+    con = verbinden()
+    try:
+        with con:
+            return con.execute("DELETE FROM goodie_ausgabe WHERE goodie_id = ? AND helfer_id = ?",
+                               (goodie_id, helfer_id)).rowcount > 0
+    finally:
+        con.close()
 
 
 # --- Datenschutz und Jugendschutz (Lastenheft 2.9) --------------------------

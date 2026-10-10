@@ -361,6 +361,9 @@ MELDUNGEN = {
     'eingecheckt': 'Eingecheckt.',
     'nichts-heute': 'Für heute steht bei dieser Person nichts an – nichts eingecheckt.',
     'ausgecheckt': 'Check-in zurückgenommen.',
+    'goodie': 'Goodie abgehakt.',
+    'goodie-zurueck': 'Goodie zurückgenommen.',
+    'goodie-nicht': 'Das steht dieser Person (noch) nicht zu.',
     'code-unbekannt': 'Diesen Code kennen wir nicht – am besten nach dem Namen suchen.',
     'danke-zu': 'Danke sagen geht ab dem letzten Tag der Veranstaltung.',
     'danke-fotos': 'Der Link zu den Fotos muss mit https:// beginnen.',
@@ -2303,8 +2306,10 @@ async def checkin_seite(request: Request, q: str = "", p: str = "", hinweis: str
     angebot = db.angebot(v["id"])
     for eintrag in gruppe:
         person = eintrag["person"]
+        # G-02: nach den angetretenen Schichten – die zweite Stufe zielt
+        # auf die zweite Schicht, nicht auf die zweite Anmeldung.
         eintrag["goodies"] = db.goodies_fuer(
-            v["id"], eintrag["schichten_gesamt"], eintrag["stunden"],
+            v["id"], person["id"], eintrag["angetreten"], eintrag["stunden"],
             db._alter(person, v["beginn"]))
         # T-03: das Shirt, sobald die erste Schicht angetreten ist.
         eintrag["shirt"] = (bool(angebot["shirt"]) and not person["tshirt_ausgegeben_am"]
@@ -2366,6 +2371,40 @@ async def checkin_tshirt(request: Request, helfer_id: int,
     db.tshirt_ausgeben(helfer_id, groesse, sitzung.kuerzel)
     _unterschrift_dazu("tshirt", helfer_id, "ausgabe", sitzung.kuerzel)
     return _checkin_zurueck(daten, helfer_id, "tshirt")
+
+
+@app.post("/helfer/checkin/{helfer_id}/goodie/{goodie_id}")
+async def checkin_goodie(request: Request, helfer_id: int, goodie_id: int,
+                         sitzung: auth.Sitzung = Depends(_sitzung), v=Depends(_veranstaltung)):
+    """T-03, G-02: ein Goodie abhaken – nur, was der Person zusteht, und
+    unter der Altersgrenze die Alternative. Ist das Alter unbekannt, zählt
+    der Ausweis: `voll` heißt, er wurde gezeigt."""
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    person = db.helfer_laden(helfer_id)
+    eintrag = next((e for e in db.checkin_gruppe(v["id"], helfer_id)
+                    if e["person"]["id"] == helfer_id), None)
+    if person is None or eintrag is None:
+        return _checkin_zurueck(daten, helfer_id, "goodie-nicht")
+    lage = db.goodies_fuer(v["id"], helfer_id, eintrag["angetreten"], eintrag["stunden"],
+                           db._alter(person, v["beginn"]))
+    g = next((x for x in lage["verdient"] if x["id"] == goodie_id), None)
+    if g is None:
+        return _checkin_zurueck(daten, helfer_id, "goodie-nicht")
+    was = g["name"] if g["unbekannt"] and str(daten.get("voll") or "") == "1" else g["was"]
+    db.goodie_ausgeben(goodie_id, helfer_id, was, sitzung.kuerzel)
+    return _checkin_zurueck(daten, helfer_id, "goodie")
+
+
+@app.post("/helfer/checkin/{helfer_id}/goodie/{goodie_id}/zurueck")
+async def checkin_goodie_zurueck(request: Request, helfer_id: int, goodie_id: int,
+                                 sitzung: auth.Sitzung = Depends(_sitzung)):
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    db.goodie_zuruecknehmen(goodie_id, helfer_id)
+    return _checkin_zurueck(daten, helfer_id, "goodie-zurueck")
 
 
 # --- Material einrichten (Lastenheft 3.8, V-09) -----------------------------

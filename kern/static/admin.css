@@ -1456,6 +1456,8 @@ main > p:not(.trefferzahl):not(.knopfreihe):not(.balken),
   border-radius: 8px; background: #000; }
 .checkin-kamera[hidden] { display: none; }
 .checkin-shirt { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.checkin-goodie { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .3rem 0; }
+.checkin-goodie form { margin: 0; }
 
 /* Ein Kennzeichen oder eine Nummer braucht mehr Platz als eine Menge (3.8). */
 .mengen .menge input.kennzeichen-feld { width: 9rem; }

@@ -102,7 +102,10 @@ KAI = person("Kai Berg", email="", geburtsdatum="2012-05-01", volljaehrig=0, ang
 BEN = person("Ben Lauf", volljaehrig=1, telefon="+491511111111")
 CARL = person("Carl Bald", volljaehrig=1)
 DORA = person("Dora Morgen", volljaehrig=1)
+# Lena ist von Hand angelegt, ihr Alter kennen wir nicht.
+LENA = person("Lena Ohne", volljaehrig=None)
 for helfer_id, schicht_id in ((ANNA, FRUEH), (ANNA, SPAET), (KAI, FRUEH), (KAI, SPAET),
+                              (LENA, FRUEH), (LENA, SPAET),
                               (BEN, LAUF), (CARL, BALD), (DORA, MORGEN)):
     db.einteilen(schicht_id, helfer_id)
 KONTO = testdb.abfrage(db_url, "kern", "INSERT INTO konto (email, name, kuerzel, rolle)"
@@ -110,7 +113,7 @@ KONTO = testdb.abfrage(db_url, "kern", "INSERT INTO konto (email, name, kuerzel,
 sql("INSERT INTO bereich_leitung (bereich_id, konto_id) VALUES (?, ?)", SHUTTLE, KONTO)
 
 print("Erinnerung mit Code (C-02, T-01)")
-pruefe(versand.erinnern() == 4, "vier Erinnerungen: Anna (mit Kai), Ben, Carl, Dora")
+pruefe(versand.erinnern() == 5, "fünf Erinnerungen: Anna (mit Kai), Lena, Ben, Carl, Dora")
 anna_mail = sql("SELECT * FROM mail_out WHERE helfer_id = ? AND typ = 'vorher'", ANNA)[0]
 CODE = zugang.token(zugang.CHECKIN, db.helfer_laden(ANNA))
 pruefe(anna_mail["qr"] == CODE and "Code im Anhang" in anna_mail["body"]
@@ -142,7 +145,7 @@ class Postfach:
 
 kern_mail._verbindung = lambda _: Postfach()
 config.SMTP_HOST, config.MAIL_FROM = "smtp.example.org", "orga@example.org"
-pruefe(versand.verschicken() == (4, 0), "verschickt")
+pruefe(versand.verschicken() == (5, 0), "verschickt")
 an_anna = next(n for n in gesendet if n["To"] == "anna@example.org")
 anhaenge = list(an_anna.iter_attachments())
 pruefe(len(anhaenge) == 1 and anhaenge[0].get_filename() == "check-in-code.png"
@@ -205,7 +208,7 @@ try:
     pruefe(seite.index('href="/helfer/checkin"') < seite.index('href="/helfer/monitor"'),
            "vorn, vor dem Monitor")
     zahlen = re.findall(r'zaehler-zahl">(\d+)<', seite)
-    pruefe(zahlen[:2] == ["0", "3"], "heute niemand da; noch nicht da: Anna, Kai, Ben – " + str(zahlen))
+    pruefe(zahlen[:2] == ["0", "4"], "heute niemand da; noch nicht da: Anna, Kai, Lena, Ben – " + str(zahlen))
     liste = seite.split("Noch nicht da (")[1].split("Gleich dran")[0]
     pruefe("Anna Berg" in liste and "Kai Berg" in liste and "Ben Lauf" in liste
            and "Carl Bald" not in liste,
@@ -225,8 +228,9 @@ try:
     pruefe(f'id="person-{ANNA}"' in seite and f'id="person-{KAI}"' in seite
            and "Alle einchecken" in seite, "Anna kommt mit Kai – beide stehen da, ein Knopf für alle")
     pruefe("Das Shirt gibt es nach dem Einchecken." in seite, "das Shirt erst nach dem Einchecken")
-    pruefe("Steht zu: Bier am Bierwagen" in seite and "Steht zu: Eistüte" in seite,
-           "Anna steht das Bier zu, Kai mit 15 die Eistüte")
+    pruefe("Goodies: noch 2 Schichten bis Bier am Bierwagen." in seite
+           and "Bier am Bierwagen ausgeben" not in seite,
+           "Goodies erst nach angetretenen Schichten – noch 2 bis zum Bier")
 
     print("Einchecken")
     status, ort, _ = anfrage("POST", f"/helfer/checkin/{ANNA}", {"csrf": csrf, "alle": "1"})
@@ -253,6 +257,42 @@ try:
     _, _, seite = anfrage("GET", f"/helfer/ausgabe?helfer={ANNA}")
     pruefe(re.search(r'<option value="%d" selected>' % ANNA, seite),
            "in der Ausgabe ist Anna schon gewählt")
+
+    print("Goodies abhaken (4.2, G-02)")
+    _, _, seite = anfrage("GET", f"/helfer/checkin?p={ANNA}")
+    anna = seite.split(f'id="person-{ANNA}"')[1].split(f'id="person-{KAI}"')[0]
+    kai = seite.split(f'id="person-{KAI}"')[1]
+    pruefe(">Bier am Bierwagen ausgeben</button>" in anna,
+           "Anna hat zwei Schichten angetreten – das Bier steht zu")
+    pruefe(">Eistüte ausgeben</button>" in kai and "statt Bier am Bierwagen, unter 16" in kai,
+           "Kai ist 15 – für ihn die Eistüte")
+    goodie = sql("SELECT id FROM goodie WHERE veranstaltung_id = ?", VA)[0][0]
+    status, ort, _ = anfrage("POST", f"/helfer/checkin/{ANNA}/goodie/{goodie}",
+                             {"csrf": csrf, "p": str(ANNA)})
+    anfrage("POST", f"/helfer/checkin/{ANNA}/goodie/{goodie}", {"csrf": csrf, "p": str(ANNA)})
+    pruefe("hinweis=goodie" in ort and [tuple(z.values()) for z in sql(
+        "SELECT was, ausgegeben_von FROM goodie_ausgabe WHERE helfer_id = ?", ANNA)]
+           == [("Bier am Bierwagen", "KK")], "abgehakt, einmal, mit Kürzel")
+    anfrage("POST", f"/helfer/checkin/{KAI}/goodie/{goodie}", {"csrf": csrf, "p": str(ANNA),
+                                                               "voll": "1"})
+    pruefe(sql("SELECT was FROM goodie_ausgabe WHERE helfer_id = ?", KAI)[0][0] == "Eistüte",
+           "Kai bekommt die Eistüte – auch wenn jemand auf „Ausweis“ drückt, sein Alter ist bekannt")
+    _, _, seite = anfrage("GET", f"/helfer/checkin?p={ANNA}")
+    pruefe("✓</span> Bier am Bierwagen" in seite and "✓</span> Eistüte" in seite,
+           "am Tisch steht, was schon raus ist")
+    anfrage("POST", f"/helfer/checkin/{LENA}", {"csrf": csrf})
+    _, _, seite = anfrage("GET", f"/helfer/checkin?p={LENA}")
+    pruefe("Bier am Bierwagen – Ausweis ab 16 gezeigt" in seite and ">Eistüte ausgeben</button>" in seite,
+           "bei Lena, Alter unbekannt: Bier nach Ausweis oder die Eistüte")
+    anfrage("POST", f"/helfer/checkin/{LENA}/goodie/{goodie}", {"csrf": csrf, "p": str(LENA),
+                                                                "voll": "1"})
+    pruefe(sql("SELECT was FROM goodie_ausgabe WHERE helfer_id = ?", LENA)[0][0] == "Bier am Bierwagen",
+           "Ausweis gezeigt – das Bier")
+    status, ort, _ = anfrage("POST", f"/helfer/checkin/{CARL}/goodie/{goodie}", {"csrf": csrf})
+    pruefe("hinweis=goodie-nicht" in ort and not sql("SELECT 1 FROM goodie_ausgabe WHERE helfer_id = ?", CARL),
+           "Carl hat noch keine Schicht angetreten – nichts")
+    anfrage("POST", f"/helfer/checkin/{ANNA}/goodie/{goodie}/zurueck", {"csrf": csrf, "p": str(ANNA)})
+    pruefe(not sql("SELECT 1 FROM goodie_ausgabe WHERE helfer_id = ?", ANNA), "zurücknehmen geht")
 
     print("Noch nicht da (T-02)")
     _, _, seite = anfrage("GET", "/helfer")

@@ -507,6 +507,14 @@ an Goodies zusteht, und die Ausgabe mit der Person schon gewählt. *Noch nicht
 da* steht am Tisch, in der Übersicht und bei der Bereichsleitung für ihre
 Bereiche, mit Nummer und dem Weg zur Schicht für einen Springer.
 
+**Stand 10.10.2026, Schritt 4.2:** T-03 ist vollständig. Am Check-in-Tisch
+steht je Person, welche Goodies ihr nach den angetretenen Schichten oder
+Stunden zustehen – die zweite Stufe zielt auf die zweite Schicht, nicht auf
+die zweite Anmeldung –, und wird abgehakt, einmal je Goodie. Unter der
+Altersgrenze gibt es die Alternative; ist das Alter unbekannt, entscheidet
+der Ausweis. Darunter, was als Nächstes kommt. Dass Nacht- und
+Frühschichten doppelt zählen (G-02, wahlweise), steht noch aus.
+
 ### 5.11 Backoffice-Benutzer und Rechte (B)
 
 | Nr. | Anforderung | Prio | Phase |
@@ -943,7 +951,7 @@ Phase Vorrang.
 | # | Schritt | Aufwand |
 | --- | --- | --- |
 | 4.1 | **Check-in zentral bei der Orga**, je Veranstaltung einstellbar: QR-Code in der Erinnerung und in Mein Helferplatz, Scan oder Name, alle Schichten des Tages mit einem Klick; *noch nicht da* ab 15 Minuten vor Beginn, Springer einsetzen; am selben Tisch Shirt und Material | **erledigt** |
-| 4.2 | Goodies am Check-in-Tisch abhaken, mit Schwelle, Altersgrenze und Alternative | 2 h |
+| 4.2 | Goodies am Check-in-Tisch abhaken, mit Schwelle, Altersgrenze und Alternative | **erledigt** |
 | 4.3 | Stempelkarte, Belohnungsstufen, Abzeichen | 6 h |
 | 4.4 | Helferparty: Einladung, Zusagen, Begleitpersonen | 3 h |
 | 4.5 | Freunde mitbringen | 3 h |
@@ -961,7 +969,7 @@ Fehler beheben, nichts Neues.
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, **erledigt** |
-| 4 Veranstaltungstag, Anerkennung | ~21 h, davon ~7 h erledigt |
+| 4 Veranstaltungstag, Anerkennung | ~21 h, davon ~9 h erledigt |
 | **gesamt** | **~146 h** |
 
 Phase 1 und 2 sind die Öffnung. Fällt die Zeit knapp aus, wird Phase 4
