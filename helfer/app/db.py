@@ -1655,21 +1655,128 @@ def erinnerung_faellig(von: str, bis: str) -> list[Zeile]:
         con.close()
 
 
-def danke_offen(vid: int) -> list[Zeile]:
-    """G-07: wer bei dieser Veranstaltung dabei war und noch keinen Dank hat."""
+def danke_offen(vid: int, art: str = "danke") -> list[Zeile]:
+    """G-07: wer bei dieser Veranstaltung dabei war und noch keinen Dank hat
+    – oder, mit `art`, keine andere Mail dieser Art (die Einladung zur
+    Party, G-09)."""
     con = verbinden()
     try:
         return con.execute(_BETEILIGT + " AND x.vid = ? GROUP BY x.vid, x.empfaenger"
-                           " ORDER BY x.empfaenger", ("danke", vid)).fetchall()
+                           " ORDER BY x.empfaenger", (art, vid)).fetchall()
     finally:
         con.close()
 
 
-def gedankt(vid: int) -> int:
+def gedankt(vid: int, art: str = "danke") -> int:
     con = verbinden()
     try:
         return int(con.execute("SELECT COUNT(*) FROM erinnerung WHERE veranstaltung_id = ?"
-                               " AND art = 'danke'", (vid,)).fetchone()[0])
+                               " AND art = ?", (vid, art)).fetchone()[0])
+    finally:
+        con.close()
+
+
+# --- Helferparty (Lastenheft 4.4: G-09) -------------------------------------
+
+def party_laden(vid: int) -> Zeile | None:
+    con = verbinden()
+    try:
+        return con.execute("SELECT * FROM party WHERE veranstaltung_id = ?", (vid,)).fetchone()
+    finally:
+        con.close()
+
+
+def party_setzen(vid: int, beginn: str, ort: str, hinweis: str) -> None:
+    con = verbinden()
+    try:
+        with con:
+            con.execute(
+                "INSERT INTO party (veranstaltung_id, beginn, ort, hinweis, geaendert_am)"
+                " VALUES (?, ?, ?, ?, ?) ON CONFLICT (veranstaltung_id) DO UPDATE SET"
+                " beginn = excluded.beginn, ort = excluded.ort, hinweis = excluded.hinweis,"
+                " geaendert_am = excluded.geaendert_am", (vid, beginn, ort, hinweis, jetzt()))
+    finally:
+        con.close()
+
+
+def party_gruppe(vid: int, helfer_id: int) -> list[dict]:
+    """Wer zu einer Antwort gehört: die Person und alle, die sie ohne eigene
+    Adresse mitangemeldet hat – je mit ihrer bisherigen Antwort."""
+    con = verbinden()
+    try:
+        leute = con.execute(
+            "SELECT h.*, z.kommt, z.begleitung FROM helfer h"
+            " LEFT JOIN party_zusage z ON z.helfer_id = h.id AND z.veranstaltung_id = ?"
+            " WHERE h.id = ? OR (h.angemeldet_von = ? AND h.email = '')"
+            " ORDER BY h.id = ? DESC, h.id", (vid, helfer_id, helfer_id, helfer_id)).fetchall()
+        return [dict(z) for z in leute]
+    finally:
+        con.close()
+
+
+def party_antworten(vid: int, helfer_id: int, kommen: set[int], begleitung: int) -> None:
+    """Die Antwort für die Gruppe: wer kommt, wer nicht, und wie viele
+    Begleitpersonen – die stehen bei der, die geantwortet hat."""
+    gruppe = [p["id"] for p in party_gruppe(vid, helfer_id)]
+    con = verbinden()
+    try:
+        with con:
+            for nummer in gruppe:
+                con.execute(
+                    "INSERT INTO party_zusage (veranstaltung_id, helfer_id, kommt, begleitung, am)"
+                    " VALUES (?, ?, ?, ?, ?) ON CONFLICT (veranstaltung_id, helfer_id) DO UPDATE"
+                    " SET kommt = excluded.kommt, begleitung = excluded.begleitung, am = excluded.am",
+                    (vid, nummer, 1 if nummer in kommen else 0,
+                     min(max(0, begleitung), 20) if nummer == helfer_id else 0, jetzt()))
+    finally:
+        con.close()
+
+
+def party_eingeladen(vid: int, helfer_id: int) -> bool:
+    """Ob die Person zu dieser Party eingeladen ist – oder schon geantwortet
+    hat, etwa als Mitangemeldete."""
+    return _gibt_es(
+        "SELECT 1 WHERE EXISTS (SELECT 1 FROM erinnerung WHERE veranstaltung_id = ?"
+        " AND helfer_id = ? AND art = 'party') OR EXISTS (SELECT 1 FROM party_zusage"
+        " WHERE veranstaltung_id = ? AND helfer_id = ?)", (vid, helfer_id, vid, helfer_id))
+
+
+def party_stand(vid: int) -> dict:
+    """Für die Planung: wer kommt, mit wie vielen, wer abgesagt hat."""
+    con = verbinden()
+    try:
+        zeilen = [dict(z) for z in con.execute(
+            "SELECT z.*, h.name FROM party_zusage z JOIN helfer h ON h.id = z.helfer_id"
+            " WHERE z.veranstaltung_id = ? ORDER BY lower(h.name)", (vid,)).fetchall()]
+    finally:
+        con.close()
+    kommen = [z for z in zeilen if z["kommt"]]
+    begleitung = sum(z["begleitung"] for z in zeilen)
+    return {"kommen": kommen, "absagen": [z for z in zeilen if not z["kommt"]],
+            "begleitung": begleitung, "gesamt": len(kommen) + begleitung}
+
+
+def party_heute(vid: int) -> list[Zeile]:
+    """Wer zugesagt hat und am Party-Tag noch nicht erinnert ist – je
+    Antwort einmal, an die Person mit Adresse."""
+    con = verbinden()
+    try:
+        return con.execute(
+            "SELECT DISTINCT h.id FROM party_zusage z JOIN helfer h ON h.id = z.helfer_id"
+            " WHERE z.veranstaltung_id = ? AND z.kommt = 1 AND h.email <> ''"
+            " AND NOT EXISTS (SELECT 1 FROM erinnerung n WHERE n.veranstaltung_id = ?"
+            "                 AND n.helfer_id = h.id AND n.art = 'party_tag')",
+            (vid, vid)).fetchall()
+    finally:
+        con.close()
+
+
+def partys_heute(tag: str) -> list[Zeile]:
+    con = verbinden()
+    try:
+        return con.execute("SELECT p.* FROM party p JOIN angebot a"
+                           " ON a.veranstaltung_id = p.veranstaltung_id AND a.party = 1"
+                           " WHERE left(p.beginn, 10) = ?", (tag,)).fetchall()
     finally:
         con.close()
 
@@ -1789,6 +1896,9 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                         " (SELECT 1 FROM verfuegbarkeit x WHERE x.helfer_id = ?"
                         "  AND x.veranstaltung_id = v.veranstaltung_id"
                         "  AND x.beginn = v.beginn AND x.ende = v.ende)", (weg, behalten))
+            con.execute("DELETE FROM party_zusage g WHERE helfer_id = ? AND EXISTS"
+                        " (SELECT 1 FROM party_zusage x WHERE x.helfer_id = ?"
+                        "  AND x.veranstaltung_id = g.veranstaltung_id)", (weg, behalten))
             con.execute("DELETE FROM goodie_ausgabe g WHERE helfer_id = ? AND EXISTS"
                         " (SELECT 1 FROM goodie_ausgabe x WHERE x.helfer_id = ?"
                         "  AND x.goodie_id = g.goodie_id)", (weg, behalten))
@@ -1804,7 +1914,8 @@ def zusammenfuehren(behalten: int, weg: int, wer: str) -> list[dict] | None:
                         "  AND x.bereich_id IS NOT DISTINCT FROM g.bereich_id"
                         "  AND x.schicht_id IS NOT DISTINCT FROM g.schicht_id)", (weg, behalten))
             for tabelle in ("verfuegbarkeit", "einsatzgrenze", "einladung", "erinnerung",
-                            "goodie_ausgabe", "ausgabe", "protokoll", "absage", "mail_out"):
+                            "goodie_ausgabe", "party_zusage", "ausgabe", "protokoll",
+                            "absage", "mail_out"):
                 con.execute("UPDATE " + tabelle + " SET helfer_id = ? WHERE helfer_id = ?",
                             (behalten, weg))
             # Die Unterschrift unter der Shirt-Ausgabe hängt an der Person.

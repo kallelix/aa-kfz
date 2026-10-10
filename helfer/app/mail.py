@@ -334,6 +334,50 @@ def danke(person, va_name: str, beteiligte: list[dict], fotos: str, wort: str,
     return ("danke", person["email"], "Danke! – " + va_name, "\n".join(zeilen))
 
 
+# --- Helferparty (Lastenheft 4.4: G-09) -------------------------------------
+
+def party_einladung(person, va_name: str, wann: str, ort: str, hinweis: str, link: str,
+                    andere: list[str]) -> tuple:
+    """An alle, die geholfen haben – mit dem Link für Zu- oder Absage und die
+    Zahl der Begleitpersonen."""
+    fuer = "dich" + (" und " + ", ".join(andere) if andere else "")
+    zeilen = [
+        f"Hallo {_vorname(person)},",
+        "",
+        f"nach {va_name} feiern wir – und {fuer} {'seid' if andere else 'bist'} eingeladen!",
+        "",
+        f"  Wann: {wann}",
+    ]
+    if ort:
+        zeilen.append(f"  Wo:   {ort}")
+    if hinweis:
+        zeilen += ["", hinweis]
+    zeilen += [
+        "",
+        "Sag uns bitte, ob du kommst und wie viele du mitbringst – dann wissen wir,",
+        "wie viel auf den Grill muss:",
+        "",
+        f"  {link}",
+        _fuss(),
+    ]
+    return ("party", person["email"], "Einladung zur Helferparty – " + va_name, "\n".join(zeilen))
+
+
+def party_heute(person, va_name: str, uhr: str, ort: str, link: str) -> tuple:
+    """Am Party-Tag, an alle, die zugesagt haben."""
+    text = "\n".join([
+        f"Hallo {_vorname(person)},",
+        "",
+        f"heute ist die Helferparty von {va_name}: um {uhr} Uhr" + (f", {ort}." if ort else "."),
+        "Wir freuen uns auf euch!",
+        "",
+        "Doch keine Zeit? Hier kannst du absagen:",
+        f"  {link}",
+        _fuss(),
+    ])
+    return ("party_tag", person["email"], "Heute: Helferparty", text)
+
+
 # --- Selbstbedienung (Lastenheft 2.5) ---------------------------------------
 
 def abgesagt(person, va_text: str, zeilen: list[str], platz: str) -> tuple:

@@ -86,6 +86,18 @@
       {% endif %}
     {% endfor %}
 
+    {% if x.party %}
+      {# G-09: die Helferparty – zu- oder absagen über den eigenen Link. #}
+      <section class="karte">
+        <h3>Helferparty</h3>
+        <p>{{ x.party.wann }}{% if x.party.ort %} · {{ x.party.ort }}{% endif %}</p>
+        <p>{% if x.party.kommt is none %}Du hast noch nicht geantwortet.
+          {%- elif x.party.kommt %}Du kommst{% if x.party.begleitung %} mit {{ x.party.begleitung }} {{ 'Begleitperson' if x.party.begleitung == 1 else 'Begleitpersonen' }}{% endif %} – schön!
+          {%- else %}Du hast abgesagt.{% endif %}</p>
+        <a class="knopf klein zweit" href="{{ x.party.link }}">{{ 'Antworten' if x.party.kommt is none else 'Antwort ändern' }}</a>
+      </section>
+    {% endif %}
+
     {% if x.noch and x.noch.vorschlaege %}
       {# G-03: direkt nach dem Eintragen – die zweite und dritte Schicht. #}
       <section class="karte noch">

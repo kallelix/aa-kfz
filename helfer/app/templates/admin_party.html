@@ -1,0 +1,90 @@
+{% extends "admin_base.html" %}
+{% block titel %}Helferparty{% endblock %}
+{% block ueberschrift %}Helferparty{% endblock %}
+
+{# G-09: eingeladen ist jeder, der geholfen hat – keine Belohnungsstufe.
+   Wer kommt, sagt es über seinen Link, mit der Zahl der Begleitpersonen;
+   am Tag selbst kommt eine Erinnerung (versand.party_erinnern). #}
+{% block inhalt %}
+  {% if not angebot.party %}
+    <section class="kasten">
+      <h2>Keine Helferparty</h2>
+      <p>Für diese Veranstaltung ist keine Helferparty eingestellt. Einschalten lässt sie sich
+        unter <a href="/helfer/goodies">Goodies &amp; Verpflegung</a>.</p>
+    </section>
+  {% else %}
+
+  <section class="zaehler zaehler-flach">
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Kommen</p>
+      <p class="zaehler-zahl">{{ stand.gesamt }}</p>
+      <p class="zaehler-detail">{{ stand.kommen | length }} Helfer, {{ stand.begleitung }} Begleitung</p>
+    </div>
+    <div class="zaehler-kachel">
+      <p class="zaehler-titel">Abgesagt</p>
+      <p class="zaehler-zahl">{{ stand.absagen | length }}</p>
+      <p class="zaehler-detail">eingeladen: {{ schon }}</p>
+    </div>
+  </section>
+
+  <section class="kasten">
+    <h2>Wann und wo</h2>
+    <form method="post" action="/helfer/party">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="feld">
+        <label for="datum">Tag</label>
+        <input type="date" id="datum" name="datum" required value="{{ party.beginn[:10] if party }}">
+      </div>
+      <div class="feld">
+        <label for="uhr">Uhrzeit</label>
+        <input type="time" id="uhr" name="uhr" required value="{{ party.beginn[11:16] if party }}">
+      </div>
+      <div class="feld">
+        <label for="ort">Ort</label>
+        <input type="text" id="ort" name="ort" maxlength="200" value="{{ party.ort if party }}"
+               placeholder="Am Orgazelt">
+      </div>
+      <div class="feld">
+        <label for="hinweis">Hinweis <span class="optional">optional</span></label>
+        <textarea id="hinweis" name="hinweis" rows="2" maxlength="1000"
+                  placeholder="Grillen und Beisammensein – bringt gute Laune mit.">{{ party.hinweis if party }}</textarea>
+      </div>
+      {% if darf %}<button type="submit" class="knopf">Speichern</button>{% endif %}
+    </form>
+  </section>
+
+  {% if party %}
+    <section class="kasten">
+      <h2>Einladen ({{ anzahl }})</h2>
+      <p class="hilfe">An alle, die bei dieser Veranstaltung dabei sind; wer ohne eigene Adresse
+        mitangemeldet ist, steht in der Mail dessen, der angemeldet hat. Wer eine Einladung hat,
+        bekommt keine zweite.</p>
+      {% if anzahl and darf %}
+        <form method="post" action="/helfer/party/einladen">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="knopf">{{ anzahl }} {{ 'Einladung' if anzahl == 1 else 'Einladungen' }} schicken</button>
+        </form>
+      {% elif not anzahl %}
+        <p class="leer">Alle sind eingeladen.</p>
+      {% endif %}
+      {% if beispiel %}<h3>So sieht die Mail aus</h3><pre>{{ beispiel }}</pre>{% endif %}
+    </section>
+  {% endif %}
+
+  {% if stand.kommen or stand.absagen %}
+    <section>
+      <h2>Antworten</h2>
+      <ul class="strichliste">
+        {% for z in stand.kommen %}
+          <li><span><a href="/helfer/helfer/{{ z.helfer_id }}">{{ z.name }}</a></span>
+            <span>kommt{% if z.begleitung %} + {{ z.begleitung }}{% endif %}</span></li>
+        {% endfor %}
+        {% for z in stand.absagen %}
+          <li><span><a href="/helfer/helfer/{{ z.helfer_id }}">{{ z.name }}</a></span>
+            <span class="gedaempft">kommt nicht{% if z.begleitung %} (+ {{ z.begleitung }}){% endif %}</span></li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+  {% endif %}
+{% endblock %}

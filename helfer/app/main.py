@@ -358,6 +358,10 @@ MELDUNGEN = {
     'eingeladen': 'Die Einladungen sind unterwegs.',
     'hilferuf': 'Der Hilferuf ist unterwegs.',
     'gedankt': 'Die Danke-Mails sind unterwegs.',
+    'party-gespeichert': 'Gespeichert.',
+    'party-wann': 'Bitte einen Tag und eine Uhrzeit, etwa 2027-07-04 und 18:00.',
+    'party-eingeladen': 'Die Einladungen sind unterwegs.',
+    'party-erst': 'Erst Tag, Uhrzeit und Ort eintragen – dann einladen.',
     'eingecheckt': 'Eingecheckt.',
     'nichts-heute': 'Für heute steht bei dieser Person nichts an – nichts eingecheckt.',
     'ausgecheckt': 'Check-in zurückgenommen.',
@@ -449,7 +453,9 @@ def _helfer_gruppen(aktuell) -> list:
         ("Leute", [("/helfer/helfer", "Helfer", ()),
                    ("/helfer/einladen", "Einladen", ()),
                    ("/helfer/hilferuf", "Hilferuf", ()),
-                   ("/helfer/danke", "Danke", ())]),
+                   ("/helfer/danke", "Danke", ())]
+         # G-09: die Party nur, wenn die Veranstaltung eine feiert.
+         + ([("/helfer/party", "Helferparty", ())] if angebot.get("party") else [])),
         ("Vor Ort", vor_ort),
     ]
 
@@ -1489,6 +1495,122 @@ async def danke_senden(request: Request, sitzung: auth.Sitzung = Depends(_sitzun
             db.erinnerung_vermerken(v["id"], empfaenger["id"], "danke",
                                     _danke_mail(v, empfaenger, fotos, wort, naechste))
     return _zurueck("/helfer/danke", "gedankt")
+
+
+# --- Helferparty (Lastenheft 4.4: G-09) -------------------------------------
+
+def _party_wann(beginn: str) -> str:
+    """'Samstag, 04.07. um 18:00 Uhr'."""
+    zeit = datetime.fromisoformat(beginn)
+    return config.WOCHENTAGE[zeit.weekday()] + zeit.strftime(", %d.%m. um %H:%M Uhr")
+
+
+def _party_link(request: Request, vid: int, person) -> str:
+    return f"{_basis(request)}/party/{zugang.token(zugang.PARTY, person)}?v={vid}"
+
+
+def _party_mail(request: Request, v, party, empfaenger) -> tuple:
+    andere = [p["vorname"] or p["name"] for p in db.party_gruppe(v["id"], empfaenger["id"])[1:]]
+    return mail.party_einladung(empfaenger, v["name"], _party_wann(party["beginn"]), party["ort"],
+                                party["hinweis"], _party_link(request, v["id"], empfaenger), andere)
+
+
+@app.get("/helfer/party")
+async def party_seite(request: Request, hinweis: str = "",
+                      sitzung: auth.Sitzung = Depends(_sitzung), v=Depends(_veranstaltung)):
+    """G-09: wann und wo, die Einladung an alle, die dabei sind, und wer
+    kommt – mit wie vielen."""
+    party = db.party_laden(v["id"])
+    offen = db.danke_offen(v["id"], "party")
+    beispiel = ""
+    if party and offen:
+        beispiel = _party_mail(request, v, party, db.helfer_laden(offen[0]["empfaenger"]))[3]
+    return templates.TemplateResponse(
+        "admin_party.html",
+        _admin(request, sitzung, hinweis=hinweis, angebot=db.angebot(v["id"]), party=party,
+               stand=db.party_stand(v["id"]), anzahl=len(offen),
+               schon=db.gedankt(v["id"], "party"), beispiel=beispiel,
+               darf=_pflegt_grenzen(sitzung)))
+
+
+@app.post("/helfer/party")
+async def party_sichern(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
+                        v=Depends(_veranstaltung)):
+    _nur_orga(sitzung)
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    tag = _tag_pruefen(str(daten.get("datum") or ""))
+    uhr = eintraege._uhrzeit(str(daten.get("uhr") or ""))
+    if not tag or not uhr:
+        return _zurueck("/helfer/party", "party-wann")
+    db.party_setzen(v["id"], f"{tag} {uhr}", normalisieren.text(daten.get("ort"))[:200],
+                    str(daten.get("hinweis") or "").strip()[:1000])
+    return _zurueck("/helfer/party", "party-gespeichert")
+
+
+@app.post("/helfer/party/einladen")
+async def party_einladen(request: Request, sitzung: auth.Sitzung = Depends(_sitzung),
+                         v=Depends(_veranstaltung)):
+    """An alle, die dabei sind und noch keine Einladung haben – je einmal."""
+    _nur_orga(sitzung)
+    daten = await _csrf_pflicht(request, sitzung)
+    if daten is None:
+        return Response("Ungültiger CSRF-Token", status_code=400)
+    party = db.party_laden(v["id"])
+    if party is None or not db.angebot(v["id"])["party"]:
+        return _zurueck("/helfer/party", "party-erst")
+    for zeile in db.danke_offen(v["id"], "party"):
+        person = db.helfer_laden(zeile["empfaenger"])
+        if person is not None:
+            db.erinnerung_vermerken(v["id"], person["id"], "party",
+                                    _party_mail(request, v, party, person))
+    return _zurueck("/helfer/party", "party-eingeladen")
+
+
+def _party_zugang(tok: str, v: str):
+    """Person, Veranstaltung und Party zu einem Link – nur, wenn die Person
+    eingeladen ist und die Veranstaltung eine Party feiert."""
+    person = _person_mit(zugang.PARTY, tok)
+    va = db.VERANSTALTUNGEN.laden(int(v)) if v.isdigit() else None
+    if person is None or va is None or not db.angebot(va["id"])["party"]:
+        return None, None, None
+    party = db.party_laden(va["id"])
+    if party is None or not db.party_eingeladen(va["id"], person["id"]):
+        return None, None, None
+    return person, va, party
+
+
+@app.get("/party/{tok}")
+def party_antwort_seite(request: Request, tok: str, v: str = "", hinweis: str = ""):
+    """G-09: zu- oder absagen, für sich und alle, die man mitangemeldet hat,
+    und wie viele man mitbringt. Der Link zeigt nur die Seite – gespeichert
+    wird mit dem Knopf (7.4)."""
+    person, va, party = _party_zugang(tok, v)
+    if person is None:
+        return _nicht_da(request)
+    gruppe = db.party_gruppe(va["id"], person["id"])
+    return templates.TemplateResponse(
+        "anmeldung_party.html",
+        _oeffentlich(request, va, person=person, tok=tok, party=party,
+                     wann=_party_wann(party["beginn"]), gruppe=gruppe,
+                     vorbei=db.marke(db.jetzt_lokal()) >= party["beginn"],
+                     gespeichert=hinweis == "gespeichert"))
+
+
+@app.post("/party/{tok}")
+async def party_antworten(request: Request, tok: str, v: str = ""):
+    person, va, party = _party_zugang(tok, v)
+    if person is None:
+        return _nicht_da(request)
+    daten = await request.form()
+    try:
+        begleitung = int(str(daten.get("begleitung") or 0))
+    except ValueError:
+        begleitung = 0
+    db.party_antworten(va["id"], person["id"],
+                       {int(x) for x in daten.getlist("kommt") if str(x).isdigit()}, begleitung)
+    return RedirectResponse(f"/party/{tok}?v={va['id']}&hinweis=gespeichert", status_code=303)
 
 
 # --- Dubletten zusammenführen (Lastenheft 3.2: I-06) ------------------------
@@ -2844,7 +2966,7 @@ class _Adresse(StringConvertor):
     Pfadteile. Sonst passte '/monitor/' ohne Schrägstrich auf '/{adresse}',
     und Starlette leitete dorthin um, statt 404 zu geben."""
     regex = (r"(?!(?:helfer|monitor|unterschrift|static|gemeinsam|platz|bestaetigen"
-             r"|kalender|email|eltern|datenschutz|abbestellen|s)(?![^/]))[^/]+")
+             r"|kalender|email|eltern|datenschutz|abbestellen|party|s)(?![^/]))[^/]+")
 
 
 register_url_convertor("adresse", _Adresse())
@@ -3454,6 +3576,18 @@ def _kommende(vids) -> list:
                    and v["ende"] >= heute), key=lambda v: v["beginn"])
 
 
+def _platz_party(request: Request, v, person) -> dict | None:
+    if not db.angebot(v["id"])["party"] or not db.party_eingeladen(v["id"], person["id"]):
+        return None
+    party = db.party_laden(v["id"])
+    if party is None:
+        return None
+    antwort = db.party_gruppe(v["id"], person["id"])[0]
+    return {"wann": _party_wann(party["beginn"]), "ort": party["ort"], "kommt": antwort["kommt"],
+            "begleitung": antwort["begleitung"] or 0,
+            "link": _party_link(request, v["id"], person)}
+
+
 _PLATZ_HINWEISE = {
     "bestaetigt": "Danke – deine Adresse ist bestätigt. Du bist dabei!",
     "dazu": "Eingetragen. Eine Mail mit allem ist unterwegs.",
@@ -3489,6 +3623,8 @@ def platz(request: Request, tok: str, hinweis: str = ""):
         veranstaltungen.append({
             "va": v, "tage": _tage_text(v), "adresse": normalisieren.kurzadresse(v["kurz"]),
             "zustand": _zustand(v), "personen": ergebnis["personen"],
+            # G-09: die Party, wenn die Person eingeladen ist.
+            "party": _platz_party(request, v, person),
             # G-01, G-05: je Person die Stempelkarte und ihre Abzeichen.
             "karten": {e["person"]["id"]: {"karte": db.stempelkarte(v["id"], e["person"]["id"]),
                                            "abzeichen": db.abzeichen(v["id"], e["person"]["id"])}

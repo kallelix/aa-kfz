@@ -410,6 +410,14 @@ Abzeichen *Schicht-Retter*, *Frühaufsteher*, *Nachtwache* und *Stammhelfer*
 ergeben sich aus den Schichten; ob eine Schicht gerettet wurde, wird beim
 Eintragen vermerkt.
 
+**Stand 10.10.2026, Schritt 4.4:** G-09 ist umgesetzt. Die Orga trägt Tag,
+Uhrzeit, Ort und einen Hinweis ein und lädt mit einem Klick alle ein, die
+dabei sind – je einmal. Über den Link in der Mail sagt man für sich und alle,
+die man ohne eigene Adresse mitangemeldet hat, zu oder ab und gibt die Zahl
+der Begleitpersonen an; Mein Helferplatz zeigt die Antwort. Die Orga sieht,
+wie viele kommen, davon Helfer und Begleitung, und wer abgesagt hat. Am
+Party-Tag geht ab acht Uhr eine Erinnerung an alle, die zugesagt haben.
+
 ### 5.8 Kommunikation und WhatsApp (C)
 
 Die Recherche (Stand Oktober 2026, Quellen in Anhang A) ergibt ein klares
@@ -963,7 +971,7 @@ Phase Vorrang.
 | 4.1 | **Check-in zentral bei der Orga**, je Veranstaltung einstellbar: QR-Code in der Erinnerung und in Mein Helferplatz, Scan oder Name, alle Schichten des Tages mit einem Klick; *noch nicht da* ab 15 Minuten vor Beginn, Springer einsetzen; am selben Tisch Shirt und Material | **erledigt** |
 | 4.2 | Goodies am Check-in-Tisch abhaken, mit Schwelle, Altersgrenze und Alternative | **erledigt** |
 | 4.3 | Stempelkarte, Belohnungsstufen, Abzeichen | **erledigt** |
-| 4.4 | Helferparty: Einladung, Zusagen, Begleitpersonen | 3 h |
+| 4.4 | Helferparty: Einladung, Zusagen, Begleitpersonen | **erledigt** |
 | 4.5 | Freunde mitbringen | 3 h |
 
 Der Check-in steht vorn: erst mit ihm ist *noch nicht da* verlässlich, und
@@ -979,7 +987,7 @@ Fehler beheben, nichts Neues.
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, **erledigt** |
-| 4 Veranstaltungstag, Anerkennung | ~21 h, davon ~15 h erledigt |
+| 4 Veranstaltungstag, Anerkennung | ~21 h, davon ~18 h erledigt |
 | **gesamt** | **~146 h** |
 
 Phase 1 und 2 sind die Öffnung. Fällt die Zeit knapp aus, wird Phase 4

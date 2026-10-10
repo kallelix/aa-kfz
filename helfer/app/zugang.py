@@ -31,6 +31,8 @@ ELTERN = "eltern"
 ABBESTELLEN = "abbestellen"
 # Der Code am Check-in (T-01): zeigt der Orga, wer da steht – mehr nicht.
 CHECKIN = "checkin"
+# Zu- oder Absage zur Helferparty (G-09) – kann nur das.
+PARTY = "party"
 
 # Ab so vielen falschen Codes gilt nur noch der Link aus der Mail.
 CODE_VERSUCHE = 5

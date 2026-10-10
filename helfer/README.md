@@ -202,6 +202,19 @@ Check-in hängt der QR-Code als Bild an der Mail; der Text bleibt Text. Das
 erledigt der Mail-Worker (`versand.erinnern`); wie lange vorher, steht in
 `ERINNERN_STUNDEN`.
 
+## Helferparty
+
+Feiert eine Veranstaltung eine Helferparty (Goodies & Verpflegung →
+Helferparty), steht unter Leute → Helferparty, wann und wo (Lastenheft 4.4,
+G-09). Eingeladen wird mit einem Klick, alle, die dabei sind – keine
+Belohnungsstufe; wer ohne eigene Adresse mitangemeldet ist, steht in der Mail
+dessen, der angemeldet hat. Jede Mail trägt einen Link, über den man für sich
+und die Mitangemeldeten zu- oder absagt und sagt, wie viele man mitbringt;
+Mein Helferplatz zeigt die Antwort. Die Seite zählt für die Planung: wie
+viele kommen, davon Helfer und Begleitung, wer abgesagt hat. Am Party-Tag
+geht ab acht Uhr eine Erinnerung an alle, die zugesagt haben
+(`versand.party_erinnern`).
+
 ## Check-in
 
 Ob eine Veranstaltung einen Check-in hat, stellt sie unter Goodies &
@@ -505,6 +518,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_erinnerung.py   # Erinnerung vor der Schicht, Danke danach
 .venv/Scripts/python.exe helfer/tests/test_checkin.py      # Code, Gruppe, Shirt, noch nicht da, Schalter
 .venv/Scripts/python.exe helfer/tests/test_anerkennung.py  # Stempelkarte, Stufen, Abzeichen
+.venv/Scripts/python.exe helfer/tests/test_party.py        # Einladung, Zusage mit Begleitung, Erinnerung am Tag
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

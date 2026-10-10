@@ -1,0 +1,40 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Helferparty{% endblock %}
+{% block ueberschrift %}Helferparty{% endblock %}
+
+{# G-09: zu- oder absagen, für sich und alle, die man ohne eigene Adresse
+   mitangemeldet hat, und wie viele man mitbringt. Der Link zeigt nur diese
+   Seite – erst der Knopf speichert (7.4). #}
+{% block inhalt %}
+  {% if gespeichert %}<div class="hinweis gut">Danke – wir haben es notiert.</div>{% endif %}
+
+  <div class="karte">
+    <h2>{{ wann }}</h2>
+    {% if party.ort %}<p>{{ party.ort }}</p>{% endif %}
+    {% if party.hinweis %}<p>{{ party.hinweis }}</p>{% endif %}
+  </div>
+
+  {% if vorbei %}
+    <p>Die Party hat schon angefangen – antworten geht nicht mehr. Komm einfach vorbei!</p>
+  {% else %}
+    <form method="post" action="/party/{{ tok }}?v={{ va.id }}">
+      <fieldset>
+        <legend>Wer kommt?</legend>
+        {% for p in gruppe %}
+          <label class="haken">
+            <input type="checkbox" name="kommt" value="{{ p.id }}"
+                   {% if p.kommt or (p.kommt is none and loop.first) %}checked{% endif %}>
+            <span>{{ 'Ich' if loop.first else p.vorname or p.name }}</span>
+          </label>
+        {% endfor %}
+      </fieldset>
+      <label for="begleitung">Wie viele bringst du mit? <span class="leise">– Partner, Kinder, Freunde,
+        die nicht mitgeholfen haben</span></label>
+      <input type="number" id="begleitung" name="begleitung" min="0" max="20"
+             value="{{ gruppe[0].begleitung or 0 }}">
+      <button type="submit" class="knopf">Speichern</button>
+      <p class="leise">Niemand kommt? Dann alle Häkchen weg und speichern – das hilft uns
+        genauso beim Planen.</p>
+    </form>
+  {% endif %}
+{% endblock %}

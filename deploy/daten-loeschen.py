@@ -75,6 +75,8 @@ PLAENE: dict[str, list[tuple[str, str]]] = {
          "Unterschriften samt Namenszug, außer für laufende Veranstaltungen"),
         ("DELETE FROM ausgabe WHERE veranstaltung_id IN {VORBEI}",
          "Ausgaben samt Namen (Funk, Schlüssel, Material)"),
+        ("DELETE FROM party_zusage WHERE veranstaltung_id IN {VORBEI}",
+         "Zu- und Absagen zur Helferparty"),
         ("DELETE FROM goodie_ausgabe WHERE goodie_id IN"
          " (SELECT id FROM goodie WHERE veranstaltung_id IN {VORBEI})",
          "abgehakte Goodies"),

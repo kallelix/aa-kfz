@@ -254,12 +254,34 @@ def erinnern() -> int:
     return erinnert
 
 
+def party_erinnern() -> int:
+    """G-09: am Party-Tag eine Erinnerung an alle, die zugesagt haben – ab
+    acht Uhr morgens, je Person einmal."""
+    jetzt = db.jetzt_lokal()
+    if jetzt.hour < 8:
+        return 0
+    erinnert = 0
+    for p in db.partys_heute(jetzt.strftime("%Y-%m-%d")):
+        v = db.VERANSTALTUNGEN.laden(p["veranstaltung_id"])
+        if v is None:
+            continue
+        for zeile in db.party_heute(v["id"]):
+            person = db.helfer_laden(zeile["id"])
+            db.erinnerung_vermerken(v["id"], person["id"], "party_tag", mail.party_heute(
+                person, v["name"], p["beginn"][11:16], p["ort"],
+                link("/party/" + zugang.token(zugang.PARTY, person))))
+            erinnert += 1
+    return erinnert
+
+
 def runde() -> None:
     gesendet, fehlgeschlagen = verschicken()
     if anmeldestart():
         protokoll.info("Anmeldestart: Vorgemerkte benachrichtigt")
     if erinnern():
         protokoll.info("Erinnerungen vor der Schicht eingereiht")
+    if party_erinnern():
+        protokoll.info("Erinnerungen an die Helferparty eingereiht")
     erinnert, verfallen = fristen()
     if gesendet or fehlgeschlagen or erinnert or verfallen:
         protokoll.info("Versand: %s gesendet, %s fehlgeschlagen, %s erinnert, %s verfallen",
