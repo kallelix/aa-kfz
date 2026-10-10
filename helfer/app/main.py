@@ -3307,6 +3307,9 @@ def _danke_seite(request, v, ergebnis, p, t, fehler="", status_code=200, hinweis
     return templates.TemplateResponse(
         "anmeldung_danke.html",
         _oeffentlich(request, v, anmeldung=ergebnis, p=p, t=t, fehler=fehler,
+                     # G-01: die Stempelkarte gleich in der Bestätigung.
+                     karte=db.stempelkarte(v["id"], ergebnis["anmelder"]["id"]),
+                     abzeichen=db.abzeichen(v["id"], ergebnis["anmelder"]["id"]),
                      code_gesperrt=ergebnis["anmelder"]["code_versuche"] >= zugang.CODE_VERSUCHE,
                      noch=_noch_eine(v, ergebnis["personen"]), hinweis=hinweis,
                      gruende=list(gruende)),
@@ -3486,6 +3489,10 @@ def platz(request: Request, tok: str, hinweis: str = ""):
         veranstaltungen.append({
             "va": v, "tage": _tage_text(v), "adresse": normalisieren.kurzadresse(v["kurz"]),
             "zustand": _zustand(v), "personen": ergebnis["personen"],
+            # G-01, G-05: je Person die Stempelkarte und ihre Abzeichen.
+            "karten": {e["person"]["id"]: {"karte": db.stempelkarte(v["id"], e["person"]["id"]),
+                                           "abzeichen": db.abzeichen(v["id"], e["person"]["id"])}
+                       for e in ergebnis["personen"]},
             "leitungen": db.leitungen(sorted(bereiche)),
             # G-03: direkt nach dem Eintragen, nicht bei jedem Besuch.
             "noch": _noch_eine(v, ergebnis["personen"][:1])

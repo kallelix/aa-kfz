@@ -80,6 +80,10 @@
       {% if not eintrag.schichten and not eintrag.fenster and not eintrag.warteliste %}
         <p class="leise">Noch keine Schicht.</p>
       {% endif %}
+      {% set k = x.karten[eintrag.person.id] %}
+      {% if k.karte.schichten %}
+        {% with karte = k.karte, abzeichen = k.abzeichen %}{% include "_stempelkarte.html" %}{% endwith %}
+      {% endif %}
     {% endfor %}
 
     {% if x.noch and x.noch.vorschlaege %}

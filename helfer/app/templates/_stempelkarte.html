@@ -1,0 +1,23 @@
+{# G-01: je Schicht ein Stempel – ein Bild, das jeder kennt. In den Kreisen
+   steht, was es auf welcher Stufe gibt (G-02); ohne Goodies bleibt der
+   Dank. Darunter die Abzeichen (G-05). Erwartet `karte` und `abzeichen`. #}
+<div class="stempelkarte">
+  <div class="kudos" role="img" aria-label="{{ karte.schichten }} Stempel von {{ karte.felder | length }}">
+    {% for f in karte.felder %}
+      <div class="{{ 'voll' if f.voll }}">{{ f.kurz or ('✓' if f.voll else '') }}</div>
+    {% endfor %}
+  </div>
+  {% if karte.satz %}
+    <p>{{ karte.satz }}</p>
+  {% elif not karte.goodies %}
+    <p>{{ karte.schichten }} {{ 'Schicht' if karte.schichten == 1 else 'Schichten' }} – danke, dass du mithilfst!</p>
+  {% endif %}
+  {% for g in karte.nach_stunden %}
+    <p class="leise">{{ g.text }}: {{ 'geschafft' if g.erreicht else 'ab ' ~ g.ab ~ ' Stunden – bisher ' ~ karte.stunden }}</p>
+  {% endfor %}
+  {% if abzeichen %}
+    <p class="abzeichen">
+      {% for a in abzeichen %}<span class="marke frei" title="{{ a.text }}">{{ a.name }}</span> {% endfor %}
+    </p>
+  {% endif %}
+</div>

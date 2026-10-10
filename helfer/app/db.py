@@ -1025,10 +1025,15 @@ def _eintragen(con: Verbindung, vid: int, ids: list[int], schichten: list[dict],
                             " VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
                             (s["id"], helfer_id, jetzt()))
             else:
+                # G-05: wer sich einträgt, solange die Schicht unter ihrem
+                # Minimum ist, hat sie gerettet.
+                retter = art == "platz" and con.execute(
+                    "SELECT COUNT(*) FROM einteilung WHERE schicht_id = ? AND art = 'platz'",
+                    (s["id"],)).fetchone()[0] < s["minimum"]
                 con.execute(
                     "INSERT INTO einteilung (schicht_id, helfer_id, quelle, art,"
-                    " eingeteilt_am) VALUES (?, ?, 'selbst', ?, ?)",
-                    (s["id"], helfer_id, art, jetzt()))
+                    " eingeteilt_am, retter) VALUES (?, ?, 'selbst', ?, ?, ?)",
+                    (s["id"], helfer_id, art, jetzt(), 1 if retter else 0))
         for _, von, bis in fenster:
             con.execute(
                 "INSERT INTO verfuegbarkeit (veranstaltung_id, helfer_id, beginn,"
@@ -4374,6 +4379,108 @@ def goodies_fuer(vid: int, helfer_id: int, schichten: int, stunden: float,
             "was": g["alternative"] if alternative and g["alternative"] else g["name"],
             "mindestalter": g["mindestalter"], "ausgabe": schon.get(g["id"])})
     return ergebnis
+
+
+# --- Stempelkarte und Abzeichen (Lastenheft 4.3: G-01, G-02, G-05) -------
+
+# So viele Kreise höchstens – sonst bricht die Reihe auf dem Handy dreimal um.
+STEMPEL_HOECHSTENS = 12
+
+ABZEICHEN = {
+    "retter": ("Schicht-Retter", "eingetragen, als die Schicht unter ihrem Minimum war"),
+    "frueh": ("Frühaufsteher", "eine Schicht vor 7 Uhr"),
+    "nacht": ("Nachtwache", "eine Schicht über Mitternacht oder ab 22 Uhr"),
+    "stamm": ("Stammhelfer", "das dritte Jahr in Folge dabei"),
+}
+
+
+def _kurz(text: str) -> str:
+    """Was in einen Kreis passt: das erste Wort."""
+    return (text or "").split(" ")[0]
+
+
+def stempelkarte(vid: int, helfer_id: int) -> dict:
+    """G-01, G-02: je eingetragener Schicht ein Stempel, und in den Kreisen,
+    was es auf welcher Stufe gibt – das Shirt ab der ersten, die Goodies nach
+    ihrer Schwelle, unter der Altersgrenze die Alternative. Goodies nach
+    Stunden stehen darunter. Gibt die Veranstaltung keine Goodies aus (V-07),
+    bleibt der Dank."""
+    con = verbinden()
+    try:
+        zeile = con.execute(
+            "SELECT COUNT(*) AS schichten,"
+            " COALESCE(SUM(EXTRACT(EPOCH FROM (s.ende::timestamp - s.beginn::timestamp))"
+            "  / 3600), 0) AS stunden"
+            " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? AND e.bestaetigen_bis IS NULL",
+            (helfer_id, vid)).fetchone()
+        person = con.execute("SELECT * FROM helfer WHERE id = ?", (helfer_id,)).fetchone()
+    finally:
+        con.close()
+    schichten, stunden = int(zeile["schichten"]), float(zeile["stunden"])
+    v = VERANSTALTUNGEN.laden(vid)
+    alter = _alter(person, v["beginn"]) if person is not None and v is not None else None
+    angebot_ = angebot(vid)
+    stufen: dict[int, list[str]] = {}
+    nach_stunden = []
+    if angebot_["goodies"]:
+        if angebot_["shirt"]:
+            stufen.setdefault(1, []).append("Helfershirt")
+        for g in goodies(vid):
+            text = g["name"]
+            if g["mindestalter"] and alter is not None and alter < g["mindestalter"]:
+                if not g["alternative"]:
+                    continue
+                text = g["alternative"]
+            if g["ab_schichten"]:
+                stufen.setdefault(g["ab_schichten"], []).append(text)
+            else:
+                nach_stunden.append({"text": text, "ab": g["ab_stunden"],
+                                     "erreicht": stunden >= g["ab_stunden"]})
+    felder = min(max([schichten, 1, *stufen]), STEMPEL_HOECHSTENS)
+    naechste = next(((ab, stufen[ab]) for ab in sorted(stufen) if ab > schichten), None)
+    satz = ""
+    if stufen:
+        if naechste:
+            fehlt = naechste[0] - schichten
+            satz = (f"Noch {fehlt} {'Schicht' if fehlt == 1 else 'Schichten'} bis "
+                    + " und ".join(naechste[1]) + ".")
+        else:
+            satz = "Alle Goodies sind deine – danke, dass du so viel mithilfst!"
+    return {"schichten": schichten, "stunden": round(stunden, 1), "goodies": bool(stufen or nach_stunden),
+            "felder": [{"voll": i <= schichten,
+                        "kurz": " + ".join(_kurz(t) for t in stufen.get(i, []))}
+                       for i in range(1, felder + 1)],
+            "satz": satz, "nach_stunden": nach_stunden}
+
+
+def abzeichen(vid: int, helfer_id: int) -> list[dict]:
+    """G-05: Abzeichen, die etwas Echtes würdigen – aus den Schichten dieser
+    Veranstaltung und, beim Stammhelfer, aus den Jahren davor."""
+    con = verbinden()
+    try:
+        hier = con.execute(
+            "SELECT bool_or(e.retter = 1) AS retter,"
+            " bool_or(substr(s.beginn, 12, 5) < '07:00') AS frueh,"
+            " bool_or(left(s.ende, 10) > left(s.beginn, 10) AND substr(s.ende, 12, 5) > '00:00'"
+            "         OR substr(s.beginn, 12, 5) >= '22:00') AS nacht"
+            " FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
+            " WHERE e.helfer_id = ? AND s.veranstaltung_id = ? AND e.bestaetigen_bis IS NULL",
+            (helfer_id, vid)).fetchone()
+        jahre = {int(z["jahr"]) for z in con.execute(
+            "SELECT DISTINCT extract(year FROM v.beginn) AS jahr FROM einteilung e"
+            " JOIN schicht s ON s.id = e.schicht_id"
+            " JOIN kern.veranstaltung v ON v.id = s.veranstaltung_id WHERE e.helfer_id = ?",
+            (helfer_id,)).fetchall()}
+        jahr = con.execute("SELECT extract(year FROM beginn) FROM kern.veranstaltung WHERE id = ?",
+                           (vid,)).fetchone()
+    finally:
+        con.close()
+    erreicht = {k for k in ("retter", "frueh", "nacht") if hier[k]}
+    if jahr is not None and {int(jahr[0]), int(jahr[0]) - 1, int(jahr[0]) - 2} <= jahre:
+        erreicht.add("stamm")
+    return [{"schluessel": k, "name": ABZEICHEN[k][0], "text": ABZEICHEN[k][1]}
+            for k in ABZEICHEN if k in erreicht]
 
 
 def goodie_ausgeben(goodie_id: int, helfer_id: int, was: str, wer: str) -> bool:

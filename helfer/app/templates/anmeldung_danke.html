@@ -64,6 +64,11 @@
     {% endfor %}
   {% endfor %}
 
+  {% if karte.schichten %}
+    <h2>Deine Stempelkarte</h2>
+    {% include "_stempelkarte.html" %}
+  {% endif %}
+
 
   {% if noch.vorschlaege %}
     {# G-03: die zweite und dritte Schicht – direkt nach der ersten. #}

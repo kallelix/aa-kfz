@@ -400,6 +400,16 @@ Schicht fehlt. Vorgeschlagen wird nur, was passt: frei für alle, ohne
 Überschneidung, im Alter, und keine Voraussetzung, die noch niemand bestätigt
 hat.
 
+**Stand 10.10.2026, Schritt 4.3:** G-01, G-02 und G-05 sind umgesetzt. Die
+Stempelkarte steht in Mein Helferplatz je Person und gleich auf der
+Bestätigungsseite: je eingetragener Schicht ein Stempel, in den Kreisen das
+Shirt ab der ersten Schicht und die Goodies nach ihrer Schwelle – unter der
+Altersgrenze die Alternative –, darunter der nächste Schritt und die Goodies
+nach Stunden; ohne Goodies bleibt der Dank. Jede Schicht zählt gleich. Die
+Abzeichen *Schicht-Retter*, *Frühaufsteher*, *Nachtwache* und *Stammhelfer*
+ergeben sich aus den Schichten; ob eine Schicht gerettet wurde, wird beim
+Eintragen vermerkt.
+
 ### 5.8 Kommunikation und WhatsApp (C)
 
 Die Recherche (Stand Oktober 2026, Quellen in Anhang A) ergibt ein klares
@@ -952,7 +962,7 @@ Phase Vorrang.
 | --- | --- | --- |
 | 4.1 | **Check-in zentral bei der Orga**, je Veranstaltung einstellbar: QR-Code in der Erinnerung und in Mein Helferplatz, Scan oder Name, alle Schichten des Tages mit einem Klick; *noch nicht da* ab 15 Minuten vor Beginn, Springer einsetzen; am selben Tisch Shirt und Material | **erledigt** |
 | 4.2 | Goodies am Check-in-Tisch abhaken, mit Schwelle, Altersgrenze und Alternative | **erledigt** |
-| 4.3 | Stempelkarte, Belohnungsstufen, Abzeichen | 6 h |
+| 4.3 | Stempelkarte, Belohnungsstufen, Abzeichen | **erledigt** |
 | 4.4 | Helferparty: Einladung, Zusagen, Begleitpersonen | 3 h |
 | 4.5 | Freunde mitbringen | 3 h |
 
@@ -969,7 +979,7 @@ Fehler beheben, nichts Neues.
 | 1 Fundament | ~20 h, davon ~18 h erledigt |
 | 2 Öffnung | ~65 h, **erledigt** |
 | 3 Assistent, Helferstamm, Backoffice-Konten, Materialausgabe | ~40 h, **erledigt** |
-| 4 Veranstaltungstag, Anerkennung | ~21 h, davon ~9 h erledigt |
+| 4 Veranstaltungstag, Anerkennung | ~21 h, davon ~15 h erledigt |
 | **gesamt** | **~146 h** |
 
 Phase 1 und 2 sind die Öffnung. Fällt die Zeit knapp aus, wird Phase 4

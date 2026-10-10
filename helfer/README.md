@@ -115,6 +115,21 @@ Die erste Schicht ist leicht – es geht um die zweite und dritte (Lastenheft
 - Die Startseite zeigt je Tag, wie viele der geplanten Plätze besetzt sind –
   das Wir, keine Rangliste.
 
+## Stempelkarte und Abzeichen
+
+Je eingetragener Schicht ein Stempel (Lastenheft 4.3, G-01), in Mein
+Helferplatz für jede Person und gleich auf der Bestätigungsseite. In den
+Kreisen steht, was es auf welcher Stufe gibt (G-02): das Shirt ab der ersten
+Schicht, die Goodies nach ihrer Schwelle, unter der Altersgrenze die
+Alternative; darunter „Noch 2 Schichten bis …“ und die Goodies nach Stunden.
+Gibt die Veranstaltung keine Goodies aus, bleibt der Dank. Jede Schicht zählt
+gleich. Ausgegeben wird am Check-in-Tisch nach den *angetretenen* Schichten.
+
+Abzeichen würdigen etwas Echtes (G-05): *Schicht-Retter* – eingetragen, als
+die Schicht unter ihrem Minimum war, vermerkt im Moment des Eintragens –,
+*Frühaufsteher* (vor 7 Uhr), *Nachtwache* (über Mitternacht oder ab 22 Uhr)
+und *Stammhelfer* (das dritte Jahr in Folge). Keine Ranglisten (G-08).
+
 ## Unter Last
 
 Der Lasttest (Lastenheft 2.10, `tests/test_last.py`) prüft, was bei einem
@@ -489,6 +504,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_hilferuf.py     # passende Stamm-Helfer, Text, 24 Stunden, abbestellen
 .venv/Scripts/python.exe helfer/tests/test_erinnerung.py   # Erinnerung vor der Schicht, Danke danach
 .venv/Scripts/python.exe helfer/tests/test_checkin.py      # Code, Gruppe, Shirt, noch nicht da, Schalter
+.venv/Scripts/python.exe helfer/tests/test_anerkennung.py  # Stempelkarte, Stufen, Abzeichen
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

@@ -231,6 +231,8 @@ input[type="text"], input[type="email"], input[type="tel"], input[type="date"], 
   color: var(--gedaempft);
 }
 .kudos div.voll { border: 2px solid var(--ok); background: var(--ok-hell); color: var(--ok); font-weight: 700; }
+.stempelkarte { margin: .5rem 0 1rem; }
+.abzeichen { display: flex; gap: .4rem; flex-wrap: wrap; }
 .person { border-top: 1px solid var(--rand); margin-top: 1rem; padding-top: .5rem; }
 .fuss { margin-top: 2rem; font-size: .88rem; color: var(--gedaempft); text-align: center; }
 .fuss a { color: var(--text); }
