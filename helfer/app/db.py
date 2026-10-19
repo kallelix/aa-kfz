@@ -190,7 +190,8 @@ def helfer_liste(vid: int) -> list[Zeile]:
         return _mit_suche(con.execute(
             "SELECT h.*,"
             " (SELECT COUNT(*) FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
-            "  WHERE e.helfer_id = h.id AND s.veranstaltung_id = ?) AS schichten"
+            "  WHERE e.helfer_id = h.id AND s.veranstaltung_id = ?) AS schichten,"
+            " h.stamm_einwilligung_am IS NOT NULL AND " + _NIE_DABEI + " AS nie_dabei"
             " FROM helfer h ORDER BY lower(h.name)", (vid,)).fetchall(),
             "name", "email", "tshirt_roh")
     finally:
@@ -1245,6 +1246,10 @@ def interesse_benachrichtigen(interesse_id: int, mail: tuple) -> None:
 # Adresse, nicht auf dem Weg hinaus, und nicht abbestellt (C-09).
 _AUFRUFBAR = ("h.stamm_einwilligung_am IS NOT NULL AND h.email <> '' AND h.aktiv = 1"
               " AND h.loeschen_beantragt_am IS NULL AND h.aufrufe_abbestellt_am IS NULL")
+# Bei keiner Veranstaltung dabei gewesen – etwa, wer sich über „Mitmachen“
+# gemeldet hat (C-10).
+_NIE_DABEI = ("NOT EXISTS (SELECT 1 FROM teilnahme t WHERE t.helfer_id = h.id)"
+              " AND NOT EXISTS (SELECT 1 FROM einteilung e WHERE e.helfer_id = h.id)")
 
 def stamm_einzuladen(vid: int) -> list[Zeile]:
     """Wer aus dem Helferstamm (D-03) zu dieser Veranstaltung noch keine
@@ -1252,7 +1257,7 @@ def stamm_einzuladen(vid: int) -> list[Zeile]:
     con = verbinden()
     try:
         return con.execute(
-            "SELECT h.* FROM helfer h WHERE " + _AUFRUFBAR +
+            "SELECT h.*, " + _NIE_DABEI + " AS nie_dabei FROM helfer h WHERE " + _AUFRUFBAR +
             " AND NOT EXISTS (SELECT 1 FROM teilnahme t WHERE t.helfer_id = h.id"
             "                 AND t.veranstaltung_id = ?)"
             " AND NOT EXISTS (SELECT 1 FROM einteilung e JOIN schicht s ON s.id = e.schicht_id"
@@ -1260,6 +1265,101 @@ def stamm_einzuladen(vid: int) -> list[Zeile]:
             " AND NOT EXISTS (SELECT 1 FROM einladung x WHERE x.helfer_id = h.id"
             "                 AND x.veranstaltung_id = ?)"
             " ORDER BY lower(h.name)", (vid, vid, vid)).fetchall()
+    finally:
+        con.close()
+
+
+def stamm_zaehlen() -> dict:
+    """Wie viele Einladungen erreichen können – und wie viele davon noch
+    nie dabei waren (C-10)."""
+    con = verbinden()
+    try:
+        zeile = con.execute(
+            "SELECT COUNT(*) AS stamm, COUNT(*) FILTER (WHERE " + _NIE_DABEI + ") AS nie_dabei"
+            " FROM helfer h WHERE " + _AUFRUFBAR).fetchone()
+        return {"stamm": int(zeile["stamm"]), "nie_dabei": int(zeile["nie_dabei"])}
+    finally:
+        con.close()
+
+
+# --- Helfer werden ohne Veranstaltung (Lastenheft C-10) ---------------------
+
+def mitmachen(person: dict) -> tuple[bool, Zeile]:
+    """Wer sich unter /mitmachen meldet. Kennen wir Name und Adresse schon –
+    auch in anderer Schreibweise –, ist es dieselbe Person, und es ändert
+    sich nichts, bis sie den Link aus der Mail anklickt. Sonst wird sie
+    angelegt, noch unbestätigt. Liefert (neu, Person)."""
+    schluessel = normalisieren.schluessel(person["name"], person["email"])
+    con = verbinden()
+    try:
+        with con:
+            vorhanden = con.execute("SELECT * FROM helfer WHERE schluessel = ?",
+                                    (schluessel,)).fetchone()
+            if vorhanden is None:
+                vorhanden = next((k for k in con.execute(
+                    "SELECT * FROM helfer WHERE lower(email) = ? ORDER BY id",
+                    (person["email"],)).fetchall()
+                    if _gleicher_name(k["name"], person["name"])), None)
+            if vorhanden is not None:
+                return False, vorhanden
+            zeile = con.execute(
+                "INSERT INTO helfer (vorname, nachname, name, email, telefon, schluessel,"
+                " angelegt_am, mitmachen_am) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT (schluessel) DO NOTHING RETURNING *",
+                (person["vorname"], person["nachname"], person["name"], person["email"],
+                 person["telefon"], schluessel, jetzt(), jetzt())).fetchone()
+            if zeile is None:
+                # Gleichzeitig ein zweites Mal abgeschickt.
+                return False, con.execute("SELECT * FROM helfer WHERE schluessel = ?",
+                                          (schluessel,)).fetchone()
+            _protokollieren(con, zeile["id"], "selbst", "Über „Mitmachen“ gemeldet")
+            return True, zeile
+    finally:
+        con.close()
+
+
+def stamm_beitreten(helfer_id: int) -> bool:
+    """Der Klick auf den Link aus der Mail (C-10): die Adresse ist bestätigt,
+    die Person im Helferstamm (D-03) – und wer Einladungen einmal abbestellt
+    hatte (C-09), hat sie mit der neuen Einwilligung wieder bestellt. True,
+    wenn die Einwilligung neu ist."""
+    con = verbinden()
+    try:
+        with con:
+            con.execute("UPDATE helfer SET email_bestaetigt_am = ? WHERE id = ?"
+                        " AND email_bestaetigt_am IS NULL", (jetzt(), helfer_id))
+            _eltern_durch_anmelder(con, helfer_id)
+            con.execute("UPDATE helfer SET aufrufe_abbestellt_am = NULL WHERE id = ?",
+                        (helfer_id,))
+            neu = con.execute("UPDATE helfer SET stamm_einwilligung_am = ? WHERE id = ?"
+                              " AND stamm_einwilligung_am IS NULL",
+                              (jetzt(), helfer_id)).rowcount > 0
+            if neu:
+                _protokollieren(con, helfer_id, "selbst",
+                                "Einwilligung Helferstamm erteilt (über „Mitmachen“)")
+            return neu
+    finally:
+        con.close()
+
+
+def mitmachen_verfallen_lassen(stunden: int) -> int:
+    """Wer sich über „Mitmachen“ gemeldet und nach `stunden` nicht bestätigt
+    hat, wird wieder gelöscht – Angaben, die niemand bestätigt hat,
+    behalten wir nicht (C-10, wie I-03). Nur, wenn sonst nichts an der
+    Person hängt. Gibt zurück, wie viele es waren."""
+    grenze = (jetzt_lokal() - timedelta(hours=stunden)).strftime("%Y-%m-%d %H:%M:%S")
+    con = verbinden()
+    try:
+        with con:
+            return con.execute(
+                "DELETE FROM helfer h WHERE h.mitmachen_am <= ?"
+                " AND h.email_bestaetigt_am IS NULL AND h.stamm_einwilligung_am IS NULL"
+                " AND h.tshirt_ausgegeben_am IS NULL AND " + _NIE_DABEI +
+                " AND NOT EXISTS (SELECT 1 FROM warteliste WHERE helfer_id = h.id)"
+                " AND NOT EXISTS (SELECT 1 FROM verfuegbarkeit WHERE helfer_id = h.id)"
+                " AND NOT EXISTS (SELECT 1 FROM ausgabe WHERE helfer_id = h.id)"
+                " AND NOT EXISTS (SELECT 1 FROM helfer m WHERE m.angemeldet_von = h.id)",
+                (grenze,)).rowcount
     finally:
         con.close()
 
@@ -2365,6 +2465,27 @@ def angaben_aendern(anmelder_id: int, helfer_id: int, werte: dict) -> bool:
                         ", geaendert_am = ? WHERE id = ?", (*werte.values(), jetzt(), helfer_id))
             _protokollieren(con, helfer_id, "selbst", "Angaben geändert")
         return True
+    finally:
+        con.close()
+
+
+def alter_nachtragen(anmelder_id: int, helfer_id: int, werte: dict) -> bool:
+    """Das Alter, wo es fehlt (C-10): wer über „Mitmachen“ kam oder aus dem
+    Import stammt, wird beim ersten Eintragen danach gefragt. Was schon
+    dasteht, bleibt."""
+    felder = ("volljaehrig", "geburtsdatum", "eltern_name", "eltern_email")
+    con = verbinden()
+    try:
+        with con:
+            if not _gehoert(con, anmelder_id, helfer_id):
+                return False
+            if con.execute("UPDATE helfer SET " + ", ".join(f + " = ?" for f in felder) +
+                           ", geaendert_am = ? WHERE id = ? AND volljaehrig IS NULL"
+                           " AND geburtsdatum IS NULL",
+                           (*(werte[f] for f in felder), jetzt(), helfer_id)).rowcount:
+                _protokollieren(con, helfer_id, "selbst", "Alter angegeben")
+                return True
+            return False
     finally:
         con.close()
 

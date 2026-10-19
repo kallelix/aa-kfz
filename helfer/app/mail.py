@@ -209,16 +209,44 @@ def anmeldung_offen(email: str, vorname: str, va_text: str, anmeldung: str) -> t
     return ("anmeldestart", email, "Die Anmeldung ist offen", text)
 
 
-def einladung(person, va_text: str, schichten: str, abbestellen: str) -> tuple:
-    """An den Helferstamm (D-03): die Angaben sind schon da, es fehlen nur
-    die Schichten."""
+def mitmachen(person, link: str) -> tuple:
+    """C-10: nach dem Eintrag unter „Mitmachen“ – erst der Klick macht die
+    Person zum Teil des Helferstamms."""
     text = "\n".join([
         f"Hallo {_vorname(person)},",
         "",
-        f"die Anmeldung für {va_text} ist offen – und wir würden uns",
-        "freuen, wenn du wieder dabei bist!",
+        "schön, dass du bei uns mithelfen willst! Bitte bestätige kurz deine",
+        "Mailadresse – dann schreiben wir dir, sobald eine Veranstaltung",
+        "geplant ist, und du suchst dir deine Schichten aus:",
         "",
-        "Deine Angaben haben wir noch. Such dir einfach Schichten aus:",
+        f"  {link}",
+        "",
+        "Warst du das nicht? Dann ignoriere diese Mail einfach – ohne Bestätigung",
+        f"löschen wir die Angaben nach {config.BESTAETIGEN_FRIST_STUNDEN} Stunden wieder.",
+        _fuss(),
+    ])
+    return ("mitmachen", person["email"], "Bitte bestätige: Du willst mithelfen", text)
+
+
+def einladung(person, va_text: str, schichten: str, abbestellen: str,
+              nie_dabei: bool = False) -> tuple:
+    """An den Helferstamm (D-03): die Angaben sind schon da, es fehlen nur
+    die Schichten. Wer sich über „Mitmachen“ gemeldet hat und noch nie
+    dabei war (C-10), wird nicht „wieder“ eingeladen."""
+    if nie_dabei:
+        anfang = [f"die Anmeldung für {va_text} ist offen! Du hast dich",
+                  "bei uns als Helfer gemeldet – jetzt geht es los.",
+                  "",
+                  "Such dir einfach Schichten aus:"]
+    else:
+        anfang = [f"die Anmeldung für {va_text} ist offen – und wir würden uns",
+                  "freuen, wenn du wieder dabei bist!",
+                  "",
+                  "Deine Angaben haben wir noch. Such dir einfach Schichten aus:"]
+    text = "\n".join([
+        f"Hallo {_vorname(person)},",
+        "",
+        *anfang,
         "",
         f"  {schichten}",
         "",
@@ -228,7 +256,8 @@ def einladung(person, va_text: str, schichten: str, abbestellen: str) -> tuple:
         f"  {abbestellen}",
         _fuss(),
     ])
-    return ("einladung", person["email"], "Die Anmeldung ist offen – bist du wieder dabei?", text)
+    return ("einladung", person["email"], "Die Anmeldung ist offen – bist du "
+            + ("dabei?" if nie_dabei else "wieder dabei?"), text)
 
 
 def hilferuf(person, va_text: str, eintraege: list[tuple[str, str]], abbestellen: str) -> tuple:

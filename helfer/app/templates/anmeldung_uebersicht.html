@@ -10,7 +10,12 @@
         <span>{{ eintrag.tage }} · {{ eintrag.zustand_text }}</span>
       </a>
     {% endfor %}
+    <p class="leise">Diesmal keine Zeit? <a href="/mitmachen">Trag dich in unseren
+      Helferstamm ein</a> – wir schreiben dir zur nächsten Veranstaltung.</p>
   {% else %}
-    <p>Gerade suchen wir keine Helfer. Schau bald wieder vorbei – oder frag uns direkt.</p>
+    {# C-10: auch ohne Veranstaltung kann man sich melden. #}
+    <p>Gerade suchen wir keine Helfer. Trag dich trotzdem ein – sobald eine Veranstaltung
+      geplant ist, schreiben wir dir.</p>
+    <a class="knopf" href="/mitmachen">Mitmachen</a>
   {% endif %}
 {% endblock %}

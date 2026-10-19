@@ -304,6 +304,10 @@ Mit Lastenheft 2.4 ist dieselbe `location` breiter geworden: sie zählt auch
 „Link anfordern“ und den Code (`/<veranstaltung>/link`, `…/danke`) und alles
 unter `/platz/` und `/bestaetigen/`. Die Zeile ist von Hand zu ersetzen.
 
+Mit Lastenheft C-10 (Helfer werden ohne Veranstaltung) zählt sie auch
+`/mitmachen` und `/mitmachen/<link>` – das Formular verschickt Mails. Auch
+diese Zeile ist von Hand zu ersetzen.
+
 ## 3. Sicherung
 
 Ein Lauf, eine Datei: `pg_dump` sichert die ganze Datenbank, also alle drei

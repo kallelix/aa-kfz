@@ -133,7 +133,13 @@
   {% endfor %}
 
   {% if not veranstaltungen and not weitere %}
-    <p>Gerade gibt es keine Veranstaltung, für die du eingetragen bist.</p>
+    {% if person.stamm_einwilligung_am %}
+      {# C-10: im Helferstamm, auch ohne Veranstaltung. #}
+      <p>Du bist in unserem Helferstamm. Sobald eine Veranstaltung geplant ist, schreiben wir
+        dir – dann suchst du dir hier deine Schichten aus.</p>
+    {% else %}
+      <p>Gerade gibt es keine Veranstaltung, für die du eingetragen bist.</p>
+    {% endif %}
   {% endif %}
 
   {% if checkin_qr %}
@@ -166,6 +172,6 @@
       <a href="/platz/{{ token }}/loeschen?wer={{ m.id }}">Daten löschen</a></p>
   {% endfor %}
 
-  <p class="leise">Bitte sei 15 Minuten vor Beginn am Treffpunkt. Diese Seite ist dein
+  <p class="leise">{% if veranstaltungen %}Bitte sei 15 Minuten vor Beginn am Treffpunkt. {% endif %}Diese Seite ist dein
     Zugang – gib den Link nicht weiter.</p>
 {% endblock %}

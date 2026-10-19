@@ -180,6 +180,11 @@ def fristen() -> tuple[int, int]:
         db.erinnert(person["id"])
         erinnert += 1
     angebot_mails(angebote, config.BASIS_URL)
+    # C-10: über „Mitmachen“ gemeldet, nie bestätigt.
+    weg = db.mitmachen_verfallen_lassen(frist)
+    if weg:
+        protokoll.info("%d Meldungen über „Mitmachen“ nicht bestätigt, gelöscht", weg)
+    verfallen += weg
     db.nach_rueckgabe_loeschen()
     db.mails_aufraeumen()
     return erinnert, verfallen

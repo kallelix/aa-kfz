@@ -460,6 +460,7 @@ Orga pro Hilferuf zehn Sekunden und erspart jede Abhängigkeit.
 | C-07 | **Keine** automatisierte Anbindung: keine inoffiziellen Bibliotheken, und Nummern aus der Datenbank werden nicht nach WhatsApp übertragen. | M | – |
 | C-08 | Interessenten einer angekündigten Veranstaltung bekommen eine Mail, sobald die Anmeldung öffnet. **Stamm-Helfer werden mit einem Klick eingeladen**; wer kommt, muss nur noch Zeiten wählen – Name, Größe und Verpflegung sind vorbelegt. | S | 3 |
 | C-09 | Hilferufe und Ankündigungen lassen sich mit einem Klick abbestellen, getrennt von den Mails zu eigenen Schichten. | M | 3 |
+| C-10 | **Helfer werden ohne Veranstaltung**: unter `/mitmachen` meldet sich, wer helfen will, auch wenn gerade keine Veranstaltung geplant ist – Pflicht sind nur Vorname, Nachname, Mail und die Einwilligung (D-03), bestätigt per Mail. Eingeladen wird wie in C-08; Shirt, Verpflegung und Alter fragt erst die Schichtwahl, und dort stehen sie, wie gespeichert, zum Ändern. | S | 3 |
 
 **Zur Community selbst** (Orga, nicht Software): die zwei bestehenden Gruppen
 in eine Community überführen, mit einer Ankündigungsgruppe für alle und je
@@ -485,6 +486,23 @@ Schicht, der die Zusage vorbereitet. Passend: zu der Zeit frei, Zeiten und
 Vorlieben (dieses Jahr, sonst zuletzt), Alter und Einsatzgrenzen. Je Schicht
 geht höchstens eine Mail-Runde in 24 Stunden. Hilferufe und Einladungen
 bestellt man mit einem Klick ab, aus der Mail oder in Mein Helferplatz.
+
+**Stand 19.10.2026, Schritt 3.9:** C-10 ist umgesetzt. `/mitmachen` fragt
+Vorname, Nachname, Mail, freiwillig das Handy, und die Einwilligung, zu
+Veranstaltungen eingeladen zu werden – ab 16 (Art. 8 DSGVO; jünger meldet
+man sich mit den Eltern zu einer Veranstaltung an). Danach steht immer
+dasselbe da; die Mail geht an die angegebene Adresse, und erst der Klick auf
+der verlinkten Seite macht die Person zum Teil des Helferstamms. Wer schon
+bekannt ist – auch in anderer Schreibweise –, wird nicht doppelt angelegt;
+wer Einladungen abbestellt hatte, hat sie mit der neuen Einwilligung wieder
+bestellt. Unbestätigt ist der Eintrag nach der Bestätigungsfrist wieder weg.
+Die Einladung (C-08) sagt Neuen nicht „wieder dabei“. Bei der Schichtwahl
+über den persönlichen Link stehen unter jeder Person Shirt und Verpflegung,
+wie gespeichert, zum Ändern; was fehlt, wird gefragt, das Alter nur, wenn es
+unbekannt ist, unter 18 mit den Eltern (D-06). Unter Leute → Einladen stehen
+Link und QR-Code für Flyer und Plakat; wer noch nie dabei war, ist als
+„neu“ markiert. Ohne Teilnahme gilt die Speicherfrist ab der Einwilligung
+(D-04).
 
 **Stand 09.10.2026, Schritt 3.5:** C-02 und G-07 sind umgesetzt. Zwei Tage
 vor der ersten Schicht oder Springer-Zeit kommt die Erinnerung – Schichten
@@ -970,6 +988,7 @@ Phase Vorrang.
 | 3.6 | ~~Warteliste mit Nachrücken~~ – vorgezogen in 2.5 | – |
 | 3.8 | **Materialausgabe verallgemeinern** (V-09): Materialien je Veranstaltung, eine Ausgabe für alles mit Rückgabe, Unterschrift und Nummer; Funk und Schlüssel ziehen um | **erledigt** |
 | 3.7 | Persönliche Backoffice-Konten mit Rollen und Einladen – für alle drei Bereiche | **erledigt** |
+| 3.9 | **Helfer werden ohne Veranstaltung** (C-10): `/mitmachen` mit Bestätigung per Mail, Einladung wie C-08, Shirt, Verpflegung und Alter bei der Schichtwahl | **erledigt** |
 
 ### Phase 4 – Veranstaltungstag und Anerkennung (März bis Ende April 2027)
 

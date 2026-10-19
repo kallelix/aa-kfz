@@ -35,6 +35,13 @@
     </div>
   {% endif %}
 
+  {{ alter_felder(p, e, du) }}
+  {{ shirt_essen_felder(p, e) }}
+{% endmacro %}
+
+{# Alter, unter 18 die Eltern – bei der Anmeldung immer, aus Mein
+   Helferplatz nur, wenn wir es nicht kennen (C-10). #}
+{% macro alter_felder(p, e, du) %}
   <fieldset class="{% if fehler[p ~ 'volljaehrig'] %}feld-fehler{% endif %}">
     <legend>{{ 'Bist du 18 oder älter?' if du else 'Ist die Person 18 oder älter?' }}</legend>
     <div class="knopfwahl">
@@ -67,7 +74,10 @@
       {% if fehler[p ~ 'eltern_email'] %}<p class="fehler">{{ fehler[p ~ 'eltern_email'] }}</p>{% endif %}
     </div>
   </div>
+{% endmacro %}
 
+{# Shirt und Essen – nur, was die Veranstaltung anbietet (I-02). #}
+{% macro shirt_essen_felder(p, e) %}
   {% if angebot.shirt %}
     <label for="{{ p }}tshirt">T-Shirt</label>
     <div class="zeile">
@@ -153,14 +163,26 @@
     {% endif %}
 
     {% if platz %}
-      {# Aus Mein Helferplatz: die Person ist bekannt, gefragt wird nur, wer
-         mitkommt – sie selbst, die schon Mitangemeldeten, neue. #}
+      {# Aus Mein Helferplatz: die Person ist bekannt, gefragt wird, wer
+         mitkommt – sie selbst, die schon Mitangemeldeten, neue. Shirt und
+         Essen stehen da, wie wir sie kennen, und lassen sich ändern; nach
+         dem Alter fragen wir nur, wenn wir es nicht kennen (C-10). #}
       <fieldset class="karte{% if fehler.wer %} feld-fehler{% endif %}">
         <legend>Wer kommt zu diesen Schichten?</legend>
+        {% if angebot.shirt or angebot.verpflegung %}
+          <p class="leise">Was wir schon wissen, steht da – stimmt etwas nicht mehr, ändere es
+            hier.</p>
+        {% endif %}
         {% for p in [platz.person] + platz.mit %}
           <label class="haken"><input type="checkbox" name="wer" value="{{ p.id }}"
                  {% if p.id in platz.wer %}checked{% endif %}>
             <span>{{ p.name }}{% if loop.first %} <span class="leise">(du)</span>{% endif %}</span></label>
+          {% if angebot.shirt or angebot.verpflegung or p.id in platz.alter_fehlt %}
+            <div class="ergaenzen" data-ergaenzen="{{ p.id }}">
+              {% if p.id in platz.alter_fehlt %}{{ alter_felder('m' ~ p.id ~ '-', eingabe, loop.first) }}{% endif %}
+              {{ shirt_essen_felder('m' ~ p.id ~ '-', eingabe) }}
+            </div>
+          {% endif %}
         {% endfor %}
         {% if fehler.wer %}<p class="fehler">{{ fehler.wer }}</p>{% endif %}
       </fieldset>

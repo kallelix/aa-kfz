@@ -6,11 +6,23 @@
    Knopf. Mailscanner rufen Links vorab auf – ein Link, der sich beim Aufruf
    verbraucht, wäre sonst schon tot (Lastenheft 7.4). #}
 {% block inhalt %}
-  <p>Bitte bestätige, dass <strong>{{ person.email }}</strong> deine Adresse ist –
-    dann steht deine Anmeldung fest.</p>
+  {% if mitmachen %}
+    {# C-10: der Eintrag unter „Mitmachen“. #}
+    <p>Bitte bestätige, dass <strong>{{ person.email }}</strong> deine Adresse ist – dann
+      bist du in unserem Helferstamm, und wir schreiben dir, sobald eine Veranstaltung
+      geplant ist.</p>
+  {% else %}
+    <p>Bitte bestätige, dass <strong>{{ person.email }}</strong> deine Adresse ist –
+      dann steht deine Anmeldung fest.</p>
+  {% endif %}
   <form method="post" action="{{ ziel or '/bestaetigen/' ~ token }}">
     <button type="submit" class="knopf">Ja, das bin ich</button>
   </form>
-  <p class="leise">Du hast dich nicht angemeldet? Dann schließ die Seite einfach –
-    ohne Bestätigung löschen wir die Angaben wieder.</p>
+  {% if mitmachen %}
+    <p class="leise">Du hast dich nicht eingetragen? Dann schließ die Seite einfach – ohne
+      Bestätigung schreiben wir dir nicht.</p>
+  {% else %}
+    <p class="leise">Du hast dich nicht angemeldet? Dann schließ die Seite einfach –
+      ohne Bestätigung löschen wir die Angaben wieder.</p>
+  {% endif %}
 {% endblock %}

@@ -111,6 +111,20 @@ def person_pruefen(daten: dict, praefix: str, angebot: dict, stichtag: date,
             fehler[praefix + "telefon"] = "Diese Nummer können wir nicht lesen."
             telefon = ""
 
+    alter = _alter_pruefen(feld, praefix, stichtag, fehler, email)
+    shirt_essen = _shirt_essen(feld, praefix, angebot, fehler)
+    werte = {
+        "vorname": vorname, "nachname": nachname,
+        "name": (vorname + " " + nachname).strip(),
+        "email": email, "telefon": telefon, **alter,
+        "tshirt": None, "tshirt_roh": "", "veggie": None, **shirt_essen,
+    }
+    return werte, fehler
+
+
+def _alter_pruefen(feld, praefix: str, stichtag: date, fehler: dict, email: str) -> dict:
+    """Volljährig oder das Geburtsdatum, unter 18 die Eltern (D-06).
+    `email`: die eigene Adresse der Person, wenn sie eine hat."""
     volljaehrig = {"ja": 1, "nein": 0}.get(feld("volljaehrig"))
     geburtsdatum, alter = None, None
     if volljaehrig is None:
@@ -142,19 +156,10 @@ def person_pruefen(daten: dict, praefix: str, angebot: dict, stichtag: date,
             fehler[praefix + "eltern_email"] = (
                 "An diese Adresse geht die Bitte um Einverständnis." if not eltern_email
                 else "Diese Mailadresse sieht nicht vollständig aus.")
-        elif mit_kontakt and eltern_email == email:
+        elif email and eltern_email == email:
             fehler[praefix + "eltern_email"] = "Bitte die Adresse deiner Eltern – nicht deine eigene."
-
-    shirt_essen = _shirt_essen(feld, praefix, angebot, fehler)
-    werte = {
-        "vorname": vorname, "nachname": nachname,
-        "name": (vorname + " " + nachname).strip(),
-        "email": email, "telefon": telefon,
-        "volljaehrig": volljaehrig, "geburtsdatum": geburtsdatum, "alter": alter,
-        "eltern_name": eltern_name, "eltern_email": eltern_email,
-        "tshirt": None, "tshirt_roh": "", "veggie": None, **shirt_essen,
-    }
-    return werte, fehler
+    return {"volljaehrig": volljaehrig, "geburtsdatum": geburtsdatum, "alter": alter,
+            "eltern_name": eltern_name, "eltern_email": eltern_email}
 
 
 def _shirt_essen(feld, praefix: str, angebot: dict, fehler: dict) -> dict:
@@ -199,6 +204,33 @@ def angaben_pruefen(daten: dict, praefix: str, angebot: dict,
         else:
             werte["telefon"] = telefon
     return werte, fehler
+
+
+def alter_unbekannt(person) -> bool:
+    """Weder volljährig noch ein Geburtsdatum – wer über „Mitmachen“ kam
+    (C-10) oder aus dem Import stammt."""
+    return person["volljaehrig"] is None and not person["geburtsdatum"]
+
+
+def ergaenzen_pruefen(daten: dict, praefix: str, angebot: dict, person,
+                      stichtag: date) -> tuple[dict, dict, dict]:
+    """Beim Eintragen aus Mein Helferplatz (C-10): Shirt und Verpflegung,
+    wie sie gespeichert sind, zum Ansehen und Ändern – was fehlt, muss
+    jetzt her. Ein leeres Feld behält, was gespeichert ist. Das Alter nur,
+    wenn wir es nicht kennen. Liefert (Änderungen, Alter oder {}, Fehler)."""
+    fehler: dict[str, str] = {}
+    vorgabe = vorbelegen(person, praefix)
+
+    def feld(name: str) -> str:
+        return normalisieren.text(daten.get(praefix + name)) or vorgabe.get(praefix + name, "")
+
+    aenderungen = {k: w for k, w in _shirt_essen(feld, praefix, angebot, fehler).items()
+                   if person[k] != w}
+    alter = {}
+    if alter_unbekannt(person):
+        alter = _alter_pruefen(lambda name: normalisieren.text(daten.get(praefix + name)),
+                               praefix, stichtag, fehler, person["email"] or "")
+    return aenderungen, alter, fehler
 
 
 def vorbelegen(person, praefix: str) -> dict:

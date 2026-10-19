@@ -1292,7 +1292,8 @@ def _einladung(request: Request, v, person) -> tuple:
     tok = zugang.token(zugang.PLATZ, person)
     adresse = normalisieren.kurzadresse(v["kurz"])
     return mail.einladung(person, selbstanmeldung.va_text(v),
-                          f"{basis}/platz/{tok}/{adresse}/schichten", _abbestellen(request, person))
+                          f"{basis}/platz/{tok}/{adresse}/schichten", _abbestellen(request, person),
+                          nie_dabei=bool(person.get("nie_dabei")))
 
 
 def _abbestellen(request: Request, person) -> str:
@@ -1309,11 +1310,26 @@ async def einladen_seite(request: Request, hinweis: str = "",
     beispiel = mail.einladung({"vorname": "Lena", "name": "Lena", "email": ""},
                               selbstanmeldung.va_text(v), "(Link zu den Schichten)",
                               "(Link zum Abbestellen)")[3]
+    mitmachen = _basis(request) + "/mitmachen"
     return templates.TemplateResponse(
         "admin_einladen.html",
         _admin(request, sitzung, hinweis=hinweis, liste=liste, offen=_zustand(v) == "offen",
                schon=db.eingeladen(v["id"]), beispiel=beispiel,
-               darf=_pflegt_grenzen(sitzung)))
+               darf=_pflegt_grenzen(sitzung), stamm=db.stamm_zaehlen(),
+               # C-10: der Weg in den Helferstamm ohne Veranstaltung – als
+               # Link und als Code für Flyer und Plakat.
+               mitmachen=mitmachen, mitmachen_qr=segno.make(mitmachen, error="m").svg_inline(
+                   scale=4, dark="#000000", border=2)))
+
+
+@app.get("/helfer/einladen/mitmachen.svg")
+async def mitmachen_code(request: Request, sitzung: auth.Sitzung = Depends(_sitzung)):
+    """Der Code zu /mitmachen zum Herunterladen – für den Druck."""
+    puffer = io.BytesIO()
+    segno.make(_basis(request) + "/mitmachen", error="m").save(
+        puffer, kind="svg", scale=10, border=2)
+    return Response(puffer.getvalue(), media_type="image/svg+xml",
+                    headers={"Content-Disposition": 'attachment; filename="mitmachen.svg"'})
 
 
 @app.post("/helfer/einladen")
@@ -2969,7 +2985,7 @@ class _Adresse(StringConvertor):
     Pfadteile. Sonst passte '/monitor/' ohne Schrägstrich auf '/{adresse}',
     und Starlette leitete dorthin um, statt 404 zu geben."""
     regex = (r"(?!(?:helfer|monitor|unterschrift|static|gemeinsam|platz|bestaetigen"
-             r"|kalender|email|eltern|datenschutz|abbestellen|party|s)(?![^/]))[^/]+")
+             r"|kalender|email|eltern|datenschutz|abbestellen|party|s|mitmachen)(?![^/]))[^/]+")
 
 
 register_url_convertor("adresse", _Adresse())
@@ -3015,6 +3031,89 @@ def oeffentlicher_start(request: Request):
         return RedirectResponse("/" + liste[0]["adresse"], status_code=303)
     return templates.TemplateResponse("anmeldung_uebersicht.html",
                                       _oeffentlich(request, liste=liste))
+
+
+# --- Helfer werden ohne Veranstaltung (Lastenheft C-10) ---------------------
+
+def _mitmachen_seite(request: Request, eingabe=None, fehler=None, gesendet=False,
+                     status_code: int = 200):
+    return templates.TemplateResponse(
+        "anmeldung_mitmachen.html",
+        _oeffentlich(request, None, eingabe=eingabe or {}, fehler=fehler or {},
+                     gesendet=gesendet, frist=config.BESTAETIGEN_FRIST_STUNDEN),
+        status_code=status_code)
+
+
+@app.get("/mitmachen")
+def mitmachen_seite(request: Request, gesendet: str = ""):
+    """Sich als Helfer melden, auch wenn gerade keine Veranstaltung Helfer
+    sucht – nur Name und Adresse. Eingeladen wird, sobald eine geplant ist
+    (C-08); Shirt, Essen und Alter fragt erst die Schichtwahl."""
+    return _mitmachen_seite(request, gesendet=bool(gesendet))
+
+
+@app.post("/mitmachen")
+async def mitmachen(request: Request):
+    """Die Seite sagt danach immer dasselbe – ob wir jemanden schon kennen,
+    verrät sie nicht. Die Mail geht an die angegebene Adresse: mit dem Link
+    zum Bestätigen, oder, wer schon im Helferstamm ist, mit dem Link zu Mein
+    Helferplatz."""
+    daten = await request.form()
+    ziel = RedirectResponse("/mitmachen?gesendet=1", status_code=303)
+    if normalisieren.text(daten.get("webseite")):
+        return ziel
+    vorname = normalisieren.text(daten.get("vorname"))[:60]
+    nachname = normalisieren.text(daten.get("nachname"))[:60]
+    email = normalisieren.text(daten.get("email")).lower()[:120]
+    telefon = normalisieren.telefon(normalisieren.text(daten.get("telefon")))
+    fehler = {}
+    if not vorname:
+        fehler["vorname"] = "Bitte den Vornamen."
+    if not nachname:
+        fehler["nachname"] = "Bitte den Nachnamen."
+    if not selbstanmeldung._EMAIL.match(email):
+        fehler["email"] = ("Bitte deine Mailadresse – an sie geht die Bestätigung."
+                           if not email else "Diese Mailadresse sieht nicht vollständig aus.")
+    if telefon is None:
+        fehler["telefon"] = "Diese Nummer können wir nicht lesen."
+    if not daten.get("einverstanden"):
+        fehler["einverstanden"] = "Bitte das Häkchen setzen – sonst dürfen wir dir nicht schreiben."
+    if fehler:
+        return _mitmachen_seite(request, {k: str(w) for k, w in daten.items()}, fehler,
+                                status_code=400)
+    _, person = db.mitmachen({"vorname": vorname, "nachname": nachname,
+                              "name": f"{vorname} {nachname}", "email": email,
+                              "telefon": telefon})
+    if (person["stamm_einwilligung_am"] and person["email_bestaetigt_am"]
+            and not person["aufrufe_abbestellt_am"]):
+        _link_mail(request, person)
+    else:
+        db.mail_einreihen(person["id"], mail.mitmachen(
+            person, _basis(request) + "/mitmachen/" + zugang.token(zugang.STAMM, person)))
+    return ziel
+
+
+@app.get("/mitmachen/{tok}")
+def mitmachen_bestaetigen_seite(request: Request, tok: str):
+    """Der Link aus der Mail zeigt nur den Knopf – eingelöst wird erst beim
+    Klick (7.4)."""
+    person = _person_mit(zugang.STAMM, tok)
+    if person is None:
+        return _nicht_da(request)
+    return templates.TemplateResponse(
+        "anmeldung_bestaetigen.html",
+        _oeffentlich(request, None, person=person, token=tok, ziel="/mitmachen/" + tok,
+                     mitmachen=True))
+
+
+@app.post("/mitmachen/{tok}")
+async def mitmachen_bestaetigen(request: Request, tok: str):
+    person = _person_mit(zugang.STAMM, tok)
+    if person is None:
+        return _nicht_da(request)
+    db.stamm_beitreten(person["id"])
+    return RedirectResponse("/platz/" + zugang.token(zugang.PLATZ, person) + "?hinweis=dabei",
+                            status_code=303)
 
 
 @app.get("/{adresse:adresse}")
@@ -3633,6 +3732,8 @@ def _platz_party(request: Request, v, person) -> dict | None:
 
 _PLATZ_HINWEISE = {
     "bestaetigt": "Danke – deine Adresse ist bestätigt. Du bist dabei!",
+    "dabei": "Danke – du bist in unserem Helferstamm. Sobald eine Veranstaltung geplant ist, "
+             "schreiben wir dir.",
     "dazu": "Eingetragen. Eine Mail mit allem ist unterwegs.",
     "abgesagt": "Abgesagt – danke, dass du Bescheid sagst! Das hilft uns sehr.",
     "getauscht": "Getauscht. Eine Mail mit allem ist unterwegs.",
@@ -3781,11 +3882,25 @@ def platz_schichten(request: Request, tok: str, adresse: str, hinweis: str = "")
 
 def _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste, weitere, wer,
                 **extra):
+    mit = db.mitangemeldete(person["id"])
+    # C-10: wessen Alter wir nicht kennen – danach wird gefragt. Frisch
+    # gelesen: nach einer Absage wegen des Mindestalters steht es schon da.
+    alter_fehlt = {p["id"] for p in [db.helfer_laden(person["id"])] + mit
+                   if selbstanmeldung.alter_unbekannt(p)}
     return _angaben_seite(
         request, v, gewaehlte, fenster, werte, liste, weitere,
-        platz={"token": tok, "person": person, "mit": db.mitangemeldete(person["id"]),
-               "wer": wer},
+        platz={"token": tok, "person": person, "mit": mit, "wer": wer,
+               "alter_fehlt": alter_fehlt},
         basis=f"/platz/{tok}/{normalisieren.kurzadresse(v['kurz'])}", **extra)
+
+
+def _vorbelegt(person) -> dict:
+    """Shirt und Verpflegung, wie sie gespeichert sind, für die Person und
+    alle, die sie mitangemeldet hat – zum Ansehen und Ändern (C-10)."""
+    werte = {}
+    for p in [person] + db.mitangemeldete(person["id"]):
+        werte.update(selbstanmeldung.vorbelegen(p, f"m{p['id']}-"))
+    return werte
 
 
 @app.get("/platz/{tok}/{adresse:adresse}/angaben")
@@ -3801,7 +3916,7 @@ def platz_angaben(request: Request, tok: str, adresse: str):
     if not gewaehlte and not fenster:
         return RedirectResponse(f"/platz/{tok}/{adresse}/schichten?hinweis=leer",
                                 status_code=303)
-    return _dazu_seite(request, v, tok, person, gewaehlte, fenster, {},
+    return _dazu_seite(request, v, tok, person, gewaehlte, fenster, _vorbelegt(person),
                        {"voraussetzung": []}, [], [person["id"]])
 
 
@@ -3828,6 +3943,16 @@ async def platz_angaben_absenden(request: Request, tok: str, adresse: str):
 
     angebot = db.angebot(v["id"])
     neue, fehler = [], {}
+    # C-10: Shirt und Verpflegung, wie sie für diese Veranstaltung gelten
+    # sollen, und das Alter, wo wir es nicht kennen.
+    bekannt = {p["id"]: p for p in [person] + db.mitangemeldete(person["id"])}
+    nachtrag = []
+    for helfer_id in wer:
+        if helfer_id in bekannt:
+            aenderungen, alter, f = selbstanmeldung.ergaenzen_pruefen(
+                daten, f"m{helfer_id}-", angebot, bekannt[helfer_id], v["beginn"])
+            nachtrag.append((helfer_id, aenderungen, alter))
+            fehler.update(f)
     for i in range(len(personen_roh)):
         werte_i, f = selbstanmeldung.person_pruefen(daten, f"p{i}-", angebot, v["beginn"], False)
         neue.append(werte_i)
@@ -3839,6 +3964,13 @@ async def platz_angaben_absenden(request: Request, tok: str, adresse: str):
     if fehler:
         return _dazu_seite(request, v, tok, person, gewaehlte, fenster, werte, liste,
                            personen_roh, wer, fehler=fehler, status_code=400)
+    # Vor dem Eintragen: das Mindestalter der Schichten prüft dazunehmen an
+    # dem, was gespeichert ist.
+    for helfer_id, aenderungen, alter in nachtrag:
+        if aenderungen:
+            db.angaben_aendern(person["id"], helfer_id, aenderungen)
+        if alter:
+            db.alter_nachtragen(person["id"], helfer_id, alter)
     try:
         dazu = db.dazunehmen(v["id"], person["id"], wer, neue, [s["id"] for s in gewaehlte],
                              [(f["schluessel"], f["beginn"], f["ende"]) for f in fenster],

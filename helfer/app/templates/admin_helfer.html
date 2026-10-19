@@ -105,7 +105,9 @@
           {% for h in helfer %}
             <tr id="helfer-{{ h.id }}" data-suche="{{ h.suche }}"
                 {% if h.tshirt_ausgegeben_am %}class="ist-ausgegeben"{% endif %}>
-              <td><a href="/helfer/helfer/{{ h.id }}">{{ h.name }}</a></td>
+              <td><a href="/helfer/helfer/{{ h.id }}">{{ h.name }}</a>
+                {%- if h.nie_dabei %} <span class="marke marke-neu"
+                  title="im Helferstamm, noch bei keiner Veranstaltung dabei">neu</span>{% endif %}</td>
               <td data-wert="{{ h.email }}">
                 {% if h.email %}
                   <a href="mailto:{{ h.email }}">{{ h.email }}</a>

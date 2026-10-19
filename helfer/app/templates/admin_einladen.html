@@ -6,10 +6,11 @@
    bei Anmeldestart eine Mail mit seinem Link direkt zu den Schichten. Wer
    Interesse vorgemerkt hat, bekommt seine Mail von selbst (versand.py). #}
 {% block inhalt %}
-  <p>Wer bei einer früheren Veranstaltung eingewilligt hat, wieder angeschrieben zu werden,
-    bekommt eine Mail mit seinem persönlichen Link: Name, Größe und Verpflegung sind schon
-    da, es fehlen nur die Schichten. Wer Interesse vorgemerkt hat, bekommt seine Mail von
-    selbst, sobald die Anmeldung offen ist.</p>
+  <p>Wer eingewilligt hat, angeschrieben zu werden – bei einer früheren Veranstaltung oder
+    unter „Mitmachen“ –, bekommt eine Mail mit seinem persönlichen Link zu den Schichten.
+    Was wir schon wissen, steht dort und lässt sich ändern; was fehlt – Größe, Verpflegung,
+    bei Neuen das Alter –, wird beim Eintragen gefragt. Wer Interesse vorgemerkt hat, bekommt
+    seine Mail von selbst, sobald die Anmeldung offen ist.</p>
 
   <section class="kasten">
     <h2>Noch nicht eingeladen ({{ liste | length }})</h2>
@@ -21,7 +22,8 @@
     {% else %}
       <ul class="strichliste">
         {% for p in liste %}
-          <li><span><a href="/helfer/helfer/{{ p.id }}">{{ p.name }}</a></span>
+          <li><span><a href="/helfer/helfer/{{ p.id }}">{{ p.name }}</a>
+              {%- if p.nie_dabei %} <span class="marke marke-neu" title="noch bei keiner Veranstaltung dabei">neu</span>{% endif %}</span>
             <span class="gedaempft">{{ p.email }}</span></li>
         {% endfor %}
       </ul>
@@ -40,5 +42,21 @@
   <section>
     <h2>Die Mail</h2>
     <pre>{{ beispiel }}</pre>
+    <p class="hilfe">Wer noch nie dabei war, wird nicht „wieder“ eingeladen: die Mail beginnt
+      dann mit „Du hast dich bei uns als Helfer gemeldet – jetzt geht es los.“</p>
+  </section>
+
+  {# C-10: der Weg in den Helferstamm ohne Veranstaltung. #}
+  <section class="kasten">
+    <h2>Neue Helfer gewinnen</h2>
+    <p>Über diesen Link trägt sich jeder in den Helferstamm ein, auch wenn gerade keine
+      Veranstaltung Helfer sucht – mit Name und Mailadresse, bestätigt per Mail. Ist die
+      Anmeldung einer Veranstaltung offen, stehen alle oben in der Liste.</p>
+    <p><a href="{{ mitmachen }}">{{ mitmachen }}</a></p>
+    <div class="mitmachen-qr">{{ mitmachen_qr | safe }}</div>
+    <p><a class="knopf-schlicht" href="/helfer/einladen/mitmachen.svg" download>Code als SVG
+      für Flyer und Plakat</a></p>
+    <p class="hilfe">Im Helferstamm: {{ stamm.stamm }}, davon {{ stamm.nie_dabei }} noch bei
+      keiner Veranstaltung dabei.</p>
   </section>
 {% endblock %}

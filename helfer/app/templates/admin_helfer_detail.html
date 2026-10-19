@@ -48,6 +48,13 @@
         {%- else %}<span class="gedaempft">nicht angegeben</span>{% endif %}
       </dd>
 
+      {% if person.stamm_einwilligung_am %}
+        {# D-03, C-10: seit wann, und ob über „Mitmachen“. #}
+        {% set am = person.stamm_einwilligung_am %}
+        <dt>Helferstamm</dt>
+        <dd>seit {{ am[8:10] }}.{{ am[5:7] }}.{{ am[:4] }}
+          {%- if person.mitmachen_am %} <span class="gedaempft">(über „Mitmachen“)</span>{% endif %}</dd>
+      {% endif %}
       {% if eingeladen_von %}
         <dt>Kam über</dt><dd><a href="/helfer/helfer/{{ eingeladen_von.id }}">{{ eingeladen_von.name }}</a></dd>
       {% endif %}

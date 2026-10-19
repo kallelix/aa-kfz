@@ -166,6 +166,32 @@ zu Mein Helferplatz, wo man die Einladungen abstellt. Wer eine Einladung hat,
 bekommt keine zweite; die Seite zeigt vorher, wer sie bekommt und wie sie
 lautet.
 
+Bei der Schichtwahl über diesen Link stehen unter jeder Person Shirt und
+Verpflegung, wie sie gespeichert sind – ändern geht dort, und was fehlt, wird
+gefragt. Nach dem Alter fragt die Seite nur, wenn wir es nicht kennen (wer
+über „Mitmachen“ kam oder aus dem Import stammt); unter 18 mit den Eltern
+wie bei der Anmeldung.
+
+## Mitmachen ohne Veranstaltung
+
+Unter `/mitmachen` meldet sich, wer helfen will, auch wenn gerade keine
+Veranstaltung Helfer sucht (Lastenheft C-10): Vorname, Nachname, Mail,
+freiwillig das Handy, und die Einwilligung, eingeladen zu werden – ab 16.
+Shirt, Essen und Alter fragt erst die Schichtwahl. Danach steht immer
+„Fast geschafft“ da, ob wir die Person kennen oder nicht; die Mail geht an
+die angegebene Adresse – mit dem Link zum Bestätigen, oder, wer schon im
+Helferstamm ist, mit dem Link zu Mein Helferplatz. Erst der Klick auf der
+verlinkten Seite macht die Person zum Teil des Helferstamms; wer Einladungen
+einmal abbestellt hatte, hat sie damit wieder bestellt. Wer nicht bestätigt,
+ist nach `BESTAETIGEN_FRIST_STUNDEN` wieder gelöscht (`versand.fristen`).
+
+Die Startseite, die Seite jeder Veranstaltung und der Datenschutzhinweis
+führen dorthin. Unter Leute → Einladen stehen der Link und der QR-Code für
+Flyer und Plakat (auch als SVG zum Herunterladen) und wie viele im
+Helferstamm noch bei keiner Veranstaltung dabei waren; in der Einladung
+heißt es für sie nicht „wieder dabei“. In den Listen sind sie als „neu“
+markiert.
+
 ## Hilferuf
 
 Unter Leute → Hilferuf (Lastenheft 3.4, C-03) stehen die knappen Schichten –
@@ -275,9 +301,10 @@ Seit Lastenheft 2.9 (D-01 bis D-07):
   Rechtsgrundlagen, Speicherdauer, Rechte. Der Text ist ein Entwurf und
   gehört vor dem Start fachkundig geprüft (D-09).
 - **Helferstamm** nur mit eigener Einwilligung: ein freiwilliges, nicht
-  vorangekreuztes Häkchen bei der Anmeldung, in Mein Helferplatz unter
-  „Angaben ändern“ genauso leicht wieder weg. Ohne Einwilligung wird nach der
-  Veranstaltung gelöscht.
+  vorangekreuztes Häkchen bei der Anmeldung oder unter `/mitmachen`, in Mein
+  Helferplatz unter „Angaben ändern“ genauso leicht wieder weg. Ohne
+  Einwilligung wird nach der Veranstaltung gelöscht; wer nie dabei war,
+  spätestens drei Jahre nach der Einwilligung.
 - **Unter 18** fragt das Formular nach einer erziehungsberechtigten Person.
   Sie bekommt eine Mail mit den Schichten und einem Knopf; erst dann gilt die
   Anmeldung. Nach 24 Stunden geht eine Erinnerung, nach 72 sind die Plätze
@@ -532,6 +559,7 @@ Aus dem Hauptordner:
 .venv/Scripts/python.exe helfer/tests/test_anerkennung.py  # Stempelkarte, Stufen, Abzeichen
 .venv/Scripts/python.exe helfer/tests/test_party.py        # Einladung, Zusage mit Begleitung, Erinnerung am Tag
 .venv/Scripts/python.exe helfer/tests/test_freunde.py      # Link teilen, über den Link anmelden, wer zählt
+.venv/Scripts/python.exe helfer/tests/test_mitmachen.py    # ohne Veranstaltung melden, bestätigen, einladen, Shirt und Alter nachtragen
 ```
 
 Die ersten drei laufen ohne Server, die übrigen starten ihn selbst und legen

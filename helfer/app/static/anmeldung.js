@@ -87,4 +87,13 @@
     Array.prototype.forEach.call(radios, function (r) { r.addEventListener("change", zeigen); });
     zeigen();
   });
+
+  // --- Mein Helferplatz: Shirt, Essen und Alter nur für die, die mitkommen -
+  Array.prototype.forEach.call(document.querySelectorAll("[data-ergaenzen]"), function (block) {
+    var box = document.querySelector('input[name="wer"][value="' + block.dataset.ergaenzen + '"]');
+    if (!box) { return; }
+    var zeigen = function () { block.hidden = !box.checked; };
+    box.addEventListener("change", zeigen);
+    zeigen();
+  });
 })();

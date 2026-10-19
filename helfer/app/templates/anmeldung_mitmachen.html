@@ -1,0 +1,80 @@
+{% extends "anmeldung_base.html" %}
+{% block titel %}Mitmachen{% endblock %}
+{% block ueberschrift %}Werde Teil unseres Helferteams!{% endblock %}
+
+{# C-10: in den Helferstamm, auch wenn gerade keine Veranstaltung Helfer
+   sucht. Gefragt wird nur, was wir zum Einladen brauchen – Shirt, Essen und
+   Alter fragt die Schichtwahl, wenn es um eine Veranstaltung geht. Ob wir
+   jemanden schon kennen, verrät die Seite nicht: danach steht immer
+   dasselbe da. #}
+{% block inhalt %}
+  {% if gesendet %}
+    <div class="hinweis gut">
+      <strong>Fast geschafft!</strong> Wir haben dir eine Mail geschickt – bitte bestätige darin
+      deine Adresse. Danach schreiben wir dir, sobald eine Veranstaltung geplant ist.
+    </div>
+    <p class="leise">Keine Mail da? Schau auch im Spam-Ordner nach. Ohne Bestätigung löschen wir
+      die Angaben nach {{ frist }} Stunden wieder.</p>
+  {% else %}
+    <p>Ohne Helfer gibt es kein Rennen. Trag dich ein – sobald eine Veranstaltung geplant ist,
+      schreiben wir dir, und du suchst dir aus, wann und wo du hilfst. Verpflichtet bist du damit
+      zu nichts.</p>
+
+    {% if fehler %}
+      <div class="hinweis warn" role="alert">Bitte schau noch einmal auf die markierten Felder.</div>
+    {% endif %}
+
+    <form method="post" action="/mitmachen" class="karte" novalidate>
+      <div class="zeile">
+        <div class="{% if fehler.vorname %}feld-fehler{% endif %}">
+          <label for="vorname">Vorname</label>
+          <input type="text" id="vorname" name="vorname" maxlength="60" required
+                 autocomplete="given-name" value="{{ eingabe.vorname }}">
+        </div>
+        <div class="{% if fehler.nachname %}feld-fehler{% endif %}">
+          <label for="nachname">Nachname</label>
+          <input type="text" id="nachname" name="nachname" maxlength="60" required
+                 autocomplete="family-name" value="{{ eingabe.nachname }}">
+        </div>
+      </div>
+      {% for f in ('vorname', 'nachname') %}{% if fehler[f] %}<p class="fehler">{{ fehler[f] }}</p>{% endif %}{% endfor %}
+
+      <div class="{% if fehler.email %}feld-fehler{% endif %}">
+        <label for="email">E-Mail <span class="leise">– dorthin schreiben wir dir</span></label>
+        <input type="email" id="email" name="email" maxlength="120" required
+               autocomplete="email" inputmode="email" value="{{ eingabe.email }}">
+        {% if fehler.email %}<p class="fehler">{{ fehler.email }}</p>{% endif %}
+      </div>
+      <div class="{% if fehler.telefon %}feld-fehler{% endif %}">
+        <label for="telefon">Handy <span class="leise">– freiwillig</span></label>
+        <input type="tel" id="telefon" name="telefon" maxlength="40"
+               autocomplete="tel" inputmode="tel" value="{{ eingabe.telefon }}">
+        {% if fehler.telefon %}<p class="fehler">{{ fehler.telefon }}</p>{% endif %}
+      </div>
+
+      <div class="verborgen" aria-hidden="true">
+        <label for="webseite">Webseite</label>
+        <input type="text" id="webseite" name="webseite" tabindex="-1" autocomplete="off">
+      </div>
+
+      {# D-03: die Einwilligung ist hier der ganze Zweck – ohne sie gibt es
+         nichts zu speichern. Ab 16 (Art. 8 DSGVO); wer jünger ist, meldet
+         sich mit den Eltern zu einer Veranstaltung an (D-06). #}
+      <div class="{% if fehler.einverstanden %}feld-fehler{% endif %}">
+        <label class="haken"><input type="checkbox" name="einverstanden" value="1"
+               {% if eingabe.einverstanden %}checked{% endif %}>
+          <span>Ihr dürft mich per Mail zu euren Veranstaltungen einladen. Ich bin mindestens
+            16 Jahre alt. <span class="leise">Austragen geht jederzeit – mit einem Klick in jeder
+            Einladung oder in Mein Helferplatz.</span></span></label>
+        {% if fehler.einverstanden %}<p class="fehler">{{ fehler.einverstanden }}</p>{% endif %}
+      </div>
+      <p class="leise">Deine Angaben nutzen wir nur, um dich einzuladen. Mehr dazu:
+        <a href="/datenschutz">Datenschutz</a>.</p>
+      <button type="submit" class="knopf">Mitmachen</button>
+    </form>
+
+    <p class="leise">Schon einmal dabei gewesen? Trag dich trotzdem ein – wir erkennen dich
+      wieder. Jünger als 16? Dann melde dich gern mit deinen Eltern an, sobald eine
+      Veranstaltung geplant ist.</p>
+  {% endif %}
+{% endblock %}

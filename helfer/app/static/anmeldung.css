@@ -205,6 +205,8 @@ input[type="text"], input[type="email"], input[type="tel"], input[type="date"], 
 .zeile > div { flex: 1; }
 .haken { display: flex; gap: .6rem; align-items: flex-start; font-weight: 400; }
 .haken input { width: 1.4rem; height: 1.4rem; margin-top: .15rem; flex: 0 0 auto; }
+/* C-10: unter der Person, was für diese Veranstaltung gilt. */
+.ergaenzen { margin: 0 0 1rem 2rem; }
 .fehler { color: var(--dringend); font-size: .9rem; margin: .25rem 0 0; }
 .hinweis {
   border-left: 4px solid var(--akzent);
