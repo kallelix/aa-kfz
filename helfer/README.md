@@ -87,9 +87,12 @@ Nach der Anmeldung geht es ohne Konto und ohne Passwort weiter (Lastenheft
   darf nur lesen – der Link zu Mein Helferplatz steht nicht darin.
 - **Wer wiederkommt**, wird an Name und Adresse erkannt und bekommt seinen
   Link mit der eben getroffenen Auswahl, statt ein zweites Mal angelegt zu
-  werden. Ein Name in anderer Schreibweise mit derselben Adresse oder Nummer
-  löst „Bist du schon bei uns?“ aus; solche Paare stehen in der Übersicht.
-  „Link anfordern“ auf der Startseite verrät nicht, ob eine Adresse bekannt ist.
+  werden. Ein Name in anderer Schreibweise unter derselben Adresse bekommt
+  dort eine Mail „Warst du das?“ – mit dem Link zu Mein Helferplatz und einem
+  zur eigenen Anmeldung unter derselben Adresse. Die Seite sagt in beiden
+  Fällen nur „Schau in dein Postfach“: ob jemand bekannt ist, verrät sie
+  nicht, ebenso wenig „Link anfordern“. Passt nur die Nummer, wird angelegt;
+  solche Paare stehen in der Übersicht.
 
 Die Links stehen nirgends gespeichert: sie sind ein Siegel über Person und
 Zweck mit `APP_SECRET_KEY` (`app/zugang.py`). Wer den Schlüssel wechselt,

@@ -260,6 +260,17 @@ die Person. Unbestätigt halten die Plätze 72 Stunden, nach 24 kommt eine
 Erinnerung. Mögliche Dubletten zeigt die Übersicht; zusammenführen kommt mit
 I-06.
 
+**Stand 20.10.2026:** Die Seite nach dem Anmelden verrät nicht mehr, ob
+jemand bekannt ist (A-11, I-05). Bisher sagte sie „Dich kennen wir schon“
+oder fragte „Bist du schon bei uns?“ – wer Name und Adresse eines anderen
+kannte, erfuhr so, dass er eingetragen ist, und über die Nummer ließ sich
+herausfinden, wem sie gehört. Jetzt steht in beiden Fällen nur „Schau in
+dein Postfach“. Die Mail an die bekannte Adresse fragt „Warst du das?“: der
+eine Link führt zu Mein Helferplatz mit der Auswahl, der andere zur eigenen
+Anmeldung unter derselben Adresse – sein Siegel gilt für diese Veranstaltung
+und diese Adresse. Passt nur die Nummer, wird ohne Rückfrage angelegt; das
+Paar steht in der Übersicht.
+
 **Stand 09.10.2026, Schritt 3.1:** Der Assistent steht – A-01 mit beiden
 Wegen, der Assistent zuerst, und A-02 bis A-05. Die Tageszeiten sind die
 der Springer (Vormittag bis 13, Nachmittag 12 bis 18, Abend ab 17 Uhr); für
@@ -309,7 +320,7 @@ stehen sie auch auf dem Monitor, ohne Namen. Bei S-05 zählt nur, was an der Per
 | I-02 | T-Shirt-Größe als **Auswahl** (XS bis 5XL, „kein Shirt"; Damen-/Herrenschnitt nur, wenn die Veranstaltung beide anbietet), Verpflegung als Auswahl – beides nur, wenn die Veranstaltung es anbietet (V-07). Freitext nur unter *Bemerkung*. | M | 2 |
 | I-03 | Die Mailadresse wird per Link **bestätigt**. Unbestätigte Anmeldungen halten ihren Platz eine begrenzte Zeit und verfallen dann, mit Erinnerung. | M | 2 |
 | I-04 | Handynummer wird beim Speichern in eine einheitliche Form gebracht (+49 …). | S | 2 |
-| I-05 | **Dublettenprüfung beim Anmelden**: gleiche Adresse oder gleiche Nummer mit gleichem Namen (Umlaute in beiden Schreibweisen, `kern/suchen.py`) → „Bist du das?" statt einer zweiten Person. Mitangemeldete Personen derselben anmeldenden Person sind ausgenommen – das sind Familien und Vereinskollegen, keine Dubletten. | M | 2 |
+| I-05 | **Dublettenprüfung beim Anmelden**: derselbe Name in anderer Schreibweise (Umlaute in beiden Schreibweisen, `kern/suchen.py`) unter derselben Adresse → „Warst du das?" per Mail an diese Adresse statt einer zweiten Person; die Seite sagt nur „Schau in dein Postfach“ und verrät nicht, ob jemand bekannt ist. Gleicher Name mit gleicher Nummer, aber anderer Adresse → angelegt, die Orga sieht das Paar (I-06). Mitangemeldete Personen derselben anmeldenden Person sind ausgenommen – das sind Familien und Vereinskollegen, keine Dubletten. | M | 2 |
 | I-06 | **Zusammenführen im Backoffice**: zwei Personen zu einer machen, Schichten und Ausgaben wandern mit. | S | 3 |
 | I-07 | Social Login (Google, Apple …) – geprüft und **nicht empfohlen**, siehe Abschnitt 7.4. | – | – |
 

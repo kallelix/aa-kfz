@@ -268,27 +268,43 @@ try:
            "Fritz und eine neue, Mia, die Anna mitbringt (A-08)")
 
     print("Wer wiederkommt (A-11) und wer sich vertippt (I-05)")
-    status, _, seite, _ = melde_an("Anna", "Anna@Example.org", [POSTEN])
-    pruefe(status == 200 and "Dich kennen wir schon" in seite and "Shuttle" not in seite
-           and "Fritz" not in seite, "bekannt: kein zweites Mal, und die Seite verrät nichts")
+    status, _, bekannt, _ = melde_an("Anna", "Anna@Example.org", [POSTEN])
+    pruefe(status == 200 and "Schau in dein Postfach" in bekannt and "kennen wir" not in bekannt
+           and "Shuttle" not in bekannt and "Fritz" not in bekannt,
+           "bekannt: kein zweites Mal, und die Seite verrät nichts – nicht einmal, ob")
     post = mails("link", "anna@example.org")
     pruefe(len(post) == 1 and f"{PLATZ}/aa-2027/angaben?s={POSTEN}" in post[0],
            "der Link geht an Anna, mit der Auswahl")
     status, _, seite, _ = melde_an("Änna", "anna@example.org", [POSTEN])
-    pruefe(status == 200 and "Bist du schon bei uns?" in seite
+    pruefe(status == 200 and seite == bekannt
            and zeilen("SELECT COUNT(*) FROM helfer WHERE lower(email) = 'anna@example.org'") == [(1,)],
-           "„Änna“ mit Annas Adresse: erst die Frage, nichts angelegt")
-    status, _, seite, _ = melde_an("Änna", "anna@example.org", [POSTEN], aktion="bin-ich")
-    pruefe(status == 200 and len(mails("link", "anna@example.org")) == 2,
-           "„Ja, das bin ich“: der Link geht an die bekannte Adresse")
-    status, _, _, _ = melde_an("Bert", "bert.neu@example.org", [POSTEN_FR], nachname="Oehl",
-                               telefon="+49 170 1234567")
-    pruefe(status == 200 and len(mails("link", "bert@example.org")) == 0
-           and zeilen("SELECT COUNT(*) FROM helfer WHERE email = 'bert.neu@example.org'") == [(0,)],
-           "„Bert Oehl“ mit Berts Nummer und anderer Adresse wird auch gefragt")
+           "„Änna“ mit Annas Adresse: dieselbe Seite, nichts angelegt")
+    frage = mails("wiedererkannt", "anna@example.org")
+    pruefe(len(frage) == 1 and "Warst du das?" in frage[0]
+           and f"{PLATZ}/aa-2027/angaben?s={POSTEN}" in frage[0],
+           "„Warst du das?“ steht in der Mail an die Adresse – mit Annas Link und der Auswahl")
+    neu = re.search(r"https://helfer\.example\.de(/aa-2027/angaben\?\S+&neu=(\w+))",
+                    frage[0] if frage else "")
+    pruefe(neu is not None, "und mit dem Link für jemand anderen unter derselben Adresse")
+    _, _, seite, _ = anfrage("GET", neu.group(1) if neu else "/aa-2027")
+    pruefe(neu is not None and f'name="neu" value="{neu.group(2)}"' in seite,
+           "der Link öffnet das Formular und trägt sein Siegel mit")
+    status, _, seite, _ = melde_an("Änna", "anna@example.org", [POSTEN], neu="0" * 24)
+    pruefe(status == 200 and seite == bekannt, "ein falsches Siegel hilft nicht")
+    status, _, _, _ = melde_an("Änna", "anna@example.org", [POSTEN],
+                               neu=neu.group(2) if neu else "")
+    pruefe(status == 303
+           and zeilen("SELECT COUNT(*) FROM helfer WHERE lower(email) = 'anna@example.org'") == [(2,)],
+           "mit dem Siegel aus der Mail: Änna ist eine eigene Person")
+    # Den Platz wieder frei machen – unten melden sich Cleo und Lena dort an.
+    testdb.abfrage(db_url, "helfer", "DELETE FROM einteilung WHERE helfer_id IN"
+                   " (SELECT id FROM helfer WHERE name = 'Änna Berg')")
     status, ort, _, _ = melde_an("Bert", "bert.neu@example.org", [POSTEN_FR], nachname="Oehl",
-                                 telefon="0170 1234567", aktion="neu-anlegen")
-    pruefe(status == 303, "„Nein, ich bin jemand anderes“ legt neu an")
+                                 telefon="+49 170 1234567")
+    pruefe(status == 303 and len(mails("link", "bert@example.org")) == 0
+           and zeilen("SELECT COUNT(*) FROM helfer WHERE email = 'bert.neu@example.org'") == [(1,)],
+           "„Bert Oehl“ mit Berts Nummer und anderer Adresse: angelegt, ohne Rückfrage – "
+           "sie verriete, wem die Nummer gehört")
     _, _, seite, _ = anfrage("GET", "/helfer", glas=admin)
     pruefe("Vielleicht dieselbe Person" in seite and "Bert Oehl" in seite and "Bert Öhl" in seite,
            "die Orga sieht das Paar in der Übersicht")
@@ -296,7 +312,7 @@ try:
     print("Link anfordern")
     status, _, seite, _ = anfrage("POST", "/aa-2027/link", {"email": " ANNA@example.org "})
     pruefe(status == 200 and "unterwegs" in seite and len(mails("link", "anna@example.org")) == 3,
-           "an eine bekannte Adresse geht der Link")
+           "an eine bekannte Adresse geht der Link – an Anna und an Änna")
     status, _, seite2, _ = anfrage("POST", "/aa-2027/link", {"email": "fremd@example.org"})
     pruefe(status == 200 and seite2 == seite and not mails("link", "fremd@example.org"),
            "eine fremde Adresse bekommt dieselbe Seite – und keine Mail")
@@ -350,8 +366,8 @@ try:
                    " WHERE typ = 'bestaetigen'")
     vorher = zeilen("SELECT COUNT(*) FROM mail_out")[0][0]
     versand.fristen()
-    # Drei: Cleos ungesendete Mails sind schon mit ihr gegangen.
-    pruefe(zeilen("SELECT COUNT(*) FROM mail_out")[0][0] == vorher - 3
+    # Vier, mit Änna: Cleos ungesendete Mails sind schon mit ihr gegangen.
+    pruefe(zeilen("SELECT COUNT(*) FROM mail_out")[0][0] == vorher - 4
            and zeilen("SELECT COUNT(*) FROM mail_out WHERE typ = 'bestaetigen'") == [(0,)],
            "verschickte Mails gehen nach einem Monat weg")
 finally:

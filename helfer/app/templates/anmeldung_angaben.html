@@ -148,18 +148,12 @@
     {% for w in assistent.f %}<input type="hidden" name="f" value="{{ w }}">{% endfor %}
     <input type="hidden" name="weitere" value="{{ weitere|length }}">
 
-    {% if rueckfrage %}
-      {# I-05: derselbe Name in anderer Schreibweise mit derselben Adresse, oder
-         derselbe Name mit derselben Nummer. Verraten wird nichts – der Link
-         geht an die Adresse, die wir kennen. #}
-      <div class="hinweis warn" role="alert">
-        <strong>Bist du schon bei uns?</strong>
-        <p>Unter diesem Namen kennen wir jemanden mit derselben Mailadresse oder
-          Handynummer. Bist du das, schicken wir dir deinen Link zu Mein Helferplatz –
-          an die Adresse, die wir von dir haben. Dort nimmst du die Schichten dazu.</p>
-        <button type="submit" class="knopf" name="aktion" value="bin-ich">Ja, das bin ich</button>
-        <button type="submit" class="knopf zweit" name="aktion" value="neu-anlegen">Nein, ich bin jemand anderes</button>
-      </div>
+    {% if eingabe.get('neu') %}
+      {# I-05: aus der Mail „Warst du das?“ – eine eigene Anmeldung unter einer
+         Adresse, die schon jemand bei uns nutzt. #}
+      <input type="hidden" name="neu" value="{{ eingabe.neu }}">
+      <p class="leise">Du meldest dich als eigene Person an, unter einer Mailadresse, die
+        schon jemand bei uns nutzt.</p>
     {% endif %}
 
     {% if platz %}

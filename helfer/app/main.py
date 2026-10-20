@@ -3415,7 +3415,7 @@ def _formular(daten):
 
 
 def _angaben_seite(request, v, gewaehlte, fenster, eingabe, liste, weitere,
-                   fehler=None, gruende=None, status_code=200, rueckfrage=False,
+                   fehler=None, gruende=None, status_code=200,
                    platz=None, basis=None, assistent=None):
     voraussetzungen = _noetig(gewaehlte)
     extra = {"basis": basis} if basis else {}
@@ -3432,7 +3432,7 @@ def _angaben_seite(request, v, gewaehlte, fenster, eingabe, liste, weitere,
                      max_weitere=MAX_WEITERE, angebot=db.angebot(v["id"]),
                      groessen=normalisieren.GROESSEN, schnitte=selbstanmeldung.SCHNITTE,
                      verpflegung=selbstanmeldung.VERPFLEGUNG, voraussetzungen=voraussetzungen,
-                     fehler=fehler or {}, gruende=gruende or [], rueckfrage=rueckfrage,
+                     fehler=fehler or {}, gruende=gruende or [],
                      platz=platz, **extra),
         status_code=status_code)
 
@@ -3451,8 +3451,9 @@ def angaben(request: Request, adresse: str):
             return RedirectResponse(f"/{adresse}/vorschlaege?" + _auswahl_query(
                 [], [], assistent) + "&hinweis=leer", status_code=303)
         return RedirectResponse(f"/{adresse}/schichten?hinweis=leer", status_code=303)
-    return _angaben_seite(request, v, gewaehlte, fenster, {}, {"voraussetzung": []}, [],
-                          assistent=assistent)
+    neu = request.query_params.get("neu", "")[:64]
+    return _angaben_seite(request, v, gewaehlte, fenster, {"neu": neu} if neu else {},
+                          {"voraussetzung": []}, [], assistent=assistent)
 
 
 @app.post("/{adresse:adresse}/angaben")
@@ -3482,7 +3483,7 @@ def _angaben_absenden(request: Request, adresse: str, daten):
     # Weitere Person dazu oder weg – das Formular kommt nur neu, gespeichert
     # wird nichts.
     aktion, werte, personen_roh, liste = _formular(daten)
-    if aktion not in ("anmelden", "bin-ich", "neu-anlegen"):
+    if aktion != "anmelden":
         return _angaben_seite(request, v, gewaehlte, fenster, werte, liste, personen_roh,
                               assistent=assistent)
 
@@ -3501,19 +3502,28 @@ def _angaben_absenden(request: Request, adresse: str, daten):
                               personen_roh, fehler=fehler, status_code=400,
                               assistent=assistent)
 
-    # Wer schon da ist, wird nicht ein zweites Mal angelegt (A-11, I-05): er
-    # bekommt seinen Link, die Auswahl steht darin schon. Auf der Seite steht
-    # nichts über ihn – sonst sähe jeder, der Name und Adresse kennt, wofür
-    # jemand eingetragen ist.
+    # Wer schon da ist, wird nicht ein zweites Mal angelegt (A-11, I-05). Ob
+    # er es ist, klärt die Mail an die Adresse, die wir kennen – nicht diese
+    # Seite: sonst erführe jeder, der Name und Adresse kennt, dass jemand bei
+    # uns eingetragen ist. Die Seite sagt nur „Schau in dein Postfach“.
     art, treffer = db.erkennen(ich)
-    if art == "bekannt" or (art == "vielleicht" and aktion == "bin-ich"):
+    auswahl = _auswahl_query(gewaehlte, fenster)
+    if art == "bekannt":
         for person in treffer:
-            _link_mail(request, person, v, _auswahl_query(gewaehlte, fenster))
-        return templates.TemplateResponse(
-            "anmeldung_post.html", _oeffentlich(request, v, art=art, mitbringen=bool(personen_roh)))
-    if art == "vielleicht" and aktion != "neu-anlegen":
-        return _angaben_seite(request, v, gewaehlte, fenster, werte, liste, personen_roh,
-                              rueckfrage=True, assistent=assistent)
+            _link_mail(request, person, v, auswahl)
+        return _postfach(request, v, personen_roh)
+    # Der Name in anderer Schreibweise unter derselben Adresse: „Warst du
+    # das?“ steht in der Mail. Wer über deren zweiten Link kommt, hat die
+    # Adresse in der Hand und meldet sich als eigene Person an.
+    unter_der_adresse = [p for p in treffer if p["email"].lower() == ich["email"]]
+    if art == "vielleicht" and unter_der_adresse and not selbstanmeldung.zeichen_stimmt(
+            config.APP_SECRET_KEY, str(daten.get("neu") or ""), "neu", v["id"], ich["email"]):
+        for person in unter_der_adresse:
+            _wiedererkannt_mail(request, person, v, auswahl)
+        return _postfach(request, v, personen_roh)
+    # Passt nur die Nummer, ist die Adresse eine andere: die Person wird
+    # angelegt, die Orga sieht das Paar in der Übersicht (I-06). Eine
+    # Rückfrage hier verriete, wem die Nummer gehört.
 
     try:
         ergebnis = db.anmelden(v["id"], personen, [s["id"] for s in gewaehlte],
@@ -3536,6 +3546,26 @@ def _angaben_absenden(request: Request, adresse: str, daten):
     zeichen = selbstanmeldung.zeichen(config.APP_SECRET_KEY, v["id"], ergebnis["anmelder"])
     return RedirectResponse(f"/{adresse}/danke?p={ergebnis['anmelder']}&t={zeichen}",
                             status_code=303)
+
+
+def _postfach(request: Request, v, personen_roh):
+    """Dieselbe Seite, ob wir jemanden kennen oder nicht ganz sicher sind."""
+    return templates.TemplateResponse(
+        "anmeldung_post.html",
+        _oeffentlich(request, v, art="postfach", mitbringen=bool(personen_roh)))
+
+
+def _wiedererkannt_mail(request: Request, person, v, auswahl: str) -> None:
+    """I-05: „Warst du das?“ – mit dem Link zu Mein Helferplatz samt Auswahl
+    und dem Link zur eigenen Anmeldung unter derselben Adresse. Dessen
+    Siegel gilt für diese Veranstaltung und diese Adresse."""
+    adresse = normalisieren.kurzadresse(v["kurz"])
+    dazu = _links(request, person)["platz"] + f"/{adresse}/angaben?{auswahl}"
+    neu = (f"{_basis(request)}/{adresse}/angaben?{auswahl}&neu="
+           + selbstanmeldung.zeichen(config.APP_SECRET_KEY, "neu", v["id"],
+                                     person["email"].lower()))
+    db.mail_einreihen(person["id"], mail.wiedererkannt(
+        person, selbstanmeldung.va_text(v), dazu, neu))
 
 
 def _noch_eine(v, personen) -> dict:

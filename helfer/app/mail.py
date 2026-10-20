@@ -175,6 +175,32 @@ def link(person, platz: str, dazu: str = "") -> tuple:
     return ("link", person["email"], "Dein Link zu Mein Helferplatz", "\n".join(zeilen))
 
 
+def wiedererkannt(person, va_text: str, dazu: str, neu: str) -> tuple:
+    """I-05: jemand hat sich unter dieser Adresse mit einem Namen angemeldet,
+    der dem dieser Person ähnelt. Ob sie es war, klärt die Mail – nicht die
+    Seite, die jeder sehen kann."""
+    text = "\n".join([
+        f"Hallo {_vorname(person)},",
+        "",
+        f"gerade hat sich jemand unter dieser Mailadresse für {va_text}",
+        "angemeldet – mit einem Namen, der deinem sehr ähnlich ist.",
+        "",
+        "Warst du das? Dann trag dich hier ein – deine Auswahl ist schon vorgemerkt:",
+        "",
+        f"  {dazu}",
+        "",
+        "Bist du jemand anderes, der dieselbe Adresse nutzt? Dann geht es hier",
+        "mit einer eigenen Anmeldung weiter:",
+        "",
+        f"  {neu}",
+        "",
+        "Warst du es gar nicht? Dann ignoriere diese Mail einfach – angemeldet",
+        "ist noch niemand.",
+        _fuss(),
+    ])
+    return ("wiedererkannt", person["email"], "Warst du das? Deine Anmeldung", text)
+
+
 def dazu(person, va_text: str, eintraege, platz: str) -> tuple:
     """Nach dem Dazunehmen in Mein Helferplatz (C-01: Änderungen)."""
     text = "\n".join([
