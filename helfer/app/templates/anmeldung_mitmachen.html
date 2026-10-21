@@ -58,14 +58,13 @@
       </div>
 
       {# D-03: die Einwilligung ist hier der ganze Zweck – ohne sie gibt es
-         nichts zu speichern. Ab 16 (Art. 8 DSGVO); wer jünger ist, meldet
-         sich mit den Eltern zu einer Veranstaltung an (D-06). #}
+         nichts zu speichern. Keine Altersgrenze: das Alter fragt die
+         Schichtwahl, unter 18 mit den Eltern (D-06). #}
       <div class="{% if fehler.einverstanden %}feld-fehler{% endif %}">
         <label class="haken"><input type="checkbox" name="einverstanden" value="1"
                {% if eingabe.einverstanden %}checked{% endif %}>
-          <span>Ihr dürft mich per Mail zu euren Veranstaltungen einladen. Ich bin mindestens
-            16 Jahre alt. <span class="leise">Austragen geht jederzeit – mit einem Klick in jeder
-            Einladung oder in Mein Helferplatz.</span></span></label>
+          <span>Ihr dürft mich per Mail zu euren Veranstaltungen einladen. <span class="leise">Austragen
+            geht jederzeit – mit einem Klick in jeder Einladung oder in Mein Helferplatz.</span></span></label>
         {% if fehler.einverstanden %}<p class="fehler">{{ fehler.einverstanden }}</p>{% endif %}
       </div>
       <p class="leise">Deine Angaben nutzen wir nur, um dich einzuladen. Mehr dazu:
@@ -74,7 +73,7 @@
     </form>
 
     <p class="leise">Schon einmal dabei gewesen? Trag dich trotzdem ein – wir erkennen dich
-      wieder. Jünger als 16? Dann melde dich gern mit deinen Eltern an, sobald eine
-      Veranstaltung geplant ist.</p>
+      wieder. Unter 18 brauchen wir das Einverständnis deiner Eltern, sobald du dich für
+      Schichten einträgst.</p>
   {% endif %}
 {% endblock %}

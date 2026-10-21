@@ -179,8 +179,9 @@ wie bei der Anmeldung.
 
 Unter `/mitmachen` meldet sich, wer helfen will, auch wenn gerade keine
 Veranstaltung Helfer sucht (Lastenheft C-10): Vorname, Nachname, Mail,
-freiwillig das Handy, und die Einwilligung, eingeladen zu werden – ab 16.
-Shirt, Essen und Alter fragt erst die Schichtwahl. Danach steht immer
+freiwillig das Handy, und die Einwilligung, eingeladen zu werden – ohne
+Altersgrenze. Shirt, Essen und Alter fragt erst die Schichtwahl, unter 18 mit
+den Eltern. Danach steht immer
 „Fast geschafft“ da, ob wir die Person kennen oder nicht; die Mail geht an
 die angegebene Adresse – mit dem Link zum Bestätigen, oder, wer schon im
 Helferstamm ist, mit dem Link zu Mein Helferplatz. Erst der Klick auf der

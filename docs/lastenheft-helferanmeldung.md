@@ -500,8 +500,8 @@ bestellt man mit einem Klick ab, aus der Mail oder in Mein Helferplatz.
 
 **Stand 19.10.2026, Schritt 3.9:** C-10 ist umgesetzt. `/mitmachen` fragt
 Vorname, Nachname, Mail, freiwillig das Handy, und die Einwilligung, zu
-Veranstaltungen eingeladen zu werden – ab 16 (Art. 8 DSGVO; jünger meldet
-man sich mit den Eltern zu einer Veranstaltung an). Danach steht immer
+Veranstaltungen eingeladen zu werden – ohne Altersgrenze: das Alter fragt
+die Schichtwahl, unter 18 mit den Eltern (D-06). Danach steht immer
 dasselbe da; die Mail geht an die angegebene Adresse, und erst der Klick auf
 der verlinkten Seite macht die Person zum Teil des Helferstamms. Wer schon
 bekannt ist – auch in anderer Schreibweise –, wird nicht doppelt angelegt;
