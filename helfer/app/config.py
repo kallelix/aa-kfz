@@ -92,6 +92,11 @@ BASIS_PFAD = "/" + _env("BASIS_PFAD", "/").strip("/")
 # Monitor-Link gebraucht; leer heißt: aus der Anfrage ableiten.
 BASIS_URL = _env("BASIS_URL", "").strip().rstrip("/")
 
+# Der Hostname der öffentlichen Seiten im zusammengesetzten Dienst
+# (dienst/main.py). Ohne BASIS_URL nehmen ihn die Links, die im Backoffice
+# entstehen – unter admin.… gibt es die öffentlichen Seiten nicht.
+HOST_HELFER = _env("HOST_HELFER", "").strip()
+
 
 def bind_adresse() -> tuple[str, int]:
     """'127.0.0.1:8082' -> ('127.0.0.1', 8082). Auch '[::1]:8082' geht."""

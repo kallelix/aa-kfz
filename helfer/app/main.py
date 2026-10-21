@@ -1842,7 +1842,7 @@ async def monitor_verwalten(
         request: Request, hinweis: str = "",
         sitzung: auth.Sitzung = Depends(_sitzung)):
     token = db.monitor_token()
-    basis = config.BASIS_URL or str(request.base_url).rstrip("/")
+    basis = _basis(request)
     return templates.TemplateResponse(
         "admin_monitor.html",
         _admin(request, sitzung, hinweis=hinweis, token=token,
@@ -2799,7 +2799,7 @@ async def unterschriften_verwalten(
         request: Request, hinweis: str = "",
         sitzung: auth.Sitzung = Depends(_sitzung)):
     token = db.tablet_token()
-    basis = config.BASIS_URL or str(request.base_url).rstrip("/")
+    basis = _basis(request)
     return templates.TemplateResponse(
         "admin_unterschriften.html",
         _admin(request, sitzung, hinweis=hinweis, token=token,
@@ -3685,8 +3685,15 @@ async def danke_code(request: Request, adresse: str, p: str = "", t: str = ""):
 # wer den Link nicht hat, kann auch nichts abschicken.
 
 def _basis(request: Request) -> str:
-    """Für Links in Mails: die öffentliche Adresse, sonst aus der Anfrage."""
-    return config.BASIS_URL or str(request.base_url).rstrip("/")
+    """Für Links in Mails und auf Seiten: die öffentliche Adresse, sonst aus
+    der Anfrage. Kommt die aus dem Backoffice, gehört der Hostname der
+    öffentlichen Seiten hinein – unter admin.… gibt es sie nicht."""
+    if config.BASIS_URL:
+        return config.BASIS_URL
+    url = request.base_url
+    if config.HOST_HELFER and url.hostname != config.HOST_HELFER:
+        url = url.replace(hostname=config.HOST_HELFER)
+    return str(url).rstrip("/")
 
 
 def _person_mit(zweck: str, roh: str):

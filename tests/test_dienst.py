@@ -211,6 +211,21 @@ try:
         pruefe(all(('"/%s"' % b) in zeile for b in ("kennzeichen", "presse", "helfer")),
                "und von jedem Bereich kommt man in die anderen beiden")
 
+    print("Oeffentliche Links aus dem Backoffice zeigen auf die oeffentlichen Seiten")
+    # Ohne BASIS_URL leitet der Helferbereich die Adresse aus der Anfrage ab
+    # - im Backoffice ist das admin.…, wo es /mitmachen nicht gibt.
+    from kern import veranstaltungen  # noqa: E402
+    from datetime import date, timedelta  # noqa: E402
+    bald = date.today() + timedelta(days=60)
+    veranstaltungen.Veranstaltungen(lambda: DB).anlegen({
+        "name": "Testlauf", "kurz": "TL", "beginn": bald.isoformat(),
+        "ende": bald.isoformat(), "ort": "", "status": "offen"})
+    status, _, seite, _ = ruf("admin.test", "/helfer/einladen", keks=keks)
+    pruefe(status == 200 and 'href="http://helfer.test/mitmachen"' in seite,
+           "„Mitmachen“ unter Einladen zeigt auf helfer.test, nicht auf admin.test")
+    status, _, _, _ = ruf("helfer.test", "/mitmachen")
+    pruefe(status == 200, "und dort ist die Seite")
+
     print("Verweise aus dem Formular zeigen ins Backoffice")
     # Das Formular kommt ueber kennzeichen.test, die Meldung an die Orga
     # verweist aber in die Detailansicht - und die liegt unter admin.test.
