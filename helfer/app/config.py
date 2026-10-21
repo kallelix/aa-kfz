@@ -284,7 +284,9 @@ JETZT_FEST = _env("JETZT_FEST", "").strip()
 
 # --- Ansprechpartner -------------------------------------------------------
 
-KONTAKT_NAME = _env("KONTAKT_NAME", "Orga-Team Absolute Abfahrt")
+# Der Verein, nicht eine Veranstaltung: die Helferseiten gelten für alle
+# (C-10). Steht im Fuß jeder Seite und unter jeder Mail.
+KONTAKT_NAME = _env("KONTAKT_NAME", "ILRC")
 KONTAKT_MAIL = _env("KONTAKT_MAIL", "")
 KONTAKT_TELEFON = _env("KONTAKT_TELEFON", "")
 
