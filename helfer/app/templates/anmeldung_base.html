@@ -13,7 +13,9 @@
   <div class="huelle">
     <header class="kopf">
       {% block zurueck %}{% endblock %}
-      <p class="veranstaltung">{% if va %}{{ va.name }} · {{ va_tage }}{% else %}{{ veranstaltung }}{% endif %}</p>
+      {# Ohne Veranstaltung keine Zeile darüber: Mitmachen, Mein Helferplatz
+         und Datenschutz gelten für alle Veranstaltungen (C-10). #}
+      {% if va %}<p class="veranstaltung">{{ va.name }} · {{ va_tage }}</p>{% endif %}
       <h1>{% block ueberschrift %}Mithelfen{% endblock %}</h1>
     </header>
 
