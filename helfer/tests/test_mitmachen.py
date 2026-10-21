@@ -103,11 +103,9 @@ try:
         verbindung.close()
         return ergebnis
 
-    def melden(vorname, nachname, email, einverstanden=True, **mehr):
-        daten = {"vorname": vorname, "nachname": nachname, "email": email, **mehr}
-        if einverstanden:
-            daten["einverstanden"] = "1"
-        return anfrage("POST", "/mitmachen", daten)
+    def melden(vorname, nachname, email, **mehr):
+        return anfrage("POST", "/mitmachen",
+                       {"vorname": vorname, "nachname": nachname, "email": email, **mehr})
 
     def helfer(email):
         zeilen = sql("SELECT * FROM helfer WHERE email = ? ORDER BY id", email)
@@ -118,12 +116,13 @@ try:
     pruefe(status == 200 and "Gerade suchen wir keine Helfer" in seite
            and 'href="/mitmachen"' in seite, "die Startseite führt zu „Mitmachen“")
     status, _, seite, _ = anfrage("GET", "/mitmachen")
-    pruefe(status == 200 and 'name="einverstanden"' in seite and 'name="tshirt"' not in seite,
-           "nur Name, Mail, Handy und die Einwilligung – kein Shirt")
-    status, _, seite, _ = melden("", "", "kaputt", einverstanden=False)
+    pruefe(status == 200 and 'name="tshirt"' not in seite and 'type="checkbox"' not in seite
+           and "Mit „Mitmachen“ kommst du in unseren Helferstamm" in seite,
+           "nur Name, Mail und Handy – kein Shirt, kein Häkchen: wofür, steht über dem Knopf")
+    status, _, seite, _ = melden("", "", "kaputt")
     pruefe(status == 400 and "Bitte den Vornamen." in seite and "Bitte den Nachnamen." in seite
-           and "Diese Mailadresse sieht nicht vollständig aus." in seite
-           and "Bitte das Häkchen setzen" in seite, "Pflicht sind Vorname, Nachname, Mail, Häkchen")
+           and "Diese Mailadresse sieht nicht vollständig aus." in seite,
+           "Pflicht sind Vorname, Nachname und Mail")
     status, ort, _, _ = melden("Robo", "Ter", "robo@example.org", webseite="http://spam")
     pruefe(status == 303 and helfer("robo@example.org") is None, "das Honigtopf-Feld fängt Roboter")
 

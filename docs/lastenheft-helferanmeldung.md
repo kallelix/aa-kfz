@@ -471,7 +471,7 @@ Orga pro Hilferuf zehn Sekunden und erspart jede Abhängigkeit.
 | C-07 | **Keine** automatisierte Anbindung: keine inoffiziellen Bibliotheken, und Nummern aus der Datenbank werden nicht nach WhatsApp übertragen. | M | – |
 | C-08 | Interessenten einer angekündigten Veranstaltung bekommen eine Mail, sobald die Anmeldung öffnet. **Stamm-Helfer werden mit einem Klick eingeladen**; wer kommt, muss nur noch Zeiten wählen – Name, Größe und Verpflegung sind vorbelegt. | S | 3 |
 | C-09 | Hilferufe und Ankündigungen lassen sich mit einem Klick abbestellen, getrennt von den Mails zu eigenen Schichten. | M | 3 |
-| C-10 | **Helfer werden ohne Veranstaltung**: unter `/mitmachen` meldet sich, wer helfen will, auch wenn gerade keine Veranstaltung geplant ist – Pflicht sind nur Vorname, Nachname, Mail und die Einwilligung (D-03), bestätigt per Mail. Eingeladen wird wie in C-08; Shirt, Verpflegung und Alter fragt erst die Schichtwahl, und dort stehen sie, wie gespeichert, zum Ändern. | S | 3 |
+| C-10 | **Helfer werden ohne Veranstaltung**: unter `/mitmachen` meldet sich, wer helfen will, auch wenn gerade keine Veranstaltung geplant ist – Pflicht sind nur Vorname, Nachname und Mail. Der Eintrag selbst, bestätigt per Mail, ist die Einwilligung (D-03); ein eigenes Häkchen braucht es nicht, er hat keinen anderen Zweck. Eingeladen wird wie in C-08; Shirt, Verpflegung und Alter fragt erst die Schichtwahl, und dort stehen sie, wie gespeichert, zum Ändern. | S | 3 |
 
 **Zur Community selbst** (Orga, nicht Software): die zwei bestehenden Gruppen
 in eine Community überführen, mit einer Ankündigungsgruppe für alle und je
@@ -499,9 +499,10 @@ geht höchstens eine Mail-Runde in 24 Stunden. Hilferufe und Einladungen
 bestellt man mit einem Klick ab, aus der Mail oder in Mein Helferplatz.
 
 **Stand 19.10.2026, Schritt 3.9:** C-10 ist umgesetzt. `/mitmachen` fragt
-Vorname, Nachname, Mail, freiwillig das Handy, und die Einwilligung, zu
-Veranstaltungen eingeladen zu werden – ohne Altersgrenze: das Alter fragt
-die Schichtwahl, unter 18 mit den Eltern (D-06). Danach steht immer
+Vorname, Nachname, Mail und freiwillig das Handy – ohne eigenes Häkchen:
+wofür, steht über dem Knopf, und der Klick in der Bestätigungsmail ist die
+Einwilligung (D-03). Ohne Altersgrenze: das Alter fragt die Schichtwahl,
+unter 18 mit den Eltern (D-06). Danach steht immer
 dasselbe da; die Mail geht an die angegebene Adresse, und erst der Klick auf
 der verlinkten Seite macht die Person zum Teil des Helferstamms. Wer schon
 bekannt ist – auch in anderer Schreibweise –, wird nicht doppelt angelegt;

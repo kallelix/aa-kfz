@@ -179,9 +179,10 @@ wie bei der Anmeldung.
 
 Unter `/mitmachen` meldet sich, wer helfen will, auch wenn gerade keine
 Veranstaltung Helfer sucht (Lastenheft C-10): Vorname, Nachname, Mail,
-freiwillig das Handy, und die Einwilligung, eingeladen zu werden – ohne
-Altersgrenze. Shirt, Essen und Alter fragt erst die Schichtwahl, unter 18 mit
-den Eltern. Danach steht immer
+freiwillig das Handy – ohne Altersgrenze. Ein eigenes Häkchen gibt es nicht:
+der Eintrag hat keinen anderen Zweck, der steht über dem Knopf, und der Klick
+in der Bestätigungsmail ist die Einwilligung (D-03). Shirt, Essen und Alter
+fragt erst die Schichtwahl, unter 18 mit den Eltern. Danach steht immer
 „Fast geschafft“ da, ob wir die Person kennen oder nicht; die Mail geht an
 die angegebene Adresse – mit dem Link zum Bestätigen, oder, wer schon im
 Helferstamm ist, mit dem Link zu Mein Helferplatz. Erst der Klick auf der
@@ -305,8 +306,9 @@ Seit Lastenheft 2.9 (D-01 bis D-07):
   Rechtsgrundlagen, Speicherdauer, Rechte. Der Text ist ein Entwurf und
   gehört vor dem Start fachkundig geprüft (D-09).
 - **Helferstamm** nur mit eigener Einwilligung: ein freiwilliges, nicht
-  vorangekreuztes Häkchen bei der Anmeldung oder unter `/mitmachen`, in Mein
-  Helferplatz unter „Angaben ändern“ genauso leicht wieder weg. Ohne
+  vorangekreuztes Häkchen bei der Anmeldung, unter `/mitmachen` der bestätigte
+  Eintrag selbst; in Mein Helferplatz unter „Angaben ändern“ genauso leicht
+  wieder weg. Ohne
   Einwilligung wird nach der Veranstaltung gelöscht; wer nie dabei war,
   spätestens drei Jahre nach der Einwilligung.
 - **Unter 18** fragt das Formular nach einer erziehungsberechtigten Person.

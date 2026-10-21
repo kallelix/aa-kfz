@@ -3076,8 +3076,6 @@ async def mitmachen(request: Request):
                            if not email else "Diese Mailadresse sieht nicht vollständig aus.")
     if telefon is None:
         fehler["telefon"] = "Diese Nummer können wir nicht lesen."
-    if not daten.get("einverstanden"):
-        fehler["einverstanden"] = "Bitte das Häkchen setzen – sonst dürfen wir dir nicht schreiben."
     if fehler:
         return _mitmachen_seite(request, {k: str(w) for k, w in daten.items()}, fehler,
                                 status_code=400)
