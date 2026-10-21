@@ -9,7 +9,7 @@ Host** mit öffentlicher IP, der HTTPS terminiert.
 
 ```text
 Internet ──HTTPS──▶ nginx (10.0.0.10) ──HTTP──▶ LXC (10.0.0.42:8080)
-                    Zertifikate                 nur von 10.0.0.10 erreichbar
+                    Wildcard-Zertifikat         nur von 10.0.0.10 erreichbar
                     Rate Limit                         │
                                                        └──HTTPS──▶ ixsdownhillcup.com
                                                                    kidscup.bike
@@ -22,7 +22,7 @@ Vier Adressen zeigen auf denselben Dienst:
 | --- | --- |
 | `kennzeichen.example.de` | Antragsformular, öffentlich |
 | `presse.example.de` | Akkreditierung, öffentlich |
-| `helfer.example.de` | Monitor und Unterschriften-Tablet, per Token |
+| `helfer.example.de` | Helferanmeldung, öffentlich: die Seite jeder Veranstaltung, `/mitmachen`, Mein Helferplatz; dazu Monitor und Unterschriften-Tablet, per Token |
 | `admin.example.de` | **alle drei Backoffices**, eine Anmeldung |
 
 Die öffentlichen Adressen stehen auf Plakaten, in Mails und in QR-Codes –
@@ -43,23 +43,29 @@ Folgen: dann steht bei jedem Antrag die IP des nginx als Absender, und das
 Login-Rate-Limit zählt alle Fehlversuche auf einen Topf – ein Tippfehler beim
 Passwort sperrt die ganze Orga für eine Minute aus.
 
-**Drei Dinge, die nur wegen des Helfer-Teils gelten** und die erst im Betrieb
+**Vier Dinge, die nur wegen des Helfer-Teils gelten** und die erst im Betrieb
 auffallen, wenn man sie beim Aufsetzen übersieht:
 
 1. **Ausgehende Verbindungen.** Der Dienst holt den Zeitplan von den Websites
    der Rennserien und die Helferlisten beim Registrierungstool. Der Container
    braucht Egress auf Port 443 und `ca-certificates`. Fehlt eines von beidem,
    bleibt der letzte Stand stehen und das Backoffice zeigt den Fehler.
-2. **Ein Teil ist öffentlich.** Monitor und Tablet laufen ohne Anmeldung,
-   geschützt nur durch einen langen Token im Pfad. Der optionale
+2. **`helfer.example.de` ist ganz öffentlich.** Helfer melden sich dort an,
+   ohne Konto; Mein Helferplatz öffnet ein persönlicher Link aus der Mail,
+   Monitor und Tablet ein langer Token im Pfad. Der optionale
    Basic-Auth-Riegel vor dem Backoffice darf **nicht** auf
-   `helfer.example.de` ausgedehnt werden – der Bildschirm im Zelt kann kein
-   Passwort eingeben.
+   `helfer.example.de` ausgedehnt werden – weder die Helfer noch der
+   Bildschirm im Zelt können ein Passwort eingeben.
 3. **Die Content-Security-Policy braucht `connect-src 'self'`.** Monitor und
    Tablet holen sich ihren Inhalt per `fetch`. Ohne die Direktive fällt das
    auf `default-src 'none'` zurück und wird geblockt: der Monitor bliebe
    stumm auf dem ersten Stand stehen, und das Tablet bekäme nie mit, dass
    etwas ansteht.
+4. **Ohne Mailversand keine Helferanmeldung.** Jede Anmeldung und jeder
+   Eintrag unter `/mitmachen` gilt erst, wenn der Link aus der Mail
+   angeklickt ist. Kommt keine Mail an – kein SMTP eingetragen oder im Spam
+   –, kommt auch niemand an. Was dafür in `helfer.env` stehen muss, steht
+   unten unter *Konfiguration*.
 
 ---
 
@@ -67,7 +73,7 @@ auffallen, wenn man sie beim Aufsetzen übersieht:
 
 ```bash
 apt update
-apt install -y python3 python3-venv postgresql git
+apt install -y python3 python3-venv postgresql git ca-certificates
 
 adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin abfahrt
 
@@ -94,6 +100,9 @@ python3 -m venv .venv
 
 Alles bleibt root:root mit den Standardrechten – `abfahrt` darf lesen und
 ausführen, das genügt. **Kein `chown` auf `/opt/abfahrt`.**
+
+Python ab 3.11 genügt – Debian 12 und 13 und Ubuntu 24.04 bringen eine
+passende mit.
 
 `.venv/` und `data/` stehen in `.gitignore`, ein späteres `git pull` fasst sie
 also nicht an. Die Daten liegen ohnehin in PostgreSQL.
@@ -145,6 +154,28 @@ In den **drei anderen** steht, was sich unterscheidet – vor allem
 `BASIS_URL`, die Mailkonfiguration (seit Lastenheft 2.4 in allen drei) und
 beim Helfer der Abruf der Helferliste.
 
+**In `helfer.env` muss stehen** – sonst läuft die Helferanmeldung nicht oder
+nur halb:
+
+| Wert | wofür |
+| --- | --- |
+| `BASIS_URL=https://helfer.example.de` | die Links in allen Mails. Die Mails, die der Dienst von selbst verschickt – Erinnerungen, Anmeldestart, Helferparty –, haben ohne sie keine Adresse. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_TLS`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | jede Mail an Helfer. Ohne sie geht keine Bestätigung hinaus: niemand kann sich anmelden oder unter `/mitmachen` eintragen, und unbestätigte Einträge verfallen nie. |
+| `VERANTWORTLICH` | eine Zeile für `/datenschutz` – wer verantwortlich ist im Sinne der DSGVO, mit Anschrift. |
+| `KONTAKT_NAME`, `KONTAKT_MAIL`, `KONTAKT_TELEFON` | der Fuß jeder öffentlichen Seite und jeder Mail. |
+
+In `kennzeichen.env` gehört ebenfalls ein Postfach (`SMTP_…`, `MAIL_FROM`):
+darüber gehen die Einladungen zu den Backoffice-Konten.
+
+Die echten Werte stehen **nur hier**, nie im Repository – das ist
+öffentlich.
+
+**Damit die Mails ankommen:** Für die Domain in `MAIL_FROM` braucht es einen
+SPF-Eintrag, der den Mailserver erlaubt, und eine DKIM-Signatur; sonst landen
+gerade die Bestätigungen im Spam. Probe: eine Mail an ein Gmail-Postfach
+schicken und unter „Original anzeigen“ nachsehen – dort muss `spf=pass` und
+`dkim=pass` stehen.
+
 > `APP_SECRET_KEY` gehört **nur** in `dienst.env`. Die Umgebung schlägt die
 > Datei, also gälte er ohnehin für alle drei – aber daran hängen die
 > CSRF-Token, und stünden in den Bereichen verschiedene Schlüssel, passte das
@@ -176,8 +207,9 @@ journalctl -u abfahrt -f
 
 Im Protokoll muss **dreimal `starte Bereich …`** stehen – Kennzeichen,
 Presse, Helfer. Fehlt einer, ist seine `.env` nicht lesbar. Die Tabellen legt
-der Dienst beim ersten Start selbst an; dann steht je Bereich
-`Migrationen eingespielt: 0001_anfang.sql` im Protokoll.
+der Dienst beim ersten Start selbst an; dann steht je Bereich eine Zeile
+`Migrationen eingespielt: 0001_anfang.sql, …` mit allen Dateien seines Ordners
+`migrationen/` im Protokoll.
 
 ### Das erste Admin-Konto
 
@@ -264,49 +296,28 @@ install -m 644 deploy/dienst-proxy.conf /etc/nginx/snippets/abfahrt-dienst-proxy
 install -m 644 deploy/nginx-dienst.conf /etc/nginx/sites-available/abfahrt
 ln -s ../sites-available/abfahrt /etc/nginx/sites-enabled/
 
-# Die vier Adressen und die IP des Containers in der Datei anpassen, dann:
+# Die vier Adressen, die IP des Containers und die Pfade des
+# Wildcard-Zertifikats in der Datei anpassen, dann:
 nginx -t
+systemctl reload nginx
 ```
 
 Eine Datei für alle vier Adressen. Der Proxy-Schnipsel reicht `Host` durch –
 **daran** entscheidet der Dienst, welcher Bereich antwortet. Ohne die Zeile
 bekäme er den Namen des Upstreams zu sehen und fände gar keinen.
 
-### DNS und Zertifikate
+### DNS und Zertifikat
 
 1. A-Record (und ggf. AAAA) für alle vier Namen auf die öffentliche IP des
    nginx: `kennzeichen`, `presse`, `helfer`, `admin`.
-2. Zertifikate holen – zwei Server-Blöcke, also zwei Zertifikate:
-
-```bash
-certbot --nginx -d kennzeichen.example.de -d presse.example.de -d helfer.example.de
-certbot --nginx -d admin.example.de
-```
-
-Falls schon ein Wildcard-Zertifikat für `*.example.de` vorliegt, stattdessen
-dessen Pfade in der Config eintragen und certbot überspringen – dann genügt
-eines für alle vier.
-
-```bash
-systemctl reload nginx
-```
+2. **TLS endet am nginx.** Das vorhandene Wildcard-Zertifikat für
+   `*.example.de` deckt alle vier Namen; seine Pfade stehen in
+   `nginx-dienst.conf` an beiden `ssl_certificate`-Stellen. Kein certbot,
+   keine ACME-Challenge – erneuert wird das Wildcard-Zertifikat dort, wo es
+   ohnehin erneuert wird. Zum Container geht es unverschlüsselt im internen
+   Netz.
 
 ---
-
-
-Seit der öffentlichen Helferanmeldung (Lastenheft 2.2) stehen in
-[nginx-dienst.conf](nginx-dienst.conf) zwei Zeilen mehr: die Zone
-`abfahrt_helfer` oben und im Block der öffentlichen Hostnamen eine
-`location` für `/<veranstaltung>/angaben` und `/<veranstaltung>/interesse`.
-Wer die Config schon eingespielt hat, trägt beides von Hand nach.
-
-Mit Lastenheft 2.4 ist dieselbe `location` breiter geworden: sie zählt auch
-„Link anfordern“ und den Code (`/<veranstaltung>/link`, `…/danke`) und alles
-unter `/platz/` und `/bestaetigen/`. Die Zeile ist von Hand zu ersetzen.
-
-Mit Lastenheft C-10 (Helfer werden ohne Veranstaltung) zählt sie auch
-`/mitmachen` und `/mitmachen/<link>` – das Formular verschickt Mails. Auch
-diese Zeile ist von Hand zu ersetzen.
 
 ## 3. Sicherung
 
@@ -314,6 +325,10 @@ Ein Lauf, eine Datei: `pg_dump` sichert die ganze Datenbank, also alle drei
 Bereiche.
 
 ```bash
+# Die Logdatei vorher anlegen: unter /var/log darf abfahrt nichts anlegen.
+# Scheitert die Umleitung, startet cron das Skript gar nicht erst - und
+# niemand merkt, dass es keine Sicherungen gibt.
+install -o abfahrt -g abfahrt -m 640 /dev/null /var/log/abfahrt-backup.log
 crontab -u abfahrt -e
 ```
 
@@ -363,6 +378,12 @@ curl -sS -o /dev/null -w '%{http_code}
 # Das Backoffice liegt NICHT auf den oeffentlichen Adressen (muss 404 sein)
 curl -sS -o /dev/null -w '%{http_code}
 ' https://kennzeichen.example.de/kennzeichen
+curl -sS -o /dev/null -w '%{http_code}
+' https://helfer.example.de/helfer
+
+# Mitmachen ist erreichbar (200)
+curl -sS -o /dev/null -w '%{http_code}
+' https://helfer.example.de/mitmachen
 ```
 
 Im Browser:
@@ -387,9 +408,19 @@ Im Browser:
 - [ ] Eingangsmail kommt an – zuerst an eine eigene Adresse, dann an Gmail,
       GMX und Outlook
 - [ ] CSV-Export öffnet in Excel ohne Nachfrage und mit korrekten Umlauten
+- [ ] Unter `https://helfer.example.de/mitmachen` mit einer eigenen Adresse
+      eingetragen: die Mail kommt an, ihr Link beginnt mit
+      `https://helfer.example.de/`, nach dem Klick steht man in Mein
+      Helferplatz, und unter **Helfer › Leute › Einladen** zählt der
+      Helferstamm eins mehr
+- [ ] Unter **Einladen** zeigen Link und QR-Code auf
+      `https://helfer.example.de/mitmachen`
+- [ ] `https://helfer.example.de/datenschutz` nennt den Verantwortlichen,
+      der Fuß jeder öffentlichen Seite den Ansprechpartner
+- [ ] Bei Gmail unter „Original anzeigen“: `spf=pass` und `dkim=pass`
 - [ ] Monitor-Link erzeugt und auf dem Bildschirmrechner geprüft
-- [ ] `runuser -u abfahrt -- psql -d abfahrt -c '\dn'` zeigt die drei
-      Schemas `kennzeichen`, `presse`, `helfer`
+- [ ] `runuser -u abfahrt -- psql -d abfahrt -c '\dn'` zeigt die vier
+      Schemas `kern`, `kennzeichen`, `presse`, `helfer`
 - [ ] Eine Sicherung von Hand angestoßen, eine `.dump`-Datei im Zielordner
 
 ---
@@ -420,6 +451,13 @@ neuen Stand gebracht – das ist normal und gewollt.
 
 Danach einmal im Browser: Formular lädt, Backoffice lädt, ein Antrag lässt sich
 öffnen.
+
+**Die nginx-Config zieht `git pull` nicht nach** – sie liegt auf dem
+nginx-Host. Ändert sich `deploy/nginx-dienst.conf`, ist sie dort von Hand
+nachzutragen. Zuletzt betraf das die `location` der Helferanmeldung, die das
+Rate Limit trägt: mit 2.2 kam sie dazu (samt Zone `abfahrt_helfer`), mit 2.4
+zählt sie auch `/<veranstaltung>/link`, `…/danke`, `/platz/` und
+`/bestaetigen/`, mit C-10 auch `/mitmachen`.
 
 ### Schema-Änderungen
 
@@ -534,10 +572,27 @@ oder vorher sichern. Die Konfiguration ist davon nicht betroffen – die liegt i
 
 ## 7. Was nur für einen Bereich gilt
 
-### Helfer: Daten hereinholen
+### Helfer: der erste Stand
 
-Der Helfer-Bereich startet nicht leer und wartet auf Eingaben – er braucht
-erst seinen Datenbestand:
+Der Helfer-Bereich startet leer. Der Normalfall ist die eigene Anmeldung:
+
+1. Unter **Verwaltung › Alle Veranstaltungen** die Veranstaltung anlegen
+   (Abschnitt 1), unter **Verwaltung › Goodies & Verpflegung** einstellen,
+   was sie bietet – samt Check-in und Helferparty.
+2. Unter **Helfer › Planen › Bereiche & Schichten** die Bereiche und ihre
+   Schichten anlegen – oder als Vorlage aus einer früheren Veranstaltung
+   übernehmen.
+3. Den Status der Veranstaltung auf *angekündigt* (Interesse lässt sich
+   vormerken) und dann auf *Anmeldung offen* setzen.
+4. Unter **Helfer › Leute › Einladen** den Helferstamm einladen. Dort stehen
+   auch Link und QR-Code zu `/mitmachen` für Flyer und Plakat – darüber
+   tragen sich Helfer ein, auch wenn gerade keine Veranstaltung geplant ist.
+5. Unter **Verwaltung › Zeitplan-Abruf** einmal *Jetzt abrufen* drücken,
+   unter **Helfer › Vor Ort › Monitor** den Link erzeugen.
+
+### Helfer: Daten aus dem bisherigen Registrierungstool
+
+Nur, solange noch dort angemeldet wird – sonst entfällt der Abschnitt.
 
 1. **Die beiden Listen** aus dem bisherigen Registrierungstool holen –
    *Offene Posten* und *Vergebene Posten*. Zwei Wege, siehe unten: abrufen
@@ -553,6 +608,10 @@ erst seinen Datenbestand:
    Ab dann läuft der Abruf täglich von selbst.
 4. Unter **Helfer › Vor Ort › Monitor** den Link erzeugen und auf den
    Bildschirmrechner übertragen.
+
+Wer sich über die eigene Anmeldung einträgt und schon aus dem Import bekannt
+ist – gleicher Name, gleiche Adresse –, wird erkannt und nicht doppelt
+angelegt.
 
 Der Import lässt sich beliebig wiederholen: er rechnet das Soll neu aus und
 ersetzt nur seine eigenen Einteilungen. Ein von Hand gesenktes Minimum bleibt
@@ -679,7 +738,8 @@ Zusätzlich zu Abschnitt 4:
       Tagen und dem, was sie nutzt, und im Kopf ist sie gewählt
 - [ ] Uhr des Containers geht richtig (`timedatectl`) – sie steht auf dem
       Monitor
-- [ ] Import beider Listen gelaufen (Abruf oder Hochladen), Bericht durchgesehen
+- [ ] Bereiche und Schichten stehen – angelegt, als Vorlage übernommen oder
+      importiert (dann: Bericht durchgesehen)
 - [ ] Zeitplan-Abruf einmal von Hand ausgelöst, beide Serien melden Erfolg
 - [ ] Der Abruf hat die **allgemeine** DHC-Tabelle erwischt, nicht die von
       Willingen – im Bericht steht, unter welcher Überschrift er gelesen hat
@@ -748,7 +808,8 @@ Veranstaltungen gehört, die vorbei sind (letzter Tag vor heute) – eine andere
 kann gerade laufen. Personen bleiben, wenn sie in einer laufenden oder
 kommenden Veranstaltung dabei sind oder in den Helferstamm eingewilligt
 haben, samt denen, die sie mitgebracht haben – Letztere höchstens drei Jahre
-nach der letzten Teilnahme (D-04). Ihre Teilnahmen bleiben dafür stehen;
+nach der letzten Teilnahme (D-04); wer über `/mitmachen` kam und nie dabei
+war, drei Jahre nach der Einwilligung. Ihre Teilnahmen bleiben dafür stehen;
 Ausleihen, Schlüssel, Unterschriften, Absagen, Wartelisten, Springer-Zeiten,
 vorgemerktes Interesse und das Protokoll der vergangenen Veranstaltung gehen.
 Wer den Lauf einmal im Jahr nach der letzten Veranstaltung macht, löscht
